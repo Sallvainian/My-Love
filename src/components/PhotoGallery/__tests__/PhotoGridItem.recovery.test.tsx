@@ -46,27 +46,21 @@ vi.mock('../../../stores/useAppStore', async () => {
   };
 });
 
-import { createPhotoInsert } from '../../../../tests/support/factories/photos';
+import { createPhotoWithUrls } from '../../../../tests/support/factories/photos';
 import { ERROR_RETRY_DELAYS_MS } from '../../../hooks/usePhotoImage';
 import { setPhotosOverMobileData } from '../../../services/photoDownloadPreference';
 import { requestPhotoImageFill } from '../../../services/photoImageCache';
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoGridItem } from '../PhotoGridItem';
 
-// The columns the insert type leaves optional, restated after the factory's
-// body so the row is whole.
-const PHOTO_ROW = {
+const PHOTO: PhotoWithUrls = createPhotoWithUrls({
   id: PHOTO_ID,
+  user_id: 'me',
+  storage_path: PATH,
   caption: 'cap-0',
   mime_type: 'image/jpeg',
   created_at: '2026-09-01T10:00:00.000Z',
-};
-const PHOTO: PhotoWithUrls = {
-  ...createPhotoInsert({ ...PHOTO_ROW, user_id: 'me', storage_path: PATH, file_size: 68 }),
-  ...PHOTO_ROW,
-  signedUrl: null,
-  isOwn: true,
-};
+});
 
 /** Every tile is in view at once. */
 class VisibleObserver {

@@ -11,7 +11,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createPhotoInsert } from '../../../../tests/support/factories/photos';
+import { createPhotoWithUrls } from '../../../../tests/support/factories/photos';
 import type { PhotoWithUrls } from '../../../services/photoService';
 
 const names = vi.hoisted(() => ({
@@ -35,25 +35,17 @@ import { listPhotos, resetFakePhotoStore } from './fakePhotoStore';
 
 function photo(index: number, isOwn = true): PhotoWithUrls {
   const owner = isOwn ? 'me' : 'partner';
-  // The columns the insert type leaves optional, restated after the factory's
-  // body so the row is whole.
-  const row = {
-    id: `photo-${index}`,
-    caption: null,
-    mime_type: 'image/jpeg',
-    created_at: '2026-09-01T10:00:00.000Z',
-  };
-  return {
-    ...createPhotoInsert({
-      ...row,
+  return createPhotoWithUrls(
+    {
+      id: `photo-${index}`,
       user_id: owner,
       storage_path: `${owner}/${index}.jpg`,
-      file_size: 68,
-    }),
-    ...row,
-    signedUrl: null,
-    isOwn,
-  };
+      caption: null,
+      mime_type: 'image/jpeg',
+      created_at: '2026-09-01T10:00:00.000Z',
+    },
+    isOwn
+  );
 }
 
 function page(count: number, ownEvery = true): PhotoWithUrls[] {

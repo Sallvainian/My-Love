@@ -13,6 +13,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settleNameLookups } from './loveNotesTestKit';
 
 const api = vi.hoisted(() => ({
   getOwnDisplayName: vi.fn(),
@@ -78,33 +79,6 @@ vi.mock('motion/react', () => ({
 
 import { LoveNotes } from '../LoveNotes';
 
-/**
- * Wait until the mount effect's name lookups have answered and their state is
- * applied. The fallbacks equal LoveNotes' initial state, so a fallback asserted
- * any earlier passes before the behaviour has run. The own-name branch
- * (`getOwnDisplayName` with `getUser`) settles first; `getPartnerDisplayName`
- * is asked only when both of those fulfilled, so a rejected own-name read
- * settles the effect without it rather than timing out on the partner lookup.
- */
-async function settleNameLookups(): Promise<void> {
-  const settle = (lookups: Array<{ mock: { results: Array<{ value: unknown }> } }>) =>
-    act(async () =>
-      Promise.allSettled(
-        lookups.flatMap((lookup) => lookup.mock.results.map((result) => result.value))
-      )
-    );
-
-  await waitFor(() => {
-    expect(api.getOwnDisplayName).toHaveBeenCalled();
-    expect(api.getUser).toHaveBeenCalled();
-  });
-  const ownName = await settle([api.getOwnDisplayName, api.getUser]);
-  if (ownName.some((result) => result.status === 'rejected')) return;
-
-  await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalled());
-  await settle([api.getPartnerDisplayName]);
-}
-
 /** Mount the chat and wait for the name effect to settle on `expected`. */
 async function expectOwnName(expected: string): Promise<void> {
   render(<LoveNotes />);
@@ -154,7 +128,7 @@ describe('own display name in the chat', () => {
     api.getOwnDisplayName.mockResolvedValue(null);
     api.getUser.mockResolvedValue({ id: 'user-a', email: null });
     render(<LoveNotes />);
-    await settleNameLookups();
+    await settleNameLookups(api);
     expect(screen.getByTestId('own-name').textContent).toBe('You');
   });
 
@@ -202,7 +176,7 @@ describe('own display name in the chat', () => {
       api.getPartnerDisplayName.mockResolvedValue(null);
 
       render(<LoveNotes />);
-      await settleNameLookups();
+      await settleNameLookups(api);
 
       expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
       // The user-visible shape of the bug, asserted directly: whatever the
@@ -222,7 +196,7 @@ describe('own display name in the chat', () => {
 
       render(<LoveNotes />);
 
-      await settleNameLookups();
+      await settleNameLookups(api);
       expect(screen.getByTestId('own-name').textContent).toBe('person');
       expect(screen.getByTestId('partner-name').textContent).toBe('Partner');
     });

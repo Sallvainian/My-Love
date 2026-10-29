@@ -33,6 +33,7 @@ import { createInteractionInsert } from '../support/factories/interaction-record
 import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 import { resolveOwnPair } from '../support/helpers/events';
 import { test, expect } from '../support/merged-fixtures';
+import { INSUFFICIENT_PRIVILEGE } from '../support/sqlstate';
 
 /** PostgREST maps SQLSTATE 42501 — RLS denial and privilege denial alike — to 403. */
 const DENIED_HTTP_STATUS = 403;
@@ -42,7 +43,6 @@ const DENIED_HTTP_STATUS = 403;
  * why both are asserted on the code as well as the status.
  */
 const ANON_DENIED_HTTP_STATUS = 401;
-const DENIED_CODE = '42501';
 
 type ErrorEnvelope = { code?: string; message?: string };
 
@@ -184,7 +184,7 @@ test.describe('Interaction authorization boundary', () => {
         createInteractionInsert({ id: refusal.id, type: 'poke', ...refusal.body })
       );
       expect(status, refusal.label).toBe(DENIED_HTTP_STATUS);
-      expect(body.code, refusal.label).toBe(DENIED_CODE);
+      expect(body.code, refusal.label).toBe(INSUFFICIENT_PRIVILEGE);
     }
 
     await log.step('Only the two legitimate rows reached the table');
@@ -247,7 +247,7 @@ test.describe('Interaction authorization boundary', () => {
         forgery.body
       );
       expect(status, forgery.label).toBe(DENIED_HTTP_STATUS);
-      expect(body.code, forgery.label).toBe(DENIED_CODE);
+      expect(body.code, forgery.label).toBe(INSUFFICIENT_PRIVILEGE);
       expect(await readRow(supabaseAdmin, viewedRowId), forgery.label).toEqual(before);
     }
 
@@ -259,7 +259,7 @@ test.describe('Interaction authorization boundary', () => {
       { viewed: true, type: 'kiss' }
     );
     expect(combinedStatus).toBe(DENIED_HTTP_STATUS);
-    expect(combinedBody.code).toBe(DENIED_CODE);
+    expect(combinedBody.code).toBe(INSUFFICIENT_PRIVILEGE);
     // The discriminator: `viewed` is the one column the recipient may write,
     // so a patch applied column-by-column would have flipped it.
     const afterCombined = await readRow(supabaseAdmin, untouchedRowId);
@@ -341,7 +341,7 @@ test.describe('Interaction authorization boundary', () => {
         retryConfig: { maxRetries: 0 },
       });
       expect(status, `anon ${method}`).toBe(ANON_DENIED_HTTP_STATUS);
-      expect(denial.code, `anon ${method}`).toBe(DENIED_CODE);
+      expect(denial.code, `anon ${method}`).toBe(INSUFFICIENT_PRIVILEGE);
     }
     expect((await readRow(supabaseAdmin, rowId)).viewed).toBe(false);
   });

@@ -13,7 +13,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createPhotoInsert } from '../../../../tests/support/factories/photos';
+import { createPhotoWithUrls } from '../../../../tests/support/factories/photos';
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoViewer } from '../PhotoViewer';
 
@@ -45,25 +45,14 @@ afterEach(() => {
   deletePhotoMock.mockReset();
 });
 
-// The columns the insert type leaves optional, restated after the factory's
-// body so the row is whole.
-const PHOTO_ROW = {
+const photo: PhotoWithUrls = createPhotoWithUrls({
   id: 'photo-1',
+  user_id: 'me',
+  storage_path: 'me/photo-1.jpg',
   caption: 'a photo',
   mime_type: 'image/jpeg',
   created_at: '2026-09-01T10:00:00.000Z',
-};
-const photo: PhotoWithUrls = {
-  ...createPhotoInsert({
-    ...PHOTO_ROW,
-    user_id: 'me',
-    storage_path: 'me/photo-1.jpg',
-    file_size: 68,
-  }),
-  ...PHOTO_ROW,
-  signedUrl: null,
-  isOwn: true,
-};
+});
 
 /** The first photo plus a second one, for navigation and delete cases. */
 const TWO_PHOTOS: PhotoWithUrls[] = [

@@ -15,7 +15,13 @@ import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
 import { getDailyMessage } from '../../../src/utils/messageRotation';
-import { deleteDatabase, legacyCustomMessage, legacyMessage, swAuthRow } from './dbSchemaFixtures';
+import {
+  ALL_STORES,
+  deleteDatabase,
+  legacyCustomMessage,
+  legacyMessage,
+  swAuthRow,
+} from './dbSchemaFixtures';
 
 describe('dbSchema', () => {
   const openDbs: Array<{ close: () => void }> = [];
@@ -165,14 +171,7 @@ describe('dbSchema', () => {
       const messages = db.transaction('messages', 'readonly').objectStore('messages');
       expect((messages.indexNames as DOMStringList).contains('by-user')).toBe(false);
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
-      expect(Array.from(unwrap(db).objectStoreNames)).toEqual([
-        'image-cache',
-        'local-copies',
-        'messages',
-        'moods',
-        'note-queue',
-        'sw-auth',
-      ]);
+      expect(Array.from(unwrap(db).objectStoreNames)).toEqual([...ALL_STORES].sort());
     });
 
     it('deletes a stale account’s rows and favorites with the stores instead of copying them', async () => {

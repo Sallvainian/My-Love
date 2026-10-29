@@ -21,6 +21,7 @@ import { DB_NAME, DB_VERSION } from '../../../src/services/dbSchema';
 import type { MyLoveDBSchema, StoredMessageData } from '../../../src/services/dbSchema';
 import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
+import { ALL_STORES } from './dbSchemaFixtures';
 
 // The server half of custom messages and favorites; these tests drive
 // toggleFavorite, which writes the server before it changes the copy.
@@ -35,15 +36,6 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
 
 type FakeCustom = typeof import('../helpers/fakeAccountDataApis').fakeCustomMessagesApi;
 type FakeFavorites = typeof import('../helpers/fakeAccountDataApis').fakeMessageFavoritesApi;
-
-const ALL_STORES = [
-  'messages',
-  'moods',
-  'sw-auth',
-  'local-copies',
-  'image-cache',
-  'note-queue',
-] as const;
 
 /** One fixed creation time, so no row carries the live clock. */
 const CREATED_AT = '2026-01-01T00:00:00.000Z';

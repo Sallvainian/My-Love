@@ -172,12 +172,14 @@ export function stalePersistedEvent(
 
 /**
  * A stale mood dated the anchor's local day, with a note no real row could
- * produce. A test that asserts on "today" passes the instant it installs as
- * the page clock, so the mood's day and the app's day cannot drift apart.
+ * produce. The anchor is required, never the wall clock: pass `clockAnchor()`
+ * (`./events.ts`), and a test that asserts on "today" passes the instant it
+ * installs as the page clock, so the mood's day and the app's day cannot
+ * drift apart.
  */
 export function stalePersistedMood(
-  overrides: Partial<PersistedMoodSeed> = {},
-  anchor: Date = new Date()
+  anchor: Date,
+  overrides: Partial<PersistedMoodSeed> = {}
 ): PersistedMoodSeed {
   const nonce = faker.string.alphanumeric(8).toUpperCase();
 

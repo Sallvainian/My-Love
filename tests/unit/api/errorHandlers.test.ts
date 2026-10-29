@@ -34,6 +34,11 @@
  */
 import type { PostgrestError } from '@supabase/supabase-js';
 import { describe, it, expect } from 'vitest';
+import {
+  CHECK_VIOLATION_CODE,
+  INSUFFICIENT_PRIVILEGE,
+  NOT_NULL_VIOLATION,
+} from '../../support/sqlstate';
 
 import { handleSupabaseError } from '@/api/errorHandlers';
 
@@ -86,7 +91,7 @@ const MISSING_OR_BLANK_MESSAGES: ReadonlyArray<[string, Pick<WirePostgrestError,
 
 const checkViolation = (): PostgrestError =>
   asPostgrestError({
-    code: '23514',
+    code: CHECK_VIOLATION_CODE,
     message: RAW_CHECK_MESSAGE,
     details: 'Failing row contains (…).',
     hint: null,
@@ -120,7 +125,7 @@ describe('handleSupabaseError', () => {
     it('passes code, details and hint through unchanged and is not a network error', () => {
       const err = handleSupabaseError(checkViolation());
 
-      expect(err.code).toBe('23514');
+      expect(err.code).toBe(CHECK_VIOLATION_CODE);
       expect(err.details).toBe('Failing row contains (…).');
       expect(err.hint).toBeNull();
       expect(err.isNetworkError).toBe(false);
@@ -132,9 +137,9 @@ describe('handleSupabaseError', () => {
     const MAPPED: ReadonlyArray<[string, string]> = [
       ['23505', 'This record already exists'],
       ['23503', 'Referenced record not found'],
-      ['23502', 'Required field is missing'],
-      ['23514', CHECK_VIOLATION_MESSAGE],
-      ['42501', 'Permission denied - check Row Level Security policies'],
+      [NOT_NULL_VIOLATION, 'Required field is missing'],
+      [CHECK_VIOLATION_CODE, CHECK_VIOLATION_MESSAGE],
+      [INSUFFICIENT_PRIVILEGE, 'Permission denied - check Row Level Security policies'],
       ['42P01', 'Table not found - database schema may be out of sync'],
       ['PGRST116', 'No rows found'],
       ['PGRST301', 'Invalid request parameters'],

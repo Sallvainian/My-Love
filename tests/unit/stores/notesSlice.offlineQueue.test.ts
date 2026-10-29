@@ -19,7 +19,11 @@ import {
   NoteRefusedOfflineError,
   type NotesSlice,
 } from '../../../src/stores/slices/notesSlice';
-import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
+import {
+  CHECK_VIOLATION_CODE,
+  CONNECTION_FAILURE,
+  INSUFFICIENT_PRIVILEGE,
+} from '../../support/sqlstate';
 import {
   A,
   clearStores,
@@ -87,12 +91,6 @@ vi.mock('../../../src/services/imageCompressionService', () => ({
 }));
 
 const FRIENDLY_CHECK = 'Some values are not allowed - check length and format limits';
-/**
- * Postgres SQLSTATE insufficient_privilege: an RLS refusal, a rejection rather
- * than a transient failure (src/api/errorHandlers.ts `handleSupabaseError`
- * errorMessages['42501'], function-local).
- */
-const INSUFFICIENT_PRIVILEGE = '42501';
 
 /** Wait for every copy write started so far, so a read-back sees them all. */
 const copyWritesSettled = () => Promise.allSettled(copyWrites);
@@ -421,7 +419,7 @@ describe('notesSlice offline send queue', () => {
   });
 
   it.each([
-    ['08006', 'connection failure'],
+    [CONNECTION_FAILURE, 'connection failure'],
     ['40001', 'serialization failure'],
     ['53300', 'too many connections'],
     ['57014', 'statement timeout'],

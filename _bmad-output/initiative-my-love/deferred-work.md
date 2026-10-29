@@ -2694,7 +2694,9 @@ location: see reason
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: (1) Three photo-row builder patterns: six src files spread createPhotoInsert with an unexplained file_size: 68, photosSlice.localCopy.test.ts casts as SupabasePhoto, loaderIdentityGuards.photos uses a third. (2) Four copies of the hoisted vi.mock('react') useState observer (EventsSettings.pagination, EventsSettings.lifetime, PokeKissInterface, LoveNoteMessage). (3) SQLSTATE constants declared per file (CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION, INSUFFICIENT_PRIVILEGE, CONNECTION_FAILURE), with '23514' and '08006' still literal in places. (4) loadFailure() adopted in three EventsSettings files; five siblings build { status: 'failure', error } by hand. (5) settleNameLookups pasted into OwnDisplayName.test.tsx and LoveNotes.realtimeStatus.test.tsx. (6) dbSchema.v15MessageData.test.ts hard-codes the store list storageSchema.test.ts holds as ALL_STORES. (7) Ten hand-rolled IndexedDB opens across nine e2e specs read stores savedLocalCopy cannot; logout.spec.ts:28, love-notes-offline-send.spec.ts:52 and photos-offline.spec.ts:61 skip the indexedDB.databases() guard. (8) stalePersistedMood() still defaults anchor to new Date() (tests/support/helpers/persisted-blob.ts:180), relied on by persisted-events-strip.spec.ts:214. Fix as one story: shared photo-row factories, a react-state-spy module, a SQLSTATE constants module, loadFailure everywhere, a love-notes test kit, one ALL_STORES, a guarded generic IndexedDB store reader, and a required anchor.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-shared-test-fixture-consolidation
+resolution-undo: 22822117b68bd746577b22173040aca409577ba4671f1daaa8fc98c208919c3b 2026-10-29 7374617475733a206f70656e
 
 ### DW-314: No audit checks that a full e2e run leaves behind no rows it created.
 origin: epic-test-review-remediation retrospective 2026-10-29 (S4, A8)

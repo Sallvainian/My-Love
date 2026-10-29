@@ -9,6 +9,7 @@
  * `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
 import { resolveOwnPair } from '../../support/helpers/events';
+import { readStore } from '../../support/helpers/indexed-db';
 import { ownMoodHistoryRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { test, expect } from '../../support/merged-fixtures';
@@ -88,27 +89,10 @@ async function chromeText(page: Page): Promise<string> {
 
 /**
  * Rows in this device's IndexedDB `moods` store, or null until the app has
- * created the database — opening it first would create an empty one ahead of
- * the app's own upgrade.
+ * created the database (`readStore` never creates it ahead of the app).
  */
 async function savedMoodCount(page: Page): Promise<number | null> {
-  return page.evaluate(async () => {
-    if (!(await indexedDB.databases()).some(({ name }) => name === 'my-love-db')) return null;
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('my-love-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<number>((resolve, reject) => {
-        const request = db.transaction('moods').objectStore('moods').count();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  });
+  return readStore<number>(page, 'moods', { op: 'count' });
 }
 
 /**

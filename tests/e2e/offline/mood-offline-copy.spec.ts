@@ -24,6 +24,7 @@ import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { clockAnchorAvoidingFirstOfMonth, resolveOwnPair } from '../../support/helpers/events';
+import { readStore, signedInUserId } from '../../support/helpers/indexed-db';
 import { navigateTo } from '../../support/helpers/navigation';
 import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -54,30 +55,15 @@ function dayBeforeAtNoon(anchor: Date): Date {
 
 /** Every row in the page's `moods` store for the signed-in user. */
 async function ownMoodRows(page: Page): Promise<{ date: string; synced: boolean; supabaseId?: string }[]> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return [];
-    return new Promise((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve([]);
-      open.onsuccess = () => {
-        const db = open.result;
-        const all = db.transaction('moods').objectStore('moods').getAll();
-        all.onsuccess = () => {
-          db.close();
-          resolve(
-            (all.result as { userId: string; date: string; synced: boolean; supabaseId?: string }[])
-              .filter((row) => row.userId === userId)
-              .map(({ date, synced, supabaseId }) => ({ date, synced, supabaseId }))
-          );
-        };
-        all.onerror = () => {
-          db.close();
-          resolve([]);
-        };
-      };
-    });
-  });
+  const userId = await signedInUserId(page);
+  if (!userId) return [];
+  // A failed read counts as no rows, as it always did.
+  const rows = await readStore<
+    { userId: string; date: string; synced: boolean; supabaseId?: string }[]
+  >(page, 'moods', { op: 'getAll' }).catch(() => null);
+  return (rows ?? [])
+    .filter((row) => row.userId === userId)
+    .map(({ date, synced, supabaseId }) => ({ date, synced, supabaseId }));
 }
 
 /** Empty the page's `moods` store, as on a device that never held these rows. */

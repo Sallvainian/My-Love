@@ -3,32 +3,26 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import { StrictMode } from 'react';
-import type { Dispatch, HTMLAttributes, ReactNode, Ref, SetStateAction } from 'react';
+import type { HTMLAttributes, ReactNode, Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { stateSetterCalls } from '../../../../tests/support/react-state-spy';
 import type { AppState } from '../../../stores/types';
 import { EventsSettings } from '../EventsSettings';
-import { OWN_USER_ID, PARTNER_USER_ID, loadOk, makeEvent, ok } from './eventsSettingsKit';
+import {
+  OWN_USER_ID,
+  PARTNER_USER_ID,
+  loadFailure,
+  loadOk,
+  makeEvent,
+  ok,
+} from './eventsSettingsKit';
 import type { CoupleEvent, EventLoadResult } from './eventsSettingsKit';
 
 type Pagination = NonNullable<AppState['eventsPagination']>;
 
-const stateSetterCalls = vi.hoisted(() => vi.fn<(next: unknown) => void>());
-
-vi.mock('react', async () => {
-  const actual = await vi.importActual<typeof import('react')>('react');
-  return {
-    ...actual,
-    // React silently ignores unmounted state updates; observe dispatch itself.
-    useState<T,>(initial: T | (() => T)) {
-      const [value, setValue] = actual.useState(initial);
-      const observedSetter = actual.useCallback<Dispatch<SetStateAction<T>>>((next) => {
-        stateSetterCalls(next);
-        setValue(next);
-      }, [setValue]);
-      return [value, observedSetter];
-    },
-  };
-});
+vi.mock('react', async () =>
+  (await import('../../../../tests/support/react-state-spy')).reactWithStateSpy()
+);
 
 type DivProps = HTMLAttributes<HTMLDivElement> & {
   children?: ReactNode;
@@ -69,7 +63,7 @@ vi.mock('../../../stores/useAppStore', async () => {
   return { useAppStore: Object.assign(useAppStore, { getState: () => store.state }) };
 });
 
-const loadFailed: EventLoadResult = { status: 'failure', error: 'Connection failed' };
+const loadFailed = loadFailure('Connection failed');
 const loadStale: EventLoadResult = { status: 'stale' };
 
 /**

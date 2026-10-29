@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PostgrestError } from '@supabase/supabase-js';
+import { CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION } from '../../support/sqlstate';
 
 const backend = vi.hoisted(() => ({ error: null as unknown, requests: [] as string[] }));
 vi.mock('@/api/supabaseClient', () => ({
@@ -66,7 +67,7 @@ async function clickAction(user: ReturnType<typeof userEvent.setup>, button: str
 async function expectConnectionError(text: string) {
   await vi.waitFor(() => expect(screen.getByTestId('partner-connection-error').textContent).toBe(text));
 }
-const raw = { code: '23514', message: 'raw constraint with incidental duplicate unique words', details: 'diagnostics', hint: 'hint' };
+const raw = { code: CHECK_VIOLATION_CODE, message: 'raw constraint with incidental duplicate unique words', details: 'diagnostics', hint: 'hint' };
 
 describe('partner request CHECK presentation', () => {
   beforeEach(() => { cleanup(); backend.error = null; });
@@ -90,7 +91,7 @@ describe('partner request CHECK presentation', () => {
 
   it.each(actions)('%s leaves non-CHECK diagnostics unchanged', async (method) => {
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const error = { ...raw, code: '23502', message: 'original database message' };
+    const error = { ...raw, code: NOT_NULL_VIOLATION, message: 'original database message' };
     backend.error = error;
     const result = await partnerService[method]('target').catch((failure: unknown) => failure);
     expect(result).toBe(error);
@@ -121,7 +122,7 @@ describe('partner request CHECK presentation', () => {
   });
 
   it.each(actions)('%s retains plain non-CHECK caller fallback', async (_method, button, verb) => {
-    backend.error = { ...raw, code: '23502', message: 'original database message' };
+    backend.error = { ...raw, code: NOT_NULL_VIOLATION, message: 'original database message' };
     const user = userEvent.setup();
     render(<PartnerMoodView />);
     await clickAction(user, button);

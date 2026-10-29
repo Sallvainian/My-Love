@@ -4,9 +4,10 @@
  * `src/api/errorHandlers.ts:66` maps SQLSTATE `23514` to a generic sentence so
  * the raw Postgres text never reaches the user. Everything that asserts on that
  * mapping needs the same input, and the input is a wire format — not something
- * to re-invent per spec. This module holds it once, with no imports, the way
- * `./test-credentials.ts` holds the shared password: Vitest specs and Playwright
- * specs both consume it, so it must stay free of any test-framework import.
+ * to re-invent per spec. This module holds it once, importing only the
+ * import-free `./sqlstate.ts`, the way `./test-credentials.ts` holds the shared
+ * password: Vitest specs and Playwright specs both consume it, so it must stay
+ * free of any test-framework import.
  *
  * Every literal below was MEASURED against this repo's local stack on
  * 2026-08-19 (postgrest/13.0.5, reported in the `Server:` response header),
@@ -78,6 +79,7 @@
  * `love_notes` (`love_notes_content_check`, `different_users`), and
  * `partner_requests` (`partner_requests_status_check`, `no_self_requests`).
  */
+import { CHECK_VIOLATION_CODE } from './sqlstate';
 
 /**
  * The wire shape. `details` and `hint` are nullable because PostgREST sends
@@ -95,9 +97,6 @@ export interface PostgrestErrorEnvelope {
 
 /** The HTTP status PostgREST returns for SQLSTATE 23514. Measured, not assumed. */
 export const CHECK_VIOLATION_HTTP_STATUS = 400;
-
-/** SQLSTATE for `check_violation`. */
-export const CHECK_VIOLATION_CODE = '23514';
 
 /**
  * The user-facing text the `23514` key must produce, copied from
@@ -155,7 +154,7 @@ export const AUTHENTICATED_MOODS_NOTE_CHECK = authenticatedCheckViolation(
  * and appends a literal `...`.
  */
 export const SERVICE_ROLE_EVENTS_ICON_CHECK: PostgrestErrorEnvelope = {
-  code: '23514',
+  code: CHECK_VIOLATION_CODE,
   details:
     'Failing row contains (c3760217-ad5b-403f-af82-905078342ded, 00000000-0000-0000-0000-000000000001, probe, 2030-01-01, null, not-an-icon, 2026-08-19 20:54:19.405547+00, 2026-08-19 20:54:19.405547+00).',
   hint: null,

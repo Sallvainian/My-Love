@@ -134,6 +134,7 @@ import {
 // Only the batch seeder: this factory module also exports a `clearPairEvents`,
 // with a different signature from the helpers' one imported above.
 import { seedEvents } from '../support/factories/events';
+import { CHECK_VIOLATION_CODE, INSUFFICIENT_PRIVILEGE } from '../support/sqlstate';
 
 /**
  * The `public.events` row exactly as PostgREST returns it. Columns, nullability
@@ -268,7 +269,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // not a silent empty result.
     // THEN: the grant layer refuses it
     expect(read.status).toBe(401);
-    expect(read.body.code).toBe('42501');
+    expect(read.body.code).toBe(INSUFFICIENT_PRIVILEGE);
     expect(read.body.message).toBe('permission denied for table events');
 
     // WHEN: the same anon caller writes a well-formed row
@@ -284,7 +285,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // real, so nothing but the missing bearer decides this.
     // THEN: identically refused
     expect(write.status).toBe(401);
-    expect(write.body.code).toBe('42501');
+    expect(write.body.code).toBe(INSUFFICIENT_PRIVILEGE);
     expect(write.body.message).toBe('permission denied for table events');
 
     // THEN: and nothing landed
@@ -763,7 +764,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
     // (check_violation), naming the constraint from
     // `20260818000002_create_events_table.sql:19`.
     expect(refused.status).toBe(400);
-    expect(refused.body.code).toBe('23514');
+    expect(refused.body.code).toBe(CHECK_VIOLATION_CODE);
     expect(refused.body.message).toContain('events_label_check');
 
     // THEN: and the over-length row did not land

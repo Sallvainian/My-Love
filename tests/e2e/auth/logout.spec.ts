@@ -12,6 +12,7 @@
 import type { Page, Route } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { createAuthBootstrapEvent } from '../../support/factories/auth-bootstrap-notification-order';
+import { readStore } from '../../support/helpers/indexed-db';
 import { navigateTo } from '../../support/helpers/navigation';
 import { LOVE_NOTES_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -23,38 +24,27 @@ import { recurseUntil } from '../../support/helpers/recurse';
  * rows in the shared `messages` store, which holds bundled rows only.
  */
 async function ownedRowCounts(page: Page, owner: string, seed: { label: string; custom: string }) {
-  return page.evaluate(async ({ userId, label, custom }) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('my-love-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const all = (store: string) =>
-      new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
-        const request = db.transaction(store).objectStore(store).getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    try {
-      const copies = (await all('local-copies')).filter((row) => row.userId === userId);
-      const messageData = copies.find((row) => row.kind === 'message-data')?.value as
-        | { custom: Array<{ text: string; isFavorite?: boolean }>; bundledFavoriteIds: number[] }
-        | undefined;
-      const customRows = messageData?.custom ?? [];
-      return {
-        copies: copies.length,
-        custom: customRows.length,
-        favorites:
-          customRows.filter((row) => row.isFavorite).length +
-          (messageData?.bundledFavoriteIds.length ?? 0),
-        seeded:
-          JSON.stringify(copies).includes(label) && customRows.some((row) => row.text === custom),
-        strayCustom: (await all('messages')).filter((row) => row.isCustom).length,
-      };
-    } finally {
-      db.close();
-    }
-  }, { userId: owner, ...seed });
+  const all = async (store: string) => {
+    const rows = await readStore<Array<Record<string, unknown>>>(page, store, { op: 'getAll' });
+    if (!rows) throw new Error(`could not read the ${store} store`);
+    return rows;
+  };
+  const copies = (await all('local-copies')).filter((row) => row.userId === owner);
+  const messageData = copies.find((row) => row.kind === 'message-data')?.value as
+    | { custom: Array<{ text: string; isFavorite?: boolean }>; bundledFavoriteIds: number[] }
+    | undefined;
+  const customRows = messageData?.custom ?? [];
+  return {
+    copies: copies.length,
+    custom: customRows.length,
+    favorites:
+      customRows.filter((row) => row.isFavorite).length +
+      (messageData?.bundledFavoriteIds.length ?? 0),
+    seeded:
+      JSON.stringify(copies).includes(seed.label) &&
+      customRows.some((row) => row.text === seed.custom),
+    strayCustom: (await all('messages')).filter((row) => row.isCustom).length,
+  };
 }
 
 test.describe('Logout Flow', () => {

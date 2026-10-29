@@ -15,6 +15,7 @@ import { EventsSettings } from '../EventsSettings';
 import {
   createEventsStoreKit,
   fillForm,
+  loadFailure,
   loadOk,
   makeEvent,
   ok,
@@ -416,7 +417,7 @@ describe('EventsSettings edit', () => {
     const loadEvents = vi
       .fn()
       .mockImplementationOnce(async () => {
-        return { status: 'failure', error: 'The initial load failed' } as const;
+        return loadFailure('The initial load failed');
       })
       .mockImplementationOnce(async () => {
         return loadOk;
@@ -452,10 +453,7 @@ describe('EventsSettings edit', () => {
             finishMountLoad = resolve;
           })
       )
-      .mockImplementationOnce(async () => ({
-        status: 'failure',
-        error: 'The refresh failed',
-      }));
+      .mockImplementationOnce(async () => loadFailure('The refresh failed'));
     setStore({
       events: [makeEvent({ id: 'mine' })] as AppState['events'],
       loadEvents,

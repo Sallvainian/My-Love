@@ -15,6 +15,7 @@ import type { AppState } from '../../../stores/types';
 import {
   createEventsStoreKit,
   fillForm,
+  loadFailure,
   loadOk,
   makeEvent,
   ok,
@@ -233,7 +234,7 @@ describe('EventsSettings delete', () => {
     loadEvents.mockClear();
     loadEvents.mockImplementationOnce(async () => {
       store.patch({ eventsError: 'Manual refresh failed' });
-      return { status: 'failure', error: 'Manual refresh failed' } as const;
+      return loadFailure('Manual refresh failed');
     });
     await user.click(screen.getByTestId('event-delete-mine'));
     await user.click(screen.getByTestId('events-delete-confirm'));

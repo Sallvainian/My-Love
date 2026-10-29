@@ -11,7 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { enqueueNote, listQueuedNotes, removeQueuedNote } from '../../../src/services/noteQueue';
-import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
+import { CHECK_VIOLATION_CODE } from '../../support/sqlstate';
 import {
   A,
   clearStores,

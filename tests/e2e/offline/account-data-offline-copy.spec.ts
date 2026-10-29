@@ -16,6 +16,7 @@ import type { Page, Request } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
+import { readStore } from '../../support/helpers/indexed-db';
 import { navigateTo } from '../../support/helpers/navigation';
 import { ANNIVERSARIES_READ, FAVORITES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -54,25 +55,9 @@ async function savedMessageData(
 
 /** Custom rows left in the shared `messages` store (bundled rows only since v15). */
 async function customRowsInMessagesStore(page: Page): Promise<number> {
-  return page.evaluate(
-    () =>
-      new Promise<number>((resolve, reject) => {
-        const open = indexedDB.open('my-love-db');
-        open.onerror = () => reject(open.error);
-        open.onsuccess = () => {
-          const db = open.result;
-          const all = db.transaction('messages').objectStore('messages').getAll();
-          all.onsuccess = () => {
-            db.close();
-            resolve(all.result.filter((row: { isCustom?: boolean }) => row.isCustom).length);
-          };
-          all.onerror = () => {
-            db.close();
-            reject(all.error);
-          };
-        };
-      })
-  );
+  const rows = await readStore<Array<{ isCustom?: boolean }>>(page, 'messages', { op: 'getAll' });
+  if (!rows) throw new Error('could not read the messages store');
+  return rows.filter((row) => row.isCustom).length;
 }
 
 test.describe('Account data from the local copy', () => {

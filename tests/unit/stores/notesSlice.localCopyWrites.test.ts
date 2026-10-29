@@ -43,6 +43,7 @@ vi.mock('../../../src/services/localCopy', () => ({
 import 'fake-indexeddb/auto';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { NoteRefusedOfflineError } from '../../../src/stores/slices/notesSlice';
+import { CHECK_VIOLATION_CODE } from '../../support/sqlstate';
 import {
   USER_A,
   PARTNER,
@@ -67,7 +68,7 @@ import {
 import { serialized } from './serializedState';
 
 /** A server rejection: marks a queued text note failed. */
-const REJECTED = { code: '23514', message: 'check violation', details: '', hint: '' };
+const REJECTED = { code: CHECK_VIOLATION_CODE, message: 'check violation', details: '', hint: '' };
 
 describe('notesSlice love-notes local copy', () => {
   beforeEach(async () => {

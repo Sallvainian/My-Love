@@ -15,7 +15,7 @@ import {
   createDatabaseErrorEnvelope,
   type DatabaseErrorEnvelope,
 } from '../support/factories/database-error-envelope';
-import { CHECK_VIOLATION_CODE } from '../support/check-constraint-envelopes';
+import { CHECK_VIOLATION_CODE } from '../support/sqlstate';
 import { handleSupabaseError, isPostgrestError } from '../../src/api/errorHandlers';
 import type { Database } from '../../src/types/database.types';
 

@@ -174,7 +174,7 @@ test.describe('stale persisted events never rehydrate', () => {
     // clock is pinned to the mood's instant, so "today" is the mood's day even
     // if the run crosses real midnight.
     const anchor = clockAnchor();
-    const staleMood = stalePersistedMood({}, anchor);
+    const staleMood = stalePersistedMood(anchor);
 
     await seedPersistedBlob(page, { events: [staleEvent], moods: [staleMood] });
 
@@ -211,7 +211,7 @@ test.describe('stale persisted events never rehydrate', () => {
     await coupleEvents.clear();
     await seedPersistedBlob(page, {
       events: [stalePersistedEvent()],
-      moods: [stalePersistedMood()],
+      moods: [stalePersistedMood(clockAnchor())],
     });
 
     // Exactly ONE navigation for the whole test. `seedPersistedBlob` uses

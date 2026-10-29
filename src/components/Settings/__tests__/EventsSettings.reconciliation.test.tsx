@@ -17,6 +17,7 @@ import {
   deferredLoad,
   emptyStateText,
   fillForm,
+  loadFailure,
   loadOk,
   makeEvent,
   regionLabels,
@@ -179,7 +180,7 @@ describe.each([
     async function failRefresh(refresh: ReturnType<typeof deferredLoad>) {
       await act(async () => {
         store.patch({ eventsIsLoading: false, eventsError: 'Refresh failed' });
-        refresh.resolve({ status: 'failure', error: 'Refresh failed' });
+        refresh.resolve(loadFailure('Refresh failed'));
       });
     }
 

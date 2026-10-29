@@ -23,6 +23,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { goOffline } from '../../support/helpers/offline';
 import { resolveOwnPair } from '../../support/helpers/events';
+import { readStore, signedInUserId } from '../../support/helpers/indexed-db';
 import { partnerRecordRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
@@ -45,33 +46,17 @@ function noteBubble(page: Page, content: string) {
 
 /** The signed-in account's queued notes, oldest first. */
 async function queuedRows(page: Page): Promise<{ content: string; createdAt: string }[]> {
-  return page.evaluate(async () => {
-    const userId = window.__APP_STORE__?.getState().userId;
-    if (!userId) return [];
-    return new Promise<{ content: string; createdAt: string }[]>((resolve) => {
-      const open = indexedDB.open('my-love-db');
-      open.onerror = () => resolve([]);
-      open.onsuccess = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains('note-queue')) {
-          db.close();
-          resolve([]);
-          return;
-        }
-        const get = db.transaction('note-queue').objectStore('note-queue').index('by-user').getAll(userId);
-        get.onsuccess = () => {
-          db.close();
-          const rows = get.result as { content: string; createdAt: string }[];
-          rows.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
-          resolve(rows.map(({ content, createdAt }) => ({ content, createdAt })));
-        };
-        get.onerror = () => {
-          db.close();
-          resolve([]);
-        };
-      };
-    });
-  });
+  const userId = await signedInUserId(page);
+  if (!userId) return [];
+  // A failed read counts as an empty queue, as it always did.
+  const rows = await readStore<{ content: string; createdAt: string }[]>(page, 'note-queue', {
+    op: 'getAll',
+    index: 'by-user',
+    key: userId,
+  }).catch(() => null);
+  if (!rows) return [];
+  rows.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+  return rows.map(({ content, createdAt }) => ({ content, createdAt }));
 }
 
 /** The signed-in account's queued note contents, oldest first. */
