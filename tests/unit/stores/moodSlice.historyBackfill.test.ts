@@ -11,6 +11,7 @@ vi.mock('@/services/moodService', () => ({
     getAll: vi.fn(),
     getAllForUser: vi.fn(),
     getUnsyncedMoods: vi.fn(),
+    deleteSyncedForUser: vi.fn(),
   },
 }));
 
@@ -61,6 +62,7 @@ describe('moodSlice', () => {
     // the scoped read a default rather than letting it resolve undefined.
     mockedMoodService.getAllForUser.mockResolvedValue([]);
     mockedMoodService.getMergeSnapshot.mockResolvedValue(new Map());
+    mockedMoodService.deleteSyncedForUser.mockResolvedValue(0);
     savedCopies.clear();
     mockedReadLocalCopy.mockImplementation(async (userId: string, kind: string) =>
       savedCopies.has(`${userId}|${kind}`) ? (savedCopies.get(`${userId}|${kind}`) as never) : null
@@ -171,6 +173,7 @@ describe('moodSlice', () => {
       expect(entries[0].timestamp.toISOString()).toBe('2026-08-01T12:30:00.000Z');
       // Changed, so the store reloads from IndexedDB.
       expect(get().moods).toEqual(reloaded);
+      expect(mockedMoodService.deleteSyncedForUser).not.toHaveBeenCalled();
     });
 
     it('takes the local snapshot before the first server request and passes it to the merge', async () => {
@@ -276,6 +279,48 @@ describe('moodSlice', () => {
 
       expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
       expect(get().moods).toEqual([]);
+      // Sign-out's delete ran before the merge inserted its rows: delete again.
+      expect(mockedMoodService.deleteSyncedForUser).toHaveBeenCalledExactlyOnceWith(USER);
+    });
+
+    it('logs a failed follow-up delete without rejecting the backfill', async () => {
+      mockedMoodApi.getMoodHistory.mockResolvedValue([serverRow()]);
+      let finishMerge: (changed: boolean) => void = () => {};
+      mockedMoodService.mergeServerMoods.mockReturnValue(
+        new Promise((resolve) => (finishMerge = resolve))
+      );
+      const failure = new Error('idb down');
+      mockedMoodService.deleteSyncedForUser.mockRejectedValue(failure);
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().loadMoodHistoryFromServer();
+      await vi.waitFor(() => expect(mockedMoodService.mergeServerMoods).toHaveBeenCalled());
+      set({ userId: 'user-B', authSessionVersion: 2 } as never);
+      finishMerge(true);
+
+      await expect(inFlight).resolves.toBeUndefined();
+      expect(mockedMoodService.deleteSyncedForUser).toHaveBeenCalledExactlyOnceWith(USER);
+      await vi.waitFor(() =>
+        expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
+      );
+    });
+
+    it('requests no delete when the account changed during a merge that changed nothing', async () => {
+      mockedMoodApi.getMoodHistory.mockResolvedValue([serverRow()]);
+      let finishMerge: (changed: boolean) => void = () => {};
+      mockedMoodService.mergeServerMoods.mockReturnValue(
+        new Promise((resolve) => (finishMerge = resolve))
+      );
+
+      const { get, set } = createTestStore({ userId: USER, authSessionVersion: 1 });
+      const inFlight = get().loadMoodHistoryFromServer();
+      await vi.waitFor(() => expect(mockedMoodService.mergeServerMoods).toHaveBeenCalled());
+      set({ userId: 'user-B', authSessionVersion: 2 } as never);
+      finishMerge(false);
+      await inFlight;
+
+      expect(mockedMoodService.deleteSyncedForUser).not.toHaveBeenCalled();
     });
 
     it('does nothing when no one is signed in', async () => {

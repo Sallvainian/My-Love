@@ -2712,4 +2712,14 @@ location: src/stores/slices/authSlice.ts:47-67 (deleteAccountData); src/services
 source_spec: n/a
 severity: low
 reason: deleteAccountData() deletes the outgoing account's local copies and cached images and nothing else. Its JSDoc keeps "unsynced `moods` rows" for their owner to send on the next sign-in, and AGENTS.md ("Maintained by hand", sign-out rule) allows only a queue of unsent writes to stay. But the `moods` store holds synced rows (`synced: true`) beside the queue, and those stay too. The app never shows them to the next account, because every read is scoped by userId (moodService.getAllForUser), but they remain in the device's IndexedDB, unlike every other per-account copy. Nothing records keeping them on purpose: 771a93b7 says sign-out "keeps queued moods", and DW-5 (archived) proposed clearing the store before its fix scoped the reads instead. Fix: in deleteAccountData, also delete the outgoing user's `moods` rows whose `synced` is true, and keep every `synced: false` row. Nothing is lost, because the signed-in backfill (moodSlice.ts:575-590) pages through the whole server history and refills the store. Cover the boot with no session that the `my-love-account-owner` marker drives, and decide what to do with a row whose sync finishes after sign-out and marks it synced.
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-synced-moods-signout-delete
+resolution-undo: bec72ab16700c1eded375e3e02307c506b8c273be1c6fcc7faa6ebc0a5a14733 2026-10-29 7374617475733a206f70656e
+
+### DW-319: A mood row the service worker's background sync marks synced after sign-out stays on the device until that account's next sign-out there.
+origin: spec-deferred 77375ef75a5a
+location: src/sw-db.ts:97 (markMoodSynced); src/stores/slices/authSlice.ts (deleteAccountData)
+source_spec: `plan-dw-synced-moods-signout-delete.md`
+severity: low
+reason: sw-db.ts markMoodSynced has no session check, and discardAccountState clears the my-love-account-owner marker on sign-out, so when another account signs in next, nothing deletes the row. Reads stay scoped by userId, so the row is never shown to that account. The intent accepted "the row is left for the next deletion"; recording it so a sweep sees it.
 status: open

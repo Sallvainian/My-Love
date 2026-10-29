@@ -46,6 +46,10 @@ import {
   writeLocalCopy,
 } from '../../../src/services/localCopy';
 import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
+import { moodService } from '../../../src/services/moodService';
+import { moodSyncFingerprint } from '../../../src/services/moodSyncPayload';
+import { moodSyncService } from '../../../src/api/moodSyncService';
+import type { MoodEntry } from '../../../src/types';
 import { makeMoodEntry } from './moodSliceFixture';
 import { STORAGE_KEY } from '../helpers/persistedBlob';
 
@@ -659,8 +663,9 @@ describe('clearAuth on sign-out', () => {
 
   /**
    * Seed the device the way a shared phone looks: the outgoing account's local
-   * copies (custom messages and favorites among them) and an unsynced mood,
-   * beside another account's data and the bundled daily row nobody owns.
+   * copies (custom messages and favorites among them), a synced and an
+   * unsynced mood, beside another account's data (a synced mood among it) and
+   * the bundled daily row nobody owns.
    */
   async function seedDevice(outgoing: string) {
     await writeLocalCopy(outgoing, 'anniversaries', [
@@ -714,7 +719,21 @@ describe('clearAuth on sign-out', () => {
         date: '2026-08-04',
         synced: false,
       } as never);
-      return { bundledId, ownId, otherId, moodId };
+      // A synced mood is a copy of a server row: it goes with its account.
+      const syncedMoodId = await db.add('moods', {
+        ...pendingMood,
+        date: '2026-08-05',
+        synced: true,
+        supabaseId: 'srv-own-mood',
+      } as never);
+      const { id: _otherSeedId, ...otherMood } = moodEntry('OTHER-ACCOUNT', 'OTHER-MOOD-NOTE');
+      const otherSyncedMoodId = await db.add('moods', {
+        ...otherMood,
+        date: '2026-08-05',
+        synced: true,
+        supabaseId: 'srv-other-mood',
+      } as never);
+      return { bundledId, ownId, otherId, moodId, syncedMoodId, otherSyncedMoodId };
     } finally {
       db.close();
     }
@@ -733,6 +752,8 @@ describe('clearAuth on sign-out', () => {
         expect(await db.get('image-cache', [outgoing, 'partner/pic.jpg'])).toBeUndefined();
         // Custom messages and favorites go with the message-data copy.
         expect(await db.get('local-copies', [outgoing, MESSAGE_DATA_COPY_KIND])).toBeUndefined();
+        // So does its synced mood, a copy of a server row.
+        expect(await db.get('moods', ids.syncedMoodId)).toBeUndefined();
       } finally {
         db.close();
       }
@@ -750,6 +771,10 @@ describe('clearAuth on sign-out', () => {
       ).toMatchObject({
         custom: [expect.objectContaining({ id: ids.otherId, text: 'OTHER-CUSTOM' })],
         bundledFavoriteIds: [ids.bundledId],
+      });
+      expect(await db.get('moods', ids.otherSyncedMoodId)).toMatchObject({
+        userId: 'OTHER-ACCOUNT',
+        synced: true,
       });
       // …and the outgoing account's unsynced mood, a queued write, survives.
       expect(await db.get('moods', ids.moodId)).toMatchObject({ synced: false });
@@ -771,7 +796,7 @@ describe('clearAuth on sign-out', () => {
     }
   }
 
-  it("deletes the outgoing account's local copies (custom messages and favorites included) and cached images, and nothing else", async () => {
+  it("deletes the outgoing account's local copies (custom messages and favorites included), cached images and synced moods, and nothing else", async () => {
     // CAP-7: another account on the device keeps its data, and the outgoing
     // account's unsynced mood — a queued write — survives for its next sign-in.
     const ids = await seedDevice(SECRETS.userId);
@@ -779,6 +804,80 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().clearAuth();
 
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+  });
+
+  it('signs out even when deleting the synced moods fails, and logs the failure', async () => {
+    const failure = new Error('idb down');
+    vi.spyOn(moodService, 'deleteSyncedForUser').mockRejectedValue(failure);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(() => useAppStore.getState().clearAuth()).not.toThrow();
+
+    expect(useAppStore.getState().userId).toBeNull();
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(
+        "[AuthSlice] Failed to delete the outgoing account's synced moods:",
+        failure
+      )
+    );
+  });
+
+  it('deletes a mood that a sync marks synced after its account signed out', async () => {
+    // Sign-out's own delete runs while the batch is in flight and keeps the
+    // still-unsynced row; the batch then marks it synced. The follow-up delete
+    // when the batch settles is what removes it.
+    const ids = await seedDevice(SECRETS.userId);
+    useAppStore.setState({
+      syncStatus: { ...useAppStore.getState().syncStatus, isSyncing: false },
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    let releaseBatch: () => void = () => {};
+    const held = new Promise<void>((resolve) => (releaseBatch = resolve));
+    vi.spyOn(moodSyncService, 'syncPendingMoods').mockImplementation(async () => {
+      await held;
+      const db = await openMyLoveDB();
+      let row: MoodEntry | undefined;
+      try {
+        row = (await db.get('moods', ids.moodId)) as MoodEntry | undefined;
+      } finally {
+        db.close();
+      }
+      await moodService.markAsSynced(ids.moodId, 'srv-late', moodSyncFingerprint(row!));
+      return { synced: 1, failed: 0, deferred: 0, errors: [] };
+    });
+
+    const inFlight = useAppStore.getState().syncPendingMoods();
+    useAppStore.getState().clearAuth();
+    // Sign-out's delete has finished, and the queued row survived it.
+    await vi.waitFor(async () => {
+      const db = await openMyLoveDB();
+      try {
+        expect(await db.get('moods', ids.syncedMoodId)).toBeUndefined();
+        expect(await db.get('moods', ids.moodId)).toMatchObject({ synced: false });
+      } finally {
+        db.close();
+      }
+    });
+
+    releaseBatch();
+    await inFlight;
+
+    await vi.waitFor(async () => {
+      const db = await openMyLoveDB();
+      try {
+        expect(await db.get('moods', ids.moodId)).toBeUndefined();
+      } finally {
+        db.close();
+      }
+    });
+    const db = await openMyLoveDB();
+    try {
+      expect(await db.get('moods', ids.otherSyncedMoodId)).toMatchObject({
+        userId: 'OTHER-ACCOUNT',
+        synced: true,
+      });
+    } finally {
+      db.close();
+    }
   });
 
   it("deletes the outgoing account's saved data on a direct account switch", async () => {
@@ -829,6 +928,7 @@ describe('clearAuth on sign-out', () => {
       isAuthenticated: false,
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
     const ids = await seedDevice(SECRETS.userId);
+    const deleteSyncedMoods = vi.spyOn(moodService, 'deleteSyncedForUser');
 
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
@@ -836,6 +936,7 @@ describe('clearAuth on sign-out', () => {
     // Requested synchronously, for the recorded owner only.
     expect(deleteAccountCopies).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
     expect(deleteAccountImages).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
+    expect(deleteSyncedMoods).toHaveBeenCalledExactlyOnceWith(SECRETS.userId);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
   });
 
@@ -847,12 +948,14 @@ describe('clearAuth on sign-out', () => {
       isAuthenticated: false,
     } as unknown as Parameters<typeof useAppStore.setState>[0]);
     const ids = await seedDevice(SECRETS.userId);
+    const deleteSyncedMoods = vi.spyOn(moodService, 'deleteSyncedForUser');
 
     useAppStore.getState().setAuthUser(SECRETS.userId, 'a@example.com');
 
     // Sign-in starts any delete synchronously, so none was ever requested.
     expect(deleteAccountCopies).not.toHaveBeenCalled();
     expect(deleteAccountImages).not.toHaveBeenCalled();
+    expect(deleteSyncedMoods).not.toHaveBeenCalled();
     expect(await readLocalCopy(SECRETS.userId, 'anniversaries')).not.toBeNull();
     const db = await openMyLoveDB();
     try {
@@ -862,6 +965,7 @@ describe('clearAuth on sign-out', () => {
         custom: [expect.objectContaining({ id: ids.ownId })],
         bundledFavoriteIds: [ids.bundledId],
       });
+      expect(await db.get('moods', ids.syncedMoodId)).toMatchObject({ synced: true });
     } finally {
       db.close();
     }

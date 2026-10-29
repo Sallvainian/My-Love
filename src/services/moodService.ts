@@ -337,6 +337,39 @@ class MoodService extends BaseIndexedDBService<MoodEntry, MyLoveDBSchema, 'moods
   }
 
   /**
+   * Delete one user's synced mood rows from this device, for sign-out.
+   *
+   * A `synced: true` row is a copy of a server row, which the next signed-in
+   * history backfill brings back. A `synced: false` row is a queued write and
+   * is never deleted: it stays for its owner to send on their next sign-in.
+   * Other accounts' rows are outside the index range and are never touched.
+   *
+   * One readwrite transaction over the user's `by-user-date` range. Throws on
+   * failure (a write).
+   *
+   * @returns how many rows were deleted
+   */
+  async deleteSyncedForUser(userId: string): Promise<number> {
+    if (!userId) throw new Error('User not authenticated');
+    await this.init();
+    const tx = this.getTypedDB().transaction('moods', 'readwrite');
+    void tx.done.catch(() => {});
+    const range = IDBKeyRange.bound([userId, ''], [userId, '\uffff']);
+    let deleted = 0;
+    let cursor = await tx.store.index('by-user-date').openCursor(range);
+    while (cursor) {
+      if (cursor.value.synced) {
+        await cursor.delete();
+        deleted++;
+      }
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    logger.debug(`[MoodService] Deleted ${deleted} synced mood entries for a signed-out user`);
+    return deleted;
+  }
+
+  /**
    * The user's local rows per date, as `mergeServerMoods` compares them. Taken
    * before the first server request, so the merge can tell a row that changed
    * while the pages were being read (an edit that synced, a new mood) from one

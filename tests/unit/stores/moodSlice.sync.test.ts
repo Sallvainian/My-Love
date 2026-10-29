@@ -11,6 +11,7 @@ vi.mock('@/services/moodService', () => ({
     getAll: vi.fn(),
     getAllForUser: vi.fn(),
     getUnsyncedMoods: vi.fn(),
+    deleteSyncedForUser: vi.fn(),
   },
 }));
 
@@ -61,6 +62,7 @@ describe('moodSlice', () => {
     // the scoped read a default rather than letting it resolve undefined.
     mockedMoodService.getAllForUser.mockResolvedValue([]);
     mockedMoodService.getMergeSnapshot.mockResolvedValue(new Map());
+    mockedMoodService.deleteSyncedForUser.mockResolvedValue(0);
     savedCopies.clear();
     mockedReadLocalCopy.mockImplementation(async (userId: string, kind: string) =>
       savedCopies.has(`${userId}|${kind}`) ? (savedCopies.get(`${userId}|${kind}`) as never) : null
@@ -290,6 +292,43 @@ describe('moodSlice', () => {
         expect(mockedGetPartnerId).not.toHaveBeenCalled();
       });
 
+      it('deletes the signed-out account’s synced rows again when the batch settles', async () => {
+        // Sign-out's delete ran while the batch was in flight, so the rows it
+        // marked synced afterwards would otherwise stay on the device.
+        const pending = gate<SyncBatch>();
+        mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: 'USER-B', authSessionVersion: 2, syncStatus: { ...SUCCESSOR_STATUS } });
+        expect(mockedMoodService.deleteSyncedForUser).not.toHaveBeenCalled();
+        pending.settle(syncResult({ synced: 1 }));
+        await inFlight;
+
+        expect(mockedMoodService.deleteSyncedForUser).toHaveBeenCalledExactlyOnceWith('USER-A');
+      });
+
+      it('logs a failed follow-up delete without rejecting the sync', async () => {
+        const pending = gate<SyncBatch>();
+        mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
+        const failure = new Error('idb down');
+        mockedMoodService.deleteSyncedForUser.mockRejectedValue(failure);
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const { get, set } = createTestStore({ userId: 'USER-A', authSessionVersion: 1 });
+        const inFlight = get().syncPendingMoods();
+
+        set({ userId: null, authSessionVersion: 2 });
+        pending.settle(syncResult({ synced: 1 }));
+
+        await expect(inFlight).resolves.toEqual({ synced: 1, failed: 0, skipped: false });
+        expect(mockedMoodService.deleteSyncedForUser).toHaveBeenCalledExactlyOnceWith('USER-A');
+        await vi.waitFor(() =>
+          expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
+        );
+      });
+
       it('leaves the replacement account’s sync status untouched on failure', async () => {
         const pending = gate<never>();
         mockedMoodSyncService.syncPendingMoods.mockReturnValue(pending.promise);
@@ -347,6 +386,8 @@ describe('moodSlice', () => {
 
         expect(get().syncStatus).toEqual(SUCCESSOR_STATUS);
         expect(mockedMoodService.getAllForUser).not.toHaveBeenCalled();
+        // The rows are the signed-in account's own history: they stay.
+        expect(mockedMoodService.deleteSyncedForUser).not.toHaveBeenCalled();
       });
 
       it('still completes normally for an uninterrupted session', async () => {
@@ -360,6 +401,7 @@ describe('moodSlice', () => {
         expect(get().syncStatus.isSyncing).toBe(false);
         expect(get().syncStatus.lastSyncAt).toEqual(NOW);
         expect(mockedMoodService.getAllForUser).toHaveBeenCalledWith('USER-A');
+        expect(mockedMoodService.deleteSyncedForUser).not.toHaveBeenCalled();
       });
     });
   });

@@ -24,7 +24,8 @@
  *   copy after each owned successful server read. A failed read keeps both.
  * - NOT persisted to localStorage: `partialize` in `useAppStore.ts` omits
  *   `moods` and `partnerMoods`. Sign-out deletes the outgoing account's copies
- *   (`deleteAccountCopies`); its `moods` rows stay for their owner.
+ *   (`deleteAccountCopies`) and its synced `moods` rows; its unsynced rows stay
+ *   for their owner.
  */
 
 import { moodApi } from '../../api/moodApi';
@@ -38,7 +39,7 @@ import type { MoodEntry } from '../../types';
 import { normalizeMoodEntry, normalizeMoodValues } from '../../types/moods';
 import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
-import type { AppStateCreator } from '../types';
+import type { AppState, AppStateCreator } from '../types';
 
 /** Local-copy kind whose refresher backfills the own `moods` store. */
 export const MOOD_HISTORY_KIND = 'mood-history';
@@ -140,6 +141,23 @@ function parseSavedPartnerMoods(value: unknown): MoodEntry[] | null {
     moods.push(parsed);
   }
   return moods;
+}
+
+/**
+ * Delete `userId`'s synced mood rows again when a sync or backfill settles
+ * after that account is no longer signed in. Sign-out's delete
+ * (`deleteAccountData`) ran while the batch was in flight, so rows it marked
+ * synced or inserted afterwards would otherwise stay on the device.
+ *
+ * Compares the id only, not `authSessionVersion`: an account that signed back
+ * in as itself keeps its rows, which are its own mood history. Fire-and-forget;
+ * a failed delete is logged.
+ */
+function deleteSyncedMoodsIfSignedOut(userId: string | null, get: () => AppState): void {
+  if (!userId || get().userId === userId) return;
+  moodService.deleteSyncedForUser(userId).catch((error: unknown) => {
+    console.error('[MoodSlice] Failed to delete a signed-out account\'s synced moods:', error);
+  });
 }
 
 export interface MoodSlice {
@@ -416,6 +434,7 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => {
       // would otherwise fire against the new session on the dead one's behalf.
       if (!stillCurrent()) {
         logger.debug('[MoodSlice] Sync completed after the session ended - discarding UI updates');
+        deleteSyncedMoodsIfSignedOut(userId, get);
         return { synced: result.synced, failed: result.failed, skipped: false };
       }
 
@@ -593,7 +612,11 @@ export const createMoodSlice: AppStateCreator<MoodSlice> = (set, get, _api) => {
         snapshot
       );
       logger.debug(`[MoodSlice] Mood history backfill: ${newestByDate.size} dates, changed: ${changed}`);
-      if (!changed || !stillCurrent()) return;
+      if (!changed) return;
+      if (!stillCurrent()) {
+        deleteSyncedMoodsIfSignedOut(userId, get);
+        return;
+      }
       await get().loadMoods();
     } catch (error) {
       // A failed read changes nothing.
