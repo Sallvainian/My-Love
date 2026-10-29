@@ -16,7 +16,11 @@ const downloadPhoto = vi.hoisted(() => vi.fn<(path: string) => Promise<Blob>>())
 const cachePhotoImage = vi.hoisted(() => vi.fn());
 /** The real module's "image cached" notice, as a registry the tests fire. */
 const cachedListeners = vi.hoisted(() => new Set<(userId: string, path: string) => void>());
-/** The one photo the store holds; hoisted so the store mock below can use it. */
+/**
+ * The one photo the store holds; hoisted so the store mock below can use it.
+ * The store always gets a copy, so a test that mutates its row cannot change
+ * what the next test starts with.
+ */
 const { PATH, PHOTO } = vi.hoisted(() => {
   const PATH = 'owner/p0.jpg';
   return { PATH, PHOTO: { id: 'p0', storage_path: PATH } };
@@ -43,7 +47,7 @@ vi.mock('@/stores/useAppStore', async () => {
     useAppStore: create(() => ({
       userId: 'USER-A' as string | null,
       authSessionVersion: 1,
-      photos: [PHOTO],
+      photos: [{ ...PHOTO }],
     })),
   };
 });
@@ -82,7 +86,7 @@ beforeEach(() => {
   useAppStore.setState({
     userId: 'USER-A',
     authSessionVersion: 1,
-    photos: [PHOTO],
+    photos: [{ ...PHOTO }],
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
   readCachedImage.mockResolvedValue(null);
   downloadPhoto.mockResolvedValue(new Blob(['DOWNLOADED']));

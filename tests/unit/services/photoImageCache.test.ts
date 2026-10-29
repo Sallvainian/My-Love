@@ -527,6 +527,25 @@ describe('mobile data', () => {
   let alive = true;
   const live = (photos: () => readonly PhotoImageRef[]) => session(photos, () => alive);
 
+  /**
+   * Asserts that no fill started: nothing downloaded, no image cached. A
+   * negative check has no signal to wait for, so it waits one macrotask turn
+   * first. Every fake here resolves on microtasks, so a fill that a wrong
+   * resume started, however many microtasks late, has downloaded and written
+   * by then. Nothing here depends on how requestPhotoImageFill joins runs.
+   */
+  async function expectNoFillStarted() {
+    const notices: string[] = [];
+    const stop = onPhotoImageCached((_userId, path) => notices.push(path));
+    try {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    } finally {
+      stop();
+    }
+    expect(download).not.toHaveBeenCalled();
+    expect(notices).toEqual([]);
+  }
+
   beforeEach(() => {
     alive = true;
     setPhotosOverMobileData(false);
@@ -595,11 +614,9 @@ describe('mobile data', () => {
     await requestPhotoImageFill(live(() => photos));
     expect(download).not.toHaveBeenCalled();
 
-    // Still on mobile data: nothing yet. Joining the run settles any fill a
-    // wrong resume started; a non-current session releases no hold.
+    // Still on mobile data: nothing yet.
     connection.switchTo('cellular');
-    await requestPhotoImageFill(session(() => [], () => false));
-    expect(download).not.toHaveBeenCalled();
+    await expectNoFillStarted();
 
     connection.switchTo('wifi');
 
@@ -646,10 +663,8 @@ describe('mobile data', () => {
     current = false;
     connection.switchTo('wifi');
     setPhotosOverMobileData(true);
-    // Settle any fill a wrong resume started before the negative check.
-    await requestPhotoImageFill(session(() => [], () => false));
 
-    expect(download).not.toHaveBeenCalled();
+    await expectNoFillStarted();
   });
 
   it('keeps at most one listener, and none once the fill resumes', async () => {

@@ -49,6 +49,22 @@ export function storageQuota(percent: number, warning: 'none' | 'approaching' | 
   return { used: percent * 10, quota: 1_000, percent, warning };
 }
 
+/**
+ * The whole store as text, for a leak check. Plain `JSON.stringify` writes an
+ * Error, a Map and a Set as `{}`, so the previous account's label or failure
+ * text held in one of them would not be found; this spells each one out.
+ */
+export function serializedStore(): string {
+  return JSON.stringify(useAppStore.getState(), (_key, value: unknown) => {
+    if (value instanceof Error) {
+      return { ...value, name: value.name, message: value.message, cause: value.cause };
+    }
+    if (value instanceof Map) return Array.from(value.entries());
+    if (value instanceof Set) return Array.from(value.values());
+    return value;
+  });
+}
+
 /** Hand the store to USER-C mid-flight, seeding whatever C already had on screen. */
 export function switchToUserC(cOwnState: Record<string, unknown> = {}): void {
   useAppStore.setState({

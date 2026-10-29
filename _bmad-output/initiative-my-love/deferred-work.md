@@ -2622,7 +2622,9 @@ location: tests/unit/stores/loaderIdentityGuards.events.test.ts:414,476,495,513,
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: JSON.stringify writes an Error, a Map and a Set as {}, so the previous account's label or failure text held in one of those shapes would not be found. Fix: serialize with a replacer that expands them, or assert the specific fields.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-307: events.spec.ts hard-codes the plural "days" in the expected countdown.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2638,7 +2640,9 @@ location: tests/unit/stores/notesSlice.idempotency.test.ts:287,308,339,360
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The retries read store.getState().notes[0].tempId without first waiting for the drain, so the cases depend on that row not having been replaced yet. Fix: wait for the drain to settle, then read the key.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-309: usePhotoImage.test.ts shares one hoisted PHOTO object across tests.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2646,7 +2650,9 @@ location: tests/unit/hooks/usePhotoImage.test.ts:20-22
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The store mock and every beforeEach put the same object in photos, so a test or hook that mutated it would leak into the tests after it in shuffled order. Fix: put a fresh copy in the store in beforeEach.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-310: photoImageCache.test.ts settles a fill by joining a second run, which relies on the module's private coalescing.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4); plan 1.13 Residual risks (A4)
@@ -2654,7 +2660,9 @@ location: tests/unit/services/photoImageCache.test.ts:598,649
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: "Joining the run settles any fill a wrong resume started" holds only while requestPhotoImageFill coalesces overlapping calls into one run, an internal detail; and plan 1.13 notes that a resume deferred by two or more microtasks starts after the join and goes uncaught. Fix: settle on an observable signal, such as the cached notice or the download mock's settled calls.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-311: settleNameLookups never settles when the own-name lookup rejects.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2732,4 +2740,20 @@ location: src/sw-db.ts:97 (markMoodSynced); src/stores/slices/authSlice.ts (dele
 source_spec: `plan-dw-synced-moods-signout-delete.md`
 severity: low
 reason: sw-db.ts markMoodSynced has no session check, and discardAccountState clears the my-love-account-owner marker on sign-out, so when another account signs in next, nothing deletes the row. Reads stay scoped by userId, so the row is never shown to that account. The intent accepted "the row is left for the next deletion"; recording it so a sweep sees it.
+status: open
+
+### DW-320: The same JSON.stringify(state) leak check, blind to Error/Map/Set, is used outside the events file.
+origin: spec-deferred b8c7828c1182
+location: tests/unit/stores/loaderIdentityGuards.moods.test.ts:214
+source_spec: `plan-dw-store-service-test-determinism.md`
+severity: low
+reason: grep finds it at tests/unit/stores/loaderIdentityGuards.moods.test.ts:214,242, loaderIdentityGuards.partner.test.ts:225,251,322,395 and signOutClearsAccountState.test.ts:340,479,555,563; DW-306 names only the events file. They can adopt serializedStore() from loaderIdentityGuardsFixture.ts.
+status: open
+
+### DW-321: Complete list of the leak checks outside the events file that still use plain JSON.stringify on store state (it supersedes the incomplete item above).
+origin: spec-deferred a4946ac45884
+location: tests/unit/stores/loaderIdentityGuards.customMessages.test.ts:284
+source_spec: `plan-dw-store-service-test-determinism.md`
+severity: low
+reason: These are blind to an Error, Map or Set, as DW-306 was. Found with `grep -rn "JSON.stringify(" tests/unit` on 2026-10-29. On useAppStore, so they can adopt serializedStore() from loaderIdentityGuardsFixture.ts: - loaderIdentityGuards.moods.test.ts:214,242 - loaderIdentityGuards.partner.test.ts:225,251,322,395 - loaderIdentityGuards.customMessages.test.ts:284,326,395 - loaderIdentityGuards.notes.test.ts:232,271 - loaderIdentityGuards.photos.test.ts:277,341,472 - loaderIdentityGuards.messages.test.ts:251,559 - signOutClearsAccountState.test.ts:340,479,555,563,646 On a local store or a slice of state, so they need the replacer to take a value: - interactionsSubscription.test.ts:634,656 - notesSlice.localCopy.test.ts:517 - partnerSlice.localCopy.test.ts:213 - notesSlice.sessionGuard.test.ts:216 - settingsSlice.initializeApp.test.ts:307,392,447,470 - notesSlice.localCopyWrites.test.ts:174
 status: open
