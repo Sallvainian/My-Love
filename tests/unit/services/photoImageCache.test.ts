@@ -595,9 +595,10 @@ describe('mobile data', () => {
     await requestPhotoImageFill(live(() => photos));
     expect(download).not.toHaveBeenCalled();
 
-    // Still on mobile data: nothing yet.
+    // Still on mobile data: nothing yet. Joining the run settles any fill a
+    // wrong resume started; a non-current session releases no hold.
     connection.switchTo('cellular');
-    await Promise.resolve();
+    await requestPhotoImageFill(session(() => [], () => false));
     expect(download).not.toHaveBeenCalled();
 
     connection.switchTo('wifi');
@@ -645,7 +646,8 @@ describe('mobile data', () => {
     current = false;
     connection.switchTo('wifi');
     setPhotosOverMobileData(true);
-    await Promise.resolve();
+    // Settle any fill a wrong resume started before the negative check.
+    await requestPhotoImageFill(session(() => [], () => false));
 
     expect(download).not.toHaveBeenCalled();
   });

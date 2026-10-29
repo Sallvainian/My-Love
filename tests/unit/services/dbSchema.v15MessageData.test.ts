@@ -244,6 +244,8 @@ describe('dbSchema', () => {
 
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
+      // The count first: `.every` is also true for an emptied store.
+      expect(await db.count('messages')).toBe(BUNDLED.length);
       expect((await db.getAll('messages')).every((row) => !row.isCustom)).toBe(true);
     });
 

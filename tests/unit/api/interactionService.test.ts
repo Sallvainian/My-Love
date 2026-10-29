@@ -26,7 +26,8 @@ import { createInteractionRecord } from '../../support/factories/interaction-rec
 
 // UUID-shaped: the service validates the partner id it derives before inserting.
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const PARTNER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+// Hoisted: the partner lookup below answers with it by default.
+const PARTNER_ID = vi.hoisted(() => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 const STRANGER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 /** The sentence that must never come back for interactions. */
@@ -78,7 +79,7 @@ const realtime = vi.hoisted(() => {
  * derived from the authenticated relationship, never handed in by the caller.
  */
 const partnerLookup = vi.hoisted(() => {
-  let value: string | null = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  let value: string | null = PARTNER_ID;
   let calls = 0;
   return {
     resolve: async (): Promise<string | null> => {
@@ -87,7 +88,7 @@ const partnerLookup = vi.hoisted(() => {
     },
     set: (next: string | null) => { value = next; },
     calls: () => calls,
-    reset: () => { value = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'; calls = 0; },
+    reset: () => { value = PARTNER_ID; calls = 0; },
   };
 });
 

@@ -26,6 +26,7 @@ import {
   getPartnerId,
   getSession,
   getSignedInUserId,
+  MOOD_CREATED_AT,
   moodIdFor,
   openChannels,
   opOrder,
@@ -414,7 +415,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     );
     // The wire carries no updated_at; the receiver has always used the creation
     // time in its place.
-    expect(onMood.mock.calls[0][0]).toMatchObject({ updated_at: '2026-08-03T12:00:00.000Z' });
+    expect(onMood.mock.calls[0][0]).toMatchObject({ updated_at: MOOD_CREATED_AT });
 
     unsubscribe();
   });

@@ -15,6 +15,7 @@ import type { LoveNote } from '../../../src/types/models';
 import { writeLocalCopy } from '../../../src/services/localCopy';
 import { enqueueNote, listQueuedNotes } from '../../../src/services/noteQueue';
 import { LOVE_NOTES_COPY_KIND } from '../../../src/stores/slices/notesSlice';
+import { CHECK_VIOLATION_CODE } from '../../support/check-constraint-envelopes';
 import {
   A,
   B,
@@ -201,7 +202,7 @@ describe('notesSlice offline send queue', () => {
     it('a stale rejection marks the row failed but writes no state or banner', async () => {
       const store = createTestStore();
       const reply = deferred();
-      server.outcomes = [{ reject: '23514', hold: reply.promise }];
+      server.outcomes = [{ reject: CHECK_VIOLATION_CODE, hold: reply.promise }];
       await store.getState().sendNote('refused later');
       await vi.waitFor(() => expect(server.upserts).toBe(1));
 

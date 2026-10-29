@@ -250,6 +250,8 @@ const USER_ID = '00000000-0000-4000-8000-000000000001';
 export const PARTNER_ID = '00000000-0000-4000-8000-000000000002';
 export const OUTSIDER_ID = '00000000-0000-4000-8000-000000000003';
 export const TOPIC = `mood-updates:${USER_ID}`;
+/** The `created_at` every `emitMood` broadcast carries unless overridden. */
+export const MOOD_CREATED_AT = '2026-08-03T12:00:00.000Z';
 
 /**
  * Stable UUID per test label.
@@ -295,7 +297,7 @@ export function emitMood(
         mood_type: 'happy',
         mood_types: ['happy'],
         note: null,
-        created_at: '2026-08-03T12:00:00.000Z',
+        created_at: MOOD_CREATED_AT,
         ...overrides,
       },
     })

@@ -12,7 +12,7 @@
  * `useLoveNotes` is mocked rather than driven, because what is under test is
  * what `LoveNotes` does with a status, not how the status is produced.
  */
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NoteFeedStatus } from '../../../hooks/useRealtimeMessages';
@@ -85,6 +85,19 @@ async function renderWith(status: NoteFeedStatus) {
   return render(<LoveNotes />);
 }
 
+/**
+ * Wait until the mount effect's name lookups have answered and their state is
+ * applied. The fallbacks equal LoveNotes' initial state, so a fallback asserted
+ * any earlier passes before the behaviour has run. `getPartnerDisplayName` is
+ * asked only after the own-name branch, so its answer settles both.
+ */
+async function settleNameLookups(): Promise<void> {
+  await waitFor(() => expect(api.getPartnerDisplayName).toHaveBeenCalled());
+  await act(async () => {
+    await Promise.all(api.getPartnerDisplayName.mock.results.map((result) => result.value));
+  });
+}
+
 describe('LoveNotes realtime notice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,6 +123,7 @@ describe('LoveNotes realtime notice', () => {
 
     it.each(['connecting', 'idle'] as const)('shows the name alone for %s', async (status) => {
       await renderWith(status);
+      await settleNameLookups();
 
       const row = screen.getByTestId(ROW);
       expect(row).toHaveTextContent(/^PPartner$/);
@@ -135,6 +149,7 @@ describe('LoveNotes realtime notice', () => {
 
     it('falls back to "Partner" and a "P" initial when the name is unknown', async () => {
       await renderWith('connected');
+      await settleNameLookups();
 
       const row = screen.getByTestId(ROW);
       const name = within(row).getByTestId('notes-partner-name');

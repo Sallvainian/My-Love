@@ -30,6 +30,9 @@ interface FakeRow {
 const PARTNER_ID = '00000000-0000-4000-8000-0000000000b0';
 const USER_ID = '00000000-0000-4000-8000-0000000000a0';
 
+/** Postgres SQLSTATE not_null_violation: a write failure that is not a CHECK violation. */
+const NOT_NULL_VIOLATION = '23502';
+
 /** Rows the "server" holds, plus a switch to drop the next response */
 const backend = {
   writeError: null as { code: string; message: string; details: string; hint: string } | null,
@@ -213,12 +216,15 @@ describe('notesSlice send idempotency', () => {
   const friendly = 'Some values are not allowed - check length and format limits';
   const checkError = { code: '23514', message: 'new row violates love_notes constraint', details: 'raw table', hint: '' };
 
-  /** Sends a note with a picture whose row the server refuses with CHECK; returns the failed note. */
-  async function failCheckSend(store: ReturnType<typeof createTestStore>) {
+  /** Sends a note with `image` whose row the server refuses with CHECK; returns the failed note. */
+  async function failCheckSend(
+    store: ReturnType<typeof createTestStore>,
+    image = new File(['abc'], 'image.jpg', { type: 'image/jpeg' })
+  ) {
     mockedUploadCompressedBlob.mockResolvedValue({ storagePath: `${USER_ID}/image.jpg`, compressedSize: 3 });
     backend.failNextWrite = true;
     backend.writeError = checkError;
-    await expect(store.getState().sendNote('hello', new File(['abc'], 'image.jpg', { type: 'image/jpeg' }))).resolves.toBeUndefined();
+    await expect(store.getState().sendNote('hello', image)).resolves.toBeUndefined();
     return store.getState().notes[0];
   }
 
@@ -231,9 +237,11 @@ describe('notesSlice send idempotency', () => {
 
   it('a CHECK failure on send marks the note failed, keeps its image and shows the friendly banner', async () => {
     const store = createTestStore();
-    const failed = await failCheckSend(store);
+    const file = new File(['abc'], 'image.jpg', { type: 'image/jpeg' });
+    const failed = await failCheckSend(store, file);
     expect(failed.error).toBe(true);
-    expect(failed.imageBlob).toBeDefined();
+    // The compressImage mock hands back the File it was given.
+    expect(failed.imageBlob).toBe(file);
     expect(store.getState().notesError).toBe(friendly);
   });
 
@@ -345,7 +353,7 @@ describe('notesSlice send idempotency', () => {
   it('retains non-CHECK failure presentation on send and retry', async () => {
     const store = createTestStore();
     store.setState({ notesError: 'existing error' });
-    backend.writeError = { ...checkError, code: '23502' };
+    backend.writeError = { ...checkError, code: NOT_NULL_VIOLATION };
     backend.failNextWrite = true;
     await sendText(store, 'first');
     backend.failNextWrite = true;
@@ -356,13 +364,15 @@ describe('notesSlice send idempotency', () => {
 
   it('sends a note with the composed message tempId as its idempotency key', async () => {
     const store = createTestStore();
-    await sendText(store, 'i love you');
+    await store.getState().sendNote('i love you');
+    // Read before the drain settles: confirming the note drops its tempId.
+    const tempId = store.getState().notes[0].tempId;
+    await store.getState().drainQueuedNotes();
 
     expect(backend.rows).toHaveLength(1);
     // The key has to be the tempId, because that is the value the retry path
     // still has in hand after a failure.
-    const optimisticKey = backend.rows[0].idempotency_key;
-    expect(optimisticKey).toMatch(/^temp-/);
+    expect(backend.rows[0].idempotency_key).toBe(tempId);
   });
 
   it('a resend after a lost response resolves to the committed row', async () => {

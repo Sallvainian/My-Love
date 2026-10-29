@@ -802,6 +802,11 @@ describe('LoveNoteMessage', () => {
       const img = screen.getByRole('img', { name: /image from you/i });
       fireEvent.error(img); // raw error: an <img> load failure is a resource event, not a user action
 
+      // The retry request is in flight; without it the late-result check
+      // below would pass with the retry deleted.
+      expect(mockGetSignedImageUrl).toHaveBeenCalledTimes(2);
+      expect(mockGetSignedImageUrl).toHaveBeenLastCalledWith(messageWithImage.image_url);
+
       // The error handler bumps the retry count synchronously; only setter
       // calls after unmount count
       stateSetterCalls.mockClear();

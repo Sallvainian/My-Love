@@ -548,6 +548,8 @@ describe('photosSlice local copy', () => {
     it('registers the photos kind', () => {
       createTestStore();
 
+      // The refresher is a closure built inside the slice, so presence is all this case can pin;
+      // the next two tests exercise what it does.
       expect(photosRefresher()).toBeDefined();
     });
 

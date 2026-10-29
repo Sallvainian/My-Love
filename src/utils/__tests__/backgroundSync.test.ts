@@ -162,21 +162,21 @@ describe('backgroundSync utilities', () => {
       // @ts-expect-error -- serviceWorker is not optional on Navigator; the test removes it
       delete nav.serviceWorker;
 
-      await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
+      await expect(registerBackgroundSync('test-tag')).resolves.toBeUndefined();
     });
 
     it('should not throw when SyncManager is not available', async () => {
       const win = getMutableWindow();
       delete win.SyncManager;
 
-      await expect(registerBackgroundSync('test-tag')).resolves.not.toThrow();
+      await expect(registerBackgroundSync('test-tag')).resolves.toBeUndefined();
     });
 
     it('logs and resolves when the sync registration fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockRegistration.sync.register.mockRejectedValueOnce(new Error('Registration failed'));
 
-      await expect(registerBackgroundSync('error-tag')).resolves.not.toThrow();
+      await expect(registerBackgroundSync('error-tag')).resolves.toBeUndefined();
       expect(consoleSpy).toHaveBeenCalledWith(
         '[BackgroundSync] Failed to register sync:',
         expect.any(Error)
