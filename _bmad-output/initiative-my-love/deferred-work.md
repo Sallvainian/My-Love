@@ -2751,7 +2751,9 @@ location: src/sw-db.ts:97 (markMoodSynced); src/stores/slices/authSlice.ts (dele
 source_spec: `plan-dw-synced-moods-signout-delete.md`
 severity: low
 reason: sw-db.ts markMoodSynced has no session check, and discardAccountState clears the my-love-account-owner marker on sign-out, so when another account signs in next, nothing deletes the row. Reads stay scoped by userId, so the row is never shown to that account. The intent accepted "the row is left for the next deletion"; recording it so a sweep sees it.
-status: open
+status: done 2026-10-29
+resolution: closed by human decision: Accepted residual: the row is never read by another account and is deleted at its owner's next sign-out on the device.
+decision: 2026-10-29 Close: accept the residual row as the approved intent did — Accepted residual: the row is never read by another account and is deleted at its owner's next sign-out on the device.
 
 ### DW-320: The same JSON.stringify(state) leak check, blind to Error/Map/Set, is used outside the events file.
 origin: spec-deferred b8c7828c1182
