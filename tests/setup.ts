@@ -7,6 +7,10 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
+// A file that opts into Node (`// @vitest-environment node`) has no DOM, so
+// every shim below that touches one is skipped there.
+const hasDom = typeof window !== 'undefined';
+
 /**
  * happy-dom compatibility shim: spec-correct `nodeName` on `Node.prototype`.
  *
@@ -25,7 +29,9 @@ import { vi } from 'vitest';
  *
  * Must live in setupFiles: DOMPurify caches the getter at module-evaluation time.
  */
-const nodeNameDescriptor = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeName');
+const nodeNameDescriptor = hasDom
+  ? Object.getOwnPropertyDescriptor(Node.prototype, 'nodeName')
+  : undefined;
 if (
   nodeNameDescriptor?.get &&
   nodeNameDescriptor.get.call(document.createElement('div')) !== 'DIV'
@@ -51,19 +57,21 @@ if (
 import 'fake-indexeddb/auto';
 
 // Mock window.matchMedia (for responsive components)
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+if (hasDom) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 // Mock IntersectionObserver (for virtualized lists)
 class MockIntersectionObserver {
@@ -72,10 +80,12 @@ class MockIntersectionObserver {
   unobserve = vi.fn();
 }
 
-Object.defineProperty(window, 'IntersectionObserver', {
-  writable: true,
-  value: MockIntersectionObserver,
-});
+if (hasDom) {
+  Object.defineProperty(window, 'IntersectionObserver', {
+    writable: true,
+    value: MockIntersectionObserver,
+  });
+}
 
 // Mock ResizeObserver (for responsive components)
 class MockResizeObserver {
@@ -84,10 +94,12 @@ class MockResizeObserver {
   unobserve = vi.fn();
 }
 
-Object.defineProperty(window, 'ResizeObserver', {
-  writable: true,
-  value: MockResizeObserver,
-});
+if (hasDom) {
+  Object.defineProperty(window, 'ResizeObserver', {
+    writable: true,
+    value: MockResizeObserver,
+  });
+}
 
 // Suppress console.error in tests (optional - remove if you want to see errors)
 // vi.spyOn(console, 'error').mockImplementation(() => {});

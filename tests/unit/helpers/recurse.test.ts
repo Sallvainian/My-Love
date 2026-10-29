@@ -1,3 +1,8 @@
+// @vitest-environment node
+// recurseUntil runs in Playwright's Node process, never a browser. Under the
+// suite's happy-dom, Playwright's bundled source-map-support sees `window` and
+// `XMLHttpRequest`, decides it is in a browser, and fetches its own file from
+// localhost:3000, printing an ECONNREFUSED error on every run.
 import { stripVTControlCharacters } from 'node:util';
 import { expect as playwrightExpect } from '@playwright/test';
 import { RecurseTimeoutError } from '@seontechnologies/playwright-utils/recurse';
