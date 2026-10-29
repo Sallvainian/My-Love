@@ -154,3 +154,17 @@ after = []
 hitl = false
 risk = "low"
 notes = ["Read corrections.md first, then work every row in the findings files named in the description. Locate rows by content, not line number. One commit per finding group. Run lint, typecheck and the affected suites before finishing."]
+
+# Added 2026-10-28 after the 2026-10-28 tests/unit and src re-runs (see the epic's Notes).
+
+[[entry]]
+id = 13
+type = "story"
+title = "Fix the 2026-10-28 tests/unit and src High findings and tests that cannot fail"
+description = "R1, R3: fix every item in findings-2026-10-28-unit-src.md: the 12 High rows (tests/unit 8 H10 and 1 H3; src 2 H10 and 1 H4) and the seven advisory notes A1-A7 on tests that pass while the behaviour they name is broken."
+verify = "npm run lint, npm run typecheck, npm run test:unit and the shuffled npm run test:unit:coverage pass, and none of the 12 rows or 7 notes still describes its test."
+covers = ["R1", "R3"]
+after = []
+hitl = false
+risk = "low"
+notes = ["Work every item in findings-2026-10-28-unit-src.md, applying each suggested fix unless it would weaken the test. Locate items by content, not line number. For each advisory note, break the behaviour the test names and confirm the fixed test fails, then restore. One commit per finding group: tests/unit High, src High, advisory notes. If a corrected test exposes a real app bug, fix it in its own fix(...) commit and also run the e2e suite. No test-review run: the owner runs the fresh reviews after merge."]
