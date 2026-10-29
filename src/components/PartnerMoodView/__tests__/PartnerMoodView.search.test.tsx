@@ -119,7 +119,7 @@ describe('PartnerMoodView partner search', () => {
     await user.click(screen.getByTestId(`send-request-${TARGET_ID}`));
 
     expect(state.sendPartnerRequest).toHaveBeenCalledWith(TARGET_ID);
-    expect(screen.queryByText(MISSING)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('partner-search-empty')).not.toBeInTheDocument();
   });
 
   it('found without a chosen name: shows the address once, not a seed name', async () => {
@@ -141,7 +141,7 @@ describe('PartnerMoodView partner search', () => {
     expect(screen.getByTestId('partner-search-taken')).toHaveTextContent(TAKEN);
     expect(screen.queryByRole('button', { name: /send request/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('partner-search-results')).not.toBeInTheDocument();
-    expect(screen.queryByText(MISSING)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('partner-search-empty')).not.toBeInTheDocument();
   });
 
   it('missing: says no account uses that email', async () => {
@@ -150,7 +150,7 @@ describe('PartnerMoodView partner search', () => {
     await search(EMAIL);
 
     expect(screen.getByTestId('partner-search-empty')).toHaveTextContent(MISSING);
-    expect(screen.queryByText(TAKEN)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('partner-search-taken')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /send request/i })).not.toBeInTheDocument();
   });
 
@@ -160,7 +160,7 @@ describe('PartnerMoodView partner search', () => {
     await search(EMAIL);
 
     expect(screen.getByTestId('partner-search-error')).toHaveTextContent("Couldn't search");
-    expect(screen.queryByText(MISSING)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('partner-search-empty')).not.toBeInTheDocument();
   });
 
   it('shows no answer while a search is in flight', async () => {

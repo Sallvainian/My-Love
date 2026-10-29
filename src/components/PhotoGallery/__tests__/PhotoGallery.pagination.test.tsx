@@ -17,6 +17,7 @@ import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createPhotoInsert } from '../../../../tests/support/factories/photos';
 import type { PhotoWithUrls } from '../../../services/photoService';
 
 type DivProps = HTMLAttributes<HTMLDivElement> & { children?: ReactNode };
@@ -85,15 +86,20 @@ async function scrollToTrigger() {
 }
 
 function photo(index: number): PhotoWithUrls {
-  return {
+  // The columns the insert type leaves optional, restated after the factory's
+  // body so the row is whole.
+  const row = {
     id: `photo-${index}`,
-    user_id: 'me',
-    storage_path: `me/${index}.jpg`,
     caption: `cap-${index}`,
+    mime_type: 'image/jpeg',
+    created_at: '2026-09-01T10:00:00.000Z',
+  };
+  return {
+    ...createPhotoInsert({ ...row, user_id: 'me', storage_path: `me/${index}.jpg`, file_size: 68 }),
+    ...row,
     signedUrl: null,
     isOwn: true,
-    created_at: '2026-09-01T10:00:00.000Z',
-  } as unknown as PhotoWithUrls;
+  };
 }
 
 function page(count: number, from = 0): PhotoWithUrls[] {
@@ -142,7 +148,9 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
 
     const overlay = screen.getByTestId('photo-viewer-overlay');
     expect(within(overlay).getByAltText('cap-2')).toBeTruthy();
-    expect(within(overlay).getByText(/Photo 2 of 2/)).toBeTruthy();
+    expect(within(overlay).getByTestId('photo-viewer-position').textContent).toBe(
+      'Photo 2 of 2 • Your photo'
+    );
   });
 
   it('steps back to the previous photo when the last one is deleted', async () => {
@@ -154,7 +162,9 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
 
     const overlay = screen.getByTestId('photo-viewer-overlay');
     expect(within(overlay).getByAltText('cap-1')).toBeTruthy();
-    expect(within(overlay).getByText(/Photo 2 of 2/)).toBeTruthy();
+    expect(within(overlay).getByTestId('photo-viewer-position').textContent).toBe(
+      'Photo 2 of 2 • Your photo'
+    );
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe('2 photos');
   });
 
@@ -203,7 +213,9 @@ describe('PhotoGallery: deleting from the viewer (DW-176)', () => {
     expect(screen.getByTestId('photo-gallery-subtitle').textContent).toBe('3 photos');
     const overlay = screen.getByTestId('photo-viewer-overlay');
     expect(within(overlay).getByAltText('cap-1')).toBeTruthy();
-    expect(within(overlay).getByText(/Photo 2 of 3/)).toBeTruthy();
+    expect(within(overlay).getByTestId('photo-viewer-position').textContent).toBe(
+      'Photo 2 of 3 • Your photo'
+    );
   });
 });
 
@@ -247,7 +259,7 @@ describe('PhotoGallery: the store\'s newest row (DW-201)', () => {
     listPhotos.mockResolvedValue(page(50));
     await renderGallery();
 
-    const uploaded = { ...photo(99), id: 'photo-new', caption: 'cap-new' } as PhotoWithUrls;
+    const uploaded: PhotoWithUrls = { ...photo(99), id: 'photo-new', caption: 'cap-new' };
     await act(async () => {
       fakePhotoStore.setState((state) => ({ photos: [uploaded, ...state.photos] }));
     });
@@ -292,6 +304,8 @@ describe('PhotoViewer: "Photo N of M" (DW-181)', () => {
 
     await user.click(screen.getByLabelText('cap-3'));
     const overlay = screen.getByTestId('photo-viewer-overlay');
-    expect(within(overlay).getByText(/Photo 4 of 25 •/)).toBeTruthy();
+    expect(within(overlay).getByTestId('photo-viewer-position').textContent).toBe(
+      'Photo 4 of 25 • Your photo'
+    );
   });
 });

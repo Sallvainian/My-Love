@@ -138,7 +138,9 @@ describe('own display name in the chat', () => {
   it('still reads the partner name from the profile row', async () => {
     api.getOwnDisplayName.mockResolvedValue('Jessie');
     render(<LoveNotes />);
-    await waitFor(() => expect(screen.getByTestId('partner-name')).toHaveTextContent('Partner Name'));
+    await waitFor(() =>
+      expect(screen.getByTestId('partner-name').textContent).toBe('Partner Name')
+    );
   });
 
   /**

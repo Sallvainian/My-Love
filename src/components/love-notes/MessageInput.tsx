@@ -230,7 +230,11 @@ export function MessageInput() {
 
       {/* Character counter (visible at 900+ chars) */}
       {showCounter && (
-        <div className={`text-right text-sm ${counterColor}`} aria-live="polite">
+        <div
+          className={`text-right text-sm ${counterColor}`}
+          aria-live="polite"
+          data-testid="message-input-counter"
+        >
           {characterCount}/{MAX_CHARACTERS}
         </div>
       )}

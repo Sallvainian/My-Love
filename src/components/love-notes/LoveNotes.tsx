@@ -177,16 +177,22 @@ export function LoveNotes(): ReactElement {
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-partner text-base font-semibold text-card"
           aria-hidden="true"
+          data-testid="notes-partner-avatar"
         >
           {partnerInitial}
         </div>
         <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="truncate text-base font-semibold text-ink">{partnerName}</p>
+          <p className="truncate text-base font-semibold text-ink" data-testid="notes-partner-name">
+            {partnerName}
+          </p>
           {realtimeStatus === 'connected' && (
             // The feed status, not partner presence -- there is no presence
             // feature, so this must never read "Online". Not a live region: a
             // healthy feed should not announce itself.
-            <p className="flex items-center gap-1.5 text-[13px] text-muted">
+            <p
+              className="flex items-center gap-1.5 text-[13px] text-muted"
+              data-testid="notes-partner-connected"
+            >
               <span
                 className="h-2 w-2 shrink-0 rounded-full bg-good"
                 aria-hidden="true"

@@ -93,7 +93,7 @@ describe('MessageInput', () => {
       await user.click(textarea);
       await user.paste(longText);
 
-      expect(screen.getByText('905/1000')).toBeInTheDocument();
+      expect(screen.getByTestId('message-input-counter')).toHaveTextContent(/^905\/1000$/);
     });
 
     it('should show warning color at 950+ characters', async () => {
@@ -105,7 +105,8 @@ describe('MessageInput', () => {
       await user.click(textarea);
       await user.paste(longText);
 
-      const counter = screen.getByText('955/1000');
+      const counter = screen.getByTestId('message-input-counter');
+      expect(counter).toHaveTextContent(/^955\/1000$/);
       expect(counter).toHaveClass('text-ink', 'font-medium');
     });
 
@@ -480,7 +481,7 @@ describe('MessageInput', () => {
       // The composer is locked while the send is in flight and unlocks only once
       // the refusal has been handled, so the absence below cannot run early.
       await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
-      expect(screen.queryByText('Failed to send. Try again.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.getByRole('textbox')).toHaveValue('Look!');
       expect(screen.getByAltText('Selected image preview')).toBeInTheDocument();
     });
@@ -499,7 +500,7 @@ describe('MessageInput', () => {
       await user.type(screen.getByRole('textbox'), 'Hello');
       await user.click(screen.getByRole('button', { name: /send message/i }));
 
-      expect(await screen.findByText('Failed to send. Try again.')).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent(/^Failed to send\. Try again\.$/);
       expect(screen.getByRole('textbox')).toHaveValue('Hello');
     });
   });

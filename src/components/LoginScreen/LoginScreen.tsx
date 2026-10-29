@@ -306,6 +306,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
           <div
             className="flex items-center gap-3 text-xs font-semibold tracking-[.08em] text-muted"
             aria-hidden="true"
+            data-testid="login-divider"
           >
             <span className="h-px flex-1 bg-line" />
             OR
