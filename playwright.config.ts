@@ -95,6 +95,7 @@ try {
  */
 export default defineConfig({
   globalSetup: './tests/support/auth/global-setup.ts',
+  globalTeardown: './tests/support/global-teardown.ts',
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

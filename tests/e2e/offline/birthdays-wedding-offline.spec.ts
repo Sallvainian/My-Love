@@ -9,7 +9,8 @@
  *   and neither the store, the copy nor the server row changes.
  *
  * Only this worker's own pair is touched (linked once by global setup);
- * teardown resets only this pair's own `birthday` columns and `wedding_date`.
+ * teardown resets only this pair's own `birthday` columns and `wedding_date`,
+ * and deletes the pair's `couple_settings` row when the test created it.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
@@ -23,6 +24,7 @@ import {
   resolveOwnPair,
 } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { deferCoupleRowRemovalIfNew } from '../../support/helpers/teardown';
 import {
   COUPLE_SETTINGS_READ,
   OWN_PROFILE_READ,
@@ -94,6 +96,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     const partner = isoBirthdayDaysFromNow(10, 30, anchor);
     const wedding = isoDateDaysFromNow(40, anchor);
     // Deferred before the writes, so a seed that fails half-way is still reset.
+    await deferCoupleRowRemovalIfNew(supabaseAdmin, cleanup, ids.userId, ids.partnerId);
     cleanup.defer('reset the birthdays and wedding date', () => resetValues(supabaseAdmin, ids));
     await setValues(supabaseAdmin, ids, { own, partner, wedding });
 
@@ -170,6 +173,7 @@ test.describe('Birthdays and wedding date from the local copy', () => {
   }) => {
     const ids = await resolveOwnPair(supabaseAdmin);
     const own = isoBirthdayDaysFromNow(20, 29, clockAnchorAvoidingLeapDay([20]));
+    await deferCoupleRowRemovalIfNew(supabaseAdmin, cleanup, ids.userId, ids.partnerId);
     cleanup.defer('reset the birthdays and wedding date', () => resetValues(supabaseAdmin, ids));
     await setValues(supabaseAdmin, ids, { own, partner: null, wedding: null });
 

@@ -10,11 +10,13 @@
  * instead, since it is about the cards and not the save.
  *
  * Identities are this worker's own pooled pair, linked once by global setup.
- * Nothing here links, unlinks or resets a pool account; teardown resets only
- * this pair's own `birthday` columns and `wedding_date`. The pool pair's
- * `couple_settings` row always exists (`resetPair` keeps it), so the save
- * there takes the update path; the first save that creates a couple's row runs
- * on a throwaway pair of its own, deleted at teardown.
+ * Nothing here links, unlinks or resets a pool account; teardown resets this
+ * pair's own `birthday` columns and `wedding_date`, and deletes the pair's
+ * `couple_settings` row when the test created it. The pool pair's
+ * `couple_settings` row exists for the whole test (`resetPair` creates it when
+ * no earlier run left one, and teardown deletes a row the test created), so the
+ * save there takes the update path; the first save that creates a couple's row
+ * runs on a throwaway pair of its own, deleted at teardown.
  */
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
@@ -40,6 +42,7 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { deferCoupleRowRemovalIfNew } from '../../support/helpers/teardown';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
@@ -178,6 +181,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     expect(partnerAuthToken).not.toBe('');
 
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await deferCoupleRowRemovalIfNew(supabaseAdmin, cleanup, userId, partnerId);
     await resetPair(supabaseAdmin, userId, partnerId);
     cleanup.defer('reset the birthdays and wedding date', () =>
       resetPair(supabaseAdmin, userId, partnerId)
@@ -262,6 +266,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     expect(partnerAuthToken).not.toBe('');
 
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await deferCoupleRowRemovalIfNew(supabaseAdmin, cleanup, userId, partnerId);
     await resetPair(supabaseAdmin, userId, partnerId);
     cleanup.defer('reset the birthdays and wedding date', () =>
       resetPair(supabaseAdmin, userId, partnerId)
@@ -412,6 +417,7 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    await deferCoupleRowRemovalIfNew(supabaseAdmin, cleanup, userId, partnerId);
     await resetPair(supabaseAdmin, userId, partnerId);
     cleanup.defer('reset the birthdays and wedding date', () =>
       resetPair(supabaseAdmin, userId, partnerId)

@@ -2702,7 +2702,9 @@ location: tests/support/auth/worker-pool.ts; tests/e2e/
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: medium
 reason: R3's success clause "a full e2e run leaves behind no rows it created" was verified only for three love_notes content prefixes across the specs story 1.4 changed (plan 1.4 Verification). PR #377 moved cleanup into fixture teardown, but no full run has been audited across tables. Fix: a post-run check that counts the rows the worker-pool accounts own in each seeded table before and after a full run.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-leftover-row-audit
+resolution-undo: e8079d4aacc37483c3f121fc445fe62d877dd171df3ac0b5b397ab71b1b36ac0 2026-10-29 7374617475733a206f70656e
 
 ### DW-315: A history read that started before a poke was marked as seen can undo the mark when it answers, so the badge comes back.
 origin: investigation of the partner-connect poke flake 2026-10-29
