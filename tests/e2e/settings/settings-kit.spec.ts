@@ -53,8 +53,8 @@ test.describe('Settings on the style kit', () => {
       await expect(
         view.getByRole('heading', { name: 'Anniversaries', exact: true })
       ).toHaveCount(1);
-      await expect(view).not.toContainText('Event Countdowns');
-      await expect(view).not.toContainText('Anniversary Countdowns');
+      await expect(view).not.toContainText(/Event Countdowns/i);
+      await expect(view).not.toContainText(/Anniversary Countdowns/i);
 
       // Section labels.
       for (const label of ['Account', 'Countdowns', 'About']) {

@@ -17,7 +17,8 @@
  * notes and the pokes.
  *
  * One behaviour per test: the search answers; the request reaching B and B's
- * accept linking both sides; love notes arriving live; pokes arriving live.
+ * accept linking both sides; love notes arriving live; pokes arriving live; a
+ * poke sent while B is on another screen showing when B opens Partner.
  * Nothing is reloaded after a link. In the accept and love-note tests A waits
  * on Love Notes while B accepts, the one screen that joined its channel and
  * loaded its thread with no partner; each note and poke arrives on the other
@@ -32,6 +33,10 @@ import {
 import type { AppState } from '../../../src/stores/types';
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
+import {
+  parsePhoenixFrame,
+  type PhoenixFrame,
+} from '../../support/fixtures/interaction-realtime-control';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { clockAnchor } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -214,6 +219,76 @@ function trackReads(page: Page, table: string) {
   return counts;
 }
 
+type Reads = ReturnType<typeof trackReads>;
+
+/** A `system` frame confirming a postgres_changes subscription. */
+function confirmsPostgresChanges(frame: PhoenixFrame): boolean {
+  const payload = frame[4];
+  return (
+    frame[3] === 'system' &&
+    typeof payload === 'object' &&
+    payload !== null &&
+    'extension' in payload &&
+    payload.extension === 'postgres_changes' &&
+    'status' in payload &&
+    payload.status === 'ok'
+  );
+}
+
+/**
+ * Whether the page's current join of `topic` is live and its postgres_changes
+ * subscription armed, and how many history reads `reads` had counted when it
+ * was armed. SUBSCRIBED fires on the join reply, and can fire before the server
+ * has armed that subscription; it confirms it later with a `system` frame, and
+ * a row inserted before then may not be delivered. A leave, close or error of
+ * the current join clears it. Watches every socket the page opens, so call it
+ * before sign-in.
+ */
+function watchPostgresChanges(page: Page, topic: string, reads: Reads) {
+  const state = { armed: false, readsAtArming: 0 };
+  let joinRef: string | null = null;
+  const frameOn = (payload: string | Buffer): PhoenixFrame | null => {
+    const frame = parsePhoenixFrame(payload);
+    return frame?.[2] === `realtime:${topic}` ? frame : null;
+  };
+  // playwright-utils deviation: reads Realtime's Phoenix frames, which playwright-utils does not expose.
+  page.on('websocket', (socket) => {
+    socket.on('framesent', ({ payload }) => {
+      const frame = frameOn(payload);
+      if (frame?.[3] === 'phx_join') {
+        joinRef = frame[0];
+        state.armed = false;
+      } else if (frame?.[3] === 'phx_leave' && frame[0] === joinRef) {
+        state.armed = false;
+      }
+    });
+    socket.on('framereceived', ({ payload }) => {
+      const frame = frameOn(payload);
+      if (!frame || frame[0] !== joinRef) return;
+      if (frame[3] === 'phx_close' || frame[3] === 'phx_error') {
+        state.armed = false;
+      } else if (confirmsPostgresChanges(frame)) {
+        state.armed = true;
+        state.readsAtArming = reads.started;
+      }
+    });
+  });
+  return state;
+}
+
+/**
+ * Armed, and the history read the app starts on the confirmation has answered,
+ * with no other read in flight. The app reads the history when the server
+ * confirms the subscription, to catch rows that missed live delivery. After
+ * this, a poke reaches the screen over Realtime unless another read starts,
+ * which pokeAndSeeItArrive refuses.
+ */
+function caughtUp(incoming: ReturnType<typeof watchPostgresChanges>, reads: Reads): boolean {
+  return (
+    incoming.armed && reads.started > incoming.readsAtArming && reads.started === reads.settled
+  );
+}
+
 /** Navigate by the dock and wait for the screen's own Realtime join to report SUBSCRIBED. */
 async function openAndJoin(page: Page, view: 'notes' | 'partner', log: RegExp): Promise<void> {
   const joined = page.waitForEvent('console', {
@@ -379,7 +454,7 @@ test.describe('Connecting with a partner', () => {
         ]);
       }
     );
-    await expect(page.getByTestId('sent-requests-list')).not.toContainText('Unknown User');
+    await expect(page.getByTestId('sent-requests-list')).not.toContainText(/Unknown User/i);
     await expect(results).toHaveCount(0);
 
     const { data: request, error: requestError } = await supabaseAdmin
@@ -417,7 +492,7 @@ test.describe('Connecting with a partner', () => {
     ]);
     // B's received list names A.
     await expect(bPage.getByTestId('received-requests-list')).toContainText(a.name);
-    await expect(bPage.getByTestId('received-requests-list')).not.toContainText('Unknown User');
+    await expect(bPage.getByTestId('received-requests-list')).not.toContainText(/Unknown User/i);
 
     // A's thread load once A learns of the link.
     const aThreadAfterLink = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
@@ -498,21 +573,90 @@ test.describe('Connecting with a partner', () => {
     const anchor = clockAnchor();
 
     await pinFirstBrowser(page, anchor);
+    // Both watched from before sign-in. Sign-in starts the interactions
+    // refresher, and a read already in flight when a counter attaches settles
+    // without having started, leaving the in-flight count at -1.
+    const aHistoryReads = trackReads(page, 'interactions');
+    const aIncoming = watchPostgresChanges(
+      page,
+      `incoming-interactions:${a.userId}`,
+      aHistoryReads
+    );
     await signIn(page, a);
     const bPage = await openSecondBrowser(browser, testInfo, cleanup, anchor);
+    const bHistoryReads = trackReads(bPage, 'interactions');
+    const bIncoming = watchPostgresChanges(
+      bPage,
+      `incoming-interactions:${b.userId}`,
+      bHistoryReads
+    );
     await signIn(bPage, b);
 
     // ---- A poke, each way, live ----
-    const aHistoryReads = trackReads(page, 'interactions');
-    const bHistoryReads = trackReads(bPage, 'interactions');
     await Promise.all([
       openAndJoin(page, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
       openAndJoin(bPage, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
     ]);
+    await recurseUntil(
+      async () => ({
+        a: caughtUp(aIncoming, aHistoryReads),
+        b: caughtUp(bIncoming, bHistoryReads),
+      }),
+      (v) => {
+        expect(v).toEqual({ a: true, b: true });
+      }
+    );
     await expect(page.getByRole('heading', { level: 1, name: b.name })).toBeVisible();
 
     await pokeAndSeeItArrive(page, bPage, bHistoryReads);
     await pokeAndSeeItArrive(bPage, page, aHistoryReads);
+  });
+
+  test('[P1] a poke sent while the partner is on another screen shows when they open Partner', async ({
+    page,
+    browser,
+    supabaseAdmin,
+    cleanup,
+  }, testInfo) => {
+    const a = await createThrowaway(supabaseAdmin, cleanup, 'a');
+    const b = await createThrowaway(supabaseAdmin, cleanup, 'b');
+    await linkThroughRequest(a, b);
+    const anchor = clockAnchor();
+
+    await pinFirstBrowser(page, anchor);
+    await signIn(page, a);
+    const bPage = await openSecondBrowser(browser, testInfo, cleanup, anchor);
+    const bHistoryReads = trackReads(bPage, 'interactions');
+    const bIncoming = watchPostgresChanges(
+      bPage,
+      `incoming-interactions:${b.userId}`,
+      bHistoryReads
+    );
+    await signIn(bPage, b);
+    // B's sign-in read has answered, so it cannot carry the poke below.
+    await recurseUntil(
+      async () => ({ started: bHistoryReads.started, settled: bHistoryReads.settled }),
+      (v) => {
+        expect(v).toEqual({ started: 1, settled: 1 });
+      }
+    );
+
+    // ---- A pokes while B is on Home, where nothing listens for it ----
+    await openAndJoin(page, 'partner', INTERACTIONS_SUBSCRIBED_LOG);
+    const sent = observeOn({
+      page,
+      method: 'POST',
+      url: INTERACTION_SEND,
+      timeout: SECOND_CONTEXT_READ_TIMEOUT,
+    });
+    await page.getByTestId('poke-button').click();
+    expect((await sent).status).toBe(201);
+
+    // ---- B opens Partner: the read on the server's confirmation brings it ----
+    await navigateTo(bPage, 'partner');
+    await expect(bPage.getByTestId('notification-badge')).toHaveText('1');
+    expect(bIncoming.armed).toBe(true);
+    expect(bHistoryReads.started).toBe(bIncoming.readsAtArming + 1);
   });
 });
 

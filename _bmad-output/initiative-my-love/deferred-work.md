@@ -2211,7 +2211,8 @@ origin: spec-deferred 4c7cadc73a15
 location: n/a
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 reason: UNVERIFIED. Intent auditor listed realtimeLeaveContract, photoImageCache, EventsSettings hop counts; PhotoGridItem.recovery and usePhotoImage act loops; couple-start-date.spec.ts:89 and couple-settings-offline.spec.ts:110,161 start dates; lastWelcomeView = Date.now() in 33 e2e files. The e2e advisories mark the last two 'not fired'. Settle by running bmad-testarch-test-review on each folder.
-status: open
+status: done 2026-10-29
+resolution: settled 2026-10-29 by the fresh bmad-tea-test-review runs (tests/e2e and tests/api + tests/integration on 2026-10-28, src and tests/unit on 2026-10-29): none of the four reports has an H1, H2, M1 or M6 row (epic retrospective A6).
 
 ### DW-261: Returning to Settings mid-test by dock click is not gated on Settings' own mount read.
 origin: spec-deferred 766cc171c57d
@@ -2236,7 +2237,8 @@ origin: spec-deferred 3454ff3c90a8
 location: tests/e2e/
 source_spec: `3-wait-for-data-before-interacting-in-e2e-specs.md`
 reason: About 25 navigating spec files carry no M1 row and are untouched. Settle by running bmad-testarch-test-review on tests/e2e/.
-status: open
+status: done 2026-10-29
+resolution: settled 2026-10-29: the fresh 2026-10-28 bmad-tea-test-review run on tests/e2e has no M1 row (epic retrospective A6).
 
 ### DW-264: account-data.spec.ts A/B/A favorites fails about 1 run in 6 on a 406 partner-record read during sign-out/sign-in switching.
 origin: spec-deferred a50ae7184099
@@ -2346,11 +2348,11 @@ reason: The submit button is disabled while either field is empty (src/component
 status: done 2026-09-26
 resolution: fixed in PR #376 (squash 273fbf2c): the unreachable empty-fields branch in LoginScreen is deleted; the kit error-surface test reaches its error through user-event with no synthetic submit.
 
-### DW-276: A fresh M5 re-review may still score the 16 commented raw user-action dispatches this story kept.
+### DW-276: The 2026-10-29 src re-review scored two of the commented raw submits this story kept as M5 rows.
 origin: spec-deferred 2b1d4cbb8c95
-location: src/components/Settings/__tests__/EventsSettings.test.tsx:1299
+location: src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx:90; src/components/shared/__tests__/kitSurfaces.test.tsx:409
 source_spec: `5-drive-component-tests-through-user-event.md`
-reason: The registry's M5 rule (criteria-registry.md:169) has no exemption mechanism. The folder-run workers did not score fireEvent.submit past native validation, click-without-focus cases, img error or window online (test-review-target-src.md:398), which covers most kept lines, but the same-batch refresh.click() pairs in EventsSettings.test.tsx were scored (folder row at :1422 at 92f1c517). Settle by running bmad-testarch-test-review on src/ and tests/unit/ and reading the M5 rows.
+reason: The registry's M5 rule (criteria-registry.md:169) has no exemption mechanism. The folder-run workers did not score fireEvent.submit past native validation, click-without-focus cases, img error or window online (test-review-target-src.md:398), which covers most kept lines, but the same-batch refresh.click() pairs in EventsSettings.test.tsx were scored (folder row at :1422 at 92f1c517). Settle by running bmad-testarch-test-review on src/ and tests/unit/ and reading the M5 rows. Rescoped 2026-10-29 (epic retrospective A6): the fresh src run scores exactly two M5 rows, both `fireEvent.submit` calls that get past native `minLength` so the component's own length rule runs; tests/unit has none. Both are Medium, outside the epic's Boundaries. The reviewer's fix for each: prefill or type a name that passes native `minLength={3}` but fails the component's trimmed 3-30 rule (for example `'ab '`), then submit with `user.click`.
 status: open
 
 ### DW-277: AGENTS.md does not record that user-event hangs under Vitest fake setTimeout without both advanceTimers and a jest-global shim.
@@ -2376,7 +2378,8 @@ origin: spec-deferred d55a2645e7e9
 location: tests/support/helpers/recurse.ts; tests/e2e/; tests/api/
 source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
 reason: The registry row says the comment must be "on the line"; the mandate's Deviation Protocol says "a one-line comment above the code", and the diff follows the mandate. CAP-5's gate is a fresh bmad-testarch-test-review run on tests/e2e and tests/api reporting zero M9 and L9 rows. Running it settles this.
-status: open
+status: done 2026-10-29
+resolution: settled 2026-10-29: the fresh 2026-10-28 bmad-tea-test-review runs on tests/e2e and on tests/api + tests/integration have no M9 or L9 row (epic retrospective A6).
 
 ### DW-280: The favorites waits in account-data-offline-copy now resolve on the first matching GET, so a failed or cancelled read in the arm window would throw where waitForResponse skipped it.
 origin: spec-deferred bc6e87ea2a2b
@@ -2569,4 +2572,116 @@ source_spec: `tickets/epic-test-review-remediation/tickets/story-fix-the-2026-10
 severity: low
 reason: At the baseline both tests already asserted name, isRetryable and the default message (per-field toBe at :17-20, toMatchObject at :32-37); only the operation string differs, and only the second adds toBeInstanceOf(Error). The L7 conversion made the overlap visible but did not create it.
 status: done 2026-10-28
-resolution: fixed 2026-10-28: "is an instance of Error" now asserts only toBeInstanceOf(Error), and "creates an error with default message" keeps the name, operation, isRetryable and default-message checks; removing `extends Error` from OfflineError fails only the instanceof test.
+resolution: fixed 2026-10-28: "is an instance of Error" now asserts only toBeInstanceOf(Error), and "creates an error with default message" keeps the name, operation, isRetryable and default-message checks; removing `extends Error` from OfflineError fails only the instanceof test. 2026-10-29: the epic retrospective (R1, A2) found the same overlap in the withOfflineCheck describe, where 'includes operation name in thrown error' was a subset of 'throws OfflineError when offline'; it is now a second operation inside that test, and the file's two hand-typed offline messages use OFFLINE_RETRY_MESSAGE.
+
+### DW-302: AdminPanel's failed-delete test checks that an alert appears, not what it says.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
+location: tests/unit/components/AdminPanel.accountData.test.tsx:264
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: 'reports a failed delete accessibly and leaves cancel enabled' asserts only getByRole('alert') toBeInTheDocument, so an empty alert or one with the wrong message passes. Fix: assert the alert's text.
+status: open
+
+### DW-303: upload-love-note-image-limits checks x-ratelimit-remaining only against the limit, which holds by construction.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
+location: tests/api/upload-love-note-image-limits.spec.ts:134
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: medium
+reason: After one accepted upload the case asserts Number(remaining) < RATE_LIMIT_MAX_UPLOADS and that the header equals the body's count, because other cases in the worker share the minute window. A counter that never decrements still passes. Fix: read the count before and after a second upload in the same case and assert it fell by exactly one.
+status: open
+
+### DW-304: LoveNoteMessage's retry test cannot see the forceRefresh argument.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4); plan 1.13 Residual risks (A6)
+location: src/components/love-notes/__tests__/LoveNoteMessage.test.tsx (the image-service mock); src/services/loveNoteImageService.ts:235
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: The file's mock of the image service forwards only the path, so a retry that reused the cached signed URL instead of passing forceRefresh = true would pass. Fix: let the mock record its second argument and assert true on the retry.
+status: open
+
+### DW-305: PokeKissInterface's useState setter spy has no positive control while the component is mounted.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
+location: src/components/PokeKissInterface/__tests__/PokeKissInterface.test.tsx:7-25
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: stateSetterCalls observes every useState setter so the unmount cases can assert no late update. No case shows the spy records a set while mounted, so a spy that recorded nothing would pass the same negative checks. Fix: assert at least one recorded set before unmount.
+status: open
+
+### DW-306: The loaderIdentityGuards.events leak checks use JSON.stringify(state), which cannot see inside an Error, Map or Set.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
+location: tests/unit/stores/loaderIdentityGuards.events.test.ts:414,476,495,513,529
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: JSON.stringify writes an Error, a Map and a Set as {}, so the previous account's label or failure text held in one of those shapes would not be found. Fix: serialize with a replacer that expands them, or assert the specific fields.
+status: open
+
+### DW-307: events.spec.ts hard-codes the plural "days" in the expected countdown.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+location: tests/e2e/home/events.spec.ts:142-144
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: The expected text is `${FUTURE_MEETUP.daysFromNow - 1} days`, while eventCountdownHelpers.ts:60 writes "1 day" for one, so setting daysFromNow to 2 fails against correct output. Fix: build the expected text with the same singular rule.
+status: open
+
+### DW-308: notesSlice.idempotency takes a note's tempId before the queue drain settles.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+location: tests/unit/stores/notesSlice.idempotency.test.ts:287,308,339,360
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: The retries read store.getState().notes[0].tempId without first waiting for the drain, so the cases depend on that row not having been replaced yet. Fix: wait for the drain to settle, then read the key.
+status: open
+
+### DW-309: usePhotoImage.test.ts shares one hoisted PHOTO object across tests.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+location: tests/unit/hooks/usePhotoImage.test.ts:20-22
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: The store mock and every beforeEach put the same object in photos, so a test or hook that mutated it would leak into the tests after it in shuffled order. Fix: put a fresh copy in the store in beforeEach.
+status: open
+
+### DW-310: photoImageCache.test.ts settles a fill by joining a second run, which relies on the module's private coalescing.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4); plan 1.13 Residual risks (A4)
+location: tests/unit/services/photoImageCache.test.ts:598,649
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: "Joining the run settles any fill a wrong resume started" holds only while requestPhotoImageFill coalesces overlapping calls into one run, an internal detail; and plan 1.13 notes that a resume deferred by two or more microtasks starts after the join and goes uncaught. Fix: settle on an observable signal, such as the cached notice or the download mock's settled calls.
+status: open
+
+### DW-311: settleNameLookups never settles when the own-name lookup rejects.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+location: src/components/love-notes/__tests__/OwnDisplayName.test.tsx:87; src/components/love-notes/__tests__/LoveNotes.realtimeStatus.test.tsx:94
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: The helper waits for getPartnerDisplayName, which LoveNotes asks only after the own-name branch, so a case whose own-name lookup rejects fails on a waitFor timeout that names the wrong lookup. The helper is also pasted into both files (DW-313). Fix: wait on both lookups' settled results.
+status: open
+
+### DW-312: Two auth specs pin "the login screen is gone" in two different ways.
+origin: epic-test-review-remediation retrospective 2026-10-29 (R5, A4)
+location: tests/e2e/auth/login.spec.ts:135; tests/e2e/auth/bootstrap-notification-order.spec.ts:188,218
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: login.spec asserts toHaveCount(0) on the login-screen test id, while bootstrap-notification-order asserts not.toBeVisible(), which also passes when the screen is still mounted but hidden. Fix: use one form for the one contract in both specs.
+status: open
+
+### DW-313: Shared test fixtures and constants were invented file by file during the epic; one refactor story should consolidate them.
+origin: epic-test-review-remediation retrospective 2026-10-29 (D-dup1 to D-dup7, P-div1, A5)
+location: see reason
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+reason: (1) Three photo-row builder patterns: six src files spread createPhotoInsert with an unexplained file_size: 68, photosSlice.localCopy.test.ts casts as SupabasePhoto, loaderIdentityGuards.photos uses a third. (2) Four copies of the hoisted vi.mock('react') useState observer (EventsSettings.pagination, EventsSettings.lifetime, PokeKissInterface, LoveNoteMessage). (3) SQLSTATE constants declared per file (CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION, INSUFFICIENT_PRIVILEGE, CONNECTION_FAILURE), with '23514' and '08006' still literal in places. (4) loadFailure() adopted in three EventsSettings files; five siblings build { status: 'failure', error } by hand. (5) settleNameLookups pasted into OwnDisplayName.test.tsx and LoveNotes.realtimeStatus.test.tsx. (6) dbSchema.v15MessageData.test.ts hard-codes the store list storageSchema.test.ts holds as ALL_STORES. (7) Ten hand-rolled IndexedDB opens across nine e2e specs read stores savedLocalCopy cannot; logout.spec.ts:28, love-notes-offline-send.spec.ts:52 and photos-offline.spec.ts:61 skip the indexedDB.databases() guard. (8) stalePersistedMood() still defaults anchor to new Date() (tests/support/helpers/persisted-blob.ts:180), relied on by persisted-events-strip.spec.ts:214. Fix as one story: shared photo-row factories, a react-state-spy module, a SQLSTATE constants module, loadFailure everywhere, a love-notes test kit, one ALL_STORES, a guarded generic IndexedDB store reader, and a required anchor.
+status: open
+
+### DW-314: No audit checks that a full e2e run leaves behind no rows it created.
+origin: epic-test-review-remediation retrospective 2026-10-29 (S4, A8)
+location: tests/support/auth/worker-pool.ts; tests/e2e/
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: medium
+reason: R3's success clause "a full e2e run leaves behind no rows it created" was verified only for three love_notes content prefixes across the specs story 1.4 changed (plan 1.4 Verification). PR #377 moved cleanup into fixture teardown, but no full run has been audited across tables. Fix: a post-run check that counts the rows the worker-pool accounts own in each seeded table before and after a full run.
+status: open
+
+### DW-315: A history read that started before a poke was marked as seen can undo the mark when it answers, so the badge comes back.
+origin: investigation of the partner-connect poke flake 2026-10-29
+location: src/stores/slices/interactionsSlice.ts (markInteractionViewed; loadInteractionHistory)
+source_spec: n/a
+severity: low
+reason: markInteractionViewed sets viewed: true only after the server confirms, but loadInteractionHistory replaces the whole list with its answer, so an answer read before the mark carries viewed: false and puts the poke back in the unviewed count until the next read. Reads run on signed-in start, on reconnect, when History opens and, since the poke catch-up fix, each time the Partner tab's subscription is confirmed; the mark is written when the poke animation completes (PokeKissInterface.tsx:289). Read from the code, not reproduced. Fix: note the ids marked viewed while a read is in flight, as readsInFlight does for accepted rows, and keep viewed: true for them when the answer lands.
+status: open

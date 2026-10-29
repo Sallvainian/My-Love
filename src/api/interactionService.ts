@@ -21,6 +21,7 @@
  * @module api/interactionService
  */
 
+import type { RealtimeSystemPayload } from '@supabase/supabase-js';
 import { offlineMessage } from '../services/accountDataError';
 import { NoPartnerError, validatePartnerId } from '../utils/interactionValidation';
 import { logger } from '../utils/logger';
@@ -290,6 +291,11 @@ export class InteractionService {
    * @param userId - Authenticated recipient's user ID used to filter incoming interactions
    * @param callback - Function called with new interaction record
    * @param onStatusChange - Function called on subscription success, channel error, or timeout
+   * @param onDeliveryArmed - Function called each time the server confirms the
+   *   postgres_changes subscription of the current join. SUBSCRIBED comes from
+   *   the join reply and can come before this confirmation; a row inserted
+   *   before it can miss live delivery, so the caller re-reads what it may have
+   *   missed.
    * @returns Promise resolving to unsubscribe function to stop listening
    *
    * @example
@@ -313,7 +319,8 @@ export class InteractionService {
   async subscribeInteractions(
     userId: string,
     callback: (interaction: SupabaseInteractionRecord) => void,
-    onStatusChange: (status: InteractionSubscriptionStatus) => void
+    onStatusChange: (status: InteractionSubscriptionStatus) => void,
+    onDeliveryArmed?: () => void
   ): Promise<() => void> {
     // NOTE: this does NOT give each subscription its own channel, despite the
     // per-call shape. `supabase.channel(topic)` returns whatever is already
@@ -339,6 +346,16 @@ export class InteractionService {
           callback(payload.new as SupabaseInteractionRecord);
         }
       )
+      // The server's `system` message confirming the postgres_changes
+      // subscription ("Subscribed to PostgreSQL"). The client drops a message
+      // whose join_ref is not the channel's current join (@supabase/phoenix
+      // Channel.isMember), so a confirmation meant for an earlier join of this
+      // topic never reaches this listener.
+      .on('system', {}, (payload: RealtimeSystemPayload) => {
+        if (payload.extension !== 'postgres_changes' || payload.status !== 'ok') return;
+        logger.info('[InteractionService] postgres_changes subscription confirmed');
+        onDeliveryArmed?.();
+      })
       .subscribe((status) => {
         logger.info('[InteractionService] Realtime subscription status:', status);
         if (

@@ -18,7 +18,7 @@ describe('OfflineError', () => {
       name: 'OfflineError',
       operation: 'save-mood',
       isRetryable: true,
-      message: "You're offline. Please check your connection and try again.",
+      message: OFFLINE_RETRY_MESSAGE,
     });
   });
 
@@ -124,15 +124,9 @@ describe('withOfflineCheck', () => {
       operation: 'save',
       message: OFFLINE_RETRY_MESSAGE,
     });
+    // A second operation, so a hard-coded name cannot pass.
+    await expect(withOfflineCheck('sync-data', fn)).rejects.toMatchObject({ operation: 'sync-data' });
     expect(fn).not.toHaveBeenCalled();
-  });
-
-  it('includes operation name in thrown error', async () => {
-    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-    await expect(withOfflineCheck('sync-data', async () => 42)).rejects.toMatchObject({
-      name: 'OfflineError',
-      operation: 'sync-data',
-    });
   });
 
   it('propagates errors from the wrapped function', async () => {
@@ -171,7 +165,7 @@ describe('safeOfflineOperation', () => {
     expect(result).toEqual({
       success: false,
       offline: true,
-      message: "You're offline. Please check your connection and try again.",
+      message: OFFLINE_RETRY_MESSAGE,
       retry: fn,
     });
     expect(fn).not.toHaveBeenCalled();

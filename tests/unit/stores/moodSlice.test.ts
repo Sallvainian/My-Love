@@ -257,8 +257,8 @@ describe('moodSlice', () => {
   });
 
   describe('fetchPartnerMoods', () => {
-    /** Partner Mood's row limit, below the slice's default of 30; no case depends on its size. */
-    const PARTNER_MOOD_LIMIT = 10;
+    /** A limit other than the slice's default of 30, so the case can tell it was passed through. */
+    const NON_DEFAULT_LIMIT = 10;
 
     it('fetches and transforms partner moods', async () => {
       mockedGetPartnerId.mockResolvedValue('partner-uuid');
@@ -274,8 +274,9 @@ describe('moodSlice', () => {
       ]);
 
       const { get } = createTestStore();
-      await get().fetchPartnerMoods(PARTNER_MOOD_LIMIT);
+      await get().fetchPartnerMoods(NON_DEFAULT_LIMIT);
 
+      expect(mockedMoodSyncService.fetchMoods).toHaveBeenCalledWith('partner-uuid', NON_DEFAULT_LIMIT);
       expect(get().partnerMoods).toHaveLength(1);
       expect(get().partnerMoods[0].moods).toEqual(['happy', 'grateful']);
       expect(get().partnerMoods[0].date).toBe('2025-06-15');

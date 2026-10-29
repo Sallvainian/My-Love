@@ -1,6 +1,7 @@
 import { test as base } from '@playwright/test';
 
-type PhoenixFrame = [
+/** A Realtime frame on the socket: [join_ref, ref, topic, event, payload]. */
+export type PhoenixFrame = [
   joinRef: string | null,
   ref: string | null,
   topic: string,
@@ -34,7 +35,8 @@ function deferred(): Deferred {
   return { promise, resolve };
 }
 
-function parsePhoenixFrame(message: string | Buffer): PhoenixFrame | null {
+/** The frame a WebSocket message carries, or null when it is not one. */
+export function parsePhoenixFrame(message: string | Buffer): PhoenixFrame | null {
   if (typeof message !== 'string') return null;
 
   try {
