@@ -379,7 +379,7 @@ test.describe('Connecting with a partner', () => {
         ]);
       }
     );
-    await expect(page.getByTestId('sent-requests-list')).not.toContainText('Unknown User');
+    await expect(page.getByTestId('sent-requests-list')).not.toContainText(/Unknown User/i);
     await expect(results).toHaveCount(0);
 
     const { data: request, error: requestError } = await supabaseAdmin
@@ -417,7 +417,7 @@ test.describe('Connecting with a partner', () => {
     ]);
     // B's received list names A.
     await expect(bPage.getByTestId('received-requests-list')).toContainText(a.name);
-    await expect(bPage.getByTestId('received-requests-list')).not.toContainText('Unknown User');
+    await expect(bPage.getByTestId('received-requests-list')).not.toContainText(/Unknown User/i);
 
     // A's thread load once A learns of the link.
     const aThreadAfterLink = interceptNetworkCall({ method: 'GET', url: LOVE_NOTES_READ });
