@@ -165,6 +165,7 @@ import {
   cRotationPool,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -248,7 +249,7 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().messages).toEqual(cRotationPool());
       // A's own writing, one tap of Sign Out away from C's daily message card.
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+      expect(serializedStore()).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
     });
   });
 
@@ -556,7 +557,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().messages).toEqual(
         dPool.map((message) => ({ ...message, isFavorite: false }))
       );
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+      expect(serializedStore()).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
     });
   });
 

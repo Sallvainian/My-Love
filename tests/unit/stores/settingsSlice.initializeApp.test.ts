@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { SettingsSlice } from '../../../src/stores/slices/settingsSlice';
 import { projectMessageFavorites } from '../../../src/services/messageFavorites';
 import type { Message } from '../../../src/types';
+import { serialized } from './serializedState';
 
 const mockStorageService = {
   init: vi.fn(),
@@ -304,7 +305,7 @@ describe('createSettingsSlice initializeApp', () => {
     // Stale `set({ messages })` did not land — cold-boot `messages` is still
     // empty, and the outgoing account's rows are not on screen.
     expect(store.getState().messages).toEqual([]);
-    expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
+    expect(serialized(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
   });
@@ -389,7 +390,7 @@ describe('createSettingsSlice initializeApp', () => {
     const { store, updateCurrentMessage } = await switchToCDuringEmptyDbInit();
 
     expect(store.getState().messages).toEqual([]);
-    expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
+    expect(serialized(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
   });
@@ -444,7 +445,7 @@ describe('createSettingsSlice initializeApp', () => {
     const { store, updateCurrentMessage } = await signOutDuringInit();
 
     expect(store.getState().messages).toEqual([]);
-    expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
+    expect(serialized(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).not.toHaveBeenCalled();
     expect(store.getState().isLoading).toBe(false);
   });
@@ -467,7 +468,7 @@ describe('createSettingsSlice initializeApp', () => {
 
     expect(store.getState().messages).toEqual(unfavorited(shared));
     expect(store.getState().messages).not.toEqual([]);
-    expect(JSON.stringify(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
+    expect(serialized(store.getState().messages)).not.toContain('A-OUTGOING-CUSTOM');
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
 

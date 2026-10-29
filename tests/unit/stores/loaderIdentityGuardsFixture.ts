@@ -1,5 +1,6 @@
 /**
- * Shared, mock-free fixture for the `loaderIdentityGuards.*.test.ts` files.
+ * Shared, mock-free fixture for the `loaderIdentityGuards.*.test.ts` files;
+ * `signOutClearsAccountState.test.ts` also borrows `serializedStore()`.
  * Each test file keeps its own fakes, `vi.mock`s and `beforeEach`; this module
  * holds only the plain code they share.
  *
@@ -22,6 +23,7 @@
  */
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
+import { serialized } from './serializedState';
 
 export const A = 'USER-A-ID';
 export const C = 'USER-C-ID';
@@ -52,17 +54,10 @@ export function storageQuota(percent: number, warning: 'none' | 'approaching' | 
 /**
  * The whole store as text, for a leak check. Plain `JSON.stringify` writes an
  * Error, a Map and a Set as `{}`, so the previous account's label or failure
- * text held in one of them would not be found; this spells each one out.
+ * text held in one of them would not be found; `serialized` spells each one out.
  */
 export function serializedStore(): string {
-  return JSON.stringify(useAppStore.getState(), (_key, value: unknown) => {
-    if (value instanceof Error) {
-      return { ...value, name: value.name, message: value.message, cause: value.cause };
-    }
-    if (value instanceof Map) return Array.from(value.entries());
-    if (value instanceof Set) return Array.from(value.values());
-    return value;
-  });
+  return serialized(useAppStore.getState());
 }
 
 /** Hand the store to USER-C mid-flight, seeding whatever C already had on screen. */

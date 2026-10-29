@@ -165,6 +165,7 @@ import {
   A,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -222,7 +223,7 @@ describe('loader identity guards', () => {
 
       expect(useAppStore.getState().interactions).toEqual([]);
       expect(useAppStore.getState().unviewedCount).toBe(0);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-INTERACTION-MESSAGE');
+      expect(serializedStore()).not.toContain('A-INTERACTION-MESSAGE');
     });
   });
 
@@ -248,7 +249,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().partner).toEqual(PARTNER_C);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PARTNER-NAME');
+      expect(serializedStore()).not.toContain('A-PARTNER-NAME');
       // Neither shown nor saved: not under C, and not under A after the switch.
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
@@ -319,7 +320,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().sentRequests).toEqual([]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('THIRD-PARTY-EMAIL');
+      expect(serializedStore()).not.toContain('THIRD-PARTY-EMAIL');
     });
 
     it('still releases the spinner when it discards', async () => {
@@ -392,7 +393,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().searchResult).toBeNull();
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('SEARCH-HIT-DISPLAY-NAME');
+      expect(serializedStore()).not.toContain('SEARCH-HIT-DISPLAY-NAME');
     });
 
     it('discards a "taken" answer too when the account changed', async () => {

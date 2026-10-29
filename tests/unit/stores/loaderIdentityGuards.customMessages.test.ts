@@ -165,6 +165,7 @@ import {
   cRotationPool,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -281,7 +282,7 @@ describe('loader identity guards', () => {
 
       expect(readLocalCopy).toHaveBeenCalledWith(A, 'message-data');
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+      expect(serializedStore()).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
     });
 
     it('does not claim C’s list is loaded on A’s behalf when it fails', async () => {
@@ -323,7 +324,7 @@ describe('loader identity guards', () => {
         expect.any(String)
       );
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+      expect(serializedStore()).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
       expect(messageDataWrites()).toEqual([]);
     });
 
@@ -392,7 +393,7 @@ describe('loader identity guards', () => {
       expect(useAppStore.getState().customMessages).toEqual(cCustomList());
       expect(getAllStoredMessages).not.toHaveBeenCalled();
       expect(messageDataWrites()).toEqual([]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
+      expect(serializedStore()).not.toContain('A-PRIVATE-CUSTOM-MESSAGE');
     });
 
     it('sends nothing when the account changed before the queued edit started', async () => {

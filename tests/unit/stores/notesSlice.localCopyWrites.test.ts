@@ -64,6 +64,7 @@ import {
   readsHeld,
   goOffline,
 } from './notesSliceCopyFixture';
+import { serialized } from './serializedState';
 
 /** A server rejection: marks a queued text note failed. */
 const REJECTED = { code: '23514', message: 'check violation', details: '', hint: '' };
@@ -171,7 +172,7 @@ describe('notesSlice love-notes local copy', () => {
       const saved = savedCopies.get(key(USER_A)) as Record<string, unknown>[];
       expect(saved).toHaveLength(1);
       expect(saved[0].image_url).toBe(`${USER_A}/uploaded.jpg`);
-      expect(JSON.stringify(saved)).not.toContain('blob:');
+      expect(serialized(saved)).not.toContain('blob:');
     });
 
     it('a failed send is not saved; the copy holds confirmed rows only', async () => {

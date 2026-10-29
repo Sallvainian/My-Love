@@ -170,6 +170,7 @@ import {
   C,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -274,7 +275,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PHOTO-CAPTION');
+      expect(serializedStore()).not.toContain('A-PHOTO-CAPTION');
       // Nor is A's list saved as anyone's copy.
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
@@ -338,7 +339,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().photos).toEqual([cPhoto()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-PHOTO');
+      expect(serializedStore()).not.toContain('A-PRIVATE-PHOTO');
       // Nor is it saved into anyone's `photos` copy.
       expect(writeLocalCopy).not.toHaveBeenCalled();
     });
@@ -469,7 +470,7 @@ describe('loader identity guards', () => {
       // discriminates: an id-only compare would insert A's photo into it.
       expect(useAppStore.getState().userId).toBe(A);
       expect(useAppStore.getState().photos).toEqual([]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-PHOTO');
+      expect(serializedStore()).not.toContain('A-PRIVATE-PHOTO');
     });
   });
 

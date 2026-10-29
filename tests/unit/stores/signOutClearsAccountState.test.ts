@@ -51,6 +51,7 @@ import { moodSyncFingerprint } from '../../../src/services/moodSyncPayload';
 import { moodSyncService } from '../../../src/api/moodSyncService';
 import type { MoodEntry } from '../../../src/types';
 import { makeMoodEntry } from './moodSliceFixture';
+import { serializedStore } from './loaderIdentityGuardsFixture';
 import { STORAGE_KEY } from '../helpers/persistedBlob';
 
 const EXPECTED_RESET: Record<string, unknown> = {
@@ -337,7 +338,7 @@ describe('clearAuth on sign-out', () => {
       isAuthenticated: false,
       authSessionVersion: version + 1,
     });
-    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
+    expect(serializedStore()).not.toContain(SECRETS.anniversaryLabel);
   });
 
   it('clears both mood arrays', () => {
@@ -476,7 +477,7 @@ describe('clearAuth on sign-out', () => {
   it('leaves no trace of the seeded identifiers anywhere in the store', () => {
     useAppStore.getState().clearAuth();
 
-    const remaining = JSON.stringify(useAppStore.getState());
+    const remaining = serializedStore();
     for (const [label, secret] of Object.entries(SECRETS)) {
       expect(remaining, `${label} survived sign-out`).not.toContain(secret);
     }
@@ -552,7 +553,7 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
-    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
+    expect(serializedStore()).not.toContain(SECRETS.anniversaryLabel);
   });
 
   it('drops the anniversaries across a direct account switch that never passes through sign-out', () => {
@@ -560,7 +561,7 @@ describe('clearAuth on sign-out', () => {
     useAppStore.getState().setAuthUser('USER-B-ID', 'b@example.com');
 
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
-    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.anniversaryLabel);
+    expect(serializedStore()).not.toContain(SECRETS.anniversaryLabel);
   });
 
   it("drops the previous account's pending count but keeps the device's network state", () => {
@@ -643,7 +644,7 @@ describe('clearAuth on sign-out', () => {
     expect(useAppStore.getState().photos).toEqual([]);
     expect(useAppStore.getState().partner).toBeNull();
     expect(useAppStore.getState().notesPendingRemoval).toEqual([]);
-    expect(JSON.stringify(useAppStore.getState())).not.toContain(SECRETS.chatMessage);
+    expect(serializedStore()).not.toContain(SECRETS.chatMessage);
   });
 
   it('a repeat event for the SAME user leaves the session alone', () => {

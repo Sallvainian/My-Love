@@ -54,6 +54,7 @@ import { serializeAccountDataWrite } from '../../../src/services/accountDataQueu
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { listQueuedNotes } from '../../../src/services/noteQueue';
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { serialized } from './serializedState';
 
 const A = 'USER-A-ID';
 const PARTNER = 'USER-B-ID';
@@ -213,7 +214,7 @@ describe('notesSlice session guard — same account signs back in mid-flight', (
     await inFlight;
     await useAppStore.getState().drainQueuedNotes();
 
-    expect(JSON.stringify(useAppStore.getState().notes)).not.toContain('STALE-DRAFT');
+    expect(serialized(useAppStore.getState().notes)).not.toContain('STALE-DRAFT');
     expect(await listQueuedNotes(A)).toEqual([]);
     expect(loveNotesQuery).not.toHaveBeenCalled();
   });
