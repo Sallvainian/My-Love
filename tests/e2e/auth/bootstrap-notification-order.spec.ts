@@ -42,7 +42,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
       await authBootstrap.resolveLookup(stale);
       await expect(authLoader(page)).not.toBeVisible();
       await expect(page.getByTestId('app-container')).toBeVisible();
-      await expect(page.getByTestId('login-screen')).not.toBeVisible();
+      await expect(page.getByTestId('login-screen')).toHaveCount(0);
       await expect(page.getByRole('heading', { name: 'Cached current trip', exact: true })).toBeVisible();
       const after = await authBootstrap.snapshot();
       expect(after).toMatchObject({
@@ -185,7 +185,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     });
     await authBootstrap.resolveEvents([]);
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
-    await expect(page.getByTestId('login-screen')).not.toBeVisible();
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
   });
 
   test('[P1] DW-81-E2E-006 opens the app signed in from a stored session when no auth event arrives', async ({
@@ -215,7 +215,7 @@ test.describe('Auth bootstrap notification ownership in the browser', () => {
     });
     await authBootstrap.resolveEvents([]);
     await expect(page.getByTestId('events-empty-placeholder')).toBeVisible();
-    await expect(page.getByTestId('login-screen')).not.toBeVisible();
+    await expect(page.getByTestId('login-screen')).toHaveCount(0);
   });
 
   test('[P1] DW-81-E2E-007 shows Login with no trace of the previous account when no session is stored', async ({

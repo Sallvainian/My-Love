@@ -2353,7 +2353,9 @@ origin: spec-deferred 2b1d4cbb8c95
 location: src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx:90; src/components/shared/__tests__/kitSurfaces.test.tsx:409
 source_spec: `5-drive-component-tests-through-user-event.md`
 reason: The registry's M5 rule (criteria-registry.md:169) has no exemption mechanism. The folder-run workers did not score fireEvent.submit past native validation, click-without-focus cases, img error or window online (test-review-target-src.md:398), which covers most kept lines, but the same-batch refresh.click() pairs in EventsSettings.test.tsx were scored (folder row at :1422 at 92f1c517). Settle by running bmad-testarch-test-review on src/ and tests/unit/ and reading the M5 rows. Rescoped 2026-10-29 (epic retrospective A6): the fresh src run scores exactly two M5 rows, both `fireEvent.submit` calls that get past native `minLength` so the component's own length rule runs; tests/unit has none. Both are Medium, outside the epic's Boundaries. The reviewer's fix for each: prefill or type a name that passes native `minLength={3}` but fails the component's trimmed 3-30 rule (for example `'ab '`), then submit with `user.click`.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-277: AGENTS.md does not record that user-event hangs under Vitest fake setTimeout without both advanceTimers and a jest-global shim.
 origin: spec-deferred 4656b1984f27
@@ -2545,7 +2547,9 @@ location: src/hooks/usePartnerLinkListener.ts:30-37 (gate) and :49-58 (subscribe
 source_spec: n/a
 severity: medium
 reason: The partner_linked broadcast is ephemeral and never replayed, and three paths leave the listener's channel unjoined when it arrives. (1) It joins only after loadPartner answers unlinked, and subscribeMoodUpdates awaits the session, the partner lookup, setAuth and the socket first. (2) Every loadPartner sets isLoadingPartner, which turns settledUnlinked false and releases the subscriber, so on Home and Love Notes the channel is torn down and re-joined on every start, reconnect and Partner-tab mount, while the Partner tab's own subscriber passes no onPartnerLinked. (3) It passes no onStatusChange, so a Realtime reconnect never re-reads the partner. Fix: on each SUBSCRIBED call lookupPartnerId() and loadPartner() only when it answers linked (calling loadPartner directly loops through the gate), and gate on partner === null && !partnerLoadError once the first load has settled.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-partner-link-listener-rearm
+resolution-undo: 557e899a12936f0cb7f42633f9a2e20bad2908fd238445bf694e1a34e5e9c84b 2026-10-29 7374617475733a206f70656e
 
 ### DW-299: get_my_pending_partner_requests returns the name and email of the other side even when that account already has a partner.
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
@@ -2580,7 +2584,9 @@ location: tests/unit/components/AdminPanel.accountData.test.tsx:264
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: 'reports a failed delete accessibly and leaves cancel enabled' asserts only getByRole('alert') toBeInTheDocument, so an empty alert or one with the wrong message passes. Fix: assert the alert's text.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-303: upload-love-note-image-limits checks x-ratelimit-remaining only against the limit, which holds by construction.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
@@ -2588,7 +2594,9 @@ location: tests/api/upload-love-note-image-limits.spec.ts:134
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: medium
 reason: After one accepted upload the case asserts Number(remaining) < RATE_LIMIT_MAX_UPLOADS and that the header equals the body's count, because other cases in the worker share the minute window. A counter that never decrements still passes. Fix: read the count before and after a second upload in the same case and assert it fell by exactly one.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-304: LoveNoteMessage's retry test cannot see the forceRefresh argument.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4); plan 1.13 Residual risks (A6)
@@ -2596,7 +2604,9 @@ location: src/components/love-notes/__tests__/LoveNoteMessage.test.tsx (the imag
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The file's mock of the image service forwards only the path, so a retry that reused the cached signed URL instead of passing forceRefresh = true would pass. Fix: let the mock record its second argument and assert true on the retry.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-305: PokeKissInterface's useState setter spy has no positive control while the component is mounted.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
@@ -2604,7 +2614,9 @@ location: src/components/PokeKissInterface/__tests__/PokeKissInterface.test.tsx:
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: stateSetterCalls observes every useState setter so the unmount cases can assert no late update. No case shows the spy records a set while mounted, so a spy that recorded nothing would pass the same negative checks. Fix: assert at least one recorded set before unmount.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-306: The loaderIdentityGuards.events leak checks use JSON.stringify(state), which cannot see inside an Error, Map or Set.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
@@ -2612,7 +2624,9 @@ location: tests/unit/stores/loaderIdentityGuards.events.test.ts:414,476,495,513,
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: JSON.stringify writes an Error, a Map and a Set as {}, so the previous account's label or failure text held in one of those shapes would not be found. Fix: serialize with a replacer that expands them, or assert the specific fields.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-307: events.spec.ts hard-codes the plural "days" in the expected countdown.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2620,7 +2634,9 @@ location: tests/e2e/home/events.spec.ts:142-144
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The expected text is `${FUTURE_MEETUP.daysFromNow - 1} days`, while eventCountdownHelpers.ts:60 writes "1 day" for one, so setting daysFromNow to 2 fails against correct output. Fix: build the expected text with the same singular rule.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-308: notesSlice.idempotency takes a note's tempId before the queue drain settles.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2628,7 +2644,9 @@ location: tests/unit/stores/notesSlice.idempotency.test.ts:287,308,339,360
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The retries read store.getState().notes[0].tempId without first waiting for the drain, so the cases depend on that row not having been replaced yet. Fix: wait for the drain to settle, then read the key.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-309: usePhotoImage.test.ts shares one hoisted PHOTO object across tests.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2636,7 +2654,9 @@ location: tests/unit/hooks/usePhotoImage.test.ts:20-22
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The store mock and every beforeEach put the same object in photos, so a test or hook that mutated it would leak into the tests after it in shuffled order. Fix: put a fresh copy in the store in beforeEach.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-310: photoImageCache.test.ts settles a fill by joining a second run, which relies on the module's private coalescing.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4); plan 1.13 Residual risks (A4)
@@ -2644,7 +2664,9 @@ location: tests/unit/services/photoImageCache.test.ts:598,649
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: "Joining the run settles any fill a wrong resume started" holds only while requestPhotoImageFill coalesces overlapping calls into one run, an internal detail; and plan 1.13 notes that a resume deferred by two or more microtasks starts after the join and goes uncaught. Fix: settle on an observable signal, such as the cached notice or the download mock's settled calls.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-store-service-test-determinism
+resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
 
 ### DW-311: settleNameLookups never settles when the own-name lookup rejects.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
@@ -2652,7 +2674,9 @@ location: src/components/love-notes/__tests__/OwnDisplayName.test.tsx:87; src/co
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The helper waits for getPartnerDisplayName, which LoveNotes asks only after the own-name branch, so a case whose own-name lookup rejects fails on a waitFor timeout that names the wrong lookup. The helper is also pasted into both files (DW-313). Fix: wait on both lookups' settled results.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-component-test-assertion-hardening
+resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
 
 ### DW-312: Two auth specs pin "the login screen is gone" in two different ways.
 origin: epic-test-review-remediation retrospective 2026-10-29 (R5, A4)
@@ -2660,7 +2684,9 @@ location: tests/e2e/auth/login.spec.ts:135; tests/e2e/auth/bootstrap-notificatio
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: login.spec asserts toHaveCount(0) on the login-screen test id, while bootstrap-notification-order asserts not.toBeVisible(), which also passes when the screen is still mounted but hidden. Fix: use one form for the one contract in both specs.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-313: Shared test fixtures and constants were invented file by file during the epic; one refactor story should consolidate them.
 origin: epic-test-review-remediation retrospective 2026-10-29 (D-dup1 to D-dup7, P-div1, A5)
@@ -2676,7 +2702,9 @@ location: tests/support/auth/worker-pool.ts; tests/e2e/
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: medium
 reason: R3's success clause "a full e2e run leaves behind no rows it created" was verified only for three love_notes content prefixes across the specs story 1.4 changed (plan 1.4 Verification). PR #377 moved cleanup into fixture teardown, but no full run has been audited across tables. Fix: a post-run check that counts the rows the worker-pool accounts own in each seeded table before and after a full run.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-leftover-row-audit
+resolution-undo: e8079d4aacc37483c3f121fc445fe62d877dd171df3ac0b5b397ab71b1b36ac0 2026-10-29 7374617475733a206f70656e
 
 ### DW-315: A history read that started before a poke was marked as seen can undo the mark when it answers, so the badge comes back.
 origin: investigation of the partner-connect poke flake 2026-10-29
@@ -2684,7 +2712,9 @@ location: src/stores/slices/interactionsSlice.ts (markInteractionViewed; loadInt
 source_spec: n/a
 severity: low
 reason: markInteractionViewed sets viewed: true only after the server confirms, but loadInteractionHistory replaces the whole list with its answer, so an answer read before the mark carries viewed: false and puts the poke back in the unviewed count until the next read. Reads run on signed-in start, on reconnect, when History opens and, since the poke catch-up fix, each time the Partner tab's subscription is confirmed; the mark is written when the poke animation completes (PokeKissInterface.tsx:289). Read from the code, not reproduced. Fix: note the ids marked viewed while a read is in flight, as readsInFlight does for accepted rows, and keep viewed: true for them when the answer lands.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-interaction-viewed-read-race
+resolution-undo: 72a6b01666ede192297badccb8fbc90e19ec25f8443762e8246c2745fddcfa79 2026-10-29 7374617475733a206f70656e
 
 ### DW-316: About ten corrections.md items were never re-checked against the code, so Done when 2 is unproven for them.
 origin: epic-test-review-remediation retrospective 2026-10-29 (S2)
@@ -2692,7 +2722,8 @@ location: _bmad-output/initiative-my-love/tickets/epic-test-review-remediation/c
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: The retrospective checked about 30 of the file's roughly 40 items against HEAD and found every one resolved, but it does not list which ones it checked. It names the items it did not re-check one by one: the four false positives (notesSlice.offlineQueue.test.ts:312 M3, coupleSettingsService.test.ts:157 L7, DisplayNameSetup.test.tsx:183 L5, MoodHistoryTimeline.test.tsx:68 L3), EventsSettings.test.tsx:1493, EventsSettings.focus.test.tsx:363 and useNetworkStatus.test.ts:321-341. Settle by checking every item in corrections.md against HEAD, locating each by content because its line numbers predate the epic, and recording each as resolved or still open with its location. Fix what is still open under the epic's Constraints: a fix keeps or strengthens what the test proves, and a verified false positive gets a harmless change so the rule stops firing.
-status: open
+status: done 2026-10-29
+resolution: already resolved: All seven items the retrospective left unchecked are resolved at HEAD, located by content: notesSlice.offlineQueue.test.ts:147-189 split the M3 reconnect test into five single-subject tests (254dbd93); coupleSettingsService.test.ts:155-162 uses one rejects style and keeps toBeInstanceOf(AccountDataError); DisplayNameSetup.test.tsx:187 is named for behaviour ('offline: refuses before reading the session or writing...'); MoodHistoryTimeline.test.tsx:76 reads notes via the mood-note test id; EventsSettings :1493 moved to EventsSettings.reconciliation.test.tsx:346 asserting the loadingDuringRetry column; EventsSettings.focus.test.tsx:412-418 asserts openerSurvives and loadingAfterRefresh unconditionally; useNetworkStatus.test.ts:332,338 asserts vi.getTimerCount() 1 then 0. Spot re-checks of the rest also hold (login.spec.ts:138-163 signs in and checks the stored session across reload; token-persistence-overlap.spec.ts:238-239 pins the action-started list; love-notes.spec.ts:27 deletes sent notes; moodGrouping.test.ts has no 86400000; updateCurrentMessageStaleCache.test.ts pins NOW).
 
 ### DW-317: Decision record D1 (e2e page clocks anchor at the live day, never a fixed date) is only half written down where agents read it.
 origin: epic-test-review-remediation retrospective 2026-10-29 (S6, D1)
@@ -2700,7 +2731,9 @@ location: tests/support/helpers/events.ts:190-205 (clockAnchor)
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
 reason: clockAnchor's JSDoc already records that the anchor is the latest local noon at or before now, so it sits behind real time and never ahead, because a page clock ahead of the session's mint time makes supabase-js refresh the token. It does not record why a fixed calendar date was rejected: plan 1.2's Review Triage Log (story-remove-clock-timing-and-async-nondeterminism-plan.md:235) says a fixed date "would put the page clock arbitrarily far behind server timestamps" and collide unique created_at rows across reruns. The retrospective proposed a separate adr-e2e-page-clock-anchors-at-the-live-day.md beside the helper, but AGENTS.md keeps durable agent-facing prose in AGENTS.md and forbids generated documentation files. So add the missing reason to clockAnchor's JSDoc, and, if every e2e spec that seeds calendar-day rows must use clockAnchor, say so in one AGENTS.md line, rather than adding a new file.
-status: open
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 
 ### DW-318: Sign-out leaves the outgoing account's synced mood rows on the device.
 origin: AGENTS.md context refresh 2026-10-29
@@ -2708,4 +2741,38 @@ location: src/stores/slices/authSlice.ts:47-67 (deleteAccountData); src/services
 source_spec: n/a
 severity: low
 reason: deleteAccountData() deletes the outgoing account's local copies and cached images and nothing else. Its JSDoc keeps "unsynced `moods` rows" for their owner to send on the next sign-in, and AGENTS.md ("Maintained by hand", sign-out rule) allows only a queue of unsent writes to stay. But the `moods` store holds synced rows (`synced: true`) beside the queue, and those stay too. The app never shows them to the next account, because every read is scoped by userId (moodService.getAllForUser), but they remain in the device's IndexedDB, unlike every other per-account copy. Nothing records keeping them on purpose: 771a93b7 says sign-out "keeps queued moods", and DW-5 (archived) proposed clearing the store before its fix scoped the reads instead. Fix: in deleteAccountData, also delete the outgoing user's `moods` rows whose `synced` is true, and keep every `synced: false` row. Nothing is lost, because the signed-in backfill (moodSlice.ts:575-590) pages through the whole server history and refills the store. Cover the boot with no session that the `my-love-account-owner` marker drives, and decide what to do with a row whose sync finishes after sign-out and marks it synced.
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-synced-moods-signout-delete
+resolution-undo: bec72ab16700c1eded375e3e02307c506b8c273be1c6fcc7faa6ebc0a5a14733 2026-10-29 7374617475733a206f70656e
+
+### DW-319: A mood row the service worker's background sync marks synced after sign-out stays on the device until that account's next sign-out there.
+origin: spec-deferred 77375ef75a5a
+location: src/sw-db.ts:97 (markMoodSynced); src/stores/slices/authSlice.ts (deleteAccountData)
+source_spec: `plan-dw-synced-moods-signout-delete.md`
+severity: low
+reason: sw-db.ts markMoodSynced has no session check, and discardAccountState clears the my-love-account-owner marker on sign-out, so when another account signs in next, nothing deletes the row. Reads stay scoped by userId, so the row is never shown to that account. The intent accepted "the row is left for the next deletion"; recording it so a sweep sees it.
+status: open
+
+### DW-320: The same JSON.stringify(state) leak check, blind to Error/Map/Set, is used outside the events file.
+origin: spec-deferred b8c7828c1182
+location: tests/unit/stores/loaderIdentityGuards.moods.test.ts:214
+source_spec: `plan-dw-store-service-test-determinism.md`
+severity: low
+reason: grep finds it at tests/unit/stores/loaderIdentityGuards.moods.test.ts:214,242, loaderIdentityGuards.partner.test.ts:225,251,322,395 and signOutClearsAccountState.test.ts:340,479,555,563; DW-306 names only the events file. They can adopt serializedStore() from loaderIdentityGuardsFixture.ts.
+status: open
+
+### DW-321: Complete list of the leak checks outside the events file that still use plain JSON.stringify on store state (it supersedes the incomplete item above).
+origin: spec-deferred a4946ac45884
+location: tests/unit/stores/loaderIdentityGuards.customMessages.test.ts:284
+source_spec: `plan-dw-store-service-test-determinism.md`
+severity: low
+reason: These are blind to an Error, Map or Set, as DW-306 was. Found with `grep -rn "JSON.stringify(" tests/unit` on 2026-10-29. On useAppStore, so they can adopt serializedStore() from loaderIdentityGuardsFixture.ts: - loaderIdentityGuards.moods.test.ts:214,242 - loaderIdentityGuards.partner.test.ts:225,251,322,395 - loaderIdentityGuards.customMessages.test.ts:284,326,395 - loaderIdentityGuards.notes.test.ts:232,271 - loaderIdentityGuards.photos.test.ts:277,341,472 - loaderIdentityGuards.messages.test.ts:251,559 - signOutClearsAccountState.test.ts:340,479,555,563,646 On a local store or a slice of state, so they need the replacer to take a value: - interactionsSubscription.test.ts:634,656 - notesSlice.localCopy.test.ts:517 - partnerSlice.localCopy.test.ts:213 - notesSlice.sessionGuard.test.ts:216 - settingsSlice.initializeApp.test.ts:307,392,447,470 - notesSlice.localCopyWrites.test.ts:174
+status: open
+
+### DW-322: upload-love-note-image's 10-per-minute-per-user rate limit is kept in isolate memory, so it is not enforced once one user's requests spread across isolates.
+origin: spec-deferred cdcdf5b24fcb
+location: supabase/functions/upload-love-note-image/handler.ts:113-115
+source_spec: `plan-dw-e2e-assertion-precision.md`
+severity: medium
+reason: rateLimitStore is a module-level Map; two consecutive uploads over the wire failed a decrement assertion 9 of 9 serial runs locally (edge-runtime 1.77.8, policy = "per_worker"). Whether hosted functions spread one user's requests the same way is UNVERIFIED. Fix needs an owner decision on a shared store (DB table or RPC).
 status: open

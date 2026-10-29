@@ -204,10 +204,12 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     // — and with `initialIdentity` it runs before the bootstrap lookup.
     anniversariesService.fetchAnniversaries = async () => [];
     // App's partner-link listener (usePartnerLinkListener) subscribes to the
-    // account's mood topic while the store holds no partner, which it always
-    // does here (the partner refresher below is a no-op). That subscribe reads
-    // the session -- the very call this harness counts and defers -- and looks
-    // the partner up with the fake token, which PostgREST answers with 401.
+    // account's mood topic once a partner load settles with no partner. The
+    // partner refresher below is a no-op, so no load runs here and it stays
+    // closed; this stub keeps it closed if a partner load ever does run. That
+    // subscribe reads the session -- the very call this harness counts and
+    // defers -- and looks the partner up with the fake token, which PostgREST
+    // answers with 401.
     moodSyncService.subscribeMoodUpdates = async () => () => {};
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession

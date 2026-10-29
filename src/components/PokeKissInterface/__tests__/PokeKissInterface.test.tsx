@@ -145,6 +145,14 @@ describe('PokeKissInterface interaction subscription', () => {
 
     const { unmount } = render(<PokeKissInterface />);
     await waitFor(() => expect(reportStatus).toBeDefined());
+
+    // Positive control: while mounted the spy records this status's dispatch,
+    // so its silence below means no dispatch, not a spy that sees nothing.
+    stateSetterCalls.mockClear();
+    act(() => reportStatus?.('CHANNEL_ERROR'));
+    expect(stateSetterCalls).toHaveBeenCalledWith(
+      'Connection lost. Incoming pokes and kisses may not arrive.'
+    );
     unmount();
 
     // Only a dispatch made for the late status counts.

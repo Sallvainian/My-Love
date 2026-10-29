@@ -151,6 +151,7 @@ vi.mock('../../../src/services/moodService', () => ({
   moodService: {
     getAllForUser: (userId: string) => getAllForUser(userId),
     getUnsyncedMoods: (userId: string) => getUnsyncedMoods(userId),
+    deleteSyncedForUser: async () => 0,
   },
 }));
 

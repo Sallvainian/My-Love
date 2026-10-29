@@ -402,6 +402,70 @@ describe('moodService', () => {
     });
   });
 
+  describe('deleteSyncedForUser', () => {
+    const otherUser = '223e4567-e89b-42d3-a456-426614174000';
+
+    /** A synced row as the history backfill stores it. */
+    async function seedSynced(owner: string, date: string, supabaseId: string) {
+      const entry: MoodEntry = {
+        userId: owner,
+        mood: 'grateful',
+        moods: ['grateful'],
+        note: 'from the server',
+        date,
+        timestamp: new Date(`${date}T12:00:00.000Z`),
+        synced: true,
+        supabaseId,
+      };
+      await moodService.mergeServerMoods(owner, [entry], await moodService.getMergeSnapshot(owner));
+    }
+
+    it("deletes only that user's synced rows and returns the count", async () => {
+      await seedSynced(userId, '2026-08-01', 'mine-1');
+      await seedSynced(userId, '2026-08-02', 'mine-2');
+      const queued = await moodService.saveForDate(userId, '2026-08-03', ['sad'], 'queued');
+      await seedSynced(otherUser, '2026-08-01', 'theirs-1');
+      const theirQueued = await moodService.saveForDate(otherUser, '2026-08-04', ['happy'], 'theirs');
+
+      const deleted = await moodService.deleteSyncedForUser(userId);
+
+      expect(deleted).toBe(2);
+      const rows = await moodService.getAll();
+      expect(rows).toHaveLength(3);
+      expect(rows.find((r) => r.id === queued.id)).toMatchObject({
+        userId,
+        date: '2026-08-03',
+        synced: false,
+        note: 'queued',
+      });
+      expect(rows.find((r) => r.id === theirQueued.id)).toMatchObject({
+        userId: otherUser,
+        synced: false,
+      });
+      expect(rows.find((r) => r.supabaseId === 'theirs-1')).toMatchObject({
+        userId: otherUser,
+        date: '2026-08-01',
+        synced: true,
+      });
+      expect(rows.some((r) => r.userId === userId && r.synced)).toBe(false);
+    });
+
+    it('returns 0 and deletes nothing when the user has no synced rows', async () => {
+      await moodService.saveForDate(userId, '2026-08-03', ['sad']);
+      await seedSynced(otherUser, '2026-08-01', 'theirs-1');
+
+      expect(await moodService.deleteSyncedForUser(userId)).toBe(0);
+      expect(await moodService.getAll()).toHaveLength(2);
+    });
+
+    it('rejects an empty user id without touching the store', async () => {
+      await seedSynced(userId, '2026-08-01', 'mine-1');
+
+      await expect(moodService.deleteSyncedForUser('')).rejects.toThrow('User not authenticated');
+      expect(await moodService.getAll()).toHaveLength(1);
+    });
+  });
+
   describe('getAll (inherited)', () => {
     it('returns all mood entries', async () => {
       await moodService.create(userId, ['happy']);

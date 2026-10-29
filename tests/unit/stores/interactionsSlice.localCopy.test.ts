@@ -568,6 +568,45 @@ describe('interactionsSlice local copy', () => {
       expect(store.getState().unviewedCount).toBe(1);
     });
 
+    it('keeps a mark confirmed mid-read when the answer predates it', async () => {
+      const server = deferred<Interaction[]>();
+      getInteractionHistory.mockReturnValueOnce(server.promise);
+      const store = createTestStore();
+      store.setState({ interactions: [interaction('a'), interaction('b')], unviewedCount: 2 });
+
+      const read = store.getState().loadInteractionHistory();
+      await store.getState().markInteractionViewed('a');
+      // The answer was read before the mark, so it still carries `a` unviewed.
+      server.resolve([interaction('a'), interaction('b')]);
+      await read;
+
+      expect(store.getState().interactions).toEqual([
+        interaction('a', { viewed: true }),
+        interaction('b'),
+      ]);
+      expect(store.getState().unviewedCount).toBe(1);
+      expect(savedCopies.get(key(USER_A))).toEqual([
+        saved(interaction('a', { viewed: true })),
+        saved(interaction('b')),
+      ]);
+    });
+
+    it('a mark that fails while a history read is out leaves the answer as read', async () => {
+      const server = deferred<Interaction[]>();
+      getInteractionHistory.mockReturnValueOnce(server.promise);
+      markAsViewed.mockRejectedValueOnce(new Error('network'));
+      const store = createTestStore();
+      store.setState({ interactions: [interaction('a')], unviewedCount: 1 });
+
+      const read = store.getState().loadInteractionHistory();
+      await expect(store.getState().markInteractionViewed('a')).rejects.toThrow('network');
+      server.resolve([interaction('a')]);
+      await read;
+
+      expect(store.getState().interactions).toEqual([interaction('a')]);
+      expect(store.getState().unviewedCount).toBe(1);
+    });
+
     it('offline, mark-viewed changes nothing locally', async () => {
       setOnline(false);
       const store = createTestStore();

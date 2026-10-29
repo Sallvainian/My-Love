@@ -197,6 +197,18 @@ async function sendText(store: ReturnType<typeof createTestStore>, content: stri
   await store.getState().drainQueuedNotes();
 }
 
+/**
+ * The key a retry needs: the tempId of the note composed as `content`, read
+ * once `sendText` has waited for the drain. Found by content rather than by
+ * position, and checked still queued and not sending, so a row the drain had
+ * confirmed (which drops its tempId) or was still sending fails here.
+ */
+function queuedKey(store: ReturnType<typeof createTestStore>, content: string): string {
+  const note = store.getState().notes.find((n) => n.content === content);
+  expect(note).toMatchObject({ queued: true, sending: false, tempId: expect.any(String) });
+  return note!.tempId!;
+}
+
 async function clearNoteQueue(): Promise<void> {
   const db = await openMyLoveDB();
   try {
@@ -284,7 +296,7 @@ describe('notesSlice send idempotency', () => {
     backend.writeError = checkError;
     let resolve!: () => void;
     backend.waitForWrite = new Promise<void>((done) => { resolve = done; });
-    const pending = action === 'send' ? sendText(store, 'hello') : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    const pending = action === 'send' ? sendText(store, 'hello') : store.getState().retryFailedMessage(queuedKey(store, 'first'));
     await vi.waitFor(() => expect(backend.failNextWrite).toBe(false));
     store.setState({ userId: PARTNER_ID, notes: [], notesError: 'new account error' });
     resolve();
@@ -305,7 +317,7 @@ describe('notesSlice send idempotency', () => {
     backend.waitForWrite = new Promise<void>((done) => { resolve = done; });
     const pending = action === 'send'
       ? sendText(store, 'hello')
-      : store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+      : store.getState().retryFailedMessage(queuedKey(store, 'first'));
     await vi.waitFor(() => expect(backend.rows).toHaveLength(1));
 
     const newAccountNotes = [{
@@ -332,11 +344,16 @@ describe('notesSlice send idempotency', () => {
 
   it.each(['send', 'retry'] as const)('preserves unrelated errors on %s recovery', async (action) => {
     const store = createTestStore();
+    // Refused, not transient: a transient failure is sent again by the drain
+    // pass sendText joins, so 'first' would be confirmed before any retry.
+    backend.writeError = { ...checkError, code: NOT_NULL_VIOLATION };
     backend.failNextWrite = true;
     await sendText(store, 'first');
     store.setState({ notesError: 'unrelated error' });
     if (action === 'send') await sendText(store, 'second');
-    else await store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    else await store.getState().retryFailedMessage(queuedKey(store, 'first'));
+    // The recovery happened: the note sent second, or the retried one, landed.
+    expect(backend.rows.map((row) => row.content)).toEqual([action === 'send' ? 'second' : 'first']);
     expect(store.getState().notesError).toBe('unrelated error');
   });
 
@@ -357,7 +374,7 @@ describe('notesSlice send idempotency', () => {
     backend.failNextWrite = true;
     await sendText(store, 'first');
     backend.failNextWrite = true;
-    await store.getState().retryFailedMessage(store.getState().notes[0].tempId!);
+    await store.getState().retryFailedMessage(queuedKey(store, 'first'));
     expect(store.getState().notesError).toBe('existing error');
     expect(store.getState().notes[0].error).toBe(true);
   });

@@ -6,7 +6,7 @@
  * hex, gradient, `bg-white` or Tailwind palette class), which is what lets it
  * follow the OS theme.
  */
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement, forwardRef, type ComponentType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -393,12 +393,15 @@ describe('DisplayNameSetup on the kit', () => {
     expectOnKit(container.innerHTML);
   });
 
-  it('renders the edit route with a secondary Cancel and the kit failure box', () => {
+  it('renders the edit route with a secondary Cancel and the kit failure box', async () => {
+    const user = userEvent.setup();
+    // Three characters, so native minLength={3} lets the click submit, but two
+    // once trimmed, so the component's own length check refuses it.
     const { container } = render(
       <DisplayNameSetup
         isOpen
         mode="edit"
-        initialName="Fr"
+        initialName="ab "
         onComplete={vi.fn()}
         onCancel={vi.fn()}
       />
@@ -406,9 +409,10 @@ describe('DisplayNameSetup on the kit', () => {
 
     expect(screen.getByTestId('display-name-cancel')).toHaveClass('bg-tint', 'text-accent');
     expect(screen.getByTestId('display-name-submit')).toHaveClass('bg-fill');
-    fireEvent.submit(screen.getByTestId('display-name-form')); // raw submit: happy-dom applies minLength to the prefilled 2-char name and blocks a click-driven submit (a browser would not, as the value was never user-edited), so the component's own length check never runs
+    await user.click(screen.getByTestId('display-name-submit'));
 
     const error = screen.getByTestId('display-name-error');
+    expect(error).toHaveTextContent('Display name must be between 3 and 30 characters');
     expect(error).toHaveAttribute('role', 'alert');
     expect(error).toHaveClass('bg-dtint', 'text-danger');
     expect(within(error).getByTestId('display-name-error-icon')).toBeInTheDocument();

@@ -262,6 +262,7 @@ describe('AdminPanel with the real local copy and store', () => {
   it('reports a failed delete accessibly and leaves cancel enabled', async () => {
     await failFirstDelete(userEvent.setup());
     expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not delete this message. Please try again.');
     expect(screen.getByTestId('admin-delete-dialog-cancel')).toBeEnabled();
   });
 

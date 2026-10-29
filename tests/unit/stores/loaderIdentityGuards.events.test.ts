@@ -156,6 +156,7 @@ vi.mock('../../../src/services/moodService', () => ({
   moodService: {
     getAllForUser: (userId: string) => getAllForUser(userId),
     getUnsyncedMoods: (userId: string) => getUnsyncedMoods(userId),
+    deleteSyncedForUser: async () => 0,
   },
 }));
 
@@ -166,6 +167,7 @@ import {
   C,
   deferred,
   resetStoreSignedInAsA,
+  serializedStore,
   storageQuota,
   switchToUserC,
 } from './loaderIdentityGuardsFixture';
@@ -411,7 +413,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().events).toEqual([cEventStub()]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
+      expect(serializedStore()).not.toContain('A-PRIVATE-EVENT-LABEL');
     });
 
     it('leaves a successor account’s live spinner alone when it discards', async () => {
@@ -473,7 +475,7 @@ describe('loader identity guards', () => {
       await inFlight;
 
       expect(useAppStore.getState().events).toEqual([cOwnEvent]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
+      expect(serializedStore()).not.toContain('A-PRIVATE-EVENT-LABEL');
     });
 
     it('does not paint the previous account\'s failure onto the new one', async () => {
@@ -492,7 +494,7 @@ describe('loader identity guards', () => {
       // A sentinel, not null: a write that cleared the banner would also pass a
       // check that it stayed null.
       expect(useAppStore.getState().eventsError).toBe('C-OWN-LOAD-ERROR');
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REQUEST-FAILURE');
+      expect(serializedStore()).not.toContain('A-REQUEST-FAILURE');
     });
   });
 
@@ -510,7 +512,7 @@ describe('loader identity guards', () => {
       // Same id in both accounts: without the guard the map() would overwrite
       // C's row with A's, which is the leak in its most direct form.
       expect(useAppStore.getState().events).toEqual([cEventStub('a-event')]);
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-PRIVATE-EVENT-LABEL');
+      expect(serializedStore()).not.toContain('A-PRIVATE-EVENT-LABEL');
     });
 
     it('does not paint the previous account\'s failure onto the new one', async () => {
@@ -526,7 +528,7 @@ describe('loader identity guards', () => {
       // A sentinel, not null: a write that cleared the banner would also pass a
       // check that it stayed null.
       expect(useAppStore.getState().eventsError).toBe('C-OWN-LOAD-ERROR');
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REQUEST-FAILURE');
+      expect(serializedStore()).not.toContain('A-REQUEST-FAILURE');
     });
   });
 
@@ -559,7 +561,7 @@ describe('loader identity guards', () => {
       // A sentinel, not null: a write that cleared the banner would also pass a
       // check that it stayed null.
       expect(useAppStore.getState().eventsError).toBe('C-OWN-LOAD-ERROR');
-      expect(JSON.stringify(useAppStore.getState())).not.toContain('A-REQUEST-FAILURE');
+      expect(serializedStore()).not.toContain('A-REQUEST-FAILURE');
     });
   });
 

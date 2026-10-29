@@ -17,7 +17,7 @@
  *    so "no error" is not the same as "saved" and the row count has to be
  *    checked too.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import { PostgrestError } from '@supabase/supabase-js';
@@ -78,18 +78,12 @@ async function submit(user: UserEvent, name: string, onComplete = vi.fn()) {
 }
 
 /**
- * Submit the form directly, bypassing the native constraint validation the
- * input's `required`/`minLength` attributes trigger. A click cannot reach the
- * component's OWN length check — the browser refuses the submit first — so a
- * click-driven test would assert the platform's behaviour and leave
+ * Three characters to the input's native `minLength={3}`, so a click submits,
+ * but two once trimmed, so the component's OWN length rule refuses it. A plain
+ * two-character name would be refused by the platform first and leave
  * `validateDisplayName` untested.
  */
-async function submitPastNativeValidation(user: UserEvent, name: string, onComplete = vi.fn()) {
-  render(<DisplayNameSetup isOpen onComplete={onComplete} />);
-  await user.type(screen.getByLabelText('Display Name'), name);
-  fireEvent.submit(screen.getByTestId('display-name-form')); // raw submit: bypasses the native required/minLength check so the component's own length rule runs
-  return onComplete;
-}
+const SHORT_ONCE_TRIMMED = 'ab ';
 
 describe('DisplayNameSetup saves the name to the profile row', () => {
   let user: UserEvent;
@@ -273,7 +267,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
   });
 
   it('rejects a too-short name before touching the network', async () => {
-    const onComplete = await submitPastNativeValidation(user, 'ab');
+    const onComplete = await submit(user, SHORT_ONCE_TRIMMED);
 
     await waitFor(() =>
       expect(screen.getByTestId('display-name-error')).toHaveTextContent(
@@ -287,7 +281,7 @@ describe('DisplayNameSetup saves the name to the profile row', () => {
 
   // DW-192: the ring mirrors aria-invalid, as it does on the sign-in fields.
   it('rings the field in danger while an error shows', async () => {
-    await submitPastNativeValidation(user, 'ab');
+    await submit(user, SHORT_ONCE_TRIMMED);
 
     await waitFor(() => expect(screen.getByTestId('display-name-error')).toBeInTheDocument());
     const field = screen.getByLabelText('Display Name');

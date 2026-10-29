@@ -38,7 +38,8 @@
  *   list, and only until this session has a server answer or a confirmed
  *   change), then replaces state and copy with the server's list, keeping any
  *   row accepted while the read was out (from Realtime or a confirmed send)
- *   that the list lacks. A failed read changes nothing; an empty answer is
+ *   that the list lacks, and keeping `viewed: true` on any row whose mark was
+ *   confirmed while it was out. A failed read changes nothing; an empty answer is
  *   saved as `[]`. The badge count is recomputed from the list whenever the
  *   list comes from the copy or server.
  * - It is also the kind's refresher, so the history loads on signed-in start
@@ -187,14 +188,18 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
     get().userId === userId && get().authSessionVersion === authSessionVersion;
 
   /**
-   * One set per history read in flight, holding the ids of the rows accepted
-   * while it was out, from Realtime or a confirmed send. Its answer may have
-   * been read before those rows were inserted, so they are kept rather than
-   * replaced by it.
+   * One entry per history read in flight. `accepted` holds the ids of the rows
+   * accepted while it was out, from Realtime or a confirmed send; `viewed` the
+   * ids whose mark-as-viewed the server confirmed while it was out. Its answer
+   * may have been read before those rows were inserted or marked, so they are
+   * kept, and kept viewed, rather than replaced by it.
    */
-  const readsInFlight = new Set<Set<string>>();
+  const readsInFlight = new Set<{ accepted: Set<string>; viewed: Set<string> }>();
   const noteAccepted = (id: string) => {
-    for (const acceptedDuringRead of readsInFlight) acceptedDuringRead.add(id);
+    for (const read of readsInFlight) read.accepted.add(id);
+  };
+  const noteViewed = (id: string) => {
+    for (const read of readsInFlight) read.viewed.add(id);
   };
 
   /**
@@ -317,6 +322,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         if (!currentUserId || !ownsSession(currentUserId, markedInSession)) return;
 
         // Update local state
+        noteViewed(id);
         set((state) => {
           const interactions = state.interactions.map((interaction) =>
             interaction.id === id ? { ...interaction, viewed: true } : interaction
@@ -354,10 +360,10 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         throw new Error('Cannot load interaction history: User not authenticated');
       }
 
-      // Registered before the request goes out, so every row accepted after it
-      // is noted (see readsInFlight).
-      const acceptedDuringRead = new Set<string>();
-      readsInFlight.add(acceptedDuringRead);
+      // Registered before the request goes out, so every row accepted or marked
+      // viewed after it is noted (see readsInFlight).
+      const duringRead = { accepted: new Set<string>(), viewed: new Set<string>() };
+      readsInFlight.add(duringRead);
       const readNumber = ++readsStarted;
 
       try {
@@ -401,13 +407,17 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
         // Except a row accepted while this read was out, from Realtime or a
         // confirmed send, that its answer lacks: that row stays, ahead of it.
+        // And a row whose mark the server confirmed while this read was out
+        // stays viewed, though the answer may predate the mark.
         const answered = new Set(fetched.map((interaction) => interaction.id));
         const interactions = [
           ...get().interactions.filter(
             (interaction) =>
-              acceptedDuringRead.has(interaction.id) && !answered.has(interaction.id)
+              duringRead.accepted.has(interaction.id) && !answered.has(interaction.id)
           ),
-          ...fetched,
+          ...fetched.map((interaction) =>
+            duringRead.viewed.has(interaction.id) ? { ...interaction, viewed: true } : interaction
+          ),
         ];
         const unviewedCount = countUnviewed(interactions, currentUserId);
         set({ interactions, unviewedCount });
@@ -425,7 +435,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
         // A failed read changes nothing: state and copy stay as they were.
         console.error('[InteractionsSlice] Error loading interaction history:', error);
       } finally {
-        readsInFlight.delete(acceptedDuringRead);
+        readsInFlight.delete(duringRead);
       }
     },
 

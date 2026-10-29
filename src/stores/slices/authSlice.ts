@@ -13,6 +13,7 @@
 
 import { deleteAccountImages } from '../../services/imageCache';
 import { deleteAccountCopies } from '../../services/localCopy';
+import { moodService } from '../../services/moodService';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
 
@@ -46,8 +47,8 @@ function getAccountOwner(): string | null {
 
 /**
  * Delete one account's saved data from this device: its local copies
- * (anniversaries, partner, couple settings, custom messages and favorites, …)
- * and its cached images.
+ * (anniversaries, partner, couple settings, custom messages and favorites, …),
+ * its cached images and its synced `moods` rows.
  * Nothing else — unsynced `moods` rows and any other queued write stay for
  * their owner to send on the next sign-in. The server keeps everything, so the
  * next signed-in refresh brings it back.
@@ -55,7 +56,11 @@ function getAccountOwner(): string | null {
  * Fire-and-forget: sign-out must not wait on IndexedDB, and a failed delete is
  * logged rather than blocking it. Loaders and writes re-check identity before
  * saving a copy, so a refresh or write the outgoing account already started
- * cannot re-create its copy afterwards.
+ * cannot re-create its copy afterwards. A main-thread mood sync or history
+ * backfill that settles after its account signed out marks or inserts synced
+ * rows after this delete ran, so moodSlice requests the delete again when it
+ * settles. A row the service worker's background sync marks synced after
+ * sign-out stays until the next deletion for that account.
  */
 function deleteAccountData(userId: string): void {
   deleteAccountCopies(userId).catch((error: unknown) => {
@@ -63,6 +68,9 @@ function deleteAccountData(userId: string): void {
   });
   deleteAccountImages(userId).catch((error: unknown) => {
     console.error('[AuthSlice] Failed to delete the outgoing account\'s cached images:', error);
+  });
+  moodService.deleteSyncedForUser(userId).catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to delete the outgoing account\'s synced moods:', error);
   });
 }
 
@@ -288,8 +296,8 @@ function discardAccountState(
 
   // The outgoing account's saved data goes too, so the next account on this
   // device can never read it: its local copies (custom messages and favorites
-  // among them) and cached images. Unsynced `moods` rows stay for their owner
-  // (deleteAccountData).
+  // among them), cached images and synced `moods` rows. Unsynced `moods` rows
+  // stay for their owner (deleteAccountData).
   if (outgoingUserId && outgoingUserId !== identity.userId) {
     deleteAccountData(outgoingUserId);
   }

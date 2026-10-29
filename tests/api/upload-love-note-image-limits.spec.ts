@@ -125,10 +125,12 @@ test.describe('Love note image upload limits', () => {
       body.storagePath.startsWith(`${userId}/`),
       `storagePath ${body.storagePath} must be under the uploader's own prefix`
     ).toBe(true);
-    // Other cases in this worker can share the minute window, and the count
-    // lives in the function's memory, so the exact value is not predictable.
-    // An accepted upload has used one slot, so the header is a whole number
-    // below the limit, and it reports the same count as the body.
+    // The count is kept per edge-runtime isolate (a module-level Map in
+    // handler.ts), and consecutive requests can reach different isolates, so
+    // no wire test can predict the value or assert that it falls by one; the
+    // decrement is pinned in handler.test.ts. An accepted upload has used one
+    // slot of its isolate's window, so the header is a whole number below the
+    // limit, and it reports the same count as the body.
     const remaining = response.headers()['x-ratelimit-remaining'];
     expect(remaining).toMatch(/^\d+$/);
     expect(Number(remaining)).toBeLessThan(RATE_LIMIT_MAX_UPLOADS);

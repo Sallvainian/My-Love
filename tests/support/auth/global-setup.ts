@@ -15,6 +15,12 @@ import { initializeAuthSystem } from './setup';
 import { authStorageInit } from '@seontechnologies/playwright-utils/auth-session';
 import { TEST_USER_PASSWORD } from '../test-credentials';
 import { getAuthPoolSize, getWorkerEmail, getWorkerPartnerEmail } from './worker-pool';
+import {
+  ROW_AUDIT_BASELINE_ENV,
+  countPoolRows,
+  getAppUserIdByEmail,
+  serializeRowCounts,
+} from '../helpers/row-audit';
 
 const LEGACY_TEST_USERS = [
   { email: 'testuser1@test.example.com', displayName: 'Test User 1' },
@@ -88,21 +94,6 @@ async function ensureUser(
       `Failed to reset the profile display name for ${email}: ${profileNameError.message}`
     );
   }
-}
-
-async function getAppUserIdByEmail(admin: TypedSupabaseClient, email: string): Promise<string> {
-  const maxAttempts = 10;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const { data, error } = await admin.from('users').select('id').eq('email', email).single();
-    if (!error && data?.id) return data.id;
-    if (attempt === maxAttempts) {
-      throw new Error(
-        `Could not resolve app user for ${email} after ${maxAttempts} attempts: ${error?.message ?? 'not found'}`
-      );
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error('unreachable');
 }
 
 async function linkUserPair(
@@ -186,6 +177,12 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     authStorageInit({ environment: 'local', userIdentifier: `worker-${i}` });
     authStorageInit({ environment: 'local', userIdentifier: `worker-${i}-partner` });
   }
+
+  // Leftover-row audit baseline, taken once provisioning and linking are done.
+  // globalTeardown recounts and fails the run when any count grew (row-audit.ts).
+  process.env[ROW_AUDIT_BASELINE_ENV] = serializeRowCounts(
+    await countPoolRows(admin, authPoolSize)
+  );
 
   console.log(`[global-setup] Provisioned ${authPoolSize} worker pairs + legacy users`);
 }
