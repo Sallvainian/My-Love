@@ -165,7 +165,14 @@ describe('dbSchema', () => {
       const messages = db.transaction('messages', 'readonly').objectStore('messages');
       expect((messages.indexNames as DOMStringList).contains('by-user')).toBe(false);
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(Array.from(unwrap(db).objectStoreNames)).toEqual([
+        'image-cache',
+        'local-copies',
+        'messages',
+        'moods',
+        'note-queue',
+        'sw-auth',
+      ]);
     });
 
     it('deletes a stale account’s rows and favorites with the stores instead of copying them', async () => {

@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { formatDateISO } from '@/utils/dateUtils';
 
 describe('Date Formatting', () => {
-  it('[P0] should format dates consistently', () => {
+  it('[P0] formats a local date as its zero-padded YYYY-MM-DD wall-clock day', () => {
     // GIVEN: Known local dates, one zero-padded and one late in the evening
     // WHEN: Formatted as an ISO calendar date
     // THEN: The local wall-clock date is returned as YYYY-MM-DD
@@ -19,7 +19,7 @@ describe('Date Formatting', () => {
     expect(formatDateISO(new Date(2026, 8, 25, 23, 30))).toBe('2026-09-25');
   });
 
-  it('[P0] should handle edge case dates (midnight, DST transitions)', () => {
+  it('[P0] maps instants around midnight and both DST transitions to the New York calendar day', () => {
     // GIVEN: Instants around local midnight and both 2026 DST transitions
     // WHEN: Formatted as an ISO calendar date
     // THEN: Each instant maps to its New York calendar date, not the UTC one

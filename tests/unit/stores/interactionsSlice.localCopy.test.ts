@@ -413,25 +413,46 @@ describe('interactionsSlice local copy', () => {
   });
 
   describe('refresher', () => {
-    it('refreshing the interactions copy brings the last 100 interactions into the list, the unviewed count and the saved copy', async () => {
-      const store = createTestStore();
-      const [kind, refresh] = registerLocalCopy.mock.calls.at(-1) as [string, () => Promise<void>];
-      expect(kind).toBe(INTERACTIONS_COPY_KIND);
+    /** The kind and refresher the latest store registered with the local-copy service. */
+    function latestRefresher() {
+      return registerLocalCopy.mock.calls.at(-1) as [string, () => Promise<void>];
+    }
 
-      // Reconnect: the partner poked while offline; the refresh brings it in.
+    /** Reconnect: the partner poked while offline, and the refresh brings it in. */
+    async function refreshAfterAnOfflinePoke() {
+      const store = createTestStore();
+      const [, refresh] = latestRefresher();
       getInteractionHistory.mockResolvedValue([interaction('while-offline')]);
       await refresh();
+      return store;
+    }
 
+    it('registers its refresher under the interactions copy kind', () => {
+      createTestStore();
+      const [kind] = latestRefresher();
+      expect(kind).toBe(INTERACTIONS_COPY_KIND);
+    });
+
+    it('refreshing reads the last 100 interactions of the signed-in account', async () => {
+      await refreshAfterAnOfflinePoke();
       expect(getInteractionHistory).toHaveBeenCalledWith(USER_A, 100);
+    });
+
+    it('refreshing brings the read interactions into the list and the unviewed count', async () => {
+      const store = await refreshAfterAnOfflinePoke();
       expect(store.getState().interactions).toEqual([interaction('while-offline')]);
       expect(store.getState().unviewedCount).toBe(1);
+    });
+
+    it('refreshing saves the read interactions as the copy', async () => {
+      await refreshAfterAnOfflinePoke();
       expect(savedCopies.get(key(USER_A))).toEqual([saved(interaction('while-offline'))]);
     });
 
     it('does nothing when signed out', async () => {
       const store = createTestStore();
       store.setState({ userId: null });
-      const [, refresh] = registerLocalCopy.mock.calls.at(-1) as [string, () => Promise<void>];
+      const [, refresh] = latestRefresher();
 
       await expect(refresh()).resolves.toBeUndefined();
       expect(getInteractionHistory).not.toHaveBeenCalled();

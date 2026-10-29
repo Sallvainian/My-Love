@@ -146,26 +146,39 @@ describe('photosSlice local copy', () => {
   });
 
   describe('loadPhotos', () => {
-    it('first online start: lists every photo, saves the copy, requests the fill', async () => {
-      const rows = Array.from({ length: MORE_THAN_THE_OLD_STORE_CAP }, (_, n) =>
-        row(n, n % 3 ? USER_A : PARTNER)
-      );
-      listAllPhotos.mockResolvedValue(rows);
-      const store = createTestStore();
+    describe('first online start', () => {
+      /** Lists more photos than the old store cap, mixed between the account and its partner. */
+      async function firstOnlineStart() {
+        const rows = Array.from({ length: MORE_THAN_THE_OLD_STORE_CAP }, (_, n) =>
+          row(n, n % 3 ? USER_A : PARTNER)
+        );
+        listAllPhotos.mockResolvedValue(rows);
+        const store = createTestStore();
 
-      await store.getState().loadPhotos();
+        await store.getState().loadPhotos();
+        return { store, expected: rows.map((r) => shown(r)) };
+      }
 
-      const expected = rows.map((r) => shown(r));
-      expect(store.getState().photos).toEqual(expected);
-      expect(store.getState().photosLoaded).toBe(true);
-      expect(store.getState().photosLoadError).toBeNull();
-      expect(savedCopies.get(key(USER_A))).toEqual(expected);
+      it('lists every photo', async () => {
+        const { store, expected } = await firstOnlineStart();
+        expect(store.getState().photos).toEqual(expected);
+        expect(store.getState().photosLoaded).toBe(true);
+        expect(store.getState().photosLoadError).toBeNull();
+      });
 
-      expect(requestPhotoImageFill).toHaveBeenCalledTimes(1);
-      const session = lastFillSession();
-      expect(session.userId).toBe(USER_A);
-      expect(session.isCurrent()).toBe(true);
-      expect(session.photos()).toEqual(expected);
+      it('saves the listed photos as the copy', async () => {
+        const { expected } = await firstOnlineStart();
+        expect(savedCopies.get(key(USER_A))).toEqual(expected);
+      });
+
+      it('requests the image fill for the account session', async () => {
+        const { expected } = await firstOnlineStart();
+        expect(requestPhotoImageFill).toHaveBeenCalledTimes(1);
+        const session = lastFillSession();
+        expect(session.userId).toBe(USER_A);
+        expect(session.isCurrent()).toBe(true);
+        expect(session.photos()).toEqual(expected);
+      });
     });
 
     it('saves the copy as plain data: signedUrl null, isOwn per account, nothing else', async () => {

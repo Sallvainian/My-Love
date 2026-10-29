@@ -111,7 +111,7 @@ describe('sanitizeInput', () => {
     expect(sanitizeInput(long)).toHaveLength(500);
   });
 
-  it('handles empty string', () => {
+  it('returns an empty string unchanged', () => {
     expect(sanitizeInput('')).toBe('');
   });
 });

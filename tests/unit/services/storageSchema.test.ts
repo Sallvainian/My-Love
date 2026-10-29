@@ -121,10 +121,11 @@ describe('storageService schema', () => {
 
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
+      const storeNames = Array.from(db.objectStoreNames);
       for (const store of ALL_STORES) {
-        expect(db.objectStoreNames.contains(store)).toBe(true);
+        expect(storeNames).toContain(store);
       }
-      expect(db.objectStoreNames.length).toBe(ALL_STORES.length);
+      expect(storeNames).toHaveLength(ALL_STORES.length);
     } finally {
       db.close();
     }
@@ -140,7 +141,7 @@ describe('storageService schema', () => {
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
       const store = db.transaction('moods', 'readonly').objectStore('moods');
-      expect(store.indexNames.contains('by-user-date')).toBe(true);
+      expect(Array.from(store.indexNames)).toContain('by-user-date');
     } finally {
       db.close();
     }
@@ -166,8 +167,9 @@ describe('storageService schema', () => {
 
     const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
     try {
+      const storeNames = Array.from(db.objectStoreNames);
       for (const store of ALL_STORES) {
-        expect(db.objectStoreNames.contains(store)).toBe(true);
+        expect(storeNames).toContain(store);
       }
     } finally {
       db.close();
@@ -184,7 +186,7 @@ describe('storageService schema', () => {
     try {
       const store = db.transaction('messages', 'readonly').objectStore('messages');
       expect(Array.from(store.indexNames).sort()).toEqual(['by-category', 'by-date']);
-      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
     } finally {
       db.close();
     }
@@ -257,7 +259,7 @@ describe('storageService schema', () => {
     try {
       // The bundled row is untouched, legacy flag and all; the custom rows go.
       expect(await db.getAll('messages')).toEqual([raw[0]]);
-      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
       // The signed-in account's own row moved with its id and its legacy flag;
       // the ownerless row and the bundled row's flag name no account.
       const copy = (await db.get('local-copies', ['owner-a', 'message-data']))?.value as StoredMessageData;
@@ -293,7 +295,7 @@ describe('storageService schema', () => {
     try {
       const copy = (await db.get('local-copies', ['owner-a', 'message-data']))?.value as StoredMessageData;
       expect(copy.custom.map((row) => row.id)).toEqual([2]);
-      expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
+      expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('message-favorites');
     } finally {
       db.close();
     }
@@ -470,11 +472,12 @@ describe('storageService schema', () => {
 
         const db = await openDB<MyLoveDBSchema>(DB_NAME, DB_VERSION);
         try {
-          expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
+          expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
           expect(await db.getAll('messages')).toHaveLength(1);
           expect(await db.getAll('moods')).toHaveLength(1);
+          const storeNames = Array.from(db.objectStoreNames);
           for (const store of ALL_STORES) {
-            expect(db.objectStoreNames.contains(store)).toBe(true);
+            expect(storeNames).toContain(store);
           }
         } finally {
           db.close();

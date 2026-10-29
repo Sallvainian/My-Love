@@ -220,7 +220,8 @@ describe('createSettingsSlice initializeApp', () => {
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });
 
-  it('skips default message loader when IndexedDB already contains messages', async () => {
+  /** Initializes against an IndexedDB that already holds messages, so nothing is seeded. */
+  async function initializeStoredDb() {
     const existingMessages = [message(42, 'Already stored')];
 
     mockStorageService.init.mockResolvedValue(undefined);
@@ -228,10 +229,25 @@ describe('createSettingsSlice initializeApp', () => {
 
     const { store, updateCurrentMessage } = await buildTestStore();
     await store.getState().initializeApp();
+    return { store, updateCurrentMessage, existingMessages };
+  }
+
+  it('does not reseed the bundled defaults when IndexedDB already has messages', async () => {
+    await initializeStoredDb();
 
     expect(mockLoadDefaultMessages).not.toHaveBeenCalled();
     expect(mockStorageService.addMessages).not.toHaveBeenCalled();
+  });
+
+  it('reads the stored bundled rows once when IndexedDB already has messages', async () => {
+    await initializeStoredDb();
+
     expect(mockStorageService.getAllMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the stored pool and picks a current message when IndexedDB already has messages', async () => {
+    const { store, updateCurrentMessage, existingMessages } = await initializeStoredDb();
+
     expect(store.getState().messages).toEqual(unfavorited(existingMessages));
     expect(updateCurrentMessage).toHaveBeenCalledTimes(1);
   });

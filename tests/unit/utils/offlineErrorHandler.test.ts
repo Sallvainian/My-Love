@@ -14,16 +14,20 @@ import {
 describe('OfflineError', () => {
   it('creates an error with default message', () => {
     const err = new OfflineError('save-mood');
-    expect(err.message).toBe("You're offline. Please check your connection and try again.");
-    expect(err.operation).toBe('save-mood');
-    expect(err.isRetryable).toBe(true);
-    expect(err.name).toBe('OfflineError');
+    expect(err).toMatchObject({
+      name: 'OfflineError',
+      operation: 'save-mood',
+      isRetryable: true,
+      message: "You're offline. Please check your connection and try again.",
+    });
   });
 
   it('creates an error with custom message', () => {
     const err = new OfflineError('sync', 'Custom offline message');
-    expect(err.message).toBe('Custom offline message');
-    expect(err.operation).toBe('sync');
+    expect(err).toMatchObject({
+      operation: 'sync',
+      message: 'Custom offline message',
+    });
   });
 
   it('is an instance of Error', () => {
@@ -110,7 +114,7 @@ describe('withOfflineCheck', () => {
     }
   });
 
-  it('executes the function when online', async () => {
+  it("returns the wrapped operation's result when online", async () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     const result = await withOfflineCheck('test', async () => 42);
     expect(result).toBe(42);
@@ -118,7 +122,15 @@ describe('withOfflineCheck', () => {
 
   it('throws OfflineError when offline', async () => {
     Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
-    await expect(withOfflineCheck('save', async () => 42)).rejects.toThrow(OfflineError);
+    const fn = vi.fn(async () => 42);
+    const call = withOfflineCheck('save', fn);
+    await expect(call).rejects.toBeInstanceOf(OfflineError);
+    await expect(call).rejects.toMatchObject({
+      name: 'OfflineError',
+      operation: 'save',
+      message: OFFLINE_RETRY_MESSAGE,
+    });
+    expect(fn).not.toHaveBeenCalled();
   });
 
   it('includes operation name in thrown error', async () => {
