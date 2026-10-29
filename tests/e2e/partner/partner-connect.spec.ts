@@ -498,13 +498,16 @@ test.describe('Connecting with a partner', () => {
     const anchor = clockAnchor();
 
     await pinFirstBrowser(page, anchor);
+    // Both watched from before sign-in. Sign-in starts the interactions
+    // refresher, and a read already in flight when a counter attaches settles
+    // without having started, leaving the in-flight count at -1.
+    const aHistoryReads = trackReads(page, 'interactions');
     await signIn(page, a);
     const bPage = await openSecondBrowser(browser, testInfo, cleanup, anchor);
+    const bHistoryReads = trackReads(bPage, 'interactions');
     await signIn(bPage, b);
 
     // ---- A poke, each way, live ----
-    const aHistoryReads = trackReads(page, 'interactions');
-    const bHistoryReads = trackReads(bPage, 'interactions');
     await Promise.all([
       openAndJoin(page, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
       openAndJoin(bPage, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
