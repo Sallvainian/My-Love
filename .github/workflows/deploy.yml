@@ -21,6 +21,9 @@ on:
       - 'eslint.config.js'
       - '_bmad-output/**'
       - '.bmad-loop/**'
+      # The native shell's own project: it ships through Xcode, never the site.
+      - 'ios/**'
+      - 'capacitor.config.ts'
       # Every workflow except this one, which stays deployable so a repair to it
       # ships by being pushed.
       - '.github/workflows/claude*.yml'
@@ -112,6 +115,12 @@ jobs:
 
       - name: Run smoke tests
         run: npm run test:smoke
+
+      # The native shell's live update: this build as a zip plus the
+      # updates/latest.json it checks on launch. GITHUB_SHA is the id the build
+      # step baked in as __BUILD_ID__.
+      - name: Package live update
+        run: scripts/package-live-update.sh
 
       - name: Upload build
         uses: actions/upload-artifact@v7
@@ -237,6 +246,23 @@ jobs:
                 ;;
             esac
             echo "✅ PWA manifest accessible (HTTP 200, application/manifest+json)"
+
+            # Check the native shell's live-update file, the same way: the SPA
+            # fallback would answer a missing latest.json with index.html.
+            UPDATE_RESULT=$(curl -s -o /dev/null -w "%{http_code} %{content_type}" -L "${DEPLOYMENT_URL}updates/latest.json" || echo "000")
+            UPDATE_CODE=${UPDATE_RESULT%% *}
+            if [ "$UPDATE_CODE" != "200" ]; then
+              echo "❌ Live update file returned HTTP $UPDATE_CODE (expected 200)"
+              return 1
+            fi
+            case "$UPDATE_RESULT" in
+              *application/json*) ;;
+              *)
+                echo "❌ Live update file served as '${UPDATE_RESULT#* }' (expected application/json) -- the file is missing and the SPA fallback answered"
+                return 1
+                ;;
+            esac
+            echo "✅ Live update file accessible (HTTP 200, application/json)"
 
             return 0
           }

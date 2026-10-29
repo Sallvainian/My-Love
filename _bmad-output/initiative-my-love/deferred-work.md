@@ -2786,3 +2786,31 @@ status: done 2026-10-29
 resolution: resolved by sweep bundle dw-love-note-upload-shared-rate-limit
 resolution-undo: 45d6f6c51380300a04d0a207ec090ed080e768bd967ac55b5520acba78842457 2026-10-29 7374617475733a206f70656e
 decision: 2026-10-29 build: shared database counter — keep each user's upload count in a database table, checked and incremented atomically by one RPC the function calls, so every isolate enforces the same 10-per-minute limit.
+
+### DW-323: Google sign-in cannot work inside the native iOS shell.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+location: src/api/auth/actionService.ts:116-125
+severity: medium
+reason: signInWithGoogle runs Supabase's OAuth redirect inside the page, and in the shell the page is a WKWebView on capacitor://localhost. Google refuses sign-in from embedded web views (from memory, UNVERIFIED on iOS 27), and redirectTo is built from window.location.origin, which is capacitor://localhost there, so the callback could not return to the app either. Fix: in the shell, open the provider in the system browser (ASWebAuthenticationSession, e.g. via @capacitor/browser) and return through a custom URL scheme or Universal Link that hands the session to supabase-js. Email and password sign-in is unaffected.
+status: open
+
+### DW-324: Password-reset emails sent from the native shell link to capacitor://localhost.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+location: src/api/auth/actionService.ts:96-98
+severity: medium
+reason: resetPasswordForEmail builds redirectTo from window.location.origin, which is capacitor://localhost in the shell, so the emailed link points nowhere a mail app can open. Fix: in the shell, use the site's https origin (the reset then completes on the website), or add a Universal Link that opens the app's reset-password view.
+status: open
+
+### DW-325: Haptics do nothing on iPhone, in the PWA and in the native shell alike.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+location: src/utils/haptics.ts; src/hooks/useVibration.ts
+severity: low
+reason: Both call navigator.vibrate, which Safari on iOS does not implement (from memory, UNVERIFIED on iOS 27), so the mood-save and love-note vibrations never fire on iPhone. The shell can fix it with @capacitor/haptics behind a check that the installed shell has the plugin (an older shell installed before the plugin was added will not).
+status: open
+
+### DW-326: The native shell still uses the HTML dock; the iPhone Duo layout needs Apple's own tab bar.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+location: src/components/Navigation/AppNavigation.tsx; ios/App/App
+severity: low
+reason: The shell exists so the five DESTINATIONS can move into iOS's right-hand system column on iPhone Duo (folded and inner landscape), as Instagram, Netflix and others do; iOS keeps web content out of that column, so only a native UITabBar/TabView gets there. Research: _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/. Not yet proven that a native tab bar around one shared WKWebView lands in the column; prove that first. The shell also still has Capacitor's default app icon and splash.
+status: open
