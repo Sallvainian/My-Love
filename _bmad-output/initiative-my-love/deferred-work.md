@@ -2517,3 +2517,43 @@ severity: low
 reason: The partner_requests INSERT policy checks only the sender (WITH CHECK auth.uid() = from_user_id), and the client cannot see the target's partner_id (DW-292), so the request is inserted. The recipient never sees it (the connect UI is hidden once linked) and the sender sees it pending indefinitely; accept_partner_request would refuse it. Refusing at insert needs a migration (a check on the target's partner_id inside a SECURITY DEFINER function or trigger).
 status: done 2026-09-26
 resolution: fixed in the app by PR #379 (squash 35cbd323), not at insert: find_partner_by_email returns no id for an account that already has a partner, so the Connect screen can no longer send it a request, and accept_partner_request already declines every other pending request of both users when a couple links, so a request sent before its target linked elsewhere does not stay pending either. The INSERT policy is unchanged, so only a request inserted outside the app, with a partnered user's id, still stays pending, in the sender's own list.
+
+### DW-296: A received partner request shows only the name the sender chose, and one tap on Accept links the accounts for good, so a stranger can pose as the partner.
+origin: security review of PR #379 2026-09-26, recorded 2026-10-28
+location: src/components/PartnerMoodView/PartnerMoodView.tsx:586 (name) and :595 (Accept)
+source_spec: n/a
+severity: medium
+reason: The card renders `other_display_name ?? other_email`, so once a sender sets a display name their email is never shown, and Accept calls acceptPartnerRequest with no confirmation. The link cannot be undone: the client cannot update partner_id and there is no unlink RPC. Since #379 any signed-in account that knows the recipient's email can send a request, so a stranger who names themselves after the partner gets the couple's notes, moods and photos after one tap. Fix: always show other_email on received (and sent) requests, and confirm before Accept, naming that email.
+status: open
+
+### DW-297: Partner search matches an email address nobody proved they own, so an account registered with the partner's address before they sign up is offered as the partner.
+origin: security review of PR #379 2026-09-26, recorded 2026-10-28
+location: supabase/migrations/20260926000000_find_partner_by_email.sql (the users.email match); hosted Auth email-confirmation setting
+source_spec: n/a
+severity: medium
+reason: find_partner_by_email matches public.users.email with no check of auth.users.email_confirmed_at. Local supabase/config.toml has enable_confirmations = false; the hosted setting is UNVERIFIED, though the hosted auth users' aggregate fits auto-confirm. The fix has two parts in order: the owner turns on email confirmations for the hosted project in the Supabase dashboard, then a migration filters on email_confirmed_at IS NOT NULL (under auto-confirm the filter alone changes nothing).
+status: open
+
+### DW-298: The "request accepted" broadcast can be missed, and the sender then sees the link only after a reload.
+origin: security review of PR #379 2026-09-26, recorded 2026-10-28
+location: src/hooks/usePartnerLinkListener.ts:30-37 (gate) and :49-58 (subscribe); src/api/moodSyncService.ts subscribeMoodUpdates
+source_spec: n/a
+severity: medium
+reason: The partner_linked broadcast is ephemeral and never replayed, and three paths leave the listener's channel unjoined when it arrives. (1) It joins only after loadPartner answers unlinked, and subscribeMoodUpdates awaits the session, the partner lookup, setAuth and the socket first. (2) Every loadPartner sets isLoadingPartner, which turns settledUnlinked false and releases the subscriber, so on Home and Love Notes the channel is torn down and re-joined on every start, reconnect and Partner-tab mount, while the Partner tab's own subscriber passes no onPartnerLinked. (3) It passes no onStatusChange, so a Realtime reconnect never re-reads the partner. Fix: on each SUBSCRIBED call lookupPartnerId() and loadPartner() only when it answers linked (calling loadPartner directly loops through the gate), and gate on partner === null && !partnerLoadError once the first load has settled.
+status: open
+
+### DW-299: get_my_pending_partner_requests returns the name and email of the other side even when that account already has a partner.
+origin: security review of PR #379 2026-09-26, recorded 2026-10-28
+location: supabase/migrations/20260926010000_my_pending_partner_requests.sql (the select); partner_requests INSERT policy
+source_spec: n/a
+severity: low
+reason: The reviewer's rolled-back probe inserted a pending request to a linked user's id (the INSERT policy checks only auth.uid() = from_user_id, the gap DW-295 leaves at the database), and the RPC then returned that user's name and email, undoing the is_taken redaction in find_partner_by_email. The linked target never sees the request, so the sender can keep it pending and keep reading the target's current name. Fix: null both columns when the other side has partner_id IS NOT NULL, or refuse at insert a request to a partnered account or from a partnered caller, through a SECURITY DEFINER helper.
+status: open
+
+### DW-300: Partner search tells any signed-in caller whether an email has an account and whether its owner has a partner, with no rate limit.
+origin: security review of PR #379 2026-09-26, recorded 2026-10-28
+location: supabase/migrations/20260926000000_find_partner_by_email.sql (is_taken)
+source_spec: n/a
+severity: low
+reason: A documented design choice in #379, not a defect: find_partner_by_email answers is_taken to any authenticated caller, and PostgREST does not rate-limit the call, so with open signup anyone can bulk-check addresses for an account and a relationship. Needs an owner decision: rate-limit the call, or report a taken account the same way as a missing one.
+status: open
