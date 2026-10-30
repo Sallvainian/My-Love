@@ -52,6 +52,7 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - A re-plan runs only from loaded local copies or a successful read, never from a copy not yet loaded or a failed read, so it never cancels reminders it cannot replace (AGENTS.md, Known pitfalls: only a successful read overwrites a snapshot).
 - Events come from the loaded events window, the soonest 50 upcoming (`eventsService.ts`); an event past it is planned once earlier ones pass and the window moves.
 - Countdown marks are per-account offline data: a new `localCopy` kind, removed by `deleteAccountData()`, with their store state in `signedOutState()`, in the same commit (AGENTS.md, Known pitfalls).
+- A new `registerLocalCopy` refresher (the marks copy, the reminders switch's copy) stubs its read in `tests/support/harnesses/auth-bootstrap-notification-order.tsx` and `tests/e2e/auth/login.spec.ts` in the same change, because both sign in with fake tokens and an unstubbed read gets a 401 that fails the network-error monitor (AGENTS.md, Known pitfalls).
 - A new public table enables RLS in its creating migration with policies `TO authenticated`, and the pgTAP `policies_are` files are edited in the same change (AGENTS.md, Known pitfalls).
 - Web code calls the local-notification plugin only after `Capacitor.isPluginAvailable`, because older shells lack it (AGENTS.md, native iOS shell).
 - Reminders use the same lock-screen group as epic-push-notifications' non-love-note pushes; that group's name is the one contract between the two epics.
@@ -78,6 +79,8 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 
 - parent — _bmad-output/initiative-my-love/initiative-my-love.md (no Requirements yet, so this epic cites the owner's request and the code directly)
 - code — src/utils/countdownService.ts, `getNextAnniversaryDate`; src/components/RelationshipTimers/BirthdayCountdown.tsx, `getNextBirthday`
+- code — src/services/eventsService.ts, `DEFAULT_EVENTS_PAGE_SIZE` (the 50-event window)
+- code — src/components/RelationshipTimers/TimeTogether.tsx; src/components/RelationshipTimers/EventCountdown.tsx (the relationship start and the wedding card)
 - code — supabase/migrations/20260922000000_local_data_tables.sql, anniversaries policies (owner-only)
 - project-context — AGENTS.md, Conventions; Known pitfalls; Maintained by hand (native iOS shell, sign-out)
 - companion — _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/sim-driver-prototype/ (the simulator runner story 2.9 ports; `Runner/App.swift`'s pending-notification probe is the evidence story 7 builds on)
@@ -109,3 +112,5 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-30 story 7 waits on story 2.4 and story 3.10 as well as 3.12, because the Duo and push sweeps may change the driver it extends; it costs nothing on the longest chain, since story 1 already waits on 3.10.
 - Decision: 2026-10-30 the dependence on story 7's reader is not an `unknown` on stories 1, 6, 2 and 3, because an `unknown` holds the loop before a story starts; if story 7 cannot read a calendar trigger, its build blocks and those stories' scheduled-list checks move to story 8 in a re-slice.
 - Decision: 2026-10-30 the older-shell live-update check in stories 1 and 6 uses story 2.9's driver, which builds a shell from an earlier commit and serves the working tree's bundle as its live update.
+- Decision: 2026-10-30 gaps found by the replan's set checks fixed: the planner drops a reminder whose moment has passed, the birthday texts are written out from `BirthdayCountdown.tsx` and `getNextBirthday` is exported with the card unchanged, story 3 names its local copy, story 2 hides the marks list outside the shell, stories 2 and 3 check a network-off launch, story 5 checks what fires rather than what is scheduled and re-checks the sweep, and the refresher stub rule joins Constraints.
+- Decision: 2026-10-30 story 3.7's Settings section is named "Push and reminders", so it is not confused with the notifications page in _bmad-output/backlog/story-native-shell-live-update-prompt.md; earlier Notes lines that say "notifications section" mean this section.
