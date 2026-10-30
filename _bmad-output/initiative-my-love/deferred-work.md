@@ -2808,7 +2808,8 @@ origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-sh
 location: src/utils/haptics.ts; src/hooks/useVibration.ts
 severity: low
 reason: Both call navigator.vibrate, which Safari on iOS does not implement (from memory, UNVERIFIED on iOS 27), so the mood-save and love-note vibrations never fire on iPhone. The shell can fix it with @capacitor/haptics behind a check that the installed shell has the plugin (an older shell installed before the plugin was added will not).
-status: open
+status: done
+resolution: fixed 2026-10-29 on fix/native-haptics. Every buzz now goes through playHaptic in src/utils/haptics.ts, which in the native shell plays Apple's haptics through @capacitor/haptics (success and error as notification haptics, a selection as a light impact, an arriving love note as a medium one) and elsewhere keeps navigator.vibrate. useVibration and the incoming-note buzz in useRealtimeMessages route through it. The home-screen PWA on iPhone is unchanged (still no navigator.vibrate).
 
 ### DW-326: The native shell still uses the HTML dock; the iPhone Duo layout needs Apple's own tab bar.
 origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)

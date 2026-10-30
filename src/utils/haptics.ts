@@ -2,9 +2,26 @@
  * Haptic Feedback Utility
  * Story 5.2: AC-5.2.2 - Device vibrates on successful mood save
  *
- * Uses the Vibration API to provide tactile feedback on supported devices.
- * Gracefully degrades on unsupported browsers/devices.
+ * The one place the app makes the device buzz. In the native iOS shell it
+ * plays Apple's own haptics through @capacitor/haptics, because Safari on
+ * iPhone has no Vibration API (DW-325); everywhere else it uses
+ * navigator.vibrate and gracefully degrades where that is missing.
  */
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+
+/** Duration in ms, or [vibrate, pause, vibrate, ...]. */
+export type VibrationPattern = number | number[];
+
+/** What the buzz means, which picks the iPhone haptic that plays it. */
+export type HapticFeel = 'success' | 'error' | 'selection' | 'arrival';
+
+const NATIVE_HAPTICS: Record<HapticFeel, () => Promise<void>> = {
+  success: () => Haptics.notification({ type: NotificationType.Success }),
+  error: () => Haptics.notification({ type: NotificationType.Error }),
+  selection: () => Haptics.impact({ style: ImpactStyle.Light }),
+  arrival: () => Haptics.impact({ style: ImpactStyle.Medium }),
+};
 
 /**
  * Check if the Vibration API is supported in the current browser/device.
@@ -19,6 +36,32 @@ export function isVibrationSupported(): boolean {
 }
 
 /**
+ * Whether Apple's haptics can play. `isNativePlatform` comes first because on
+ * the web the plugin's navigator.vibrate fallback counts as available; the
+ * plugin check catches a shell installed before the plugin was added.
+ */
+function hasNativeHaptics(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('Haptics');
+}
+
+/**
+ * Play `feel` as an iPhone haptic in the native shell, or `pattern` through
+ * the Vibration API elsewhere. Never throws: haptics are a non-critical extra.
+ */
+export function playHaptic(pattern: VibrationPattern, feel: HapticFeel): void {
+  if (hasNativeHaptics()) {
+    NATIVE_HAPTICS[feel]().catch((error: unknown) => console.warn('Haptic failed:', error));
+    return;
+  }
+  if (!isVibrationSupported()) return;
+  try {
+    navigator.vibrate(pattern);
+  } catch (error) {
+    console.warn('Vibration failed:', error);
+  }
+}
+
+/**
  * Trigger haptic feedback for successful mood save.
  * Uses a 50ms pulse to indicate success.
  *
@@ -30,9 +73,7 @@ export function isVibrationSupported(): boolean {
  * ```
  */
 export function triggerMoodSaveHaptic(): void {
-  if (isVibrationSupported()) {
-    navigator.vibrate(50); // 50ms pulse for success confirmation
-  }
+  playHaptic(50, 'success'); // 50ms pulse for success confirmation
 }
 
 /**
@@ -51,9 +92,7 @@ export function triggerMoodSaveHaptic(): void {
  * ```
  */
 export function triggerErrorHaptic(): void {
-  if (isVibrationSupported()) {
-    navigator.vibrate([100, 50, 100]); // Error pattern
-  }
+  playHaptic([100, 50, 100], 'error'); // Error pattern
 }
 
 /**
@@ -61,7 +100,5 @@ export function triggerErrorHaptic(): void {
  * Uses a quick 15ms pulse for subtle selection feedback.
  */
 export function triggerSelectionHaptic(): void {
-  if (isVibrationSupported()) {
-    navigator.vibrate(15); // Quick tap for selection
-  }
+  playHaptic(15, 'selection'); // Quick tap for selection
 }

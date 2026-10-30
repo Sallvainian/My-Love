@@ -178,7 +178,7 @@ describe('MessageInput', () => {
       });
 
       // Should trigger error haptic
-      expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC);
+      expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC, 'error');
     });
 
     it('should trigger selection haptic when valid image selected', async () => {
@@ -194,7 +194,7 @@ describe('MessageInput', () => {
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
-        expect(mockVibrate).toHaveBeenCalledWith(30);
+        expect(mockVibrate).toHaveBeenCalledWith(30, 'selection');
       });
     });
 
@@ -426,7 +426,7 @@ describe('MessageInput', () => {
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(mockVibrate).toHaveBeenCalledWith(50);
+        expect(mockVibrate).toHaveBeenCalledWith(50, 'success');
       });
     });
 
@@ -443,7 +443,7 @@ describe('MessageInput', () => {
       await user.click(sendButton);
 
       await waitFor(() => {
-        expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC);
+        expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC, 'error');
       });
     });
   });
@@ -489,7 +489,7 @@ describe('MessageInput', () => {
     it('still fires the error haptic on an offline refusal', async () => {
       await sendRefusedPictureNote();
 
-      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC));
+      await waitFor(() => expect(mockVibrate).toHaveBeenCalledWith(ERROR_HAPTIC, 'error'));
     });
 
     it('any other failure, such as a failed save to the offline queue, still shows it', async () => {

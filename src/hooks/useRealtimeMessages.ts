@@ -34,6 +34,7 @@ import {
 import { parseLoveNoteBroadcast } from '../api/validation/broadcastSchemas';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
+import { playHaptic } from '../utils/haptics';
 import { logger } from '../utils/logger';
 
 /**
@@ -235,9 +236,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       addNote(message);
 
       // Trigger vibration feedback (AC-2.3.3)
-      if (navigator.vibrate) {
-        navigator.vibrate([30]);
-      }
+      playHaptic([30], 'arrival');
 
       // Call optional callback
       onNewMessage?.(message);
