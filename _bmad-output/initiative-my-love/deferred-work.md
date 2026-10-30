@@ -2817,3 +2817,10 @@ location: src/components/Navigation/AppNavigation.tsx; ios/App/App
 severity: low
 reason: The shell exists so the five DESTINATIONS can move into iOS's right-hand system column on iPhone Duo (folded and inner landscape), as Instagram, Netflix and others do; iOS keeps web content out of that column, so only a native UITabBar/TabView gets there. Research: _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/. Not yet proven that a native tab bar around one shared WKWebView lands in the column; prove that first. The shell also still has Capacitor's default app icon and splash.
 status: open
+
+### DW-327: The dock's unseen-count badges are never fed, so neither the dock nor the native tab bar shows one.
+origin: raised 2026-10-29 while slicing epic-iphone-duo-native-tab-bar
+location: src/App.tsx (`<AppNavigation>`); src/components/Navigation/AppNavigation.tsx (`badgeCounts`)
+severity: low
+reason: AppNavigation renders a badge per destination from its `badgeCounts` prop, but its only caller in App.tsx passes none, so no badge has ever shown. The owner parked badges until a feature supplies real counts; when it does, the native tab bar from epic-iphone-duo-native-tab-bar needs the same counts.
+status: open

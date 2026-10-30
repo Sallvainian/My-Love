@@ -1,0 +1,57 @@
+# The epic's stories in build order.
+
+[[entry]]
+id = 1
+type = "story"
+title = "A system tab bar around the shared web view sits in the Duo's side column"
+description = "The shell wraps its one web view in iOS's own tab bar with the five destinations (the dock's labels, the nearest SF Symbols, Home filled when selected); a tap opens that view through the same navigation as a dock tap. Story 1 delivers tab-to-view and proves R1's placement and R3 and R6 on the simulator; story 2 removes the HTML dock, which still shows here; story 3 adds view-to-tab; story 5 checks the device. It owns the web-side tab bar module: the tap listener behind a Capacitor.isPluginAvailable check, since the web code reaches older shells by live update. Hands to stories 2 and 3: that module, the plugin's name, a tap event that also fires when the already-selected tab is tapped, a call to set the selected tab, a way to show and hide the bar, and how the web view sits relative to the bar (whether the safe-area inset already clears it). It also owns the setup later stories reuse: the fictional-data test account and its partner (stories 2, 3 and 5), and for the simulator (stories 2 and 3) and a shell built with VITE_LIVE_UPDATE_URL pointed at a local latest.json, because a locally built shell otherwise swaps itself back to production's web code when backgrounded. A person runs the Xcode 27.1 iPhone Duo simulator through its poses and takes the screenshots."
+verify = "On the Xcode 27.1 iPhone Duo simulator, screenshots of outer portrait, outer landscape and inner landscape show the five tabs in the side column and inner portrait at the bottom, with Split View checked or recorded as not offered; each tap opens its view, a reload from Web Inspector after a tab tap reopens that view, a partner's mood arrives live whichever tab is selected, switching tabs neither reloads nor signs out, and Accessibility Inspector reads each tab's name."
+covers = ["R1", "R2", "R3", "R6"]
+after = []
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "The native tab bar replaces the HTML dock without covering content"
+description = "Extending story 1's web-side module: when the installed shell offers the native tab bar, the web app hides its HTML dock and sizes its clearance to where the tab bar sits, using story 1's finding on how the web view sits relative to it, so nothing sits under the bar, no dock-sized empty band remains, and Love Notes ends at the tab bar or the screen edge; the website, the Home Screen web app and shells without the tab bar keep the dock. The native bar shows when the dock component mounts and hides when it unmounts, so it never appears on the sign-in, setup, loading, welcome or admin screens, and it hides while a dialog, a sheet or the photo viewer is open. Completes R1 by removing the dock. Hands to story 3 the module both change. Reuses story 1's simulator setup, with a local latest.json to update the older shell; a person runs the simulators and builds the older shell from commit 67976acd."
+verify = "In every Duo simulator pose and on a non-Duo iPhone simulator, the system tab bar shows and the HTML dock does not, each view scrolled to its end shows its last item whole, no dock-sized empty band remains, and opening the photo upload dialog, the interaction history sheet and the photo viewer hides the bar until each closes; the sign-in screen and the welcome splash show no tab bar; a shell built from commit 67976acd and updated to the new bundle still shows a working dock; the Home Screen web app on the simulator shows its dock; the dock's E2E specs pass."
+covers = ["R1", "R4", "R5", "R7", "R9", "R10"]
+after = [1]
+hitl = true
+risk = "medium"
+unknown = "Does a system tab bar around the one shared web view land in the side column? Story 1 answers it; if not, this entry is re-sliced."
+
+[[entry]]
+id = 3
+type = "story"
+title = "The selected tab follows the view on screen"
+description = "A view change that does not come from a tab selects the matching tab through story 1's set-selected call: launch or reload onto a view, and the error screen's Home button. While Settings is open (from the gear or Home's Add) the last destination's tab stays selected, Home's when Settings was the first view, and tapping that tab leaves Settings, using story 1's tap event for the already-selected tab. Builds on the web-side module stories 1 and 2 share, and reuses story 1's simulator setup. A person runs the simulator checks."
+verify = "On a simulator, a reload from Web Inspector onto each of the five views shows its tab selected, the error screen's Home button selects Home, Settings opened by the gear and by Home's Add from each destination returns to it by that destination's tab, and a Web Inspector reload onto /settings made while another tab is selected moves the selection to Home."
+covers = ["R2", "R8"]
+after = [2]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Refactor sweep"
+description = "Cleanup only, scoped at its start from the plans and review findings stories 1-3 deferred; scope pushed out of a story is a new story, not this one."
+verify = "Lint, typecheck, the unit suite and the shell build pass, and every finding stories 1-3 deferred is fixed or recorded in the deferred-work ledger."
+covers = []
+after = [1, 2, 3]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 5
+type = "story"
+title = "The native tab bar ships to the owner's Duo"
+description = "The web part deploys through deploy.yml, the new shell is built with fnox and installed on the owner's Duo from Xcode 27.1, and the Duo is checked in every pose with story 1's fictional-data test account and its partner; it also re-checks what the refactor sweep could have changed. Story 1 proved R1, R3 and R6 on the simulator; this story checks them on the device, plus R2, R5, R8 and R9 after the sweep. A person installs the shell and runs the checks."
+verify = "Before the new shell is installed, the Duo's current shell, updated by live update to the deployed web code, still shows a working dock. With the new shell on the owner's Duo, folded and unfolded landscape show the tabs in the column and unfolded portrait at the bottom, with no HTML dock; a partner's mood arrives live whichever tab is selected, switching tabs never reloads, VoiceOver reads each tab's name, a reload reopens the selected view with its tab selected, Settings returns to its destination by that tab, the sign-in screen shows no tab bar, and deploy.yml's run on the merge commit succeeded with CI green on main."
+covers = ["R1", "R2", "R3", "R5", "R6", "R8", "R9"]
+after = [4]
+hitl = true
+risk = "medium"
