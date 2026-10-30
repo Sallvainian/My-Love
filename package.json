@@ -10,6 +10,7 @@
     "supabase:up": "supabase start",
     "supabase:down": "supabase stop",
     "build": "tsc -p tsconfig.app.json && vite build",
+    "ios:sync": "npm run build && cap sync ios",
     "perf:build": "mkdir -p test-results/performance && npm run typecheck && { vite build > test-results/performance/perf-build.log 2>&1; status=$?; cat test-results/performance/perf-build.log; exit $status; }",
     "perf:bundle-report": "npm run perf:build && node scripts/perf-bundle-report.mjs",
     "typecheck": "tsc -b --force",
@@ -35,6 +36,9 @@
     "deadcode": "bash scripts/deadcode.sh"
   },
   "dependencies": {
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
+    "@capgo/capacitor-updater": "^8.54.0",
     "@supabase/supabase-js": "^2.118.0",
     "dompurify": "^3.4.17",
     "idb": "^8.0.4",
@@ -49,6 +53,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
+    "@capacitor/cli": "^8.6.0",
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
     "@playwright/test": "^1.64.1",

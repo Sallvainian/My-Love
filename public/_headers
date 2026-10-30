@@ -1,0 +1,7 @@
+# Read by Workers Static Assets (wrangler.jsonc); never served.
+# The native shell runs on capacitor://localhost, so its fetch of latest.json is
+# cross-origin (src/services/nativeUpdates.ts). no-cache keeps a phone from
+# reading a stale version after a deploy.
+/updates/*
+  Access-Control-Allow-Origin: capacitor://localhost
+  Cache-Control: no-cache

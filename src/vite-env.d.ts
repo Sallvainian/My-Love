@@ -41,6 +41,13 @@ interface ImportMetaEnv {
    * Partner test user password for multi-user E2E tests (optional)
    */
   readonly VITE_TEST_PARTNER_PASSWORD?: string;
+
+  /**
+   * Where the native shell checks for live updates (optional). Defaults to the
+   * production site's updates/latest.json; point it at `wrangler dev` to test
+   * an update locally.
+   */
+  readonly VITE_LIVE_UPDATE_URL?: string;
 }
 
 interface ImportMeta {
@@ -49,3 +56,6 @@ interface ImportMeta {
 
 /** `package.json` version, injected by the `define` in vite.config.ts and vitest.config.ts. */
 declare const __APP_VERSION__: string;
+
+/** The build's live-update id, injected by the `define` in vite.config.ts and vitest.config.ts. */
+declare const __BUILD_ID__: string;

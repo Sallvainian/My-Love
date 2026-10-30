@@ -13,6 +13,10 @@ export default defineConfig(() => ({
   // The About row in Settings shows this; declared in src/vite-env.d.ts.
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // Names the build for live updates: deploy.yml publishes the same value as
+    // updates/latest.json's version, and the native shell downloads a bundle
+    // only when the two differ. A local build never matches a published one.
+    __BUILD_ID__: JSON.stringify(process.env.GITHUB_SHA ?? `local-${Date.now()}`),
   },
   build: {
     sourcemap: false,

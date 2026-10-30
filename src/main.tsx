@@ -2,13 +2,19 @@ import { LazyMotion, domAnimation } from 'motion/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { Capacitor } from '@capacitor/core';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import './index.css';
+import { startNativeUpdates } from './services/nativeUpdates';
 import { logger } from './utils/logger';
 
-// PWA auto-update: Register service worker with aggressive update strategy
-// Only register in production to prevent stale code issues in development
-if (import.meta.env.PROD) {
+// The native shell updates through nativeUpdates.ts instead: service workers
+// do not run on its capacitor:// origin, and its files ship inside the app.
+if (Capacitor.isNativePlatform()) {
+  void startNativeUpdates();
+} else if (import.meta.env.PROD) {
+  // PWA auto-update: Register service worker with aggressive update strategy
+  // Only register in production to prevent stale code issues in development
   import('virtual:pwa-register').then(({ registerSW }) => {
     const updateSW = registerSW({
       immediate: true,
