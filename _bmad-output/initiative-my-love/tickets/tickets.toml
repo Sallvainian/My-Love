@@ -28,4 +28,4 @@ slug = "epic-date-reminders"
 title = "Date Reminders"
 description = "The native iOS shell schedules 9:00 local reminders before every date (day before; month and week before for countdown-marked dates; on the day for anniversaries and birthdays), with a Settings switch, and no notification for the daily message."
 covers = []
-after = [{ epic = 3, needs = "story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name" }]
+after = [{ epic = 3, needs = "story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name; story 3.9: the cold-start and background navigation a reminder tap reuses; stories 3.10 and 3.11: the push sweep and device install, which share the Settings section, the native code and the owner's iPhone" }, { epic = 2, needs = "stories 2.4 and 2.5: the tab bar sweep and device install, which share the Xcode project and the owner's iPhone" }]

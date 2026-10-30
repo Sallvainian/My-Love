@@ -47,16 +47,19 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 
 ## Constraints
 
-- iOS keeps 64 scheduled reminders per app. On every app open, on sign-in, and whenever a date is added, changed or deleted, the app cancels all date reminders and schedules only the soonest 64; reminders past the 64th are scheduled on a later open, once they move into the soonest 64. No background task or other mechanism is added (owner decision 2026-10-29).
-- Reminder dates come from the same next-occurrence logic as Home's countdowns (`getNextAnniversaryDate`, `getNextBirthday`), and `YYYY-MM-DD` strings are parsed with `parseEventDate`, so a reminder never disagrees with its card (AGENTS.md, Conventions).
-- Countdown marks are per-account offline data: a new `localCopy` kind, removed by `deleteAccountData()` in the same commit (AGENTS.md, Known pitfalls).
+- iOS keeps 64 scheduled reminders per app. On every app launch and every return to the foreground, on sign-in, and whenever a date is added, changed or deleted, the app cancels all date reminders and schedules only the soonest 64; reminders past the 64th are scheduled on a later open, once they move into the soonest 64. No background task or other mechanism is added (owner decision 2026-10-29).
+- Anniversary and birthday reminders come from the same next-occurrence logic as Home's countdowns (`getNextAnniversaryDate`, `getNextBirthday`), and `YYYY-MM-DD` strings are parsed with `parseEventDate`, so those reminders never disagree with their cards (AGENTS.md, Conventions). Home has no yearly logic for the other two: the relationship start counts up (`TimeTogether.tsx`) and is a date and time, and the wedding card retires once the date passes (`EventCountdown.tsx`). So the relationship start recurs on its calendar date in the device's time zone, and the wedding date reminds as a one-off before the wedding and yearly after it.
+- A re-plan runs only from loaded local copies or a successful read, never from a copy not yet loaded or a failed read, so it never cancels reminders it cannot replace (AGENTS.md, Known pitfalls: only a successful read overwrites a snapshot).
+- Events come from the loaded events window, the soonest 50 upcoming (`eventsService.ts`); an event past it is planned once earlier ones pass and the window moves.
+- Countdown marks are per-account offline data: a new `localCopy` kind, removed by `deleteAccountData()`, with their store state in `signedOutState()`, in the same commit (AGENTS.md, Known pitfalls).
+- A new public table enables RLS in its creating migration with policies `TO authenticated`, and the pgTAP `policies_are` files are edited in the same change (AGENTS.md, Known pitfalls).
 - Web code calls the local-notification plugin only after `Capacitor.isPluginAvailable`, because older shells lack it (AGENTS.md, native iOS shell).
 - Reminders use the same lock-screen group as epic-push-notifications' non-love-note pushes; that group's name is the one contract between the two epics.
 - The repo is public: evidence comes from the fictional fixture accounts (AGENTS.md, Policy).
 
 ## Done when
 
-1. On the owner's iPhone, with the device clock moved ahead, a day-before reminder fires at 9:00 for each kind of date, marked dates add the month and week reminders, and anniversaries and birthdays also fire on the day (R1, R2, R3, R5).
+1. On the owner's iPhone, with the device clock moved ahead, a day-before reminder fires at 9:00 for each kind of date, in airplane mode too; marked dates add the month and week reminders; anniversaries and birthdays also fire on the day; nothing names the daily message; and tapping a reminder opens Home (R1, R2, R3, R5, R7, R10, R11).
 2. Marking and unmarking changes that person's reminders on each of their devices and not the partner's, and the switch turned off leaves no reminder scheduled (R4, R6, R8).
 3. With more than 64 reminders due, the soonest 64 are scheduled and later ones appear after a later open; after sign-out none is scheduled (Constraints, R9).
 4. An older shell updated by live update, the website and the Home Screen web app still work (R12).
@@ -89,4 +92,10 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-29 the wedding date and the relationship start count as anniversaries and remind on the day; tapping a reminder opens Home.
 - Decision: 2026-10-29 the reminders switch is kept on the account like the push switches, and the switch and the countdown marks show only in the shell, since nothing else uses them.
 - Decision: 2026-10-29 this epic is sliced after epic-push-notifications.
-- Waits on epic-push-notifications because: iOS has one notification permission for pushes and local reminders, and story 3.1 owns its prompt; the reminders switch joins story 3.7's Settings section; and reminders use the lock-screen group name that story 3.8 sets for non-love-note pushes.
+- Waits on epic-push-notifications because: iOS has one notification permission for pushes and local reminders, and story 3.1 owns its prompt. The marks list and the reminders switch join story 3.7's Settings section, and the switch is stored in its table. Reminders use the lock-screen group name story 3.8 sets for non-love-note pushes. A reminder tap reuses story 3.9's navigation. The push sweep (3.10) and device install (3.11) share the Settings section, the native code and the owner's iPhone.
+- Waits on epic-iphone-duo-native-tab-bar because: its sweep (2.4) and device install (2.5) share the Xcode project and the owner's iPhone.
+- Decision: 2026-10-30 the relationship start recurs yearly on its calendar date in the device's time zone, as "Our anniversary". The wedding date is a one-off "Wedding day" before the wedding and a yearly "Wedding anniversary" after it.
+- Decision: 2026-10-30 story 4.1 waits on the push and tab bar sweeps (3.10, 2.4), and story 4.5 waits on their ship stories (3.11, 2.5), so this epic builds after epics 2 and 3.
+- Decision: 2026-10-30 the owner split story 1 by layer. Story 1 is the planner: dates in, day-before and on-the-day reminders out, sorted and cut at 64, and scheduled through the plugin at launch. Story 6 holds the re-plan triggers (foreground, sign-in, date change, loaded data only), the sign-out cancel, the lock-screen group and tap-to-Home.
+- Decision: 2026-10-30 story 6 follows story 1 because together they are the old story 1 the owner split, and story 2 extends the scheduling module story 6 finishes. Story 2's cross-device marks are the least certain part, and the order still puts them third, since they plan from story 6's re-plan triggers.
+- Decision: 2026-10-30 tracer bullet is story 1. Build order is 1, 6, 2, 3, then the refactor sweep (4), then the ship story (5), which runs after the sweep as in the sibling epics. No shell with the plugin is installed before story 5, so the sign-out cancel arriving in story 6 leaves no gap on a device.
