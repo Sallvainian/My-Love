@@ -20,7 +20,7 @@ slug = "epic-push-notifications"
 title = "Push Notifications"
 description = "The native iOS shell gets a push on the partner's phone for moods, love notes, photos, pokes and kisses, visible date changes and partner requests, with a Settings switch per type, love notes in their own lock-screen group and an unread-notes badge."
 covers = []
-after = [{ epic = 2, needs = "story 2.7: the live-update simulator setup story 3.1 builds on, and its answer on whether the side column needs native code, which would make 3.1 wait on story 2.2 too" }]
+after = [{ epic = 2, needs = "story 2.9: the simulator driver story 3.12 extends with notification steps and every unattended push story checks through, and story 2.4: the Duo sweep, which may change the driver too" }]
 
 [[epic]]
 id = 4
@@ -28,4 +28,4 @@ slug = "epic-date-reminders"
 title = "Date Reminders"
 description = "The native iOS shell schedules 9:00 local reminders before every date (day before; month and week before for countdown-marked dates; on the day for anniversaries and birthdays), with a Settings switch, and no notification for the daily message."
 covers = []
-after = [{ epic = 3, needs = "story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name; story 3.9: the cold-start and background navigation a reminder tap reuses; stories 3.10 and 3.11: the push sweep and device install, which share the Settings section, the native code and the owner's iPhone" }]
+after = [{ epic = 2, needs = "story 2.9: the simulator driver story 4.7 extends with the scheduled-reminders reader, and story 2.4: the Duo sweep, which may change the driver too" }, { epic = 3, needs = "story 3.12: the notification steps story 4.7 builds after, since both change the driver and its host app; story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name; story 3.9: the cold-start and background navigation a reminder tap reuses; stories 3.10 and 3.11: the push sweep and device install, which share the Settings section, the native code and the owner's iPhone" }]

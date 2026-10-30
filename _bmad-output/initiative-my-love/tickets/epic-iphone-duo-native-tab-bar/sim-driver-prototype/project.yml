@@ -1,0 +1,34 @@
+name: SimDriver
+options:
+  bundleIdPrefix: dev.sallvain.simdriver
+  deploymentTarget:
+    iOS: "26.0"
+targets:
+  Runner:
+    type: application
+    platform: iOS
+    sources: [Runner]
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      PRODUCT_BUNDLE_IDENTIFIER: dev.sallvain.simdriver.runner
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_ENTITLEMENTS: Runner/Runner.entitlements
+  RunnerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [RunnerUITests]
+    dependencies:
+      - target: Runner
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      TEST_TARGET_NAME: Runner
+      CODE_SIGNING_ALLOWED: NO
+schemes:
+  RunnerUITests:
+    build:
+      targets:
+        Runner: all
+        RunnerUITests: [test]
+    test:
+      targets: [RunnerUITests]
