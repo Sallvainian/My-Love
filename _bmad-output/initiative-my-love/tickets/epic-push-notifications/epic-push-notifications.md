@@ -50,9 +50,12 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - The badge count and the lock-screen group come in the push the server sends, because iOS applies them on delivery while the app is not running (R4, R5).
 - A retried write sends one push: retryable inserts reuse one client key with `ignoreDuplicates` (AGENTS.md, Known pitfalls), and an ignored duplicate sends no second push.
 - A new public table enables RLS in its creating migration with policies `TO authenticated`, and the pgTAP `policies_are` files are edited in the same change (AGENTS.md, Known pitfalls).
-- The device registration and the switches are account data: sign-out covers them through `deleteAccountData()` and `signedOutState()` in the same commit (AGENTS.md, Known pitfalls).
+- `deleteAccountData()` runs after `supabase.auth.signOut()` has ended the session, so it cannot remove a server row. Sign-out removes the device's registration before the session ends. The device unregisters from APNs natively on every sign-out and on a boot with no session, and the sender deletes the registrations APNs reports as gone. The switches' store state is in `signedOutState()` (AGENTS.md, Known pitfalls).
+- A failed or slow push never fails or delays the write that triggered it.
+- Each registration records its APNs environment: an Xcode development install gets sandbox tokens, which a production APNs send rejects, so the sender sends to the environment the registration names.
 - Delivery is checked on the simulator and on devices; CI cannot reach APNs, so automated tests stop at the push a send would deliver.
 - The repo is public: no device tokens, real names or account data in commits or `_bmad-output/`; evidence comes from the fictional fixture accounts (AGENTS.md, Policy).
+- Every Edge Function in `supabase/functions` ships from `deploy.yml`, in a step after migrations and before the site deploy, never by hand (owner decision 2026-10-29).
 
 ## Done when
 
@@ -60,7 +63,7 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 2. Love notes stack apart from other pushes, the badge counts unread notes and clears when Love Notes opens, and tapping each push type opens its view (R4, R5, R6).
 3. After sign-out a device receives none of that account's pushes and shows no badge (R10).
 4. An older shell updated by live update, the website and the Home Screen web app still work and show no push switches (R11).
-5. The migrations ship through `deploy.yml`, the server sender is deployed, the new shell is installed on the owner's iPhone, and CI is green on main.
+5. The migrations and every Edge Function ship through `deploy.yml`, the new shell is installed on the owner's iPhone, and CI is green on main.
 
 ## Boundaries
 
@@ -72,6 +75,7 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - The dock and native tab bar badges (DW-327).
 - Touch point: Settings — epic-date-reminders adds its reminders switch there too; owner: epic-push-notifications for the six push switches.
 - Touch point: `ios/App/App/AppDelegate.swift` and the shell's native code — also changed by epic-iphone-duo-native-tab-bar.
+- Touch point: `.github/workflows/deploy.yml` — its functions-deploy step; owner: epic-push-notifications.
 - Must not change: in-app live delivery through Realtime and the arriving-note haptic.
 
 ## References
@@ -92,5 +96,12 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-29 six switches (moods, love notes, photos, pokes and kisses, dates, partner requests), all on until changed, kept on the account; the receiver's switch decides.
 - Decision: 2026-10-29 pushes go to every iOS shell signed in to the receiver's account; the website and the Home Screen web app get none.
 - Decision: 2026-10-29 with the app in the foreground no banner shows; two lock-screen stacks, love notes and everything else.
-- Open question: no workflow deploys Edge Functions (only `test.yml` mentions `supabase functions deploy`); if the server sender is one, its deploy needs a `deploy.yml` step or a hand step. Settled when the epic is sliced.
+- Decision: 2026-10-29 no workflow deployed Edge Functions; `deploy.yml` gets a functions-deploy step after migrations and before the site deploy, covering every function in `supabase/functions`, never by hand.
 - Parked: the Love Notes dock and tab bar badge (DW-327) could use the R5 count; out of this epic.
+- Unknown: whether a database trigger reaches the sender Edge Function on both the local stack and the hosted project. Story 1 answers it; if it does not, stories 4, 5 and 6 are re-sliced.
+- Decision: 2026-10-29 tracer bullet is story 1: a love note pushes to the partner's simulator through the trigger, the sender and APNs. Sign-out (story 2) follows at once, so no shell that can receive pushes leaks them across accounts.
+- Decision: 2026-10-29 stories 1, 2, 4, 5, 6, 7, 8 and 9 run in one ordered sequence, because each extends the sender or the web-side push module. Story 3 waits on story 1, so its first run deploys the sender. Story 11 runs after the refactor sweep, as in epic-iphone-duo-native-tab-bar, so the cleaned-up code is what ships.
+- Waits on epic-iphone-duo-native-tab-bar because: story 3.1 and story 2.1 both change the Xcode project and `AppDelegate.swift`, and 3.1 reuses 2.1's test pair and local live-update setup; story 3.9 needs story 2.3's view-to-tab sync so a tapped push selects its tab.
+- Decision: 2026-10-29 the set check's suggestion to move story 4 to after story 1 is declined: story 2 also changes the sender, which story 4 extends.
+- Decision: 2026-10-29 a love note that arrives while Love Notes is on screen counts as read, so the badge stays clear (fills a gap in R5).
+- Decision: 2026-10-29 sign-out removes the registration before the session ends, unregisters from APNs natively, and lets the sender delete gone registrations. Story 2 proves on a device that a sign-in after an offline sign-out re-registers, and that a sign-in by another account stops the previous account's pushes, because Apple discourages `unregisterForRemoteNotifications`.

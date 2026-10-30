@@ -20,6 +20,7 @@ slug = "epic-push-notifications"
 title = "Push Notifications"
 description = "The native iOS shell gets a push on the partner's phone for moods, love notes, photos, pokes and kisses, visible date changes and partner requests, with a Settings switch per type, love notes in their own lock-screen group and an unread-notes badge."
 covers = []
+after = [{ epic = 2, needs = "story 2.1: the native tab bar change to the Xcode project and AppDelegate, and the fictional-data test pair and local live-update setup story 3.1 builds on; story 2.3: the view-to-tab sync story 3.9 relies on" }]
 
 [[epic]]
 id = 4
@@ -27,3 +28,4 @@ slug = "epic-date-reminders"
 title = "Date Reminders"
 description = "The native iOS shell schedules 9:00 local reminders before every date (day before; month and week before for countdown-marked dates; on the day for anniversaries and birthdays), with a Settings switch, and no notification for the daily message."
 covers = []
+after = [{ epic = 3, needs = "story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name" }]

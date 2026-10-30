@@ -87,4 +87,6 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-29 the 64-reminder re-plan in Constraints is the whole scheduling rule; sign-out cancels every reminder.
 - Decision: 2026-10-29 owner added a Settings switch for all date reminders.
 - Decision: 2026-10-29 the wedding date and the relationship start count as anniversaries and remind on the day; tapping a reminder opens Home.
-- Assumption: the reminders switch is kept on the account like the push switches, and the switch and the countdown marks show only in the shell, since nothing else uses them.
+- Decision: 2026-10-29 the reminders switch is kept on the account like the push switches, and the switch and the countdown marks show only in the shell, since nothing else uses them.
+- Decision: 2026-10-29 this epic is sliced after epic-push-notifications.
+- Waits on epic-push-notifications because: iOS has one notification permission for pushes and local reminders, and story 3.1 owns its prompt; the reminders switch joins story 3.7's Settings section; and reminders use the lock-screen group name that story 3.8 sets for non-love-note pushes.
