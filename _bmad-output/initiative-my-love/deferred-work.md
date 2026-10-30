@@ -2824,3 +2824,10 @@ location: src/App.tsx (`<AppNavigation>`); src/components/Navigation/AppNavigati
 severity: low
 reason: AppNavigation renders a badge per destination from its `badgeCounts` prop, but its only caller in App.tsx passes none, so no badge has ever shown. The owner parked badges until a feature supplies real counts; when it does, the column dock from epic-iphone-duo-native-tab-bar shows them too.
 status: open
+
+### DW-328: The column rule's "both side insets non-zero means no column" case is unmeasured on a non-Duo iPhone.
+origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 7 (the side-column detection spike)
+location: _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/tickets/story-find-how-the-web-code-learns-the-side-column-s-position-and-plan.md (Findings, detection method)
+severity: medium (unverified)
+reason: Story 7's rule gives the page a column only when exactly one of env(safe-area-inset-left/right) is non-zero, because a notched or Dynamic Island iPhone in landscape is expected to inset both sides; the shell allows landscape on iPhone (Info.plist) and index.html sets viewport-fit=cover. The iPhone 18 Pro simulator rendered the readout build blank on iOS 27.0 and 27.2, so no non-Duo iPhone was measured. If such an iPhone inset only one side, story 2 would draw a column dock there. Proven by reading both side insets in the shell on a non-Duo iPhone simulator in each landscape direction; story 2's verify names a non-Duo iPhone simulator but not landscape.
+status: open
