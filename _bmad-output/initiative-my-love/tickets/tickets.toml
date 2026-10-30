@@ -6,3 +6,10 @@ slug = "epic-test-review-remediation"
 title = "Test Review Remediation"
 description = "Every finding from the 2026-09-25 and 2026-10-03 TEA test reviews is fixed, so a green suite means the behaviour works and a fresh review of each test folder reports no Critical or High."
 covers = []
+
+[[epic]]
+id = 2
+slug = "epic-iphone-duo-native-tab-bar"
+title = "iPhone Duo Native Tab Bar"
+description = "The native iOS shell shows the five dock destinations as Apple's own tab bar on every iPhone, which on iPhone Duo iOS places in the side column, while the website and the Home Screen web app keep their HTML dock."
+covers = []
