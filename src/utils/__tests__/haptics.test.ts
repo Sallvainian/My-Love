@@ -6,15 +6,39 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isVibrationSupported,
+  playHaptic,
   triggerErrorHaptic,
   triggerMoodSaveHaptic,
   triggerSelectionHaptic,
 } from '../haptics';
 
+// The web by default; the native-shell tests flip these.
+const capacitor = vi.hoisted(() => ({
+  isNativePlatform: vi.fn(() => false),
+  isPluginAvailable: vi.fn(() => true),
+}));
+
+const haptics = vi.hoisted(() => ({
+  impact: vi.fn(() => Promise.resolve()),
+  notification: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('@capacitor/core', () => ({ Capacitor: capacitor }));
+
+vi.mock('@capacitor/haptics', () => ({
+  Haptics: haptics,
+  ImpactStyle: { Heavy: 'HEAVY', Medium: 'MEDIUM', Light: 'LIGHT' },
+  NotificationType: { Success: 'SUCCESS', Warning: 'WARNING', Error: 'ERROR' },
+}));
+
 describe('haptics utility', () => {
   let vibrateMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    haptics.impact.mockClear();
+    haptics.notification.mockClear();
     vibrateMock = vi.fn().mockReturnValue(true);
 
     // Mock navigator.vibrate since happy-dom doesn't provide it
@@ -168,5 +192,60 @@ describe('haptics utility', () => {
       expect(errorCall).toEqual([100, 50, 100]);
       expect(errorCall).not.toEqual(saveCall);
     });
+  });
+
+  // DW-325: Safari on iPhone has no Vibration API, so the shell plays Apple's.
+  describe('in the native iOS shell', () => {
+    beforeEach(() => {
+      capacitor.isNativePlatform.mockReturnValue(true);
+    });
+
+    it('plays each feel as its iPhone haptic and never calls the Vibration API', () => {
+      triggerMoodSaveHaptic();
+      expect(haptics.notification).toHaveBeenLastCalledWith({ type: 'SUCCESS' });
+
+      triggerErrorHaptic();
+      expect(haptics.notification).toHaveBeenLastCalledWith({ type: 'ERROR' });
+
+      triggerSelectionHaptic();
+      expect(haptics.impact).toHaveBeenLastCalledWith({ style: 'LIGHT' });
+
+      playHaptic([30], 'arrival');
+      expect(haptics.impact).toHaveBeenLastCalledWith({ style: 'MEDIUM' });
+
+      expect(haptics.notification).toHaveBeenCalledTimes(2);
+      expect(haptics.impact).toHaveBeenCalledTimes(2);
+      expect(vibrateMock).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the Vibration API in a shell installed before the plugin', () => {
+      capacitor.isPluginAvailable.mockReturnValue(false);
+
+      triggerMoodSaveHaptic();
+
+      expect(capacitor.isPluginAvailable).toHaveBeenCalledWith('Haptics');
+      expect(haptics.notification).not.toHaveBeenCalled();
+      expect(vibrateMock).toHaveBeenCalledWith(50);
+    });
+
+    it('swallows a failed haptic with a warning', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const failure = new Error('no engine');
+      haptics.notification.mockReturnValueOnce(Promise.reject(failure));
+
+      expect(() => triggerErrorHaptic()).not.toThrow();
+
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith('Haptic failed:', failure));
+      warn.mockRestore();
+    });
+  });
+
+  // On the web the plugin's own navigator.vibrate fallback counts as an
+  // available plugin, so availability alone must not pick the native path.
+  it('uses the Vibration API on the web even though the plugin reports available', () => {
+    triggerErrorHaptic();
+
+    expect(haptics.notification).not.toHaveBeenCalled();
+    expect(vibrateMock).toHaveBeenCalledWith([100, 50, 100]);
   });
 });

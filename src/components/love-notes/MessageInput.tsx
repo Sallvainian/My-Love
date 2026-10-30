@@ -6,7 +6,7 @@
  * - Character counter (visible at 900+ chars)
  * - Textarea that grows with its content
  * - Keyboard shortcuts (Enter to send, Shift+Enter for new line, Escape to clear)
- * - Haptic feedback via Vibration API
+ * - Haptic feedback (Apple's haptics in the native shell, Vibration API elsewhere)
  * - Validation (max 1000 chars, no empty messages)
  * - Image attachment support (Love Notes Images feature)
  *
@@ -74,7 +74,7 @@ export function MessageInput() {
     const validation = imageCompressionService.validateImageFile(file);
     if (!validation.valid) {
       setImageError(validation.error || 'Invalid image file');
-      vibrate([100, 50, 100]); // Error haptic
+      vibrate([100, 50, 100], 'error'); // Error haptic
       return;
     }
 
@@ -84,7 +84,7 @@ export function MessageInput() {
     }
 
     setSelectedImage(file);
-    vibrate(30); // Selection haptic
+    vibrate(30, 'selection'); // Selection haptic
 
     // Reset file input for re-selection
     if (fileInputRef.current) {
@@ -137,7 +137,7 @@ export function MessageInput() {
       await sendNote(sanitizedContent, selectedImage || undefined);
 
       // Success vibration (single short pulse)
-      vibrate(50);
+      vibrate(50, 'success');
 
       // Clear input and selected image
       setContent('');
@@ -155,7 +155,7 @@ export function MessageInput() {
       );
 
       // Error vibration (double pulse pattern)
-      vibrate([100, 50, 100]);
+      vibrate([100, 50, 100], 'error');
     } finally {
       setIsSending(false);
     }
