@@ -166,12 +166,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
     try {
       const error = await signInWithGoogle();
 
-      if (error) {
+      // The native shell's sign-in sheet was closed: nothing failed.
+      if (error === 'cancelled') {
+        setIsGoogleLoading(false);
+      } else if (error) {
         setError('Failed to initiate Google sign-in. Please try again.');
         setIsGoogleLoading(false);
       }
-      // Note: If successful, user will be redirected to Google
-      // The loading state will persist until redirect completes
+      // Note: If successful, user will be redirected to Google (in the native
+      // shell, already signed in). The loading state persists until this screen goes
     } catch (err) {
       console.error('[LoginScreen] Google sign-in error:', err);
       setError('An unexpected error occurred with Google sign-in.');

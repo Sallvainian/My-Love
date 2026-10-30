@@ -1,7 +1,9 @@
+import { Capacitor } from '@capacitor/core';
 import type { AuthError } from '@supabase/supabase-js';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import { logger } from '../../utils/logger';
 import { supabase } from '../supabaseClient';
+import { signInWithGoogleNative } from './nativeGoogleSignIn';
 import type { AuthCredentials, AuthResult } from './types';
 
 export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> => {
@@ -111,7 +113,9 @@ export const resetPassword = async (email: string): Promise<AuthError | null> =>
   }
 };
 
-export const signInWithGoogle = async (): Promise<AuthError | null> => {
+export const signInWithGoogle = async (): Promise<AuthError | 'cancelled' | null> => {
+  if (Capacitor.isNativePlatform()) return signInWithGoogleNative();
+
   try {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',

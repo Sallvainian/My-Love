@@ -216,6 +216,20 @@ describe('LoginScreen on the kit', () => {
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
   });
 
+  // DW-323: closing the native shell's sign-in sheet is not a failure.
+  it('returns to the idle form with no error when the Google sheet is closed', async () => {
+    const user = userEvent.setup();
+    actions.signInWithGoogle.mockResolvedValue('cancelled');
+    render(<LoginScreen />);
+
+    await user.click(screen.getByTestId('google-signin-button'));
+
+    expect(screen.getByTestId('google-signin-button')).toHaveTextContent('Continue with Google');
+    expect(screen.getByTestId('google-signin-button')).toBeEnabled();
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeEnabled();
+    expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
+  });
+
   it('shows the callback notice on card2 in ink with an icon', () => {
     const { container } = renderWithCallbackNotice();
 
