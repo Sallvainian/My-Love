@@ -29,7 +29,7 @@ R3 (owner request 2026-10-29): Settings in the shell has an on/off switch per pu
 
 R4 (owner request 2026-10-29): Love-note pushes stack as their own group on the lock screen, apart from every other push. Met when a lock screen holding both kinds shows two stacks.
 
-R5 (owner request 2026-10-29): The app icon badge shows how many partner love notes arrived since the person last opened Love Notes on any of their devices, the count every push carries, and opening Love Notes clears it. Met when two notes show 2, opening Love Notes clears it, and the next note shows 1.
+R5 (owner request 2026-10-29; owner decision 2026-10-30): The app icon badge shows how many partner love notes arrived since the person last opened Love Notes on any of their devices, the count every push carries, and opening Love Notes clears it; opening Love Notes on the website or the Home Screen web app counts too, so reading notes there lowers the next push's count. Met when two notes show 2, opening Love Notes clears it, the next note shows 1, and after opening Love Notes on the website the next note shows 1 again.
 
 R6 (owner decision 2026-10-29): Tapping a push opens its view: Love Notes for a note, Partner for a mood, a poke, a kiss or a partner request, Photos for a photo, Home for a date. Met when each type's tap lands on its view from a cold start and from the background.
 
@@ -41,7 +41,7 @@ R9 (owner decision 2026-10-29): The shell asks for notification permission once,
 
 R10 (owner decision 2026-10-29; AGENTS.md sign-out): Sign-out stops the outgoing account's pushes to that device and clears its badge, and the next account signed in there receives only its own. Met when, after sign-out and sign-in as another account, the first account's partner acting shows nothing on that device.
 
-R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a shell installed before this epic keep working unchanged, including after that older shell takes the new web code by live update, and none shows the push switches. Met when an older shell updated to the new bundle, the website and the web app run with no error and no switches.
+R11 (AGENTS.md native iOS shell; owner decision 2026-10-30): The website, the Home Screen web app and a shell installed before this epic keep working with nothing visible changed (the website and the web app write R5's marker in the background), including after that older shell takes the new web code by live update, and none shows the push switches. Met when an older shell updated to the new bundle, the website and the web app run with no error and no switches.
 
 ## Constraints
 
@@ -122,3 +122,10 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-30 story 1 is kept whole as the tracer, though the replan's additions (the recorded request, the insert-never-fails check, the per-registration APNs environment, the sender's tests in CI) make it long against the loop's 2M-token story budget; a split into a thin tracer and a hardening story was proposed and declined by the owner.
 - Decision: 2026-10-30 story 1 owns the sender's `[functions]` section in `supabase/config.toml` (none exists today), because it is the first story to run the sender locally; story 3 adds `upload-love-note-image`'s section with `verify_jwt = true`, as the hosted project reports it. Story 3's check compares the Management API's function list (version and `verify_jwt`) before and after the first run, since `supabase functions list` prints no settings.
 - Decision: 2026-10-30 story 7's Settings section is named "Push and reminders", so it is not confused with the notifications page in _bmad-output/backlog/story-native-shell-live-update-prompt.md.
+- Decision: 2026-10-30 `bmad-ux` declined for the Settings "Push and reminders" section (owner decision); stories 7, 4.2 and 4.3 follow these layout rules instead:
+  - Place: a section headed "Push and reminders", shown only in the shell, between Photos and About in `Settings.tsx`. Every row is the existing switch row (`MobileDataPhotosRow`: icon tile, label, one-line helper, `role="switch"`).
+  - Pushes group, first, in this order: Love notes, Moods, Photos, Pokes and kisses, Dates, Partner requests. Love notes leads because it has its own lock-screen group and the badge.
+  - Reminders group, second: story 4.3's "Date reminders" switch, then story 4.2's marks list, one row per date under the name its Home card uses, each with a "Remind me a month and a week before" switch.
+  - Declined permission: one notice at the top of the section, above both groups: "Notifications are off for My Love. Turn them on in iOS Settings." The switches stay usable, because they are kept on the account and apply to its other devices.
+  - Wording: labels are sentence case and name the thing, with no "Notify me"; helpers say when it arrives, with "your partner" and never a name (for example, "When your partner sends a note.").
+- Decision: 2026-10-30 R5 and R11 re-derived (owner decision): opening Love Notes on the website or the Home Screen web app writes the last-opened marker in the background, and R11's "unchanged" means nothing visible changes. Story 8 writes the marker from every surface.
