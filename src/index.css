@@ -17,6 +17,12 @@
   --color-rose-900: #881337;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'Playfair Display', serif;
+  /* Google's brand colours, for the "G" on the sign-in button only. Google's
+     branding rules keep the logo in these four colours in both themes. */
+  --color-google-blue: #4285f4;
+  --color-google-red: #ea4335;
+  --color-google-yellow: #fbbc05;
+  --color-google-green: #34a853;
 }
 
 /* Style kit (the approved style kit) -- the one source for every kit

@@ -99,14 +99,24 @@ describe('LoginScreen on the kit', () => {
     expect(submit).toHaveClass('bg-fill', 'text-white', 'rounded-full', 'h-12');
   });
 
-  it('renders Continue with Google as the neutral pill with no brand logo', () => {
-    render(<LoginScreen />);
+  it('renders Continue with Google as the neutral pill led by the multicolour G', () => {
+    const { container } = render(<LoginScreen />);
 
     const google = screen.getByTestId('google-signin-button');
     expect(google).toHaveTextContent('Continue with Google');
     expect(google).toHaveClass('bg-card2', 'text-ink', 'rounded-full', 'h-12');
-    // No multicolour logo: its brand hex has no kit token.
-    expect(google.innerHTML).not.toMatch(/<svg\b/);
+    // Decorative: the label already names Google.
+    const logo = within(google).getByTestId('google-logo');
+    expect(logo).toHaveAttribute('aria-hidden', 'true');
+    // Each colour comes from a brand token, never a hex in the markup.
+    const fills = Array.from(logo.querySelectorAll('path'), (path) => path.getAttribute('class'));
+    expect(fills).toEqual([
+      'fill-google-red',
+      'fill-google-blue',
+      'fill-google-yellow',
+      'fill-google-green',
+    ]);
+    expectOnKit(container.innerHTML);
   });
 
   it('renders the OR divider and the Contact admin footer link', () => {
