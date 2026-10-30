@@ -39,7 +39,7 @@ R8 (owner decision 2026-10-29): While Settings is open, the tab of the last dest
 
 R9 (owner decision 2026-10-29): The native tab bar shows exactly where the HTML dock would and nowhere else: not on the sign-in screen, display-name setup, the loading screens, the welcome splash or the admin panel. Met when those screens show no tab bar in the shell and the signed-in views show it.
 
-R10 (owner decision 2026-10-29): While a dialog, a sheet or the photo viewer is open, the native tab bar is hidden, and it returns when the overlay closes, so no view switch happens under an open overlay, as with today's covered dock. Met when opening and closing the photo upload dialog, the interaction history sheet and the photo viewer hides and restores the bar.
+R10 (owner decision 2026-10-29): While any overlay that covers the dock today is open (dialogs, sheets, the photo viewer, and the poke, kiss and fart animations), the native tab bar is hidden, and it returns only when the last open overlay closes, so no view switch happens under an open overlay. Met when every such overlay hides the bar while open and restores it on close, and an overlay opened inside another keeps the bar hidden until both close.
 
 ## Constraints
 
@@ -48,6 +48,7 @@ R10 (owner decision 2026-10-29): While a dialog, a sheet or the photo viewer is 
 - The first story proves, on the Xcode 27.1 iPhone Duo simulator, that a system tab bar around the one shared web view lands in the column, before the rest is built; DW-326 says this is not yet proven.
 - Web code detects the capability, never the device: it relies on the native tab bar only when the installed shell offers it (`Capacitor.isPluginAvailable`), because web changes reach older shells by live update while native changes need a reinstall (AGENTS.md, native iOS shell; research rec 1).
 - The native tab bar's visibility follows the dock's mount: it shows when `AppNavigation` mounts and hides when it unmounts, so a screen added later stays in step; no separate signed-out check (owner decision 2026-10-29; the screens without the dock are early returns in `App.tsx` before the main return that renders it).
+- Overlays share no component (about ten build their own), so R10 goes through one shared hook that counts open overlays and hides the bar while the count is above zero; a count, so an overlay opened inside another does not restore the bar early. A test lists every overlay and checks that each uses the hook, so a new overlay cannot skip it (owner decision 2026-10-29).
 - A tab tap goes through the same navigation as a dock tap (`navigationSlice.currentView` and its URL handling), so history and reload behave alike (AGENTS.md, Conventions).
 - Column placement, insets and poses are checked on the Xcode 27.1 iPhone Duo simulator or the device; Playwright cannot emulate the column, safe-area insets, standalone mode or posture (research Q5).
 - Screenshots committed as evidence come from a test account with the fictional fixture data, never the owner's account, because the repo is public (AGENTS.md, Policy).
@@ -92,6 +93,9 @@ R10 (owner decision 2026-10-29): While a dialog, a sheet or the photo viewer is 
 - Decision: 2026-10-29 "an opened link" dropped from R2: the shell registers no URL scheme and has no universal links, so nothing outside the app opens it at a given view.
 - Decision: 2026-10-29 story 5 (ship to the Duo) runs after the refactor sweep, so the cleaned-up code is what gets deployed and checked on the device; a deliberate exception to the sweep closing the epic.
 - Decision: 2026-10-29 Back/Forward dropped from R2 for the shell: nothing in `src` calls `history.back/go/forward` and Capacitor's iOS code never enables swipe-back.
-- Unknown: whether a system tab bar around the one shared web view lands in the side column; story 1 answers it, and if it does not, stories 2–5 are re-sliced (DW-326).
-- Decision: 2026-10-29 that unknown gates story 2 only: stories 3–5 already wait on story 2 through `after`, so one field is cleared when story 1's result is read.
-- Decision: 2026-10-29 tracer bullet is story 1, the simulator proof that a system tab bar around the one shared web view lands in the side column; the dock hand-off (story 2) follows as the least certain part, then selection sync (story 3), which shares its web wiring.
+- Unknown: whether a system tab bar around the one shared web view lands in the side column; story 1 answers it, and if it does not, stories 2, 6, 3, 4 and 5 are re-sliced (DW-326).
+- Decision: 2026-10-29 story 5 covers R10, because Done when 1 checks an open dialog on the Duo.
+- Decision: 2026-10-29 R10 split into its own story 6, built after story 2 and before story 3: story 2 carried six requirements, and R10 alone wires a shared hook into about eight overlays plus an inventory test (AGENTS.md: split large loop stories).
+- Decision: 2026-10-29 the poke, kiss and fart animations count as R10 overlays; anything that covers the dock today hides the bar.
+- Decision: 2026-10-29 that unknown gates story 2 only: stories 6, 3, 4 and 5 already wait on story 2 through the `after` chain (6 on 2, 3 on 6, 4 on 3, 5 on 4), so one field is cleared when story 1's result is read.
+- Decision: 2026-10-29 tracer bullet is story 1, the simulator proof that a system tab bar around the one shared web view lands in the side column; the dock hand-off (story 2) follows as the least certain part, then overlay hiding (story 6), then selection sync (story 3); all three share the web-side module.
