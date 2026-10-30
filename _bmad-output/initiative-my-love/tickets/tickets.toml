@@ -10,6 +10,6 @@ covers = []
 [[epic]]
 id = 2
 slug = "epic-iphone-duo-native-tab-bar"
-title = "iPhone Duo Native Tab Bar"
-description = "The native iOS shell shows the five dock destinations as Apple's own tab bar on every iPhone, which on iPhone Duo iOS places in the side column, while the website and the Home Screen web app keep their HTML dock."
+title = "iPhone Duo Side-Column Dock"
+description = "Wherever the page has a side column, as on iPhone Duo folded and in unfolded landscape, the app's own dock is a vertical bar in that column with its buttons grouped at the bottom and Settings as a sixth; everywhere else the header and five-button bottom dock stay as they are."
 covers = []

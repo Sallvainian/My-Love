@@ -26,3 +26,4 @@ Two partners share daily messages, moods, photos and notes in one app that keeps
 
 - Open question: the project has no PRD or product brief, so this initiative has no Requirements, Constraints or Done when; `bmad-prd` or `bmad-product-brief` supplies them. The owner decides when.
 - Decision: 2026-10-28 epic-test-review-remediation reopened with stories 10–12. Its 2026-10-03 re-reviews still report findings, and its Done when now requires the 2026-10-03 rows fixed and no Critical or High on fresh folder re-reviews, instead of zero findings, because the reviewer varies between runs.
+- Decision: 2026-10-30 epic 2 retitled "iPhone Duo Side-Column Dock" and its description rewritten: the owner's Duo shows the shell drawing web content into the side column, so the native tab bar was dropped for the app's own HTML dock in the column (see the epic's Notes). Its folder slug stays `epic-iphone-duo-native-tab-bar`.

@@ -1,101 +1,93 @@
 ---
 type: epic
-title: "iPhone Duo Native Tab Bar"
+title: "iPhone Duo Side-Column Dock"
 parent: initiative-my-love
 covers: []
-sources: [_bmad-output/initiative-my-love/research-iphone-duo-pwa-support/research-iphone-duo-pwa-support.md, _bmad-output/initiative-my-love/deferred-work.md, src/components/Navigation/AppNavigation.tsx, AGENTS.md]
+sources: [_bmad-output/initiative-my-love/research-iphone-duo-pwa-support/research-iphone-duo-pwa-support.md, _bmad-output/initiative-my-love/deferred-work.md, src/components/Navigation/AppNavigation.tsx, AGENTS.md, index.html]
 companions: [_bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/duo-observed-layouts.md]
 after: []
 risk: high
 ---
 
-# iPhone Duo Native Tab Bar
+# iPhone Duo Side-Column Dock
 
 ## Description
 
-On iPhone Duo, iOS moves system bars into a side column, which in the native shell today holds only the time and status, while the app's own HTML dock floats over content at the bottom (`duo-observed-layouts.md`). Instagram, Facebook, Netflix and others put their tabs in that column. Only a system tab bar can get there, because iOS keeps web content out of the column (DW-326, research Q2). When this epic is done, the native iOS shell on every iPhone shows the five dock destinations as Apple's own tab bar, which on the Duo iOS places in the column in the poses where it puts system bars, while the website and the Home Screen web app keep their HTML dock.
+On iPhone Duo, iOS puts its status in a side column in some poses, and the app's own HTML dock floats over content at the bottom (`duo-observed-layouts.md`). Instagram, Facebook, Netflix and others put their tabs in that column. On 2026-10-30 the owner's Duo showed the current shell already drawing web content into the column, its header and cards running under iOS's status capsule, so the app's own dock can move there if taps there reach the page too, which story 7 checks; no native tab bar is needed (`index.html` has set `viewport-fit=cover` since 2026-08-18). When this epic is done, wherever the page has a side column the dock is a capsule of buttons at its bottom, with Settings as a sixth, and everywhere else the header and bottom dock stay as they are.
 
 ## Outcome
 
-On the iPhone Duo, the couple reaches the five destinations from iOS's side column, as in Instagram, Facebook and Netflix, with no dock covering content. The signal is screenshots of the Duo in each pose matching the column layout recorded in `duo-observed-layouts.md`.
+On the iPhone Duo, the couple reaches the five destinations and Settings from the side column, as in Instagram and Facebook, with nothing covered by the dock. The signal is device descriptions and test-account screenshots of the Duo in each pose matching the column layout in `duo-observed-layouts.md`.
 
 ## Requirements
 
-R1 (DW-326; research Q4): On iPhone Duo the native shell shows Home, Mood, Love Notes, Photos and Partner as iOS's own tab bar, placed where iOS places system tab bars in each pose: the side column on the outer display and in inner landscape, a bottom bar in inner portrait, and its own outer edge in Split View when iOS runs the app there (the shell declares no multiple-scene support, so that is unconfirmed). Met when simulator or device screenshots of each of those poses show the five tabs there and no HTML dock.
+R1 (owner direction 2026-10-30): In every pose where the page has a side column (on the Duo, at least outer portrait and inner landscape; story 7 records outer landscape), the dock is a vertical capsule of buttons at the column's bottom, and above it the page's header and content run on under iOS's status as today; in every other pose and device it is today's bottom dock, and changing pose switches between the two without a reload or a change of view. Met when simulator and device screenshots show the capsule in each column pose and the bottom dock in inner portrait, and folding, unfolding or rotating keeps the view on screen.
 
-R2 (DW-326; AppNavigation DESTINATIONS): Tapping a tab opens the same view, URL and history entry the matching dock button opens, and the selected tab always names the view on screen, whatever changed it. Met when each of the five tabs opens its view, a reload after a tab tap reopens that view, and every path the shell has to a view (launch or reload, Settings, the error screen's Home button) leaves its tab selected.
+R2 (AppNavigation DESTINATIONS): Each column-dock button opens the same view, URL and history entry as the matching bottom-dock button, and the button of the view on screen is marked active, whatever changed the view. Met when each button opens its view and shows active, and a reload reopens that view with its button marked.
 
-R3 (AppNavigation aria-label; owner decision 2026-10-29): VoiceOver reads each tab's name. Met when VoiceOver on the device, or Accessibility Inspector on the simulator, reads Home, Mood, Love Notes, Photos and Partner.
+R3 (AppNavigation aria-label): Every column-dock button has an accessible name that VoiceOver reads: Home, Mood, Love Notes, Photos, Partner and Settings. Met when VoiceOver on the device, or Accessibility Inspector on the simulator, reads all six in a column pose.
 
-R4 (DW-326; AGENTS.md dock clearance): While the native tab bar shows, the HTML dock does not, nothing the app draws sits under the tab bar, and no dock-sized empty band is left at the bottom; screen-pinned views such as Love Notes end at the tab bar or the screen edge. Met when every view scrolled to its end shows its last item whole in each R1 pose.
+R4 (AGENTS.md dock clearance; owner decision 2026-10-30): In column poses nothing the app draws sits under the column dock and no bottom-dock-sized empty band remains at the bottom; content may run under iOS's status capsule. Love Notes ends at the column dock's edge and runs down to the bottom of the screen. Met when, in each column pose, every view scrolled to its end shows its last item whole and clear of the column dock, and Love Notes' composer sits at the bottom of the screen beside the column dock.
 
-R5 (AGENTS.md native iOS shell; research rec 4): The website, the Home Screen web app, and a shell installed before this work keep the HTML dock and work unchanged, including after that older shell takes the new web code by live update. Met when an older shell build, updated to the new bundle on the simulator, shows a working dock.
+R5 (AGENTS.md native iOS shell; research rec 4): Wherever no side column reaches the page (other iPhones, desktop browsers, the Duo in inner portrait, and Safari or the Home Screen web app if iOS keeps the column from them), the header, its Settings gear and the five-button bottom dock look and work as today, in the website, the Home Screen web app and the shell alike, including a shell that takes the new web code by live update. Met when a non-Duo iPhone simulator and the Duo in inner portrait show today's header and dock, and the dock's E2E specs pass.
 
-R6 (DW-326 one shared WKWebView): Every tab shows the one running app: one sign-in, one set of live connections, and switching tabs keeps or drops view state exactly as switching with the dock does today. Met when a partner's mood arrives live whichever tab is selected, and switching tabs neither reloads the app nor signs out.
-
-R7 (owner decision 2026-10-29): On every iPhone other than the Duo, the native shell shows the same five tabs as iOS's own tab bar where iOS places it, in place of the HTML dock. Met when a non-Duo iPhone simulator shows the system tab bar and no HTML dock.
-
-R8 (owner decision 2026-10-29): While Settings is open, the tab of the last destination shown stays selected, and tapping it leaves Settings for that view. Met when Settings opened from each destination returns to it by that destination's tab.
-
-R9 (owner decision 2026-10-29): The native tab bar shows exactly where the HTML dock would and nowhere else: not on the sign-in screen, display-name setup, the loading screens, the welcome splash or the admin panel. Met when those screens show no tab bar in the shell and the signed-in views show it.
-
-R10 (owner decision 2026-10-29): While any overlay that covers the dock today is open (dialogs, sheets, the photo viewer, and the poke, kiss and fart animations), the native tab bar is hidden, and it returns only when the last open overlay closes, so no view switch happens under an open overlay. Met when every such overlay hides the bar while open and restores it on close, and an overlay opened inside another keeps the bar hidden until both close.
+R8 (owner decisions 2026-10-30): In column poses Settings is a sixth button in the column dock, marked active while Settings is open, and the header shows no Settings gear; where there is no column the gear stays in the header and the bottom dock keeps its five buttons. Met when, in each column pose, the column's Settings button opens Settings and shows active with no gear in the header, and in inner portrait the gear opens Settings beside a five-button dock.
 
 ## Constraints
 
-- Only a system tab bar reaches the side column: iOS keeps web content out of it and fills it with the page background (research Q2; DW-326), so no HTML imitation of the column.
-- Keep iOS's own bar placement in every pose; never override it (research Q4, HIG [3] "don't override the default bar placement").
-- The first story proves, on the Xcode 27.1 iPhone Duo simulator, that a system tab bar around the one shared web view lands in the column, before the rest is built; DW-326 says this is not yet proven.
-- Web code detects the capability, never the device: it relies on the native tab bar only when the installed shell offers it (`Capacitor.isPluginAvailable`), because web changes reach older shells by live update while native changes need a reinstall (AGENTS.md, native iOS shell; research rec 1).
-- The native tab bar's visibility follows the dock's mount: it shows when `AppNavigation` mounts and hides when it unmounts, so a screen added later stays in step; no separate signed-out check (owner decision 2026-10-29; the screens without the dock are early returns in `App.tsx` before the main return that renders it).
-- Overlays share no component (about ten build their own), so R10 goes through one shared hook that counts open overlays and hides the bar while the count is above zero; a count, so an overlay opened inside another does not restore the bar early. A test lists every overlay and checks that each uses the hook, so a new overlay cannot skip it (owner decision 2026-10-29).
-- A tab tap goes through the same navigation as a dock tap (`navigationSlice.currentView` and its URL handling), so history and reload behave alike (AGENTS.md, Conventions).
-- Column placement, insets and poses are checked on the Xcode 27.1 iPhone Duo simulator or the device; Playwright cannot emulate the column, safe-area insets, standalone mode or posture (research Q5).
-- Screenshots committed as evidence come from a test account with the fictional fixture data, never the owner's account, because the repo is public (AGENTS.md, Policy).
+- The first story finds, on the Xcode 27.1 iPhone Duo simulator and on the owner's Duo, how the web code learns the side column's position and width in each pose (safe-area insets or measurement) before the dock is built; the 2026-10-29 and 2026-10-30 observations disagree on where content stops (owner decision 2026-10-30).
+- The dock's form follows what the page learns about the column, never a device or model check, so any device that gives the page a column gets the column dock (research rec 1).
+- If only native code can report the column, web code checks the plugin with `Capacitor.isPluginAvailable` and keeps the bottom dock without it, because web changes reach older shells by live update while native changes need a reinstall (AGENTS.md, native iOS shell).
+- The column dock is the existing `AppNavigation` dock in a second form, not a second navigation, and its buttons go through the same navigation (`navigationSlice.currentView` and its URL handling), so history and reload behave alike (AGENTS.md, Conventions).
+- The dock variables in `src/index.css` (`--dock-clearance`, `--dock-top`, and any side clearance the column form adds) stay the one source for the space the dock takes, in both forms, because the dock is fixed and layout cannot see it (AGENTS.md, dock clearance).
+- Poses, the column and insets are checked on the Xcode 27.1 iPhone Duo simulator and the owner's Duo; Playwright cannot emulate the column, safe-area insets, standalone mode or posture (research Q5).
+- Screenshots committed as evidence come only from the test account with the fictional fixture data; the owner's device screenshots carry real names, so they are described in words and never committed, because the repo is public (AGENTS.md, Policy; owner decision 2026-10-30).
 
 ## Done when
 
-1. On the owner's iPhone Duo, a shell built from this epic shows the five destinations in the side column when folded and in unfolded landscape, and at the bottom in unfolded portrait, with no HTML dock, and a non-Duo iPhone shows the system tab bar in place of the dock; the sign-in screen and an open dialog show no tab bar (R1, R4, R7, R9, R10).
-2. Every destination opens from its tab, the selected tab follows the view through reload, Settings and the error screen's Home button, and VoiceOver reads each tab's name (R2, R3, R8).
-3. An older shell updated by live update, the website and the Home Screen web app still show a working HTML dock (R5).
-4. The web part ships through `deploy.yml`, the new shell is installed on the owner's Duo, and CI is green on main.
+1. On the owner's Duo, folded and in unfolded landscape the dock is a capsule at the bottom of the side column with its six buttons and no gear in the header; in unfolded portrait it is today's bottom dock with the gear; folding and unfolding switch between them without a reload, and nothing sits under the column dock (R1, R4, R8).
+2. Each column button opens its view with the same URL and history as the bottom dock and shows active, and VoiceOver reads each button's name (R2, R3).
+3. A non-Duo iPhone, a desktop browser and the Duo in inner portrait show today's header and bottom dock, and the dock's E2E specs pass (R5).
+4. The web part ships through `deploy.yml`, reaches the owner's Duo shell by live update (or a reinstall if native code changed), and CI is green on main.
 
 ## Boundaries
 
-- The website and the Home Screen web app keep the bottom HTML dock (research rec 4), with no `viewport-fit=cover` and no fold APIs (research rec 6).
-- The Settings gear stays in the web header; a system toolbar button for it in the column is out (owner decision 2026-10-29).
+- A native `UITabBar` or any other native navigation (owner direction 2026-10-30).
+- A sixth button in the bottom dock: there is no room on a phone (AGENTS.md); the gear stays in the header where there is no column (R8).
+- Any change to the five destinations themselves.
+- Fold APIs (research rec 6) and fold-aware layouts of the views themselves (two-pane content, partially folded poses).
 - The shell's default app icon and splash screen, the other half of DW-326.
 - Haptics (DW-325).
-- Unseen-count badges on the tabs, parked until the dock gets real counts (DW-327).
-- Back/Forward tab sync in the shell: nothing there triggers Back/Forward today. If swipe-back (`allowsBackForwardNavigationGestures`) is ever enabled in the shell, it returns as a requirement.
-- Any change to the five destinations; the dock is full at five (AGENTS.md).
-- Fold-aware layouts of the views themselves (two-pane content, partially folded poses).
+- Unseen-count badges on the dock, parked until the dock gets real counts (DW-327).
 
 ## References
 
 - parent — _bmad-output/initiative-my-love/initiative-my-love.md (no Requirements yet, so this epic cites its sources directly)
 - research — _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/research-iphone-duo-pwa-support.md, sections Q2, Q4, Q5 and Recommendations
 - deferred-work — _bmad-output/initiative-my-love/deferred-work.md, DW-325, DW-326 and DW-327
-- code — src/components/Navigation/AppNavigation.tsx, `DESTINATIONS` and the badge rendering
+- code — src/components/Navigation/AppNavigation.tsx (`DESTINATIONS`, the header gear, the dock); index.html (`viewport-fit=cover`)
 - project-context — AGENTS.md, Maintained by hand (native iOS shell; dock clearance)
 - companion — _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/duo-observed-layouts.md
 
 ## Notes
 
-- Decision: 2026-10-29 the shell uses the native tab bar on every iPhone, not only the Duo: one code path, no device detection (R7).
-- Decision: 2026-10-29 the Settings gear stays in the web header for this epic.
-- Decision: 2026-10-29 while Settings is open the last destination's tab stays selected, and tapping it leaves Settings (R8).
-- Decision: 2026-10-29 each tab uses the dock's label (Home, Mood, Love Notes, Photos, Partner) and the SF Symbol nearest its dock icon, Home filled when selected as in the dock; iOS shows icons only in the column.
-- Decision: 2026-10-29 when the app opens straight onto Settings, with no destination shown before it, Home's tab shows selected.
 - Source conflict: R3 — R3 asked each tab to carry the badge the dock shows, but the dock's only caller (src/App.tsx, `<AppNavigation>`) passes no `badgeCounts`, so the dock has never shown a badge.
 - Decision: 2026-10-29 R3 narrowed to VoiceOver reading each tab's name; settles the R3 source conflict.
-- Parked: tab badges, until the dock gets real counts (DW-327 in the deferred-work ledger).
-- Decision: 2026-10-29 "an opened link" dropped from R2: the shell registers no URL scheme and has no universal links, so nothing outside the app opens it at a given view.
+- Parked: dock badges, until the dock gets real counts (DW-327 in the deferred-work ledger).
 - Decision: 2026-10-29 story 5 (ship to the Duo) runs after the refactor sweep, so the cleaned-up code is what gets deployed and checked on the device; a deliberate exception to the sweep closing the epic.
-- Decision: 2026-10-29 Back/Forward dropped from R2 for the shell: nothing in `src` calls `history.back/go/forward` and Capacitor's iOS code never enables swipe-back.
-- Unknown: whether a system tab bar around the one shared web view lands in the side column; story 1 answers it, and if it does not, stories 2, 6, 3, 4 and 5 are re-sliced (DW-326).
-- Decision: 2026-10-29 story 5 covers R10, because Done when 1 checks an open dialog on the Duo.
-- Decision: 2026-10-29 R10 split into its own story 6, built after story 2 and before story 3: story 2 carried six requirements, and R10 alone wires a shared hook into about eight overlays plus an inventory test (AGENTS.md: split large loop stories).
-- Decision: 2026-10-29 the poke, kiss and fart animations count as R10 overlays; anything that covers the dock today hides the bar.
-- Decision: 2026-10-29 that unknown gates story 2 only: stories 6, 3, 4 and 5 already wait on story 2 through the `after` chain (6 on 2, 3 on 6, 4 on 3, 5 on 4), so one field is cleared when story 1's result is read.
-- Decision: 2026-10-29 tracer bullet is story 1, the simulator proof that a system tab bar around the one shared web view lands in the side column; the dock hand-off (story 2) follows as the least certain part, then overlay hiding (story 6), then selection sync (story 3); all three share the web-side module.
+- Decision: 2026-10-30 replanned on the owner's new evidence: on the owner's Duo the current shell draws web content into the side column (header and cards under iOS's status capsule), so DW-326's premise that iOS keeps web content out of the column no longer holds. The native `UITabBar` approach is dropped; the app's own HTML dock becomes a vertical bar in the column, buttons grouped at the bottom, with Settings as a sixth button. What is required changed: R1–R5 and R8 rewritten with ids kept; R6, R7, R9 and R10 retired, since they asked things of a native bar that an HTML dock inside the one web view already does (it mounts only where `AppNavigation` does and every overlay covers it). The 2026-10-29 tab-bar decisions (every iPhone, gear in the header, tab selection on Settings, SF Symbols, Back/Forward, overlay hiding, the story 6 split, the tracer) are superseded and kept in `.memlog.md`.
+- Decision: 2026-10-30 the bottom dock stays at five and the header gear stays wherever there is no column; in column poses the header shows no gear, so each screen has one Settings control.
+- Decision: 2026-10-30 content may run under iOS's status capsule; it must only stay clear of the column dock (R4).
+- Decision: 2026-10-30 epic retitled "iPhone Duo Side-Column Dock"; the folder slug `epic-iphone-duo-native-tab-bar` stays, because renaming it breaks the paths in its memlog, companions and commit history.
+- Decision: 2026-10-30 the Boundary "no `viewport-fit=cover`" is removed: `index.html` has set it since da0c1d32 (2026-08-18), for the website, the Home Screen web app and the shell alike.
+- Dropped: 2026-10-30 story 1 (a system tab bar around the shared web view): the native tab bar was dropped after the owner's evidence; its build on `feature/native-tab-bar` is abandoned unmerged, and its simulator proof never ran.
+- Dropped: 2026-10-30 story 6 (the tab bar hides under every overlay): an HTML dock is covered by every overlay already, so R10 is retired.
+- Dropped: 2026-10-30 story 3 (the selected tab follows the view): the dock marks the active view from `currentView`, so selection sync has nothing to sync; its Settings behaviour moves to story 8.
+- Decision: 2026-10-30 re-sliced: story 7 (the spike) first, then story 2 revised in place as the column dock, story 8 for Settings in the column, then the sweep (4) and the ship (5). Story 7 goes first by the owner's split: the least certain part is how the page learns the column, and nothing else can be built until that is known; it runs on the owner's Duo as well as the simulator. The slicing rules would open with a tracer instead; here story 2 is the tracer, the thinnest path through every layer (detection, dock, clearance, navigation), built right after the spike.
+- Unknown: how the web code learns the side column's position and width in each pose; story 7 answers it, and if no way works, stories 2, 8, 4 and 5 are re-sliced. It gates story 2 only; 8, 4 and 5 wait on 2 through `after`.
+- Decision: 2026-10-30 risk high is checked by people, not criteria alone: story 7 is hitl and the owner reads its result before story 2's unknown is cleared, and stories 2, 8 and 5 each end in a person's simulator or device check.
+- Decision: 2026-10-30 the dropped stories 1, 6 and 3 keep their text and `after`; only their `covers` were cleared, because they cited R6, R7, R9 and R10, which are retired.
+- Decision: 2026-10-30 the column dock is a capsule of buttons at the column's bottom, not a full-height bar; above it the header and content run on under iOS's status, so only the capsule needs clearance (R1, R4).
+- Decision: 2026-10-30 in the column the active button shows its icon on a highlight without its label, as the other apps' column tabs do (`duo-observed-layouts.md`); the label stays the accessible name. Replaces the assumption.
+- Decision: 2026-10-30 `bmad-ux` declined: the column dock uses the bottom dock's glass, button size and active highlight, Settings sits last in the group, and the capsule's width follows the column width story 7 measures.
+- Decision: 2026-10-30 story 2 is kept whole rather than splitting clearance and Love Notes into their own story: a column dock that covers content is not shippable on its own.

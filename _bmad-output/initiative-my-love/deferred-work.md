@@ -2811,16 +2811,16 @@ reason: Both call navigator.vibrate, which Safari on iOS does not implement (fro
 status: done
 resolution: fixed 2026-10-29 on fix/native-haptics. Every buzz now goes through playHaptic in src/utils/haptics.ts, which in the native shell plays Apple's haptics through @capacitor/haptics (success and error as notification haptics, a selection as a light impact, an arriving love note as a medium one) and elsewhere keeps navigator.vibrate. useVibration and the incoming-note buzz in useRealtimeMessages route through it. The home-screen PWA on iPhone is unchanged (still no navigator.vibrate).
 
-### DW-326: The native shell still uses the HTML dock; the iPhone Duo layout needs Apple's own tab bar.
+### DW-326: The native shell still has Capacitor's default app icon and splash; its iPhone Duo dock moved to an epic.
 origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
 location: src/components/Navigation/AppNavigation.tsx; ios/App/App
 severity: low
-reason: The shell exists so the five DESTINATIONS can move into iOS's right-hand system column on iPhone Duo (folded and inner landscape), as Instagram, Netflix and others do; iOS keeps web content out of that column, so only a native UITabBar/TabView gets there. Research: _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/. Not yet proven that a native tab bar around one shared WKWebView lands in the column; prove that first. The shell also still has Capacitor's default app icon and splash.
+reason: The shell exists so the five DESTINATIONS can move into iOS's right-hand system column on iPhone Duo (folded and inner landscape), as Instagram, Netflix and others do; iOS keeps web content out of that column, so only a native UITabBar/TabView gets there. Research: _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/. Not yet proven that a native tab bar around one shared WKWebView lands in the column; prove that first. The shell also still has Capacitor's default app icon and splash. 2026-10-30: the owner's Duo shows the current shell drawing web content into the column (index.html has set viewport-fit=cover since 2026-08-18), so the premise that only a native tab bar reaches it no longer holds; the dock half is now epic-iphone-duo-native-tab-bar (retitled iPhone Duo Side-Column Dock), which moves the app's own HTML dock into the column. Open here: the default app icon and splash.
 status: open
 
-### DW-327: The dock's unseen-count badges are never fed, so neither the dock nor the native tab bar shows one.
+### DW-327: The dock's unseen-count badges are never fed, so the dock never shows one.
 origin: raised 2026-10-29 while slicing epic-iphone-duo-native-tab-bar
 location: src/App.tsx (`<AppNavigation>`); src/components/Navigation/AppNavigation.tsx (`badgeCounts`)
 severity: low
-reason: AppNavigation renders a badge per destination from its `badgeCounts` prop, but its only caller in App.tsx passes none, so no badge has ever shown. The owner parked badges until a feature supplies real counts; when it does, the native tab bar from epic-iphone-duo-native-tab-bar needs the same counts.
+reason: AppNavigation renders a badge per destination from its `badgeCounts` prop, but its only caller in App.tsx passes none, so no badge has ever shown. The owner parked badges until a feature supplies real counts; when it does, the column dock from epic-iphone-duo-native-tab-bar shows them too.
 status: open
