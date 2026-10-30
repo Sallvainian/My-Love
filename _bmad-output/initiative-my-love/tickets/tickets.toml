@@ -13,3 +13,17 @@ slug = "epic-iphone-duo-native-tab-bar"
 title = "iPhone Duo Side-Column Dock"
 description = "Wherever the page has a side column, as on iPhone Duo folded and in unfolded landscape, the app's own dock is a vertical bar in that column with its buttons grouped at the bottom and Settings as a sixth; everywhere else the header and five-button bottom dock stay as they are."
 covers = []
+
+[[epic]]
+id = 3
+slug = "epic-push-notifications"
+title = "Push Notifications"
+description = "The native iOS shell gets a push on the partner's phone for moods, love notes, photos, pokes and kisses, visible date changes and partner requests, with a Settings switch per type, love notes in their own lock-screen group and an unread-notes badge."
+covers = []
+
+[[epic]]
+id = 4
+slug = "epic-date-reminders"
+title = "Date Reminders"
+description = "The native iOS shell schedules 9:00 local reminders before every date (day before; month and week before for countdown-marked dates; on the day for anniversaries and birthdays), with a Settings switch, and no notification for the daily message."
+covers = []
