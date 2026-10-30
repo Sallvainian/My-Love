@@ -16,6 +16,7 @@
 import { CircleAlert, Heart, Info, LoaderCircle } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
+import { NATIVE_AUTH_UNAVAILABLE } from '../../api/auth/types';
 import type { AuthCallbackOutcome } from '../../api/supabaseClient';
 import {
   FAILURE_BOX,
@@ -170,7 +171,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
       if (error === 'cancelled') {
         setIsGoogleLoading(false);
       } else if (error) {
-        setError('Failed to initiate Google sign-in. Please try again.');
+        // Retrying cannot help an app that predates the sign-in sheet: say so.
+        setError(
+          error.code === NATIVE_AUTH_UNAVAILABLE
+            ? error.message
+            : 'Failed to initiate Google sign-in. Please try again.'
+        );
         setIsGoogleLoading(false);
       }
       // Note: If successful, user will be redirected to Google (in the native

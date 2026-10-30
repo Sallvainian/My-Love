@@ -230,6 +230,24 @@ describe('LoginScreen on the kit', () => {
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
   });
 
+  // An installed app that predates the sign-in sheet still gets this code by
+  // live update; retrying cannot help it, so it is told to update instead.
+  it('tells an app without the Google sign-in sheet to update', async () => {
+    const user = userEvent.setup();
+    actions.signInWithGoogle.mockResolvedValue({
+      code: 'native_auth_unavailable',
+      message: 'Google sign-in needs the latest version of the app.',
+    });
+    render(<LoginScreen />);
+
+    await user.click(screen.getByTestId('google-signin-button'));
+
+    expect(screen.getByTestId('login-error')).toHaveTextContent(
+      'Google sign-in needs the latest version of the app.'
+    );
+    expect(screen.getByTestId('google-signin-button')).toBeEnabled();
+  });
+
   it('shows the callback notice on card2 in ink with an icon', () => {
     const { container } = renderWithCallbackNotice();
 

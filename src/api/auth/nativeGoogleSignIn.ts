@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { AuthError } from '@supabase/supabase-js';
 import { logger } from '../../utils/logger';
 import { supabase } from '../supabaseClient';
+import { NATIVE_AUTH_UNAVAILABLE } from './types';
 
 /**
  * Google sign-in for the native iOS shell (DW-323).
@@ -29,7 +30,11 @@ const NativeAuth = registerPlugin<NativeAuthPlugin>('NativeAuth');
 export const signInWithGoogleNative = async (): Promise<AuthError | 'cancelled' | null> => {
   // An app installed before the plugin existed still receives web updates.
   if (!Capacitor.isPluginAvailable('NativeAuth')) {
-    return new AuthError('Google sign-in needs the latest version of the app.');
+    return new AuthError(
+      'Google sign-in needs the latest version of the app.',
+      undefined,
+      NATIVE_AUTH_UNAVAILABLE
+    );
   }
 
   const { data, error } = await supabase.auth.signInWithOAuth({

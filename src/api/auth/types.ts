@@ -16,3 +16,10 @@ export interface AuthStatus {
   user: User | null;
   session: Session | null;
 }
+
+/**
+ * The code on the error Google sign-in returns in an installed app that predates
+ * the NativeAuth plugin. Here, not in nativeGoogleSignIn.ts, so the login screen
+ * can match it without importing the Supabase client.
+ */
+export const NATIVE_AUTH_UNAVAILABLE = 'native_auth_unavailable';

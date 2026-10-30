@@ -72,6 +72,10 @@ describe('signInWithGoogle in the native shell', () => {
     const result = await signInWithGoogle();
 
     expect(result).toBeInstanceOf(AuthError);
+    expect(result).toMatchObject({
+      code: 'native_auth_unavailable',
+      message: 'Google sign-in needs the latest version of the app.',
+    });
     expect(mockSignInWithOAuth).not.toHaveBeenCalled();
     expect(nativeAuth.start).not.toHaveBeenCalled();
   });
