@@ -3,7 +3,7 @@ title: 'Find how the web code learns the side column''s position and width in ea
 type: 'chore'
 ticket: '7'
 created: '2026-10-30'
-status: 'built'
+status: done
 baseline_revision: 'fc3d0ed6b7360c48e53a4201ac4058bb95291ceb'
 route: 'oneshot'
 route_source: 'auto'

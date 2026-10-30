@@ -1,32 +1,43 @@
 # The epic's stories in build order.
 
 [[entry]]
+id = 12
+type = "story"
+title = "The simulator driver reads and taps notifications"
+description = "Extends story 2.9's simulator driver with notification steps, porting the prototype's Notify.swift, notify.sh and the host app's notification probes, and shown on the driver's own host app so no My Love push code is needed. Another session showed on the iPhone Duo simulator (iOS 27.1) a banner read, the badge read, a tap from a cold start and from the background, and two pushes on one thread shown as one Grouped cell; telling two groups apart by thread id and scrolling to older groups are new here. Steps: tap SpringBoard's Allow or Don't Allow on the permission alert, and reset the permission between runs; deliver a payload with xcrun simctl push; read a banner's text (NotificationShortLookView's label), which needs the watch started before the push is sent, because banners last seconds; read Notification Center's groups by thread id, after returning to Home before each drag from the top (a second drag while it is open lands on search) and scrolling to reach older groups; read the app icon badge from the icon's value ('3 new items'); and tap a notification to open the app from a cold start and from the background, putting another app in front first, since an XCUITest run leaves its target in front and an app in front shows no banner. Elements are queried by identifier across all types, because a banner is not .other. Hands stories 1, 2 and 4 to 9 the steps they check pushes with, and story 4.1 the permission step; story 4.7 extends the driver after it."
+verify = "With no person acting, on the iPhone Duo simulator the driver grants permission through SpringBoard's alert, and after a reset declines it, reads a pushed banner's title and body, reads two pushes on one thread as one Notification Center group and a third on another thread as a second, reads the badge a push set, and opens the host app by tapping a banner from a cold start and from the background, each state confirmed through XCUIApplication.state."
+covers = []
+after = ["2.9", "2.4"]
+hitl = false
+risk = "high"
+
+[[entry]]
 id = 1
 type = "story"
 title = "A love note pushes to the partner's iPhone"
-description = "The thinnest path through every layer. The shell gains the push capability and, on the first signed-in launch of a shell with it, asks for notification permission once. It registers the device for the signed-in account in a new RLS-protected table, with the APNs environment its signing gives (sandbox for an Xcode development install, production otherwise), where a device registered again under another account moves to that account. iOS has one notification permission for pushes and local reminders, so epic-date-reminders reuses this prompt. A new sender Edge Function sends a love-note push through APNs with the sender's name and the note's text (a picture-only note says a picture was sent) to every device registered to the partner and none of the sender's. The sender runs from a database trigger on each newly inserted row, so a note queued offline pushes when it reaches the server and an insert ignored as a duplicate fires nothing; a failed or slow push never fails or delays the insert. Story 1 confirms the trigger works on the local stack and the hosted project (the epic's Unknown). Web code calls the plugin only after Capacitor.isPluginAvailable. A person creates the APNs key in the paid developer team, stores it in fnox and as a Supabase secret, enables the Push capability in Xcode, and runs the simulator checks. It builds on story 2.7's live-update simulator setup (a shell with VITE_LIVE_UPDATE_URL pointed at a local latest.json, so a locally built shell does not swap itself back to production's web code when backgrounded) and adds a web build pointed at the local stack and a fixture pair there; stories 2 and 4–9 and epic-date-reminders' stories reuse it. It waits on story 2.7 for that setup and for its answer on whether the side column needs native code, which would make this story wait on 2.2 as well. Hands on: the device table, the sender and its payload builder (extended by stories 2, 4, 5, 6, 7 and 8), the web-side push module (extended by stories 2, 7, 8 and 9), and the permission prompt (reused by epic-date-reminders)."
-verify = "On an Xcode 27.1 iPhone simulator signed in as one fixture account against the local stack, a love note from its partner shows a push with the sender's name and the text; a picture-only note says a picture was sent; a retried send shows one push; the sender's own simulator shows none; the permission prompt shows once across two launches; a shell built before this epic and updated to the new bundle by live update runs with no error; the sender's deno unit tests and an api-project spec for registration and the trigger pass."
+description = "The thinnest path through every layer. The shell gains the push capability and, on the first signed-in launch of a shell with it, asks for notification permission once. It registers the device for the signed-in account in a new RLS-protected table, with the APNs environment its signing gives (sandbox for an Xcode development install, production otherwise), where a device registered again under another account moves to that account. iOS has one notification permission for pushes and local reminders, so epic-date-reminders reuses this prompt. A new sender Edge Function sends a love-note push through APNs with the sender's name and the note's text (a picture-only note says a picture was sent) to every device registered to the partner and none of the sender's. The sender runs from a database trigger on each newly inserted row, so a note queued offline pushes when it reaches the server and an insert ignored as a duplicate fires nothing; a failed or slow push never fails or delays the insert. Story 1 confirms the trigger works on the local stack; story 13 confirms it on the hosted project (the epic's Unknown). Web code calls the plugin only after Capacitor.isPluginAvailable. The Push capability is set in the Xcode project's code (the aps-environment entitlement). No APNs key exists until story 13: with no key set, the sender records the request it would have sent (device, environment, payload) where the driver can read it, so the simulator check delivers the payload that came through the trigger with xcrun simctl push; stories 2 and 4–9 reuse that record, and real APNs delivery is story 13's. Story 1 adds the sender's deno tests to test.yml beside upload-love-note-image's, so CI runs them. The simulator checks run through story 2.9's driver and story 12's notification steps, against the local stack with story 2.9's fixture pair, with no person; stories 2 and 4–9 add any further fixture accounts they need (another pair, two unlinked accounts) the same way. Hands on: the device table, the sender and its payload builder (extended by stories 2, 4, 5, 6, 7 and 8, and deployed by story 3), the recorded request, the web-side push module (extended by stories 2, 7, 8 and 9), and the permission prompt (reused by epic-date-reminders)."
+verify = "The sender's deno unit tests and an api-project spec for registration and the trigger pass, showing a love note's insert reaches the sender on the local stack, a retried send yields one push, a picture-only note's payload says a picture was sent, no push targets the sender's own devices, a failed or slow send neither fails nor delays the insert, and each registration records its APNs environment, which picks the APNs host the sender would call. Through story 2.9's driver, on the iPhone Duo simulator signed in as one fixture account against the local stack, the permission alert shows once across two launches, the device registers, and the payload the sender built for a note from the partner, delivered with xcrun simctl push, shows a banner with the sender's name and the text; a shell built before this epic (story 2.9's earlier-commit build) and updated to the new bundle by live update runs with no error."
 covers = ["R1", "R7", "R9", "R11"]
-after = ["2.7"]
-hitl = true
+after = [12]
+hitl = false
 risk = "high"
 
 [[entry]]
 id = 2
 type = "story"
 title = "Sign-out stops a device's pushes"
-description = "deleteAccountData() runs after supabase.auth.signOut() has ended the session, so the server row cannot be removed there. Instead, sign-out removes the device's registration before the session ends, while still online, then unregisters the device from APNs natively and clears the app icon badge. A sign-out made offline, and a boot with no session that the my-love-account-owner marker sends to deleteAccountData(), still unregister natively and clear the badge, so no push shows. The sender deletes any registration APNs reports as gone, and a sign-in by another account takes the device's registration over. The next account receives only its own pushes. Apple discourages unregisterForRemoteNotifications, so re-registering after it, and the takeover stopping the previous account's pushes, are proven on a device. Extends story 1's web-side push module, device table and sender. Reuses story 1's simulator setup. A person runs the simulator and device checks."
-verify = "Unit tests show sign-out removes the registration before the session ends, and that sign-out, offline sign-out and the no-session boot unregister natively and clear the badge; a deno test shows the sender deletes a registration APNs reports as gone; on a simulator, after signing out and signing in as an account from another fixture pair, a love note to the first account shows nothing there, and a note to the new account shows its push; on a device, after an offline sign-out and a sign-in as the same account, pushes arrive again, and after an offline sign-out and a sign-in as another fixture account, the first account's partner's note shows nothing and the new account's pushes arrive."
+description = "deleteAccountData() runs after supabase.auth.signOut() has ended the session, so the server row cannot be removed there. Instead, sign-out removes the device's registration before the session ends, while still online, then unregisters the device from APNs natively and clears the app icon badge. A sign-out made offline, and a boot with no session that the my-love-account-owner marker sends to deleteAccountData(), still unregister natively and clear the badge, so no push shows. The sender deletes any registration APNs reports as gone, and a sign-in by another account takes the device's registration over. The next account receives only its own pushes. Apple discourages unregisterForRemoteNotifications, so re-registering after it, and the takeover stopping the previous account's pushes, are proven on a device in story 13. Extends story 1's web-side push module, device table and sender. The simulator checks run through story 2.9's driver and story 12's notification steps against story 2.9's fixture pair and another pair added the same way, with no person."
+verify = "Unit tests show sign-out removes the registration before the session ends, and that sign-out, offline sign-out and the no-session boot unregister natively and clear the badge; a deno test shows the sender deletes a registration APNs reports as gone; through story 2.9's driver on the simulator, after signing out and signing in as an account from another fixture pair, the sender targets no device of the first account for a love note to it, the new account's note payload delivered with xcrun simctl push shows its banner, and the badge reads clear after sign-out."
 covers = ["R10"]
 after = [1]
-hitl = true
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 3
 type = "story"
 title = "Every Edge Function deploys from deploy.yml"
-description = "deploy.yml gets a job after migrate and before build that deploys every function in supabase/functions (upload-love-note-image and story 1's sender); build needs it, so a failed function deploy stops the site deploy. It owns the per-function settings in supabase/config.toml, which story 1's sender joins. Before the first run, the builder reads each hosted function's settings read-only (JWT verification among them) and keeps them, so the automated deploy changes nothing that was set by hand. A person triggers the first run, because it deploys to production. Waits on story 1 so the first run deploys the sender; story 11 relies on it to ship to production."
+description = "deploy.yml gets a job after migrate and before build that deploys every function in supabase/functions (upload-love-note-image and story 1's sender); build needs it, so a failed function deploy stops the site deploy. It owns the per-function settings in supabase/config.toml, which story 1's sender joins. Before the first run, the builder reads each hosted function's settings read-only (JWT verification among them) and keeps them, so the automated deploy changes nothing that was set by hand. A person triggers the first run, because it deploys to production. Waits on story 1 so the first run deploys the sender; story 13 checks the deployed sender on the hosted project, and story 11 relies on it to ship to production."
 verify = "A workflow_dispatch run of deploy.yml deploys every function before the site build, `supabase functions list` on the linked project shows each at the new version with its settings unchanged, and the workflow's needs: chain puts the functions job after migrate and before build."
 covers = []
 after = [1]
@@ -34,80 +45,91 @@ hitl = true
 risk = "medium"
 
 [[entry]]
+id = 13
+type = "story"
+title = "Pushes arrive through APNs on a device and from the hosted project"
+description = "The checks no simulator can make without a person, run before the remaining push types build on the sender. A person creates the APNs key in the paid developer team and stores it in fnox and as a hosted Supabase secret, with the Push Notifications capability on the dev.sallvain.mylove App ID, sets whatever the hosted trigger needs to reach the sender (pg_net is dropped in 20251206024345_remote_schema.sql), and provisions a second fictional fixture pair on production beside story 2.7's. Then, with the sender story 3 deployed: a love note's insert on the hosted project reaches the sender through the trigger (the epic's Unknown, hosted half) and its push arrives through APNs on a device signed in to a fixture account; story 2's device proofs run there, because Apple discourages unregisterForRemoteNotifications: after an offline sign-out and a sign-in as the same account pushes arrive again, and after an offline sign-out and a sign-in as another fixture account the first account's partner's note shows nothing while the new account's pushes arrive. Whether the simulator also receives a real APNs sandbox push is recorded; a simulator build has registered and received a device token, but delivery was never tried. Fixes found here belong to this story; device observations are described in words, and no device token is committed."
+verify = "With the key in fnox and as a hosted secret, a love note from the partner fixture account on the hosted project shows its push through APNs on the device with the sender's name and the text; after an offline sign-out and a sign-in as the same account pushes arrive again; after an offline sign-out and a sign-in as another fixture account the first account's partner's note shows nothing and the new account's pushes arrive; the plan records whether a real APNs sandbox push reached the simulator."
+covers = ["R1", "R10"]
+after = [2, 3]
+hitl = true
+risk = "high"
+
+[[entry]]
 id = 4
 type = "story"
 title = "Moods, photos, pokes and kisses push"
-description = "Extends story 1's sender and trigger pattern to new moods, photos and interactions. A mood push names the mood, and photo and poke-or-kiss pushes name the sender and the action. Each goes to the partner's devices only, one push per new row: a mood upsert that hits its (user_id, created_at) key and updates the row pushes nothing. Reuses story 1's test pair; a person runs the simulator check."
-verify = "On a simulator, a mood, a photo, a poke and a kiss from the partner each show their push with the R7 text, a mood re-sent with the same key shows no second push, and the sender's deno tests cover each payload."
+description = "Extends story 1's sender and trigger pattern to new moods, photos and interactions. A mood push names the mood, and photo and poke-or-kiss pushes name the sender and the action. Each goes to the partner's devices only, one push per new row: a mood upsert that hits its (user_id, created_at) key and updates the row pushes nothing. Reuses story 2.9's fixture pair; the simulator check runs through story 2.9's driver and story 12's notification steps, with no person."
+verify = "The sender's deno tests and an api-project spec cover each payload and show a mood re-sent with the same key builds no second push; through story 2.9's driver on the simulator, the payloads the sender built for a mood, a photo, a poke and a kiss from the partner, delivered with xcrun simctl push, each show a banner with the R7 text."
 covers = ["R1", "R7"]
-after = [2]
-unknown = "Does a database trigger reach the sender on the local stack and the hosted project? Story 1 answers it; if not, stories 4, 5 and 6 are re-sliced."
-hitl = true
+after = [13]
+unknown = "Does a database trigger reach the sender on the local stack and the hosted project? Story 1 answers it for the local stack and story 13 for the hosted project; if not, stories 4, 5 and 6 are re-sliced."
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 5
 type = "story"
 title = "Date changes push"
-description = "Extends the sender to dates the partner can read. Adding or changing an event, the wedding date, the relationship start or the sender's own birthday pushes to the partner. A delete, a date cleared to NULL and an update that changes nothing the partner sees push nothing, and anniversaries never push. Reuses story 1's test pair; a person runs the simulator check."
-verify = "On a simulator, adding and editing an event and setting the wedding date, the relationship start and a birthday each show a push; deleting an event, clearing the wedding date, saving an unchanged row and adding an anniversary show none; the sender's deno tests cover each case."
+description = "Extends the sender to dates the partner can read. Adding or changing an event, the wedding date, the relationship start or the sender's own birthday pushes to the partner. A delete, a date cleared to NULL and an update that changes nothing the partner sees push nothing, and anniversaries never push. Reuses story 2.9's fixture pair; the simulator check runs through story 2.9's driver and story 12's notification steps, with no person."
+verify = "The sender's deno tests and an api-project spec show adding and editing an event and setting the wedding date, the relationship start and a birthday each build a push, and deleting an event, clearing the wedding date, saving an unchanged row and adding an anniversary build none; through story 2.9's driver on the simulator, an event's and a birthday's payloads delivered with xcrun simctl push show banners with the R7 text."
 covers = ["R1", "R7"]
 after = [4]
-hitl = true
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 6
 type = "story"
 title = "Partner requests push"
-description = "Extends the sender: a new partner request pushes to the person asked, who is not yet a partner, and accepting one (users.partner_id changes only in the accept_partner_request RPC) pushes to the person who sent it. Declining pushes nothing. Reuses story 1's simulator setup with two unlinked fixture accounts; a person runs the check."
-verify = "On a simulator, a request from an unlinked fixture account shows a push to the person asked, accepting it shows a push to the sender, declining shows none, and the sender's deno tests cover both payloads."
+description = "Extends the sender: a new partner request pushes to the person asked, who is not yet a partner, and accepting one (users.partner_id changes only in the accept_partner_request RPC) pushes to the person who sent it. Declining pushes nothing. Adds two unlinked fixture accounts on the local stack through story 2.9's provisioning; the simulator check runs through story 2.9's driver and story 12's notification steps, with no person."
+verify = "The sender's deno tests and an api-project spec show a request from an unlinked fixture account builds a push to the person asked, accepting it builds one to the sender, and declining builds none; through story 2.9's driver on the simulator, both payloads delivered with xcrun simctl push show banners with the R7 text."
 covers = ["R2", "R7"]
 after = [5]
-hitl = true
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 7
 type = "story"
 title = "Each push type has a Settings switch"
-description = "Settings in the shell gets six switches (moods, love notes, photos, pokes and kisses, dates, partner requests), each on until changed and kept on the account in a new RLS-protected table. The sender skips a type the receiver switched off, for all their devices. When notification permission was declined, Settings says notifications are off in iOS Settings. The website, the Home Screen web app and older shells show no switches. The switches' store state is in signedOutState(). Extends the sender stories 1 and 4–6 built; in epic-date-reminders, story 4.2 adds a countdown-marks list to this section and story 4.3 a reminders switch stored in this story's table. Reuses story 1's simulator setup. A person runs the simulator check."
-verify = "On a simulator, turning each switch off stops its push from the partner and turning it on restores it, the setting survives a reinstall, a declined permission shows the iOS Settings message, and the website shows no switches; unit tests cover the Settings section and the sender's skip."
+description = "Settings in the shell gets six switches (moods, love notes, photos, pokes and kisses, dates, partner requests), each on until changed and kept on the account in a new RLS-protected table. The sender skips a type the receiver switched off, for all their devices. When notification permission was declined, Settings says notifications are off in iOS Settings. The website, the Home Screen web app and older shells show no switches. The switches' store state is in signedOutState(). Extends the sender stories 1 and 4–6 built; in epic-date-reminders, story 4.2 adds a countdown-marks list to this section and story 4.3 a reminders switch stored in this story's table. The simulator checks run through story 2.9's driver and story 12's notification steps against story 2.9's fixture pair, with no person."
+verify = "Unit tests cover the Settings section, and the sender's deno tests and an api-project spec show a type switched off builds no push for any of the receiver's devices and switching it on restores it; through story 2.9's driver on the simulator, each switch toggles in Settings, the setting survives an uninstall and reinstall, and a declined permission (the driver taps Don't Allow) shows the iOS Settings message; an E2E spec shows the website has no switches, and a shell built before this epic (story 2.9's earlier-commit build), updated by live update, shows none."
 covers = ["R3", "R9", "R11"]
 after = [6]
-hitl = true
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 8
 type = "story"
 title = "Love notes stack apart and the badge counts unread notes"
-description = "Every push carries a lock-screen group: love notes in one, everything else in another, and epic-date-reminders' story 4.6 puts reminders in that second group by its name. A new per-account marker records when the person last opened Love Notes, and every push carries the count of partner notes newer than it. Opening Love Notes writes the marker and clears the badge, and a note arriving while Love Notes is on screen counts as read. With the app in the foreground, a push shows no banner and the badge still updates. Extends the sender and story 1's web-side push module. Reuses story 1's simulator setup. A person runs the lock-screen and badge checks."
-verify = "On a simulator, a love note and a mood show as two lock-screen stacks; two notes show badge 2, opening Love Notes clears it, and the next note shows 1; a note arriving with Love Notes open leaves the badge clear; a push arriving with the app open on another view shows no banner and raises the badge; unit tests cover the count and the marker."
+description = "Every push carries a lock-screen group: love notes in one, everything else in another, and epic-date-reminders' story 4.6 puts reminders in that second group by its name. A new per-account marker records when the person last opened Love Notes, and every push carries the count of partner notes newer than it. Opening Love Notes writes the marker and clears the badge, and a note arriving while Love Notes is on screen counts as read. With the app in the foreground, a push shows no banner and the badge still updates. Extends the sender and story 1's web-side push module. The lock-screen and badge checks run through story 2.9's driver and story 12's notification steps, with payloads the sender built delivered by xcrun simctl push, with no person."
+verify = "Unit tests and the sender's deno tests cover the count, the marker and each payload's group. Through the driver on the simulator, a love note and a mood show as two Notification Center groups; two notes read badge 2, opening Love Notes clears it, and the next note reads 1; a note arriving with Love Notes open leaves the badge clear; a push arriving with the app in front on another view shows no banner and raises the badge."
 covers = ["R4", "R5", "R8"]
 after = [7]
-hitl = true
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 9
 type = "story"
 title = "Tapping a push opens its view"
-description = "Tapping a push opens its view through navigationSlice: Love Notes for a note, Partner for a mood, a poke, a kiss or a partner request, Photos for a photo, Home for a date. This works from a cold start and from the background, and the view opens after sign-in restores. Story 4.6 routes a date reminder's tap to Home through the same cold-start and background navigation. Extends story 1's web-side push module and the payloads story 8 finished. Reuses story 1's simulator setup. A person runs the simulator check."
-verify = "On a simulator, tapping each push type opens its view both with the app terminated and with it backgrounded on another view; unit tests map each payload to its view."
+description = "Tapping a push opens its view through navigationSlice: Love Notes for a note, Partner for a mood, a poke, a kiss or a partner request, Photos for a photo, Home for a date. This works from a cold start and from the background, and the view opens after sign-in restores. Story 4.6 routes a date reminder's tap to Home through the same cold-start and background navigation. Extends story 1's web-side push module and the payloads story 8 finished. The simulator check runs through story 2.9's driver and story 12's tap step, with no person."
+verify = "Unit tests map each payload to its view; through the driver on the simulator, tapping each push type's banner, delivered with xcrun simctl push, opens its view both with the app terminated and with it backgrounded on another view."
 covers = ["R6"]
 after = [8]
-hitl = true
+hitl = false
 risk = "medium"
 
 [[entry]]
 id = 10
 type = "story"
 title = "Refactor sweep"
-description = "Cleanup only, scoped at its start from the plans and review findings stories 1–9 deferred; scope pushed out of a story is a new story, not this one. Story 11 ships the result and checks it on the owner's iPhone."
-verify = "Lint, typecheck, the unit suite, the sender's deno tests and an xcodebuild of the App scheme for an iOS simulator pass, and every finding stories 1–9 deferred is fixed or recorded in the deferred-work ledger."
+description = "Cleanup only, scoped at its start from the plans and review findings stories 12, 1, 2, 3, 13 and 4–9 deferred; scope pushed out of a story is a new story, not this one. Story 11 ships the result and checks it on the owner's iPhone."
+verify = "Lint, typecheck, the unit suite, the sender's deno tests and an xcodebuild of the App scheme for an iOS simulator pass, and every finding stories 12, 1, 2, 3, 13 and 4–9 deferred is fixed or recorded in the deferred-work ledger."
 covers = []
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+after = [12, 1, 2, 3, 13, 4, 5, 6, 7, 8, 9]
 hitl = false
 risk = "low"
 
