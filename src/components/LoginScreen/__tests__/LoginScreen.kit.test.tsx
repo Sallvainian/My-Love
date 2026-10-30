@@ -99,14 +99,24 @@ describe('LoginScreen on the kit', () => {
     expect(submit).toHaveClass('bg-fill', 'text-white', 'rounded-full', 'h-12');
   });
 
-  it('renders Continue with Google as the neutral pill with no brand logo', () => {
-    render(<LoginScreen />);
+  it('renders Continue with Google as the neutral pill led by the multicolour G', () => {
+    const { container } = render(<LoginScreen />);
 
     const google = screen.getByTestId('google-signin-button');
     expect(google).toHaveTextContent('Continue with Google');
     expect(google).toHaveClass('bg-card2', 'text-ink', 'rounded-full', 'h-12');
-    // No multicolour logo: its brand hex has no kit token.
-    expect(google.innerHTML).not.toMatch(/<svg\b/);
+    // Decorative: the label already names Google.
+    const logo = within(google).getByTestId('google-logo');
+    expect(logo).toHaveAttribute('aria-hidden', 'true');
+    // Each colour comes from a brand token, never a hex in the markup.
+    const fills = Array.from(logo.querySelectorAll('path'), (path) => path.getAttribute('class'));
+    expect(fills).toEqual([
+      'fill-google-red',
+      'fill-google-blue',
+      'fill-google-yellow',
+      'fill-google-green',
+    ]);
+    expectOnKit(container.innerHTML);
   });
 
   it('renders the OR divider and the Contact admin footer link', () => {
@@ -214,6 +224,38 @@ describe('LoginScreen on the kit', () => {
     expect(contact).toBeDisabled();
     await user.click(contact);
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
+  });
+
+  // DW-323: closing the native shell's sign-in sheet is not a failure.
+  it('returns to the idle form with no error when the Google sheet is closed', async () => {
+    const user = userEvent.setup();
+    actions.signInWithGoogle.mockResolvedValue('cancelled');
+    render(<LoginScreen />);
+
+    await user.click(screen.getByTestId('google-signin-button'));
+
+    expect(screen.getByTestId('google-signin-button')).toHaveTextContent('Continue with Google');
+    expect(screen.getByTestId('google-signin-button')).toBeEnabled();
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeEnabled();
+    expect(screen.queryByTestId('login-error')).not.toBeInTheDocument();
+  });
+
+  // An installed app that predates the sign-in sheet still gets this code by
+  // live update; retrying cannot help it, so it is told to update instead.
+  it('tells an app without the Google sign-in sheet to update', async () => {
+    const user = userEvent.setup();
+    actions.signInWithGoogle.mockResolvedValue({
+      code: 'native_auth_unavailable',
+      message: 'Google sign-in needs the latest version of the app.',
+    });
+    render(<LoginScreen />);
+
+    await user.click(screen.getByTestId('google-signin-button'));
+
+    expect(screen.getByTestId('login-error')).toHaveTextContent(
+      'Google sign-in needs the latest version of the app.'
+    );
+    expect(screen.getByTestId('google-signin-button')).toBeEnabled();
   });
 
   it('shows the callback notice on card2 in ink with an icon', () => {

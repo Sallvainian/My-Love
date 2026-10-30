@@ -2792,14 +2792,16 @@ origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-sh
 location: src/api/auth/actionService.ts:116-125
 severity: medium
 reason: signInWithGoogle runs Supabase's OAuth redirect inside the page, and in the shell the page is a WKWebView on capacitor://localhost. Google refuses sign-in from embedded web views (from memory, UNVERIFIED on iOS 27), and redirectTo is built from window.location.origin, which is capacitor://localhost there, so the callback could not return to the app either. Fix: in the shell, open the provider in the system browser (ASWebAuthenticationSession, e.g. via @capacitor/browser) and return through a custom URL scheme or Universal Link that hands the session to supabase-js. Email and password sign-in is unaffected.
-status: open
+status: done
+resolution: fixed on fix/native-google-sign-in: in the shell, signInWithGoogle (src/api/auth/nativeGoogleSignIn.ts) opens the provider in ASWebAuthenticationSession through the app-local NativeAuth plugin (ios/App/App/NativeAuth.swift) and exchanges the returned code in the web view; dev.sallvain.mylove://auth-callback was added to the hosted redirect allow list on 2026-10-29.
 
 ### DW-324: Password-reset emails sent from the native shell link to capacitor://localhost.
 origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
 location: src/api/auth/actionService.ts:96-98
 severity: medium
 reason: resetPasswordForEmail builds redirectTo from window.location.origin, which is capacitor://localhost in the shell, so the emailed link points nowhere a mail app can open. Fix: in the shell, use the site's https origin (the reset then completes on the website), or add a Universal Link that opens the app's reset-password view.
-status: open
+status: done
+resolution: unreachable: resetPassword has no caller in the UI (only actionService.ts and the re-export in authService.ts), and the app has no reset-password view, so the shell never sends a reset email. Revisit when a reset UI is added: the redirect must then return to the app, like Google sign-in's dev.sallvain.mylove://auth-callback.
 
 ### DW-325: Haptics do nothing on iPhone, in the PWA and in the native shell alike.
 origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
