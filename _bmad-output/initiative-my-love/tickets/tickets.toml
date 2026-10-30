@@ -20,7 +20,7 @@ slug = "epic-push-notifications"
 title = "Push Notifications"
 description = "The native iOS shell gets a push on the partner's phone for moods, love notes, photos, pokes and kisses, visible date changes and partner requests, with a Settings switch per type, love notes in their own lock-screen group and an unread-notes badge."
 covers = []
-after = [{ epic = 2, needs = "story 2.1: the native tab bar change to the Xcode project and AppDelegate, and the fictional-data test pair and local live-update setup story 3.1 builds on; story 2.3: the view-to-tab sync story 3.9 relies on" }]
+after = [{ epic = 2, needs = "story 2.7: the live-update simulator setup story 3.1 builds on, and its answer on whether the side column needs native code, which would make 3.1 wait on story 2.2 too" }]
 
 [[epic]]
 id = 4
@@ -28,4 +28,4 @@ slug = "epic-date-reminders"
 title = "Date Reminders"
 description = "The native iOS shell schedules 9:00 local reminders before every date (day before; month and week before for countdown-marked dates; on the day for anniversaries and birthdays), with a Settings switch, and no notification for the daily message."
 covers = []
-after = [{ epic = 3, needs = "story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name; story 3.9: the cold-start and background navigation a reminder tap reuses; stories 3.10 and 3.11: the push sweep and device install, which share the Settings section, the native code and the owner's iPhone" }, { epic = 2, needs = "stories 2.4 and 2.5: the tab bar sweep and device install, which share the Xcode project and the owner's iPhone" }]
+after = [{ epic = 3, needs = "story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name; story 3.9: the cold-start and background navigation a reminder tap reuses; stories 3.10 and 3.11: the push sweep and device install, which share the Settings section, the native code and the owner's iPhone" }]

@@ -72,9 +72,9 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - No push for anniversaries (private to their creator), for deleting anything, for the daily message, or for the fart animation, which never reaches the server.
 - Images in pushes, which need a Notification Service Extension.
 - Quiet hours and per-device switches.
-- The dock and native tab bar badges (DW-327).
+- The dock's badges (DW-327).
 - Touch point: Settings — epic-date-reminders adds its reminders switch there too; owner: epic-push-notifications for the six push switches.
-- Touch point: `ios/App/App/AppDelegate.swift` and the shell's native code — also changed by epic-iphone-duo-native-tab-bar.
+- Touch point: `ios/App/App/AppDelegate.swift` and the shell's native code — owner: epic-push-notifications; epic-date-reminders adds its local-notification plugin there, and epic-iphone-duo-native-tab-bar changes it only if its story 2.7 finds the side column needs native code.
 - Touch point: `.github/workflows/deploy.yml` — its functions-deploy step; owner: epic-push-notifications.
 - Must not change: in-app live delivery through Realtime and the arriving-note haptic.
 
@@ -97,11 +97,12 @@ R11 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-29 pushes go to every iOS shell signed in to the receiver's account; the website and the Home Screen web app get none.
 - Decision: 2026-10-29 with the app in the foreground no banner shows; two lock-screen stacks, love notes and everything else.
 - Decision: 2026-10-29 no workflow deployed Edge Functions; `deploy.yml` gets a functions-deploy step after migrations and before the site deploy, covering every function in `supabase/functions`, never by hand.
-- Parked: the Love Notes dock and tab bar badge (DW-327) could use the R5 count; out of this epic.
+- Parked: the Love Notes dock badge (DW-327) could use the R5 count; out of this epic.
 - Unknown: whether a database trigger reaches the sender Edge Function on both the local stack and the hosted project. Story 1 answers it; if it does not, stories 4, 5 and 6 are re-sliced.
 - Decision: 2026-10-29 tracer bullet is story 1: a love note pushes to the partner's simulator through the trigger, the sender and APNs. Sign-out (story 2) follows at once, so no shell that can receive pushes leaks them across accounts.
 - Decision: 2026-10-29 stories 1, 2, 4, 5, 6, 7, 8 and 9 run in one ordered sequence, because each extends the sender or the web-side push module. Story 3 waits on story 1, so its first run deploys the sender. Story 11 runs after the refactor sweep, as in epic-iphone-duo-native-tab-bar, so the cleaned-up code is what ships.
-- Waits on epic-iphone-duo-native-tab-bar because: story 3.1 and story 2.1 both change the Xcode project and `AppDelegate.swift`, and 3.1 reuses 2.1's test pair and local live-update setup; story 3.9 needs story 2.3's view-to-tab sync so a tapped push selects its tab.
 - Decision: 2026-10-29 the set check's suggestion to move story 4 to after story 1 is declined: story 2 also changes the sender, which story 4 extends.
 - Decision: 2026-10-29 a love note that arrives while Love Notes is on screen counts as read, so the badge stays clear (fills a gap in R5).
 - Decision: 2026-10-29 sign-out removes the registration before the session ends, unregisters from APNs natively, and lets the sender delete gone registrations. Story 2 proves on a device that a sign-in after an offline sign-out re-registers, and that a sign-in by another account stops the previous account's pushes, because Apple discourages `unregisterForRemoteNotifications`.
+- Decision: 2026-10-30 the waits on epic-iphone-duo-native-tab-bar repointed after its replan dropped stories 2.1 and 2.3. Story 3.1 waits on story 2.7 instead of 2.1: it builds on 2.7's live-update simulator setup, adding a web build and fixture pair on the local stack, and 2.7 answers whether the side column needs native code before 3.1 starts; if it does, 3.1 also waits on story 2.2, which then changes the Xcode project too. Story 3.9 loses `"2.3"`: the dock marks the view on screen from `currentView`, so a push tap that navigates through `navigationSlice` marks it with nothing extra.
+- Decision: 2026-10-30 story 3.9 gets no wait on story 2.2, though both may change `App.tsx`: the owner builds one epic at a time, so 2.2 is done before 3.9 starts.
