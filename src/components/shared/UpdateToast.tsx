@@ -3,8 +3,9 @@
  *
  * The native shell's live update, shown: while a newer build downloads, a
  * toast with its progress; once it is queued, "Refresh app for update?" with a
- * Refresh button that restarts onto it at once. Dismissing the prompt leaves
- * the build queued, and the plugin still swaps it in on the next background.
+ * Refresh button that restarts onto it at once. Either can be closed; closing
+ * the prompt leaves the build queued, and the plugin still swaps it in on the
+ * next background.
  *
  * It reads `nativeUpdates`' status, which stays idle on the web, so it renders
  * nothing there. It sits above the dock: `--dock-clearance` and
@@ -14,14 +15,22 @@
 import { AnimatePresence, m as motion } from 'motion/react';
 import { Download, RefreshCw, X } from 'lucide-react';
 import { useState, useSyncExternalStore } from 'react';
-import { applyUpdate, getUpdateStatus, subscribeUpdateStatus } from '../../services/nativeUpdates';
+import {
+  applyUpdate,
+  getUpdateStatus,
+  subscribeUpdateStatus,
+  type UpdateStatus,
+} from '../../services/nativeUpdates';
 
 export function UpdateToast() {
   const status = useSyncExternalStore(subscribeUpdateStatus, getUpdateStatus);
-  const [dismissed, setDismissed] = useState(false);
+  // The state whose toast was dismissed. It covers the bottom of the screen
+  // (Love Notes' composer included), so each state can be closed; closing the
+  // progress still lets the Refresh prompt appear when the download ends.
+  const [dismissed, setDismissed] = useState<UpdateStatus['state'] | null>(null);
 
-  const showDownloading = status.state === 'downloading';
-  const showReady = status.state === 'ready' && !dismissed;
+  const showDownloading = status.state === 'downloading' && dismissed !== 'downloading';
+  const showReady = status.state === 'ready' && dismissed !== 'ready';
 
   return (
     <AnimatePresence>
@@ -51,6 +60,14 @@ export function UpdateToast() {
                     {Math.round(status.percent)}%
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setDismissed('downloading')}
+                  className="-my-3 -mr-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+                  aria-label="Hide download progress"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
               <div
                 className="relative h-1.5 overflow-hidden rounded-full bg-tint"
@@ -93,7 +110,7 @@ export function UpdateToast() {
               </button>
               <button
                 type="button"
-                onClick={() => setDismissed(true)}
+                onClick={() => setDismissed('ready')}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label="Dismiss update"
               >

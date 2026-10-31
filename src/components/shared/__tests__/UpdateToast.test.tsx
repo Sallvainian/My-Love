@@ -131,6 +131,21 @@ describe('UpdateToast', () => {
     expect(store.applyUpdate).not.toHaveBeenCalled();
   });
 
+  it('hides the progress on dismiss and still shows the prompt once ready', async () => {
+    store.set({ state: 'downloading', percent: 30 });
+    render(<UpdateToast />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide download progress' }));
+
+    expect(screen.queryByTestId('update-toast')).not.toBeInTheDocument();
+
+    act(() => store.set({ state: 'downloading', percent: 60 }));
+    expect(screen.queryByTestId('update-toast')).not.toBeInTheDocument();
+
+    act(() => store.set({ state: 'ready' }));
+    expect(screen.getByText('Refresh app for update?')).toBeVisible();
+  });
+
   it('sits above the dock and clear of the side column', () => {
     store.set({ state: 'ready' });
     render(<UpdateToast />);
