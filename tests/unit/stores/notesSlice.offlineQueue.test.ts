@@ -17,7 +17,6 @@ import {
   IMAGE_NOTE_NEEDS_CONNECTION,
   LOVE_NOTES_COPY_KIND,
   NoteRefusedOfflineError,
-  type NotesSlice,
 } from '../../../src/stores/slices/notesSlice';
 import {
   CHECK_VIOLATION_CODE,
