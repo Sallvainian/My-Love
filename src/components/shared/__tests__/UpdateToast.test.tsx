@@ -146,13 +146,13 @@ describe('UpdateToast', () => {
     expect(screen.getByText('Refresh app for update?')).toBeVisible();
   });
 
-  it('sits above the dock and clear of the side column', () => {
+  it('sits at the top, below the status bar, and clear of the side column', () => {
     store.set({ state: 'ready' });
     render(<UpdateToast />);
 
     expect(screen.getByTestId('update-toast')).toHaveClass(
       'fixed',
-      'bottom-[calc(var(--dock-clearance)+0.5rem)]',
+      'top-[calc(env(safe-area-inset-top)+0.5rem)]',
       'left-[calc(var(--dock-left)+1rem)]',
       'right-[calc(var(--dock-right)+1rem)]'
     );
