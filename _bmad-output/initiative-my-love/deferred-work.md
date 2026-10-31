@@ -2919,4 +2919,5 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGr
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
 severity: medium
 reason: By reading Notify.swift: the read-and-scroll loop stops at 30 screens and exits 0; cross-screen merge matches any shared text; an unreachable stacked cell is reported with count 1; merge's return value is unused. The scrolling code changed after its only 8-group run. The owner moved the multi-group case to story 3.14 (2026-10-31), which reads up to 8 groups on one unfolded screen, so these stay open past 8 groups. Recorded as DW-338. Settle with a run of more groups than fit on the unfolded inner display, including one group taller than a drag step.
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-338 (the same review finding, carried in from story 3.12's plan frontmatter); tracked there.
