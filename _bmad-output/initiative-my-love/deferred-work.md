@@ -2904,3 +2904,19 @@ source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-refactor-swee
 severity: medium
 reason: Story 9's residual risks say a non-Duo phone is reachable by ax only while Device Hub's window shows it, and sim never selects --device's window (DW-334); pose, rotate, state, background and screenshot all go through ax. The "each on its own xcrun simctl clone" wording predates this change (story 9); story 4 split the work dir per checkout, which removes the shared-files clash only. Unverified: whether Device Hub can show two device windows at once and ax then drives each by --device. Settle it by booting a clone beside the Duo, opening both in Device Hub, and running `sim --device <clone> rotate` while the Duo's window is in front; if the clone does not rotate, AGENTS.md's line must say one Duo story at a time until DW-334 is fixed. The fix edits AGENTS.md, so it is deferred. (declared severity: medium (unverified))
 status: open
+
+### DW-338: The sim driver's `center` reads Notification Center past one screen unreliably: its scroll-and-merge code is unproven and can merge, split or cut short groups
+origin: spec-deferred story-3.12 review
+location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
+severity: medium
+reason: Story 12's review found, by reading the code, that the multi-screen path has four faults. The read-and-scroll loop stops after 30 screens and still exits 0 with partial groups. Groups on different screens count as one when they share any notification text, so two threads with identical wording merge, and duplicates collapse. A stacked cell that is never reachable is reported as one notification. `merge`'s return value is unused, although the plan said to scroll "until none is new". The scrolling code changed after its only 8-group run, so none of this is proven either way. The owner moved the multi-group case to story 3.14 on 2026-10-31; 3.14 reads up to 8 groups unfolded in portrait, on one screen, so these faults stay open past 8 groups. Settle it with a run of more groups than fit on the unfolded inner display, plus one thread whose expanded group is taller than a drag step.
+status: open
+
+### DW-339: sim center's multi-screen read (scroll and merge) is unproven and can cut groups short, merge two threads with identical text, collapse duplicates, or count an unreachable stack as one notification.
+origin: spec-deferred cbe0cc5a3421
+location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
+severity: medium
+reason: By reading Notify.swift: the read-and-scroll loop stops at 30 screens and exits 0; cross-screen merge matches any shared text; an unreachable stacked cell is reported with count 1; merge's return value is unused. The scrolling code changed after its only 8-group run. The owner moved the multi-group case to story 3.14 (2026-10-31), which reads up to 8 groups on one unfolded screen, so these stay open past 8 groups. Recorded as DW-338. Settle with a run of more groups than fit on the unfolded inner display, including one group taller than a drag step.
+status: open
