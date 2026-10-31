@@ -8,7 +8,7 @@
  * constraint and ON CONFLICT DO NOTHING, so "how many rows exist" is an
  * observable outcome.
  */
-import { expect, vi, type Mock } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { create, type StateCreator } from 'zustand';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy } from '../../../src/services/localCopy';

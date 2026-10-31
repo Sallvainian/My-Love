@@ -14,21 +14,11 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import { DB_NAME, DB_VERSION, openMyLoveDB } from '../../../src/services/dbSchema';
-import type { MyLoveDBSchema } from '../../../src/services/dbSchema';
 import { storeAuthToken } from '../../../src/sw-db';
 import { deleteDatabase, withinTimeout } from './dbSchemaFixtures';
 
 describe('dbSchema', () => {
   const openDbs: Array<{ close: () => void }> = [];
-
-  /** Open db and track for automatic cleanup */
-  async function openTestDb<T = MyLoveDBSchema>(
-    ...args: Parameters<typeof openDB<MyLoveDBSchema>>
-  ) {
-    const db = await openDB<MyLoveDBSchema>(...args);
-    openDbs.push(db);
-    return db;
-  }
 
   beforeEach(async () => {
     await deleteDatabase();
