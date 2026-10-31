@@ -8,9 +8,10 @@
  * next background.
  *
  * It reads `nativeUpdates`' status, which stays idle on the web, so it renders
- * nothing there. It sits above the dock: `--dock-clearance` and
- * `--dock-left`/`--dock-right` (index.css) keep it off the bottom dock and the
- * side column alike, and clear of SyncToast at the top.
+ * nothing there. It sits at the top, centred, just below iOS's status
+ * (`env(safe-area-inset-top)`), over the header and above SyncToast, which
+ * starts 5rem down; `--dock-left`/`--dock-right` (index.css) keep it clear of
+ * the side column.
  */
 import { AnimatePresence, m as motion } from 'motion/react';
 import { Download, RefreshCw, X } from 'lucide-react';
@@ -24,9 +25,9 @@ import {
 
 export function UpdateToast() {
   const status = useSyncExternalStore(subscribeUpdateStatus, getUpdateStatus);
-  // The state whose toast was dismissed. It covers the bottom of the screen
-  // (Love Notes' composer included), so each state can be closed; closing the
-  // progress still lets the Refresh prompt appear when the download ends.
+  // The state whose toast was dismissed. It covers the header, so each state
+  // can be closed; closing the progress still lets the Refresh prompt appear
+  // when the download ends.
   const [dismissed, setDismissed] = useState<UpdateStatus['state'] | null>(null);
 
   const showDownloading = status.state === 'downloading' && dismissed !== 'downloading';
@@ -37,11 +38,11 @@ export function UpdateToast() {
       {(showDownloading || showReady) && (
         <motion.div
           key="update-toast"
-          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          initial={{ opacity: 0, y: -40, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.95 }}
+          exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className="fixed right-[calc(var(--dock-right)+1rem)] bottom-[calc(var(--dock-clearance)+0.5rem)] left-[calc(var(--dock-left)+1rem)] z-100 mx-auto max-w-sm overflow-hidden rounded-[20px] border border-line bg-card shadow-float"
+          className="fixed right-[calc(var(--dock-right)+1rem)] top-[calc(env(safe-area-inset-top)+0.5rem)] left-[calc(var(--dock-left)+1rem)] z-100 mx-auto max-w-sm overflow-hidden rounded-[20px] border border-line bg-card shadow-float"
           role="status"
           aria-live="polite"
           data-testid="update-toast"
