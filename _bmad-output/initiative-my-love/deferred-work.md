@@ -2921,3 +2921,35 @@ severity: medium
 reason: By reading Notify.swift: the read-and-scroll loop stops at 30 screens and exits 0; cross-screen merge matches any shared text; an unreachable stacked cell is reported with count 1; merge's return value is unused. The scrolling code changed after its only 8-group run. The owner moved the multi-group case to story 3.14 (2026-10-31), which reads up to 8 groups on one unfolded screen, so these stay open past 8 groups. Recorded as DW-338. Settle with a run of more groups than fit on the unfolded inner display, including one group taller than a drag step.
 status: done 2026-10-31
 resolution: duplicate of DW-338 (the same review finding, carried in from story 3.12's plan frontmatter); tracked there.
+
+### DW-340: send-push claims a (note, device) row before the APNs call, so a sender killed mid-send drops that push and nothing retries
+origin: spec-deferred story-3.1 review
+location: supabase/functions/send-push/handler.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium
+reason: The handler inserts the push_requests row, then sends. If the isolate dies or times out between the two, the row blocks every later call for that note and device, and pg_net calls the sender once per insert, so no retry exists. A failed APNs answer releases its claim, but nothing calls again. Settle it with story 13's real APNs run and a choice between a pending state that a later call may retake and a retrier.
+status: open
+
+### DW-341: send-push treats a picture-only note as one with an image and blank text, but the real stand-in text is unverified
+origin: spec-deferred story-3.1 review
+location: supabase/functions/send-push/payload.ts (hasCaption)
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium (unverified)
+reason: MessageInput.tsx sends '' for a picture-only note, while love_notes_content_check needs at least one character, and no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as the note's text instead of "Sent you a picture". Settle it by sending a picture-only note from the app against the local stack and reading the stored content.
+status: open
+
+### DW-342: A send-push claim is inserted before the APNs call, so an isolate killed between claim and send drops that push for good, and nothing re-calls the sender for a released claim.
+origin: spec-deferred a15d99cc6689
+location: supabase/functions/send-push/handler.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium
+reason: handler.ts claims (note, token) before sending; pg_net fires once per insert and nothing retries. Settles with a real APNs run (story 13) and a decision on a pending state or a retrier.
+status: open
+
+### DW-343: Picture-only detection assumes the stand-in text is blank; the composer sends an empty string and love_notes_content_check needs at least one character, so the real stand-in is unverified.
+origin: spec-deferred 431bc8339dd8
+location: supabase/functions/send-push/payload.ts (hasCaption)
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium
+reason: MessageInput.tsx sends '' for a picture-only note; the table check requires char_length(content) >= 1; no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as text. Settle by sending a picture-only note from the app against the local stack and reading the row. (declared severity: medium (unverified))
+status: open

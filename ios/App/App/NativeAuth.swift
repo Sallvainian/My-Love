@@ -62,6 +62,7 @@ class MainViewController: CAPBridgeViewController {
 
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(NativeAuthPlugin())
+        bridge?.registerPluginInstance(PushEnvironmentPlugin())
     }
 
     override func viewSafeAreaInsetsDidChange() {
