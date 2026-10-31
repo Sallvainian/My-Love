@@ -1,0 +1,485 @@
+#!/bin/zsh
+# Simulator driver for the iOS shell, so a session can check the shell on a
+# simulator with no person: it builds and installs the shell against the local
+# Supabase stack, signs in a local fixture pair, folds and rotates with `ax`,
+# and taps, scrolls and reads the page through an XCUITest runner
+# (RunnerUITests/Drive.swift). `sim help` lists the commands.
+#
+# Every build happens in a staged copy outside the repo, in $SIM_DRIVER_WORK
+# (default ~/Library/Caches/my-love-sim-driver): `cap sync` copies dist/ into
+# the app and `npx wrangler deploy` ships whatever dist/ holds, so a test build
+# never touches the repo's dist/ or ios/App/App/public/; and
+# ios/App/CapApp-SPM resolves ../../../node_modules, which a loop worktree
+# lacks. The stage has its own node_modules.
+#
+# Needs: ax and xcodegen on PATH (`ax doctor` all ok), Device Hub open on the
+# current Space, the Mac unlocked, and `supabase start` for the local stack.
+
+setopt errexit nounset pipefail
+
+TOOL=${0:A:h}
+REPO=$(git -C "$TOOL" rev-parse --show-toplevel)
+WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver}
+BUNDLE=dev.sallvain.mylove
+EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com)
+# A shell that must stay on its own web code checks an address nothing
+# answers: a failed check leaves it on the build it has (story 7's Setup).
+DEAD_UPDATE_URL=http://127.0.0.1:9/updates/latest.json
+DEVICE_ARG=${SIM_DEVICE:-}
+UDID=
+
+usage() {
+  cat <<'EOF'
+usage: sim [--device UDID|NAME] COMMAND [ARGS]
+
+Shell:
+  build [--from REV] [--readout] [--update-port N]
+                         Build the shell from the working tree (or REV) in a
+                         stage outside the repo, uninstall the old one, install
+                         and launch. --readout adds story 7's readout;
+                         --update-port points its live-update check at
+                         http://127.0.0.1:N (else nothing answers it).
+  serve-update [--port N] [--readout]
+                         Package the working tree as a live update and serve it
+                         on 127.0.0.1:N (default 8790) in the background.
+  serve-update --stop    Stop that server.
+  launch                 Launch the shell, or bring it to the front.
+  background             Press Home (Device Hub's button, through ax).
+  uninstall              Remove the shell and its data.
+
+Accounts (local stack only):
+  provision              Create or reset the fixture pair and link them.
+  signin [partner]       Sign in through the login form (default: the first).
+
+Device:
+  pose closed|partial|open   Fold or unfold (ax pose).
+  rotate [N]                 Rotate a quarter turn N times: right (ax rotate),
+                             or left where Device Hub has only Rotate Left.
+  state                      Pose, active display and orientation (ax state).
+  screenshot PATH [--display inner|outer]
+                             Save a PNG of a display (default: the active one).
+
+Page (points from the web view's top-left):
+  tap X Y                Tap a page point.
+  scroll up|down         Swipe the web view.
+  dump                   One JSON line: the web view's frame and its elements.
+  readout                The readout's lines.
+
+The device is --device, else $SIM_DEVICE, else the only booted simulator.
+SIM_SUPABASE_URL overrides the local stack's URL (default: .env.test's).
+Work dir: $SIM_DRIVER_WORK, default ~/Library/Caches/my-love-sim-driver.
+EOF
+}
+
+die() { local code=$1; shift; print -u2 -- "sim: $*"; exit $code; }
+# Progress goes to stderr, so stdout carries only results (dump's JSON).
+say() { print -u2 -- "sim: $*"; }
+
+# Runs one named stage with its output in $WORK/logs/<name>.log; on failure
+# prints the log's tail and exits naming the stage.
+stage() {
+  local name=$1; shift
+  local log=$WORK/logs/$name.log
+  mkdir -p $WORK/logs
+  say "$name..."
+  if ! "$@" >$log 2>&1; then
+    tail -n 25 $log >&2
+    die 1 "$name failed (full log: $log)"
+  fi
+}
+
+# ---- device ----------------------------------------------------------------
+
+# --device, else $SIM_DEVICE, else the only booted simulator. Ambiguity
+# (two booted, or a name on two runtimes) exits 2 with the candidates.
+resolve_device() {
+  [[ -n $UDID ]] && return
+  local out code=0
+  out=$(xcrun simctl list devices -j | node -e '
+    const want = process.argv[1];
+    const all = Object.entries(JSON.parse(require("fs").readFileSync(0, "utf8")).devices)
+      .flatMap(([rt, ds]) => ds.filter((d) => d.isAvailable)
+        .map((d) => ({ ...d, rt: rt.replace(/.*SimRuntime\./, "") })));
+    let pick = want
+      ? all.filter((d) => d.udid === want || d.name === want)
+      : all.filter((d) => d.state === "Booted");
+    if (want && pick.length > 1 && pick.some((d) => d.state === "Booted"))
+      pick = pick.filter((d) => d.state === "Booted");
+    const line = (d) => `${d.udid}  ${d.name} (${d.rt}) ${d.state}`;
+    if (pick.length === 1) { console.log(pick[0].udid); process.exit(0); }
+    if (pick.length === 0) {
+      console.log(want ? `no simulator named or numbered ${want}` : "no booted simulator; boot one or pass --device");
+      process.exit(4);
+    }
+    console.log("more than one simulator matches; pass --device or set SIM_DEVICE:\n" + pick.map(line).join("\n"));
+    process.exit(2);
+  ' "$DEVICE_ARG") || code=$?
+  (( code == 0 )) || die $code "$out"
+  UDID=$out
+}
+
+# grep reads all input: -q exits on the first match, and under pipefail the
+# producer's SIGPIPE would then fail the pipeline.
+booted() { xcrun simctl list devices | grep "$UDID) (Booted)" >/dev/null; }
+
+require_booted() {
+  resolve_device
+  booted || die 4 "simulator $UDID is not booted"
+}
+
+# ---- local stack -------------------------------------------------------------
+
+supabase_url() {
+  if [[ -n ${SIM_SUPABASE_URL:-} ]]; then print -- $SIM_SUPABASE_URL; return; fi
+  sed -n 's/^VITE_SUPABASE_URL=//p' $REPO/.env.test
+}
+
+# Refuses anything but a local URL, then checks the stack answers.
+require_stack() {
+  local url=$(supabase_url)
+  [[ $url == http://127.0.0.1:* || $url == http://localhost:* ]] ||
+    die 1 "refusing $url: the driver uses the local stack only"
+  curl -sf -m 5 -o /dev/null "$url/auth/v1/health" ||
+    die 1 "the local stack does not answer at $url: run supabase start"
+}
+
+# ---- runner ----------------------------------------------------------------
+
+RUNNER=$WORK/runner
+
+# Regenerates and rebuilds the XCUITest runner when its sources are newer
+# than the last build.
+ensure_runner() {
+  local stamp=$RUNNER/built.stamp
+  if [[ -f $stamp && -d $RUNNER/dd/Build/Products ]] &&
+    [[ -z $(find $TOOL/project.yml $TOOL/Runner $TOOL/RunnerUITests -newer $stamp -print -quit) ]]; then
+    return
+  fi
+  say "runner sources changed since the last build; regenerating"
+  rm -rf $RUNNER/src
+  mkdir -p $RUNNER/src
+  # Stamped before the copy, so an edit made during it still counts as newer.
+  touch $RUNNER/building.stamp
+  cp -R $TOOL/project.yml $TOOL/Runner $TOOL/RunnerUITests $RUNNER/src/
+  stage xcodegen xcodegen generate --spec $RUNNER/src/project.yml --quiet
+  stage runner-build xcodebuild build-for-testing -project $RUNNER/src/SimDriver.xcodeproj \
+    -scheme RunnerUITests -destination "id=$UDID" -derivedDataPath $RUNNER/dd
+  mv $RUNNER/building.stamp $stamp
+}
+
+# Runs one Drive step and prints its DRIVE lines without the prefix.
+drive() {
+  require_booted
+  ensure_runner
+  local log=$WORK/logs/drive.log code=0
+  TEST_RUNNER_ACTION="$*" xcodebuild test-without-building \
+    -project $RUNNER/src/SimDriver.xcodeproj -scheme RunnerUITests \
+    -destination "id=$UDID" -derivedDataPath $RUNNER/dd \
+    -only-testing:RunnerUITests/Drive/testDrive >$log 2>&1 || code=$?
+  sed -n 's/^DRIVE //p' $log
+  if (( code != 0 )); then
+    grep -E 'error:|XCTAssert|failed' $log | grep -v '^Test Suite' | head -n 5 >&2 || true
+    die 1 "drive step '$1' failed (full log: $log)"
+  fi
+}
+
+# ---- stage and build ---------------------------------------------------------
+
+# Fills a stage with the working tree (no REV) or REV, keeping its
+# node_modules, and runs npm ci only when package-lock.json changed.
+sync_stage() {
+  local dir=$1 rev=${2:-}
+  mkdir -p $dir
+  find $dir -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} +
+  if [[ -n $rev ]]; then
+    git -C $REPO archive $rev | tar -x -C $dir
+  else
+    git -C $REPO ls-files -co --exclude-standard -z |
+      rsync -a --from0 --files-from=- --ignore-missing-args $REPO/ $dir/
+  fi
+  local lock=$(shasum -a 256 $dir/package-lock.json | cut -d' ' -f1)
+  if [[ $(cat $dir/node_modules/.sim-driver-lock 2>/dev/null) != $lock ]]; then
+    stage npm-ci zsh -c "cd ${(q)dir} && npm ci --no-audit --no-fund"
+    print -- $lock >$dir/node_modules/.sim-driver-lock
+  fi
+}
+
+# Builds the web code in a stage against .env.test. Inherited VITE_* values
+# are dropped first: Vite gives process.env priority over .env.test, and
+# fnox's would point the bundle at production.
+build_web() {
+  local dir=$1 id=$2 update_url=$3 readout=$4
+  stage vite zsh -c '
+    for v in ${(k)parameters[(I)VITE_*]}; do unset $v; done
+    [[ -n ${SIM_SUPABASE_URL:-} ]] && export VITE_SUPABASE_URL=$SIM_SUPABASE_URL
+    cd $1 && GITHUB_SHA=$2 VITE_LIVE_UPDATE_URL=$3 npx vite build --mode test' \
+    sim-vite $dir $id $update_url
+  if [[ $readout == 1 ]]; then
+    node -e '
+      const fs = require("fs");
+      const [file, readout] = process.argv.slice(1);
+      const html = fs.readFileSync(file, "utf8");
+      if (!html.includes("</head>")) process.exit(1);
+      fs.writeFileSync(file, html.replace("</head>", fs.readFileSync(readout, "utf8") + "</head>"));
+    ' $dir/dist/index.html $TOOL/readout.html || die 1 "readout: no </head> in $dir/dist/index.html"
+    say "readout injected into the stage's dist/index.html"
+  fi
+}
+
+cmd_build() {
+  local rev= readout=0 port=
+  while (( $# )); do
+    case $1 in
+      --from) rev=${2:?--from needs a revision}; shift 2 ;;
+      --readout) readout=1; shift ;;
+      --update-port) port=${2:?--update-port needs a port}; shift 2 ;;
+      *) die 2 "build: unknown option $1" ;;
+    esac
+  done
+  [[ -z $port || $port == <1-65535> ]] || die 2 "build: --update-port takes a port number"
+  if [[ -n $rev ]]; then
+    git -C $REPO rev-parse --verify --quiet "$rev^{commit}" >/dev/null ||
+      die 1 "build: unknown revision $rev"
+  fi
+  require_booted
+  require_stack
+
+  local dir id update_url=$DEAD_UPDATE_URL
+  if [[ -n $rev ]]; then
+    dir=$WORK/stage/rev
+    id=sim-$(git -C $REPO rev-parse --short "$rev^{commit}")-$(date +%s)
+  else
+    dir=$WORK/stage/tree
+    id=sim-tree-$(date +%s)
+  fi
+  [[ -n $port ]] && update_url=http://127.0.0.1:$port/updates/latest.json
+  say "staging ${rev:-the working tree} in $dir"
+  sync_stage $dir $rev
+  build_web $dir $id $update_url $readout
+  stage cap-sync zsh -c "cd ${(q)dir} && npx cap sync ios"
+  if [[ -n $port ]]; then
+    # The updater refuses http unless told otherwise; the stage only.
+    node -e '
+      const fs = require("fs");
+      const f = process.argv[1];
+      const c = JSON.parse(fs.readFileSync(f, "utf8"));
+      c.plugins = c.plugins || {};
+      c.plugins.CapacitorUpdater = { ...c.plugins.CapacitorUpdater, httpsOnly: false };
+      fs.writeFileSync(f, JSON.stringify(c, null, "\t") + "\n");
+    ' $dir/ios/App/App/capacitor.config.json
+    say "httpsOnly: false in the stage's capacitor.config.json"
+  fi
+  stage xcodebuild xcodebuild -project $dir/ios/App/App.xcodeproj -scheme App \
+    -configuration Debug -destination "id=$UDID" -derivedDataPath $WORK/derived/app build
+  local app=$WORK/derived/app/Build/Products/Debug-iphonesimulator/App.app
+  [[ -d $app ]] || die 1 "xcodebuild: no App.app at $app"
+  # A reinstall keeps the data container, and with it any bundle the updater
+  # downloaded earlier, so the old shell goes first.
+  stage simctl-uninstall xcrun simctl uninstall $UDID $BUNDLE
+  stage simctl-install xcrun simctl install $UDID $app
+  stage simctl-launch xcrun simctl launch $UDID $BUNDLE
+  say "installed $id on $UDID (readout: $readout, update URL: $update_url)"
+}
+
+# ---- live update -------------------------------------------------------------
+
+SERVE_PID=$WORK/serve.pid
+
+# Serves a folder on 127.0.0.1 with the headers public/_headers gives
+# /updates/* on the live site: the shell's fetch is cross-origin.
+SERVE_PY='
+import functools, http.server, sys
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "capacitor://localhost")
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+port, root = int(sys.argv[1]), sys.argv[2]
+http.server.ThreadingHTTPServer(("127.0.0.1", port), functools.partial(Handler, directory=root)).serve_forever()
+'
+
+# True when $SERVE_PID names a live process running SERVE_PY, so a stale
+# pid that another process has since taken is never killed.
+serve_running() {
+  [[ -f $SERVE_PID ]] || return 1
+  local cmd
+  cmd=$(ps -p $(cat $SERVE_PID) -o command= 2>/dev/null) || return 1
+  [[ $cmd == *ThreadingHTTPServer* ]]
+}
+
+cmd_serve_update() {
+  local port=8790 readout=0
+  while (( $# )); do
+    case $1 in
+      --stop)
+        if serve_running && kill $(cat $SERVE_PID) 2>/dev/null; then
+          say "stopped the update server (pid $(cat $SERVE_PID))"
+        else
+          say "no update server running"
+        fi
+        rm -f $SERVE_PID
+        return ;;
+      --port) port=${2:?--port needs a number}; shift 2 ;;
+      --readout) readout=1; shift ;;
+      *) die 2 "serve-update: unknown option $1" ;;
+    esac
+  done
+  [[ $port == <1-65535> ]] || die 2 "serve-update: --port takes a port number"
+  serve_running &&
+    die 1 "the driver's update server already runs (pid $(cat $SERVE_PID)): sim serve-update --stop stops it"
+  require_stack
+  if lsof -nP -iTCP:$port -sTCP:LISTEN >/dev/null 2>&1; then
+    die 1 "port $port is busy"
+  fi
+  local dir=$WORK/stage/tree base=http://127.0.0.1:$port id=sim-tree-$(date +%s)
+  say "staging the working tree in $dir"
+  sync_stage $dir
+  build_web $dir $id $base/updates/latest.json $readout
+  stage package-live-update zsh -c 'cd $1 && GITHUB_SHA=$2 UPDATE_BASE_URL=$3 scripts/package-live-update.sh' \
+    sim-package $dir $id $base
+  rm -rf $WORK/serve
+  cp -R $dir/dist $WORK/serve
+  nohup python3 -I -c "$SERVE_PY" $port $WORK/serve >$WORK/logs/serve.log 2>&1 &!
+  print -- $! >$SERVE_PID
+  local tries=0
+  until curl -sf -m 2 -o /dev/null $base/updates/latest.json; do
+    (( ++tries < 20 )) || { cmd_serve_update --stop; die 1 "update server did not start (log: $WORK/logs/serve.log)"; }
+    sleep 0.25
+  done
+  say "serving $id at $base/updates/latest.json (pid $(cat $SERVE_PID); stop with sim serve-update --stop)"
+}
+
+# ---- accounts ----------------------------------------------------------------
+
+stack_secret() {
+  supabase status -o env 2>/dev/null | sed -n 's/^SECRET_KEY="\(.*\)"$/\1/p'
+}
+
+cmd_provision() {
+  require_stack
+  local key=$(stack_secret)
+  [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
+  (cd $REPO && SIM_SUPABASE_URL=$(supabase_url) SIM_SUPABASE_SECRET_KEY=$key \
+    node scripts/sim-driver/provision.ts) || die 1 "provision failed"
+}
+
+cmd_signin() {
+  local which=${1:-}
+  [[ -z $which || $which == partner ]] || die 2 "signin takes nothing or 'partner'"
+  require_stack
+  local email=${EMAILS[1]}
+  [[ $which == partner ]] && email=${EMAILS[2]}
+  local password
+  password=$(node --input-type=module -e '
+    const m = await import(process.argv[1]); console.log(m.TEST_USER_PASSWORD);
+  ' $REPO/tests/support/test-credentials.ts)
+  drive signin $email $password
+}
+
+# ---- page --------------------------------------------------------------------
+
+cmd_readout() {
+  local json
+  json=$(drive dump) || exit $?
+  print -r -- $json | node -e '
+    const doc = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const box = doc.elements.find((e) => e.label.includes("inset T/R/B/L"));
+    if (!box) { console.error("sim: no readout on screen (build with --readout)"); process.exit(1); }
+    console.log(box.label);
+  '
+}
+
+# Device Hub shows Rotate Right for the Duo but only Rotate Left for the
+# iPhone 17, and ax rotate presses Rotate Right; there, press Rotate Left and
+# wait for ax state's orientation to change (portraitUpsideDown is a step).
+cmd_rotate() {
+  local times=$1
+  local controls
+  controls=$(ax controls --device $UDID)
+  if print -r -- $controls | grep -x 'Rotate Right' >/dev/null; then
+    ax rotate $times --device $UDID
+    return
+  fi
+  local i from to tries
+  for (( i = 0; i < times; i++ )); do
+    from=$(ax state --device $UDID | sed -n 's/^orientation: //p')
+    ax control 'Rotate Left' --device $UDID >/dev/null
+    tries=0
+    until to=$(ax state --device $UDID | sed -n 's/^orientation: //p'); [[ $to != $from ]]; do
+      (( ++tries < 20 )) || die 5 "rotate: orientation stayed $from"
+      sleep 0.25
+    done
+    print -- "rotated left: $from to $to"
+  done
+}
+
+cmd_screenshot() {
+  local out=${1:?screenshot needs a PATH} which=
+  shift
+  if (( $# )); then
+    [[ $1 == --display && ( ${2:-} == inner || ${2:-} == outer ) ]] ||
+      die 2 "screenshot: --display takes inner or outer"
+    which=$2
+  fi
+  require_booted
+  # The phone's screens are the display-class-0 ports; on the Duo the larger
+  # is the inner display. Without --display, take the one ax reports active.
+  if [[ -z $which ]] && (( $(xcrun simctl io $UDID enumerate | grep -c 'Display class: 0') > 1 )); then
+    which=$(ax state --json --device $UDID | node -e '
+      console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).activeDisplay.position)')
+  fi
+  local port
+  port=$(xcrun simctl io $UDID enumerate | node -e '
+    const which = process.argv[1];
+    const ports = require("fs").readFileSync(0, "utf8").split(/^Port:/m)
+      .filter((p) => /Display class: 0/.test(p))
+      .map((p) => ({ uuid: p.match(/UUID: (\S+)/)[1],
+        area: +p.match(/Default width: (\d+)/)[1] * +p.match(/Default height: (\d+)/)[1] }))
+      .sort((a, b) => a.area - b.area);
+    if (!ports.length) process.exit(1);
+    console.log((which === "inner" ? ports[ports.length - 1] : ports[0]).uuid);
+  ' "$which") || die 6 "no phone display found on $UDID"
+  xcrun simctl io $UDID screenshot --display=$port $out >/dev/null 2>&1 || die 6 "simctl screenshot failed"
+  say "saved $out${which:+ ($which display)}"
+}
+
+# ---- main --------------------------------------------------------------------
+
+args=()
+while (( $# )); do
+  case $1 in
+    --device) DEVICE_ARG=${2:?--device needs a UDID or name}; shift 2 ;;
+    *) args+=$1; shift ;;
+  esac
+done
+set -- "${args[@]}"
+(( $# )) || { usage; exit 2; }
+cmd=$1; shift
+
+case $cmd in
+  help|-h|--help) usage ;;
+  provision) cmd_provision ;;
+  build) cmd_build "$@" ;;
+  serve-update) cmd_serve_update "$@" ;;
+  signin) cmd_signin "$@" ;;
+  pose)
+    [[ ${1:-} == (closed|partial|open) ]] || die 2 "pose takes closed, partial or open"
+    require_booted; ax pose $1 --device $UDID ;;
+  rotate)
+    [[ -z ${1:-} || $1 == <1-9> ]] || die 2 "rotate takes a count from 1 to 9"
+    require_booted; cmd_rotate ${1:-1} ;;
+  state) require_booted; ax state --device $UDID ;;
+  tap)
+    [[ $# == 2 && $1 == <->(|.<->) && $2 == <->(|.<->) ]] || die 2 "tap takes X Y in page points"
+    drive tap $1 $2 ;;
+  scroll)
+    [[ ${1:-} == (up|down) ]] || die 2 "scroll takes up or down"
+    drive scroll $1 ;;
+  dump) drive dump ;;
+  readout) cmd_readout ;;
+  background) require_booted; ax control Home --device $UDID >/dev/null; say "pressed Home" ;;
+  launch) require_booted; xcrun simctl launch $UDID $BUNDLE >/dev/null; say "launched $BUNDLE" ;;
+  screenshot) cmd_screenshot "$@" ;;
+  uninstall) require_booted; xcrun simctl uninstall $UDID $BUNDLE; say "uninstalled $BUNDLE" ;;
+  *) usage >&2; die 2 "unknown command $cmd" ;;
+esac

@@ -2830,4 +2830,20 @@ origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar 
 location: _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/tickets/story-find-how-the-web-code-learns-the-side-column-s-position-and-plan.md (Findings, detection method)
 severity: medium (unverified)
 reason: Story 7's rule gives the page a column only when exactly one of env(safe-area-inset-left/right) is non-zero, because a notched or Dynamic Island iPhone in landscape is expected to inset both sides; the shell allows landscape on iPhone (Info.plist) and index.html sets viewport-fit=cover. The iPhone 18 Pro simulator rendered the readout build blank on iOS 27.0 and 27.2, so no non-Duo iPhone was measured. If such an iPhone inset only one side, story 2 would draw a column dock there. Proven by reading both side insets in the shell on a non-Duo iPhone simulator in each landscape direction; story 2's verify names a non-Duo iPhone simulator but not landscape.
+status: done 2026-10-30
+resolution: measured 2026-10-30 by epic-iphone-duo-native-tab-bar story 9 through scripts/sim-driver/sim with story 7's readout, in the shell on the iPhone 17 simulator (iOS 27.2), which renders it: portrait 62/0/34/0 (T/R/B/L, page 402x874), landscape-primary (device landscapeLeft) 0/62/20/62 and landscape-secondary (device landscapeRight) 0/62/20/62 (page 874x402). Both side insets are non-zero in each landscape, so the exactly-one-side rule gives this iPhone no column and story 2 keeps its bottom dock there.
+
+### DW-329: The sim driver's work dir is shared, so two runs on simulator clones would clobber each other.
+origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (the simulator driver)
+location: scripts/sim-driver/sim (WORK, sync_stage, ensure_runner, drive, SERVE_PID); AGENTS.md, Maintained by hand (the sim driver line)
+severity: medium
+reason: AGENTS.md says to run one Duo story at a time "or each on its own xcrun simctl clone", but every sim invocation defaults to the one $SIM_DRIVER_WORK: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, every drive step writes and then parses $WORK/logs/drive.log, and serve.pid is a single file. Two stories driving two clones at once would wipe each other's stage and runner and read each other's drive output. Fix by keying the work dir's per-run parts on the device UDID, or by having the AGENTS.md line and the sim header require a separate SIM_DRIVER_WORK per clone; deferred because the review workflow routes agent-context edits to the ledger.
+status: open
+
+### DW-330: The sim driver's default work dir is shared by every run, so two stories driving two simulator clones at once (which AGENTS.md now allows) would clobber each other's stage, runner, drive log and
+origin: spec-deferred 9ebb86d180dd
+location: scripts/sim-driver/sim (WORK, sync_stage, ensure_runner, drive, SERVE_PID); AGENTS.md Maintained by hand
+source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-simulator-driver-is-a-repo-tool-plan.md`
+severity: medium
+reason: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, drive writes and parses $WORK/logs/drive.log, and serve.pid is one file; none is keyed on the device. The fix edits AGENTS.md (or keys the work dir on the UDID), so it is deferred; recorded as DW-329 in the deferred-work ledger.
 status: open

@@ -1,0 +1,37 @@
+# The sim driver's XCUITest runner (scripts/sim-driver/sim), kept out of
+# ios/App so the shipped app never changes. `sim` copies this folder into its
+# work dir and runs xcodegen there; Runner is only the host the UI tests need,
+# and RunnerUITests/Drive.swift drives the installed shell by bundle id.
+name: SimDriver
+options:
+  bundleIdPrefix: dev.sallvain.simdriver
+  deploymentTarget:
+    iOS: "26.0"
+targets:
+  Runner:
+    type: application
+    platform: iOS
+    sources: [Runner]
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      PRODUCT_BUNDLE_IDENTIFIER: dev.sallvain.simdriver.runner
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGN_STYLE: Manual
+  RunnerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [RunnerUITests]
+    dependencies:
+      - target: Runner
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      TEST_TARGET_NAME: Runner
+      CODE_SIGNING_ALLOWED: NO
+schemes:
+  RunnerUITests:
+    build:
+      targets:
+        Runner: all
+        RunnerUITests: [test]
+    test:
+      targets: [RunnerUITests]
