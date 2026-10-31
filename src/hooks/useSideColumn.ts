@@ -3,7 +3,10 @@
  *
  * Which side of the page, if any, holds a screen column the page draws under:
  * the iPhone Duo's 84 pt strip beside the shell's page in folded portrait, both
- * folded landscapes, unfolded landscape and the right pane side by side.
+ * folded landscapes, unfolded landscape and the right pane side by side. In the
+ * left pane iOS gives no column, so the shell's MainViewController
+ * (ios/App/App/NativeAuth.swift) adds an 84 pt left inset and this hook reads
+ * it like any other column.
  *
  * Story 7's rule: the column is the one side whose `env(safe-area-inset-*)` is
  * non-zero. Both zero (unfolded portrait, Safari, the Home Screen web app) or
