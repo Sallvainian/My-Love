@@ -7,7 +7,10 @@
  *
  * Story 7's rule: the column is the one side whose `env(safe-area-inset-*)` is
  * non-zero. Both zero (unfolded portrait, Safari, the Home Screen web app) or
- * both non-zero (a notched iPhone in landscape, 62/62) means no column. Only
+ * both non-zero (a notched iPhone in landscape, 62/62) means no column. A side
+ * counts only when it can hold one 44px dock button, so a narrow one-sided
+ * cutout band (Android Chrome in landscape, about 24-48px) keeps the bottom
+ * dock instead of a capsule narrower than its buttons. Only
  * the insets decide it -- `screen.*` reports the outer display in every pose,
  * and the user agent or `display-mode` say nothing about the pose.
  *
@@ -29,10 +32,13 @@ import { useLayoutEffect, useState } from 'react';
 
 export type SideColumn = 'left' | 'right';
 
-/** Exactly one non-zero side insets a column; anything else is none. */
+// The capsule's button width (w-11): a side inset narrower than this is no column.
+const MIN_COLUMN_INSET = 44;
+
+/** Exactly one side inset wide enough for a dock button is a column; anything else is none. */
 export function sideColumnFromInsets(left: number, right: number): SideColumn | null {
-  const hasLeft = left > 0;
-  const hasRight = right > 0;
+  const hasLeft = left >= MIN_COLUMN_INSET;
+  const hasRight = right >= MIN_COLUMN_INSET;
   if (hasLeft === hasRight) return null;
   return hasLeft ? 'left' : 'right';
 }

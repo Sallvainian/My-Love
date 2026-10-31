@@ -183,10 +183,11 @@
   }
 
   /* The column form (AppNavigation sets data-dock on <html> when exactly one
-     side inset is non-zero): the dock is a capsule filling that side's column,
-     so content clears it sideways, ending at the column's edge, and keeps only
-     the home-indicator band at the bottom. A bottom clearance would leave a
-     band as tall as the capsule (about 250px) under the last item. */
+     side inset is wide enough for a dock button): the dock is a capsule
+     filling that side's column, so content clears it sideways, ending at the
+     column's edge, and keeps only the home-indicator band at the bottom. A
+     bottom clearance would leave a band as tall as the capsule (about 250px)
+     under the last item. */
   :root[data-dock='column-right'] {
     --dock-clearance: env(safe-area-inset-bottom);
     --dock-top: env(safe-area-inset-bottom);

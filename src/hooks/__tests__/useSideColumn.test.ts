@@ -84,6 +84,9 @@ describe('sideColumnFromInsets', () => {
     [84, 0, 'left'],
     [0, 0, null],
     [62, 62, null],
+    [0, 32, null],
+    [32, 0, null],
+    [0, 44, 'right'],
   ] as const)('insets %d/%d give %s', (left, right, expected) => {
     expect(sideColumnFromInsets(left, right)).toBe(expected);
   });
@@ -122,6 +125,9 @@ describe('useSideColumn', () => {
     [84, 0, 'left'],
     [0, 0, null],
     [62, 62, null],
+    [0, 32, null],
+    [32, 0, null],
+    [0, 44, 'right'],
   ] as const)('reads %d/%d as %s on mount', (left, right, expected) => {
     setInsets(left, right);
     const { result } = renderHook(() => useSideColumn());
