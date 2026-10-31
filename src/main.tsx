@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { Capacitor } from '@capacitor/core';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { UpdateToast } from './components/shared/UpdateToast';
 import './index.css';
 import { startNativeUpdates } from './services/nativeUpdates';
 import { logger } from './utils/logger';
@@ -47,6 +48,8 @@ createRoot(document.getElementById('root')!).render(
     <LazyMotion features={domAnimation}>
       <ErrorBoundary>
         <App />
+        {/* Outside App so it shows on every screen, sign-in included. */}
+        <UpdateToast />
       </ErrorBoundary>
     </LazyMotion>
   </StrictMode>
