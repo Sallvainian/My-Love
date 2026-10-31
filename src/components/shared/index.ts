@@ -10,3 +10,5 @@
 export { NetworkStatusIndicator } from './NetworkStatusIndicator';
 
 export { SyncToast, type SyncResult } from './SyncToast';
+
+export { UpdateToast } from './UpdateToast';

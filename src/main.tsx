@@ -4,9 +4,14 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { Capacitor } from '@capacitor/core';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { UpdateToast } from './components/shared/UpdateToast';
 import './index.css';
 import { startNativeUpdates } from './services/nativeUpdates';
+import { markNativeShell } from './utils/nativeShell';
 import { logger } from './utils/logger';
+
+// Before the first paint, so the shell never shows a scroll bar.
+markNativeShell(document.documentElement);
 
 // The native shell updates through nativeUpdates.ts instead: service workers
 // do not run on its capacitor:// origin, and its files ship inside the app.
@@ -47,6 +52,8 @@ createRoot(document.getElementById('root')!).render(
     <LazyMotion features={domAnimation}>
       <ErrorBoundary>
         <App />
+        {/* Outside App so it shows on every screen, sign-in included. */}
+        <UpdateToast />
       </ErrorBoundary>
     </LazyMotion>
   </StrictMode>
