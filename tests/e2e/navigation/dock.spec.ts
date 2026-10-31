@@ -9,6 +9,7 @@
  * and resets to Home on reload. The reload case below is the only thing that
  * catches that.
  */
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -27,6 +28,19 @@ const PATHS: Record<(typeof ALL_DESTINATIONS)[number], RegExp> = {
   photos: /\/photos$/,
   partner: /\/partner$/,
   settings: /\/settings$/,
+};
+
+/**
+ * What shows that each dock destination's view rendered. Photos renders one of
+ * two roots depending on whether the account has photos.
+ */
+const VIEW_WITNESS: Record<(typeof DOCK_DESTINATIONS)[number], (page: Page) => Locator> = {
+  home: (page) => page.getByTestId('message-text'),
+  mood: (page) => page.getByTestId('mood-tracker'),
+  notes: (page) => page.getByTestId('love-notes-view'),
+  photos: (page) =>
+    page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state')),
+  partner: (page) => page.getByTestId('partner-mood-view'),
 };
 
 test.describe('Bottom Dock', () => {
@@ -165,6 +179,34 @@ test.describe('Bottom Dock', () => {
     await expect(page).toHaveURL(/\/settings$/);
     await expect(page.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
   });
+
+  // The dock's form changes with the screen (a side-column capsule on the Duo),
+  // and a reload mounts it afresh: each destination must survive one.
+  for (const view of DOCK_DESTINATIONS) {
+    test(`[P0] should keep ${view} and its dock button current across a reload`, async ({
+      page,
+    }) => {
+      // Start elsewhere, so the tap is a real navigation.
+      await page.goto(view === 'home' ? '/mood' : '/');
+      await expect(page.getByTestId('nav-dock')).toBeVisible();
+
+      // WHEN: Its dock button is tapped
+      await navigateTo(page, view);
+      await expect(page).toHaveURL(PATHS[view]);
+      await expect(VIEW_WITNESS[view](page)).toBeVisible();
+
+      // AND: The page is reloaded on that URL
+      await page.reload();
+
+      // THEN: The view renders again and its button alone is current
+      await expect(page).toHaveURL(PATHS[view]);
+      await expect(VIEW_WITNESS[view](page)).toBeVisible();
+      await expect(page.getByTestId(`nav-${view}`)).toHaveAttribute('aria-current', 'page');
+      for (const other of ALL_DESTINATIONS.filter((v) => v !== view)) {
+        await expect(page.getByTestId(`nav-${other}`)).not.toHaveAttribute('aria-current', 'page');
+      }
+    });
+  }
 
   test('[P0] should go back to the previous view from Settings', async ({ page }) => {
     await page.goto('/');

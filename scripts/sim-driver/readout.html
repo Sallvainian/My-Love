@@ -1,0 +1,50 @@
+<!-- Story 7's on-screen readout, verbatim from its plan's Setup. `sim build --readout`
+     and `sim serve-update --readout` insert this file before the closing head tag of a
+     staged build's index.html; `sim readout` prints its text. Never in the repo's builds. -->
+<script>
+(() => {
+  const css = 'position:fixed;inset:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);pointer-events:none;z-index:2147483646;box-sizing:border-box';
+  let last = 'load', tap = '-', ro = '-', change = '-', prevInsets = '', eventSincePoll = false;
+  const now = () => new Date().toTimeString().slice(0, 8);
+  const start = () => {
+    const safe = document.createElement('div');
+    safe.style.cssText = css;
+    const edge = document.createElement('div');
+    edge.style.cssText = 'width:100%;height:100%;outline:2px dashed lime;outline-offset:-2px';
+    safe.append(edge);
+    const box = document.createElement('pre');
+    box.style.cssText = 'position:fixed;left:6px;top:40%;margin:0;padding:6px 8px;background:rgba(0,0,0,.8);color:#0f0;font:10px/1.3 ui-monospace,monospace;pointer-events:none;z-index:2147483647;white-space:pre';
+    document.documentElement.append(safe, box);
+    const render = () => {
+      const s = getComputedStyle(safe);
+      const vv = window.visualViewport;
+      const insets = [s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft].map((v) => parseFloat(v)).join('/');
+      if (prevInsets && insets !== prevInsets) change = prevInsets + ' -> ' + insets + ' @' + now() + (eventSincePoll ? ' w/ ' + last : ' NO EVT');
+      prevInsets = insets;
+      eventSincePoll = false;
+      const r = edge.getBoundingClientRect();
+      box.textContent = [
+        'inset T/R/B/L ' + insets,
+        'safe box x' + Math.round(r.left) + '-' + Math.round(r.right) + ' y' + Math.round(r.top) + '-' + Math.round(r.bottom),
+        'inset change ' + change,
+        'resizeObserver ' + ro,
+        'inner ' + innerWidth + 'x' + innerHeight + '  screen ' + screen.width + 'x' + screen.height,
+        'vv ' + (vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '-') + '  dpr ' + devicePixelRatio,
+        'orient ' + (screen.orientation ? screen.orientation.type : '-') + '  standalone ' + matchMedia('(display-mode: standalone)').matches,
+        'last event ' + last,
+        'last tap ' + tap,
+      ].join('\n');
+    };
+    const on = (name) => () => { last = name + ' @' + now(); eventSincePoll = true; };
+    new ResizeObserver(() => { ro = 'fired @' + now(); }).observe(edge);
+    setInterval(render, 300);
+    addEventListener('resize', on('resize'));
+    addEventListener('orientationchange', on('orientationchange'));
+    if (window.visualViewport) visualViewport.addEventListener('resize', on('vv-resize'));
+    if (screen.orientation) screen.orientation.addEventListener('change', on('orientation.change'));
+    addEventListener('pointerdown', (e) => { tap = Math.round(e.clientX) + ',' + Math.round(e.clientY) + ' @' + now(); }, true);
+    render();
+  };
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>

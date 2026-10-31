@@ -17,6 +17,19 @@
  * index.css; <main> and the floating buttons read them rather than hardcoding
  * the dock's size. Change the dock's inset or height and update both.
  *
+ * The dock has a second form. Where the screen keeps a column beside the page
+ * (the iPhone Duo shell: folded, unfolded landscape, the right pane side by
+ * side -- `useSideColumn`), the same <nav> becomes an icon-only vertical
+ * capsule at that column's bottom, as wide as the column's `env()` inset and
+ * flush with the screen edge, so it covers nothing the page lays out. The form
+ * is published as `data-dock="column-left|column-right"` on <html>, and
+ * index.css switches the dock variables on it: no bottom band, and
+ * `--dock-left`/`--dock-right`, which <main> applies as side padding, so
+ * content ends at the column's edge. In that form Settings is the capsule's
+ * sixth button, so the column holds every destination, and the header's gear
+ * gives way to a spacer of its size that keeps the wordmark centred; the
+ * bottom form keeps the gear and five dock buttons.
+ *
  * Every colour is a style-kit token from index.css (`bg-glass`, `text-ink`,
  * `text-muted`, `bg-tint`/`text-accent`, `bg-fill`, `ring-line`,
  * `shadow-float`), matching the approved style kit. Each token switches with the
@@ -33,6 +46,8 @@ import {
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useLayoutEffect } from 'react';
+import { useSideColumn } from '../../hooks/useSideColumn';
 import type { ViewType } from '../../stores/slices/navigationSlice';
 
 interface Destination {
@@ -47,7 +62,10 @@ interface Destination {
   fillWhenActive?: boolean;
 }
 
-/** Settings is not here: it is the gear in the top bar. */
+/**
+ * Settings is not here: it is the gear in the top bar, or `SETTINGS`, the
+ * column capsule's sixth button.
+ */
 const DESTINATIONS: readonly Destination[] = [
   { view: 'home', label: 'Home', Icon: Heart, fillWhenActive: true },
   { view: 'mood', label: 'Mood', Icon: FaceSlightlySmiling },
@@ -55,6 +73,8 @@ const DESTINATIONS: readonly Destination[] = [
   { view: 'photos', label: 'Photos', Icon: Camera },
   { view: 'partner', label: 'Partner', Icon: Users },
 ];
+
+const SETTINGS: Destination = { view: 'settings', label: 'Settings', Icon: SettingsIcon };
 
 /**
  * Shared by the bar and the dock. The dock alone adds `backdrop-saturate-[1.4]`
@@ -67,7 +87,8 @@ export interface AppNavigationProps {
   onViewChange: (view: ViewType) => void;
   /**
    * Unseen counts per dock destination. Missing, zero or negative entries
-   * render no badge, and `settings` is ignored: the gear carries no badge slot.
+   * render no badge, and `settings` is ignored in both forms: neither the gear
+   * nor the column's Settings button carries a badge.
    */
   badgeCounts?: Partial<Record<ViewType, number>>;
 }
@@ -78,12 +99,24 @@ function pluralisedBadgeLabel(count: number): string {
 
 export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNavigationProps) {
   const isSettings = currentView === 'settings';
+  const column = useSideColumn();
+  // The column holds every destination; the bottom dock leaves Settings to the gear.
+  const buttons = column ? [...DESTINATIONS, SETTINGS] : DESTINATIONS;
+
+  // Publishes the form to index.css, which moves the dock's space with it.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (column) root.setAttribute('data-dock', `column-${column}`);
+    else root.removeAttribute('data-dock');
+    return () => root.removeAttribute('data-dock');
+  }, [column]);
 
   return (
     <>
       <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
         <div className="flex h-16 items-center gap-2 px-3">
-          {/* Balances the gear so the wordmark stays optically centred. */}
+          {/* Balances the gear so the wordmark stays optically centred; also
+              the slot a future notifications button takes. */}
           <span aria-hidden="true" className="min-h-11 min-w-11" />
 
           {/* The app name rather than the active destination, and a span rather
@@ -105,29 +138,48 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
             </span>
           </span>
 
-          <button
-            type="button"
-            onClick={() => onViewChange('settings')}
-            className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors ${
-              isSettings ? 'bg-tint text-accent' : 'text-muted hover:text-ink'
-            }`}
-            data-testid="nav-settings"
-            aria-label="Settings"
-            aria-current={isSettings ? 'page' : undefined}
-          >
-            <SettingsIcon className="h-5 w-5" />
-          </button>
+          {column ? (
+            // Settings is in the column capsule; this keeps the gear's space so
+            // the wordmark stays centred.
+            <span aria-hidden="true" className="min-h-11 min-w-11" />
+          ) : (
+            <button
+              type="button"
+              onClick={() => onViewChange('settings')}
+              className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors ${
+                isSettings ? 'bg-tint text-accent' : 'text-muted hover:text-ink'
+              }`}
+              data-testid="nav-settings"
+              aria-label="Settings"
+              aria-current={isSettings ? 'page' : undefined}
+            >
+              <SettingsIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </header>
 
       <nav
-        className={`fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-15 items-center justify-between gap-1 rounded-full px-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`}
+        className={
+          column
+            ? // The column's own width (its `env()` inset, never a literal), flush
+              // with the screen edge, its bottom where the bottom dock's sits.
+              `fixed ${
+                column === 'right'
+                  ? 'right-0 w-[env(safe-area-inset-right)]'
+                  : 'left-0 w-[env(safe-area-inset-left)]'
+              } bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-1 rounded-full py-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`
+            : `fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-15 items-center justify-between gap-1 rounded-full px-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`
+        }
         aria-label="Primary"
         data-testid="nav-dock"
+        data-form={column ? 'column' : 'bottom'}
       >
-        {DESTINATIONS.map(({ view, label, Icon, fillWhenActive }) => {
+        {buttons.map(({ view, label, Icon, fillWhenActive }) => {
           const isActive = currentView === view;
-          const count = badgeCounts?.[view] ?? 0;
+          const count = view === 'settings' ? 0 : (badgeCounts?.[view] ?? 0);
+          // The column is too narrow for the active label: icons only there.
+          const showLabel = isActive && !column;
 
           return (
             <button
@@ -135,9 +187,11 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
               type="button"
               onClick={() => onViewChange(view)}
               className={`relative flex h-11 items-center justify-center rounded-full transition-colors ${
-                isActive
-                  ? 'min-w-0 shrink gap-1.5 bg-tint px-3.5 text-sm font-semibold text-accent'
-                  : 'w-11 shrink-0 text-muted hover:text-ink'
+                column
+                  ? `w-11 shrink-0 ${isActive ? 'bg-tint text-accent' : 'text-muted hover:text-ink'}`
+                  : isActive
+                    ? 'min-w-0 shrink gap-1.5 bg-tint px-3.5 text-sm font-semibold text-accent'
+                    : 'w-11 shrink-0 text-muted hover:text-ink'
               }`}
               data-testid={`nav-${view}`}
               // The label replaces the button's content as its accessible name,
@@ -146,11 +200,11 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon
-                className={`shrink-0 ${isActive ? 'h-5 w-5' : 'h-5.5 w-5.5'} ${
+                className={`shrink-0 ${showLabel ? 'h-5 w-5' : 'h-5.5 w-5.5'} ${
                   isActive && fillWhenActive ? 'fill-current' : ''
                 }`}
               />
-              {isActive && <span className="truncate whitespace-nowrap">{label}</span>}
+              {showLabel && <span className="truncate whitespace-nowrap">{label}</span>}
               {/* No click handler of its own: the badge sits inside the button,
                   so a tap on it bubbles to the button and selects the view. */}
               {count > 0 && (
