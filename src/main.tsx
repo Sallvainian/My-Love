@@ -7,7 +7,11 @@ import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { UpdateToast } from './components/shared/UpdateToast';
 import './index.css';
 import { startNativeUpdates } from './services/nativeUpdates';
+import { markNativeShell } from './utils/nativeShell';
 import { logger } from './utils/logger';
+
+// Before the first paint, so the shell never shows a scroll bar.
+markNativeShell(document.documentElement);
 
 // The native shell updates through nativeUpdates.ts instead: service workers
 // do not run on its capacitor:// origin, and its files ship inside the app.

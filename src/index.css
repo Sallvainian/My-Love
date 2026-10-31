@@ -158,6 +158,22 @@
       scrollbar-color: color-mix(in srgb, var(--kit-fill) 40%, transparent) var(--kit-page);
     }
   }
+
+  /* Inside the native iOS shell (main.tsx marks <html> with data-native) no
+     view draws a scroll bar, as in any app: the page and every inner scroller
+     still scroll, only the bar is gone. Placed after the rules above so it
+     wins over their pink thumb. The website keeps its scroll bars. */
+  :root[data-native],
+  :root[data-native] * {
+    scrollbar-width: none;
+  }
+
+  :root[data-native]::-webkit-scrollbar,
+  :root[data-native] *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 @layer components {
