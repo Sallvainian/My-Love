@@ -3045,3 +3045,11 @@ source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-dev
 severity: low
 reason: Sign-out removes only the stored token's row; a reinstall gets a new APNs token. The story's simulator check found one such stale row from story 1's install and deleted it by hand. Ledger DW-353.
 status: open
+
+### DW-355: Every push to main now rebuilds both Edge Functions from the unpinned esm.sh import, so production functions can change with no reviewed change, and an esm.sh outage blocks a frontend-only site deploy.
+origin: review story-3.3
+location: .github/workflows/deploy.yml (functions job); supabase/functions/send-push/index.ts:15; supabase/functions/upload-love-note-image/index.ts:22
+source_spec: `tickets/epic-push-notifications/tickets/story-every-edge-function-deploys-from-deploy-yml-plan.md`
+severity: medium (unverified)
+reason: Both entrypoints import `https://esm.sh/@supabase/supabase-js@2`, and `supabase functions deploy --use-api` resolves that on Supabase's side at every deploy. Story 3.3's ticket asks for every function on every run, and for `build` to need the function deploy, so a newer 2.x on esm.sh reaches production on the next frontend-only push, and an esm.sh or bundler outage stops the site deploy. test.yml leaves `index.ts` out of `deno test` to avoid exactly this CDN dependency. That the resolved version drifts between deploys is unverified; compare the deployed bundle's supabase-js version across two runs to settle it. To fix, decide between pinning the import to an exact version in both functions and deploying functions only when `supabase/functions/**` or `supabase/config.toml` changed (which needs the owner to amend the "every run" decision).
+status: open

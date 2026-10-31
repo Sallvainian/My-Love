@@ -370,11 +370,16 @@ deno_version = 2
 
 # The love-note insert trigger (notify_love_note_push) has no user JWT, so it
 # authenticates to send-push with the shared secret in push_sender_settings,
-# which the function checks itself. upload-love-note-image's section arrives
-# with story 3.3.
+# which the function checks itself.
 [functions.send-push]
 enabled = true
 verify_jwt = false
+
+# Called by the app with the signed-in user's JWT; true matches what the hosted
+# project reported for its hand-made deploy on 2026-10-31.
+[functions.upload-love-note-image]
+enabled = true
+verify_jwt = true
 
 [analytics]
 enabled = false
