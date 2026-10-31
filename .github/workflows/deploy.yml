@@ -88,8 +88,34 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: supabase db push
 
-  build:
+  # Every Edge Function in supabase/functions, never deployed by hand. After the
+  # migrations, because a function reads the tables they create; before the
+  # build, so a failed function deploy stops the site deploy. With no names the
+  # CLI deploys every function folder, and each [functions.<name>] section in
+  # supabase/config.toml sets that function's verify_jwt. --use-api bundles on
+  # Supabase's side, so no Docker image is pulled; there is no --prune, so a
+  # function that exists only on the hosted project is left alone.
+  functions:
+    name: Deploy Edge Functions
     needs: migrate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.118.0
+
+      - name: Deploy functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref ${{ vars.SUPABASE_PROJECT_ID }} --use-api
+
+  build:
+    needs: functions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -133,7 +159,8 @@ jobs:
           retention-days: 7
 
   # The Cloudflare credentials live on the production environment, so only this
-  # job can read them -- not the build, which runs third-party npm code. This
+  # job and the two Supabase jobs above, which run no npm code, can read them --
+  # not the build, which runs third-party npm code. This
   # job installs with --ignore-scripts for the same reason: no dependency's
   # install script runs beside the token. wrangler deploy needs none of them.
   deploy:
