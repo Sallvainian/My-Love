@@ -207,6 +207,7 @@ describe('AppNavigation', () => {
       notes: 'Love Notes',
       photos: 'Photos',
       partner: 'Partner',
+      settings: 'Settings',
     };
 
     it('is the bottom dock with no data-dock when there is no side column', () => {
@@ -228,44 +229,96 @@ describe('AppNavigation', () => {
       }
     );
 
-    it.each([null, 'left', 'right'] as const)(
-      'keeps one Primary nav of five labelled buttons in DESTINATIONS order (column %s)',
+    function expectOnePrimaryNav(views: ViewType[]) {
+      const navs = screen.getAllByRole('navigation');
+      expect(navs).toHaveLength(1);
+      expect(navs[0]).toBe(screen.getByTestId('nav-dock'));
+      expect(navs[0]).toHaveAttribute('aria-label', 'Primary');
+      const buttons = within(navs[0]).getAllByRole('button');
+      expect(buttons.map((b) => b.getAttribute('data-testid'))).toEqual(
+        views.map((view) => `nav-${view}`)
+      );
+      expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(
+        views.map((view) => LABELS[view])
+      );
+    }
+
+    it('keeps one Primary nav of five labelled buttons and the header gear with no column', () => {
+      renderNavigation();
+
+      expectOnePrimaryNav(DOCK_DESTINATIONS);
+      const header = screen.getByTestId('app-header');
+      expect(within(header).getAllByRole('button')).toEqual([screen.getByTestId('nav-settings')]);
+      expect(screen.getAllByTestId('nav-settings')).toHaveLength(1);
+    });
+
+    it.each(['left', 'right'] as const)(
+      'keeps one Primary nav of six labelled buttons, Settings last, and no header button (column %s)',
       (side) => {
         sideColumn.current = side;
         renderNavigation();
 
-        const navs = screen.getAllByRole('navigation');
-        expect(navs).toHaveLength(1);
-        expect(navs[0]).toBe(screen.getByTestId('nav-dock'));
-        expect(navs[0]).toHaveAttribute('aria-label', 'Primary');
-        const buttons = within(navs[0]).getAllByRole('button');
-        expect(buttons.map((b) => b.getAttribute('data-testid'))).toEqual(
-          DOCK_DESTINATIONS.map((view) => `nav-${view}`)
-        );
-        expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(
-          DOCK_DESTINATIONS.map((view) => LABELS[view])
-        );
-        // The header and its gear are the same in both forms.
-        expect(within(screen.getByTestId('app-header')).getAllByRole('button')).toEqual([
-          screen.getByTestId('nav-settings'),
-        ]);
+        expectOnePrimaryNav(ALL_DESTINATIONS);
+        expect(screen.getAllByTestId('nav-settings')).toHaveLength(1);
+        const header = screen.getByTestId('app-header');
+        expect(within(header).queryAllByRole('button')).toEqual([]);
+        // Two gear-sized spacers flank the wordmark, so it stays centred.
+        const row = header.firstElementChild as HTMLElement;
+        const spacers = [row.firstElementChild, row.lastElementChild];
+        for (const spacer of spacers) {
+          expect(spacer?.tagName).toBe('SPAN');
+          expect(spacer).toHaveAttribute('aria-hidden', 'true');
+          expect(spacer).toHaveClass('min-h-11', 'min-w-11');
+          expect(spacer).toBeEmptyDOMElement();
+        }
+        expect(row.children[1]).toBe(screen.getByTestId('app-wordmark'));
+        expect(row.children).toHaveLength(3);
       }
     );
 
-    it('shows icons only in the column, the active one highlighted', () => {
-      sideColumn.current = 'right';
-      renderNavigation({ currentView: 'notes' });
+    it.each(['notes', 'settings'] as const)(
+      'shows icons only in the column, the active one (%s) highlighted',
+      (current) => {
+        sideColumn.current = 'right';
+        renderNavigation({ currentView: current });
 
-      for (const view of DOCK_DESTINATIONS) {
-        expect(screen.getByTestId(`nav-${view}`).textContent).toBe('');
+        for (const view of ALL_DESTINATIONS) {
+          expect(screen.getByTestId(`nav-${view}`).textContent).toBe('');
+        }
+        const active = screen.getByTestId(`nav-${current}`);
+        expect(active).toHaveAttribute('aria-current', 'page');
+        expect(active).toHaveClass('bg-tint', 'text-accent', 'h-11', 'w-11');
+        for (const view of ALL_DESTINATIONS.filter((v) => v !== current)) {
+          expect(screen.getByTestId(`nav-${view}`)).not.toHaveClass('bg-tint');
+          expect(screen.getByTestId(`nav-${view}`)).toHaveClass('h-11', 'w-11', 'text-muted');
+          expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
+        }
       }
-      const active = screen.getByTestId('nav-notes');
-      expect(active).toHaveAttribute('aria-current', 'page');
-      expect(active).toHaveClass('bg-tint', 'text-accent');
-      for (const view of DOCK_DESTINATIONS.filter((v) => v !== 'notes')) {
-        expect(screen.getByTestId(`nav-${view}`)).not.toHaveClass('bg-tint');
-        expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
-      }
+    );
+
+    it('makes the column Settings a real button reporting settings', async () => {
+      sideColumn.current = 'right';
+      const user = userEvent.setup();
+      const { onViewChange } = renderNavigation();
+
+      const settings = within(screen.getByTestId('nav-dock')).getByTestId('nav-settings');
+      expect(settings.tagName).toBe('BUTTON');
+      expect(settings).toHaveAttribute('type', 'button');
+      await user.click(settings);
+
+      expect(onViewChange).toHaveBeenCalledTimes(1);
+      expect(onViewChange).toHaveBeenCalledWith('settings');
+    });
+
+    it('ignores a settings count in the column', () => {
+      sideColumn.current = 'left';
+      renderNavigation({ badgeCounts: { settings: 4, notes: 2 } });
+
+      expect(screen.queryByTestId('nav-settings-badge')).not.toBeInTheDocument();
+      expect(screen.getByTestId('nav-settings').textContent).toBe('');
+      expect(screen.getByTestId('nav-settings')).toHaveAttribute('aria-label', 'Settings');
+      // Other column badges still render.
+      expect(screen.getByTestId('nav-notes-badge')).toHaveTextContent('2');
     });
 
     it('reports a column tap through the same onViewChange', async () => {
@@ -305,6 +358,31 @@ describe('AppNavigation', () => {
       expect(onViewChange).not.toHaveBeenCalled();
     });
 
+    it('moves Settings between the gear and the column on a form switch, aria-current following', () => {
+      const onViewChange = vi.fn();
+      const { rerender } = render(
+        <AppNavigation currentView="settings" onViewChange={onViewChange} />
+      );
+      const header = screen.getByTestId('app-header');
+      const dock = screen.getByTestId('nav-dock');
+
+      for (const side of [null, 'right', null] as const) {
+        sideColumn.current = side;
+        rerender(<AppNavigation currentView="settings" onViewChange={onViewChange} />);
+
+        const settings = screen.getByTestId('nav-settings');
+        expect(screen.getAllByTestId('nav-settings')).toHaveLength(1);
+        expect(side ? dock : header).toContainElement(settings);
+        expect(side ? header : dock).not.toContainElement(settings);
+        expect(settings).toHaveAttribute('aria-current', 'page');
+        expect(settings).toHaveClass('bg-tint', 'text-accent');
+        for (const view of DOCK_DESTINATIONS) {
+          expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
+        }
+      }
+      expect(onViewChange).not.toHaveBeenCalled();
+    });
+
     it('clears data-dock on unmount', () => {
       sideColumn.current = 'right';
       const { unmount } = renderNavigation();
@@ -317,12 +395,12 @@ describe('AppNavigation', () => {
 
     // The reload case: a fresh mount already in the column form marks the view
     // the URL restored.
-    it.each(DOCK_DESTINATIONS)('marks %s on a fresh mount in the column form', (view) => {
+    it.each(ALL_DESTINATIONS)('marks %s on a fresh mount in the column form', (view) => {
       sideColumn.current = 'right';
       renderNavigation({ currentView: view });
 
       expect(screen.getByTestId(`nav-${view}`)).toHaveAttribute('aria-current', 'page');
-      for (const other of DOCK_DESTINATIONS.filter((v) => v !== view)) {
+      for (const other of ALL_DESTINATIONS.filter((v) => v !== view)) {
         expect(screen.getByTestId(`nav-${other}`)).not.toHaveAttribute('aria-current');
       }
     });

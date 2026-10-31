@@ -2855,3 +2855,19 @@ source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-dock-beco
 severity: medium
 reason: sideColumnFromInsets switches to the column form for any single non-zero side inset, and the capsule is exactly w-[env(safe-area-inset-left|right)] while each button is w-11 (44 px); index.html sets viewport-fit=cover. Unverified: no Android device or emulator was measured. Settle it by reading env(safe-area-inset-left/right) in Android Chrome in landscape on a punch-hole phone; if one side is non-zero and small, add a minimum column width (for example a button's 44 px) to the rule, which the ticket's "exactly one non-zero" wording does not settle. (declared severity: medium (unverified))
 status: open
+
+### DW-332: The sim driver's signin appends to whatever the login fields already hold, so a retry after a failed first attempt types onto the leftover email and is refused.
+origin: spec-deferred 45d95a4edb9e
+location: scripts/sim-driver/RunnerUITests/Drive.swift:59
+source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-settings-is-the-sixth-button-in-the-column-dock-plan.md`
+severity: medium
+reason: scripts/sim-driver/RunnerUITests/Drive.swift signIn taps the first web text field and calls typeText(email) with no clear first. In story 8's run `sim signin` exited 1 on its first try right after `sim build` on both the Duo and the iPhone 17 simulators (no assertion message in the drive log); on the iPhone 17 the retry produced `…comsest.example.com` and "Invalid email or password", and only `xcrun simctl terminate` plus `sim launch` recovered. The first-try failure itself is not yet explained.
+status: open
+
+### DW-333: Story 8's column-form clause on AGENTS.md's "A new view is registered in five hand-maintained places" line sits inside the bmad:context managed block, so a context refresh may drop it.
+origin: spec-deferred 4aaacfef0310
+location: AGENTS.md:27
+source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-settings-is-the-sixth-button-in-the-column-dock-plan.md`
+severity: low
+reason: AGENTS.md lines 1-2 open the managed block ("edits inside this block are replaced on refresh") and it closes at line 90; the edited bullet is line 27. The Maintained-by-hand dock paragraph carries the same fact outside the block, so the rule survives there, but a refresh that rewrites line 27 from older wording would again say Settings is never a dock item. Fix by having the next refresh keep the column-form exception, or by dropping the clause from line 27 and relying on the hand-maintained paragraph; deferred because the fix edits agent-context files.
+status: open
