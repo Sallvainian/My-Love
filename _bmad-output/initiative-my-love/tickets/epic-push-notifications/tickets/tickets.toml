@@ -12,13 +12,24 @@ hitl = false
 risk = "high"
 
 [[entry]]
+id = 14
+type = "story"
+title = "The simulator driver reads Notification Center on the unfolded Duo in portrait"
+description = "Story 12's sim center reads Notification Center's groups reliably only while they all fit on one screen: scrolling to older groups did not work, and the owner checked the 8-group case (threads A–H) by hand; on the iPhone Duo simulator unfolded and in portrait, all 8 fit on one screen (both owner, 2026-10-31). So a check of up to 8 groups needs no person: on the Duo, sim center first records the pose and orientation ax state reports, unfolds with ax pose open, rotates with ax rotate until ax state reads portrait, reads, and then puts the pose and orientation back, also when the read fails. Folding can change the orientation (story 2.8 found pose closed left the Duo in landscapeRight), so after folding it rotates until ax state matches what it recorded. Story 2.7 found AXe coordinate taps reach the shell only in outer portrait, never the inner display, and story 2.9 proved XCUITest taps on the inner display only inside the web view, so this story shows that XCUITest's drag from the top and its taps reach SpringBoard on the inner display; if they do not, the story stops and is re-sliced. sim help states the group count center was proven at. Builds on story 12's center step, comes before story 1 because both may change scripts/sim-driver/sim, and changes only scripts/sim-driver/ and the driver's clause in AGENTS.md."
+verify = "With no person acting, on the iPhone Duo simulator with the host app authorized and one push delivered on each of threads A–H, each payload's title naming its thread, sim center --host started from folded portrait, from folded landscapeLeft, from folded landscapeRight and from unfolded landscape each prints eight groups, A to H each exactly once with one notification, and ax state afterwards reads the pose and orientation it read before; a center run interrupted with SIGINT after it has unfolded also restores them; unfolded in portrait, sim banner FILE --host --tap cold and --tap background each bring the host app to runningForeground, showing an XCUITest tap reaches SpringBoard on the inner display."
+covers = []
+after = [12]
+hitl = false
+risk = "high"
+
+[[entry]]
 id = 1
 type = "story"
 title = "A love note pushes to the partner's iPhone"
 description = "The thinnest path through every layer. The shell gains the push capability and, on the first signed-in launch of a shell with it, asks for notification permission once. It registers the device for the signed-in account in a new RLS-protected table, with the APNs environment its signing gives (sandbox for an Xcode development install, production otherwise), where a device registered again under another account moves to that account. iOS has one notification permission for pushes and local reminders, so epic-date-reminders reuses this prompt. A new sender Edge Function sends a love-note push through APNs with the sender's name and the note's text (a picture-only note says a picture was sent) to every device registered to the partner and none of the sender's. The sender runs from a database trigger on each newly inserted row, so a note queued offline pushes when it reaches the server and an insert ignored as a duplicate fires nothing; a failed or slow push never fails or delays the insert. Story 1 confirms the trigger works on the local stack; story 13 confirms it on the hosted project (the epic's Unknown). Web code calls the plugin only after Capacitor.isPluginAvailable. The Push capability is set in the Xcode project's code (the aps-environment entitlement). No APNs key exists until story 13: with no key set, the sender records the request it would have sent (device, environment, payload) where the driver can read it, so the simulator check delivers the payload that came through the trigger with xcrun simctl push; stories 2 and 4–9 reuse that record, and real APNs delivery is story 13's. Story 1 adds the sender's deno tests to test.yml beside upload-love-note-image's, so CI runs them, and the sender's [functions.<name>] section in supabase/config.toml, which has none today, so it runs on the local stack. The simulator checks run through story 2.9's driver and story 12's notification steps, against the local stack with story 2.9's fixture pair, with no person; stories 2 and 4–9 add any further fixture accounts they need (another pair, two unlinked accounts) the same way. Hands on: the device table, the sender and its payload builder (extended by stories 2, 4, 5, 6, 7 and 8, and deployed by story 3), the recorded request, the web-side push module (extended by stories 2, 7, 8 and 9), and the permission prompt (reused by epic-date-reminders)."
 verify = "The sender's deno unit tests and an api-project spec for registration and the trigger pass, showing a love note's insert reaches the sender on the local stack, a retried send yields one push, a picture-only note's payload says a picture was sent, no push targets the sender's own devices, a failed or slow send neither fails nor delays the insert, and each registration records its APNs environment, which picks the APNs host the sender would call. Through story 2.9's driver, on the iPhone Duo simulator signed in as one fixture account against the local stack, the permission alert shows once across two launches, the device registers, and the payload the sender built for a note from the partner, delivered with xcrun simctl push, shows a banner with the sender's name and the text; a shell built before this epic (story 2.9's earlier-commit build) and updated to the new bundle by live update runs with no error."
 covers = ["R1", "R7", "R9", "R11"]
-after = [12]
+after = [14]
 hitl = false
 risk = "high"
 
@@ -126,10 +137,10 @@ risk = "medium"
 id = 10
 type = "story"
 title = "Refactor sweep"
-description = "Cleanup only, scoped at its start from the plans and review findings stories 12, 1, 2, 3, 13 and 4–9 deferred; scope pushed out of a story is a new story, not this one. Story 11 ships the result and checks it on the owner's iPhone."
-verify = "Lint, typecheck, the unit suite, the sender's deno tests and an xcodebuild of the App scheme for an iOS simulator pass, and every finding stories 12, 1, 2, 3, 13 and 4–9 deferred is fixed or recorded in the deferred-work ledger."
+description = "Cleanup only, scoped at its start from the plans and review findings stories 12, 14, 1, 2, 3, 13 and 4–9 deferred; scope pushed out of a story is a new story, not this one. Story 11 ships the result and checks it on the owner's iPhone."
+verify = "Lint, typecheck, the unit suite, the sender's deno tests and an xcodebuild of the App scheme for an iOS simulator pass, and every finding stories 12, 14, 1, 2, 3, 13 and 4–9 deferred is fixed or recorded in the deferred-work ledger."
 covers = []
-after = [12, 1, 2, 3, 13, 4, 5, 6, 7, 8, 9]
+after = [12, 14, 1, 2, 3, 13, 4, 5, 6, 7, 8, 9]
 hitl = false
 risk = "low"
 
