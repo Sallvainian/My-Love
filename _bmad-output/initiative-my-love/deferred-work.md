@@ -2944,7 +2944,8 @@ location: supabase/functions/send-push/handler.ts
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium
 reason: handler.ts claims (note, token) before sending; pg_net fires once per insert and nothing retries. Settles with a real APNs run (story 13) and a decision on a pending state or a retrier.
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-340 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
 
 ### DW-343: Picture-only detection assumes the stand-in text is blank; the composer sends an empty string and love_notes_content_check needs at least one character, so the real stand-in is unverified.
 origin: spec-deferred 431bc8339dd8
@@ -2952,4 +2953,5 @@ location: supabase/functions/send-push/payload.ts (hasCaption)
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium
 reason: MessageInput.tsx sends '' for a picture-only note; the table check requires char_length(content) >= 1; no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as text. Settle by sending a picture-only note from the app against the local stack and reading the row. (declared severity: medium (unverified))
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-341 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
