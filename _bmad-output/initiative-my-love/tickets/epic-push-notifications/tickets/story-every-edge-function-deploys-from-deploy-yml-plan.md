@@ -3,7 +3,7 @@ title: 'Every Edge Function deploys from deploy.yml'
 type: 'chore'
 ticket: '3'
 created: '2026-10-31'
-status: 'built'
+status: done
 baseline_revision: 'fd2df715c4c4b87340f247aef5b2ff26ff77fd09'
 route: 'oneshot'
 route_source: 'auto'
@@ -70,3 +70,5 @@ Quick pass 1, 2026-10-31. One medium patched, two low patched, one medium deferr
 
 **Hand checks (person):**
 - The dispatch runs the whole workflow. It also builds and deploys the site from the branch and publishes a live update, so every shell downloads a bundle. Dispatch only while the branch is `main` plus this change alone (rebase first if `main` has moved), or the run rolls the site and the shells back. Run `gh workflow run deploy.yml --ref ci/deploy-edge-functions`, then read `GET /v1/projects/{ref}/functions` again. Expected: `upload-love-note-image` above version 6 with `verify_jwt: true`, `send-push` present with `verify_jwt: false`, and the run's functions job finishing before build starts.
+
+**Production run (2026-10-31):** run by merging PR #429 rather than a dispatch, so the site built from `main`. Before the merge, the hosted function list showed `upload-love-note-image` at version 6 with `verify_jwt: true` and no `send-push`. Deploy run `41253556648` on merge commit `8427fb8a` succeeded with jobs in order: Apply Migrations, Deploy Edge Functions, build, deploy, health-check. Afterwards the list showed `upload-love-note-image` at version 7 with `verify_jwt: true`, and `send-push` at version 1 with `verify_jwt: false`.
