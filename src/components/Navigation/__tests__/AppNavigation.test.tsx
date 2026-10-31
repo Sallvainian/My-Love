@@ -287,10 +287,10 @@ describe('AppNavigation', () => {
         }
         const active = screen.getByTestId(`nav-${current}`);
         expect(active).toHaveAttribute('aria-current', 'page');
-        expect(active).toHaveClass('bg-tint', 'text-accent', 'h-11', 'w-11');
+        expect(active).toHaveClass('bg-tint', 'text-accent', 'h-9', 'w-9');
         for (const view of ALL_DESTINATIONS.filter((v) => v !== current)) {
           expect(screen.getByTestId(`nav-${view}`)).not.toHaveClass('bg-tint');
-          expect(screen.getByTestId(`nav-${view}`)).toHaveClass('h-11', 'w-11', 'text-muted');
+          expect(screen.getByTestId(`nav-${view}`)).toHaveClass('h-9', 'w-9', 'text-muted');
           expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
         }
       }
