@@ -26,7 +26,9 @@ TOOL=${0:A:h}
 REPO=$(git -C "$TOOL" rev-parse --show-toplevel)
 WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver/${REPO:t}-$(print -rn -- $REPO | shasum | cut -c1-8)}
 BUNDLE=dev.sallvain.mylove
-EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com)
+# The first pair (seeded), then the second (no rows): signin's targets in order.
+EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com
+  simdriver-other@test.example.com simdriver-other-partner@test.example.com)
 # A shell that must stay on its own web code checks an address nothing
 # answers: a failed check leaves it on the build it has (story 7's Setup).
 DEAD_UPDATE_URL=http://127.0.0.1:9/updates/latest.json
@@ -53,8 +55,13 @@ Shell:
   uninstall              Remove the shell and its data.
 
 Accounts (local stack only):
-  provision              Create or reset the fixture pair and link them.
-  signin [partner]       Sign in through the login form (default: the first).
+  provision              Create or reset both fixture pairs and link each:
+                         Casey and Jessie, seeded so every view scrolls;
+                         Harper and Morgan, love notes wiped, nothing seeded.
+  signin [partner|other|other-partner]
+                         Sign in through the login form (default: Casey;
+                         partner: Jessie; other: Harper; other-partner: Morgan).
+  signout                Sign out through Settings and wait for the login form.
 
 Device:
   pose closed|partial|open   Fold or unfold (ax pose).
@@ -435,10 +442,15 @@ cmd_provision() {
 
 cmd_signin() {
   local which=${1:-}
-  [[ -z $which || $which == partner ]] || die 2 "signin takes nothing or 'partner'"
   require_stack
-  local email=${EMAILS[1]}
-  [[ $which == partner ]] && email=${EMAILS[2]}
+  local email
+  case $which in
+    '') email=${EMAILS[1]} ;;
+    partner) email=${EMAILS[2]} ;;
+    other) email=${EMAILS[3]} ;;
+    other-partner) email=${EMAILS[4]} ;;
+    *) die 2 "signin takes nothing, 'partner', 'other' or 'other-partner'" ;;
+  esac
   local password
   password=$(node --input-type=module -e '
     const m = await import(process.argv[1]); console.log(m.TEST_USER_PASSWORD);
@@ -773,6 +785,7 @@ case $cmd in
   build) cmd_build "$@" ;;
   serve-update) cmd_serve_update "$@" ;;
   signin) cmd_signin "$@" ;;
+  signout) (( $# == 0 )) || die 2 "signout takes nothing"; drive signout ;;
   pose)
     [[ ${1:-} == (closed|partial|open) ]] || die 2 "pose takes closed, partial or open"
     require_booted; ax pose $1 --device $UDID ;;

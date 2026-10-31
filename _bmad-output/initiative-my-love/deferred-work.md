@@ -3021,3 +3021,27 @@ source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver
 severity: low
 reason: banner's trap is `trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM` (sim:600), unchanged since the baseline c9bf63ec. center's traps set 130 for INT and 143 for TERM. A caller telling the two signals apart by exit code gets 130 from banner for both.
 status: open
+
+### DW-352: Sign-out leaves the outgoing account's delivered notifications in Notification Center, so the next person on a shared device can read them.
+origin: spec-deferred story-3.2 plan
+location: src/services/pushNotifications.ts (stopDevicePushes)
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+reason: Sign-out now removes the device's registration, unregisters from APNs and clears the badge, but the ticket does not ask for delivered notifications to go, and stopDevicePushes deliberately avoids the push plugin's removeAllDeliveredNotifications(), which rejects unless register() ran this launch. Each banner already delivered keeps its sender's name and note text in Notification Center after sign-out. Settle it in a later story with a native removal (UNUserNotificationCenter removeAllDeliveredNotifications) gated on its own plugin check, and a decision on whether a sign-out should empty the app's whole Notification Center group.
+status: open
+
+### DW-353: A reinstalled shell leaves its old token's push_devices row on the account, and only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
+origin: review story-3.2
+location: src/services/pushNotifications.ts (removePushRegistration); supabase/functions/send-push/handler.ts (410 branch)
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+reason: Sign-out removes only the row for the token this install stored. An uninstall and reinstall gets a new APNs token, so the old row stays registered to the account. With a real APNs key the next send to it answers 410 and the sender deletes it; on the local stack there is no key, so the stale row stays, and every `sim build` (which uninstalls first) leaves one. Story 3.2's simulator check deleted one such row by hand before it ran. Settle it with a decision: either the driver clears the fixture accounts' push_devices rows when it provisions or reinstalls, or registration drops the account's other rows for this device (which needs a device identity APNs does not give).
+status: open
+
+### DW-354: A reinstalled shell leaves its old token's push_devices row on the account; only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
+origin: spec-deferred 24a607eba37a
+location: src/services/pushNotifications.ts (removePushRegistration); supabase/functions/send-push/handler.ts (410 branch)
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+reason: Sign-out removes only the stored token's row; a reinstall gets a new APNs token. The story's simulator check found one such stale row from story 1's install and deleted it by hand. Ledger DW-353.
+status: open

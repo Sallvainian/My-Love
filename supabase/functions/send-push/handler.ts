@@ -27,10 +27,19 @@
  * sends nothing. With no APNs key the claimed row is the output (delivery
  * `recorded`): the request that would have been sent, for `sim push` to
  * deliver. A failed APNs send releases its claim so a later call can retry.
- * Deleting registrations APNs reports as gone is story 3.2.
+ *
+ * ## Gone registrations
+ *
+ * APNs answers 410 for a token that is no longer valid (the app was removed,
+ * or the device unregistered on sign-out and got a new token). The claim is
+ * released and the registration deleted, counted `gone`, but only if it was
+ * not registered again after APNs's `timestamp` (or, with none, after this
+ * send started): a token re-registered meanwhile is live again. Any other
+ * refusal deletes nothing; a 400 `BadDeviceToken` is an environment mismatch,
+ * not a dead device.
  */
 
-import { type ApnsClient } from './apns.ts';
+import type { ApnsClient, ApnsResult } from './apns.ts';
 import { buildLoveNotePayload, type ApnsPayload } from './payload.ts';
 
 export interface NoteRow {
@@ -63,12 +72,19 @@ export interface PushDb {
   /** Inserts the row unless (note, token) exists; true when this call inserted it. */
   claimRequest(row: PushRequestRow): Promise<boolean>;
   releaseRequest(noteId: string, token: string): Promise<void>;
+  /**
+   * Deletes the registration of a token APNs reports gone, unless it was
+   * registered again after `goneAt` (ms since the epoch).
+   */
+  deleteGoneDevice(token: string, goneAt: number): Promise<void>;
 }
 
 export interface SendPushDeps {
   db: PushDb;
   /** Null when no APNs key is configured: requests are recorded, not sent. */
   apns: ApnsClient | null;
+  /** Milliseconds since the epoch; defaults to `Date.now`. */
+  now?: () => number;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -128,6 +144,8 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
     let recorded = 0;
     let skipped = 0;
     let failed = 0;
+    let gone = 0;
+    const now = deps.now ?? Date.now;
 
     await Promise.all(
       devices.map(async (device) => {
@@ -149,16 +167,26 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
             recorded++;
             return;
           }
+          const startedAt = now();
+          let result: ApnsResult | null = null;
           try {
-            const result = await deps.apns.send(device.token, device.environment, payload);
-            if (result.ok) {
-              sent++;
-              return;
-            }
-            console.error('[send-push] APNs refused a push:', result.status, result.reason);
+            result = await deps.apns.send(device.token, device.environment, payload);
           } catch (error) {
             console.error('[send-push] APNs send failed:', error instanceof Error ? error.message : error);
           }
+          if (result?.ok) {
+            sent++;
+            return;
+          }
+          if (result?.status === 410) {
+            // Delete first, so a failed release cannot keep a dead registration.
+            // A failure from here on is counted failed by the catch below.
+            await deps.db.deleteGoneDevice(device.token, result.timestamp ?? startedAt);
+            await deps.db.releaseRequest(note.id, device.token);
+            gone++;
+            return;
+          }
+          if (result) console.error('[send-push] APNs refused a push:', result.status, result.reason);
           failed++;
           counted = true;
           await deps.db.releaseRequest(note.id, device.token);
@@ -169,7 +197,7 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
       })
     );
 
-    return json(200, { sent, recorded, skipped, failed });
+    return json(200, { sent, recorded, skipped, failed, gone });
   } catch (error) {
     console.error('[send-push] failed:', error instanceof Error ? error.message : error);
     return json(500, { error: 'Internal error' });

@@ -669,6 +669,10 @@ export type Database = {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
+      unregister_push_device: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

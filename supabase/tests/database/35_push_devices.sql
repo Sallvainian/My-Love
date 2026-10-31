@@ -1,10 +1,12 @@
 -- ============================================
 -- pgTAP: push_devices, push_requests, push_sender_settings, register_push_device
--- and the love-note push trigger (20261031000000)
+-- and the love-note push trigger (20261031000000); unregister_push_device
+-- (20261031010000)
 --
 -- Pinned here: the exact policy sets (a policy added, renamed or dropped fails
 -- this file), who can touch each table, the register RPC (reassignment by
--- token, bad environment, no session), and the trigger -- it queues exactly one
+-- token, bad environment, no session), the unregister RPC (own row only, no
+-- session, anon), and the trigger -- it queues exactly one
 -- pg_net call per new note with the note id and the shared secret, does nothing
 -- without settings, fires nothing for an insert ignored as a duplicate, and
 -- cannot fail the insert.
@@ -18,7 +20,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(33);
+select plan(41);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -192,6 +194,63 @@ select throws_ok(
   'PUSH-DB-025: a NULL auth.uid() is refused'
 );
 reset role;
+
+-- ============================================
+-- unregister_push_device (20261031010000)
+-- ============================================
+-- Here the second account owns token-one and the first owns token-two.
+select ok(
+  not has_function_privilege('anon', 'public.unregister_push_device(text)', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.unregister_push_device(text)', 'EXECUTE'),
+  'PUSH-DB-034: unregister_push_device is for authenticated only'
+);
+
+select tests.authenticate_as((select a_id from t_ids));
+select lives_ok(
+  $$select public.unregister_push_device('token-one')$$,
+  'PUSH-DB-035: unregistering another account''s token does not raise'
+);
+reset role;
+select is(
+  (select user_id from public.push_devices where token = 'token-one'),
+  (select b_id from t_ids),
+  'PUSH-DB-036: and the other account''s row is untouched'
+);
+
+select tests.authenticate_as((select a_id from t_ids));
+select lives_ok(
+  $$select public.unregister_push_device('token-two')$$,
+  'PUSH-DB-037: a signed-in user unregisters their own device'
+);
+reset role;
+select is(
+  (select count(*)::int from public.push_devices where token = 'token-two'),
+  0,
+  'PUSH-DB-038: their row is gone'
+);
+
+select tests.authenticate_as((select b_id from t_ids));
+select tests.clear_jwt();
+select throws_ok(
+  $$select public.unregister_push_device('token-one')$$,
+  'Authentication required',
+  'PUSH-DB-039: a NULL auth.uid() is refused'
+);
+reset role;
+
+select set_config('role', 'anon', true);
+select throws_ok(
+  $$select public.unregister_push_device('token-one')$$,
+  '42501',
+  null,
+  'PUSH-DB-040: anon cannot call it'
+);
+reset role;
+select is(
+  (select count(*)::int from public.push_devices where token = 'token-one'),
+  1,
+  'PUSH-DB-041: the refused calls removed nothing'
+);
 
 -- ============================================
 -- The trigger

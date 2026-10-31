@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { isOnline } from '../api/errorHandlers';
 import { supabase } from '../api/supabaseClient';
 
 /**
@@ -16,8 +17,15 @@ import { supabase } from '../api/supabaseClient';
  * available, and a shell installed before this plugin existed still receives
  * this bundle by live update and must show nothing new.
  *
- * Not here yet: unregistering on sign-out, the Settings switches, the badge,
- * tap handling and foreground suppression (later stories of the epic).
+ * Sign-out stops the device's pushes in two steps (story 3.2):
+ * `removePushRegistration` deletes this device's row while the session still
+ * exists (online only), then `stopDevicePushes` unregisters from APNs and
+ * clears the badge on every transition to signed out. Each native plugin is
+ * checked on its own: a shell from story 3.1 has `PushNotifications` but no
+ * `AppBadge`.
+ *
+ * Not here yet: the Settings switches, badge counts, tap handling and
+ * foreground suppression (later stories of the epic).
  */
 
 type ApnsEnvironment = 'sandbox' | 'production';
@@ -28,6 +36,48 @@ interface PushEnvironmentPlugin {
 }
 
 const PushEnvironment = registerPlugin<PushEnvironmentPlugin>('PushEnvironment');
+
+/** `ios/App/App/AppBadge.swift`: the app icon's badge. */
+interface AppBadgePlugin {
+  clear(): Promise<void>;
+}
+
+const AppBadge = registerPlugin<AppBadgePlugin>('AppBadge');
+
+/**
+ * localStorage key holding the APNs token this device last registered with.
+ * Device state, not account state: sign-out reads it to remove this device's
+ * row and then drops it; an account switch keeps it, because the incoming
+ * account's registration moves the same token's row.
+ */
+export const PUSH_TOKEN_STORAGE_KEY = 'my-love-push-token';
+
+/** Sign-out waits at most this long for the server to drop the registration. */
+const UNREGISTER_TIMEOUT_MS = 3_000;
+
+function rememberToken(token: string): void {
+  try {
+    localStorage.setItem(PUSH_TOKEN_STORAGE_KEY, token);
+  } catch (error) {
+    console.error('[Push] Could not remember the device token:', error);
+  }
+}
+
+function storedToken(): string | null {
+  try {
+    return localStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function forgetToken(): void {
+  try {
+    localStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+  } catch (error) {
+    console.error('[Push] Could not forget the device token:', error);
+  }
+}
 
 /** What `startPushRegistration` did, for tests and logs. */
 export type PushRegistrationOutcome = 'unavailable' | 'denied' | 'registering';
@@ -58,6 +108,7 @@ async function recordDevice(token: string): Promise<void> {
 function listenOnce(): Promise<void> {
   listening ??= (async () => {
     await PushNotifications.addListener('registration', (token) => {
+      rememberToken(token.value);
       void recordDevice(token.value).catch((error: unknown) =>
         console.error('[Push] Could not record the device:', error)
       );
@@ -100,4 +151,73 @@ export async function startPushRegistration(): Promise<PushRegistrationOutcome> 
     console.error('[Push] Registration did not start:', error);
     return 'unavailable';
   }
+}
+
+/**
+ * Deletes this device's registration under the signed-in account, so its
+ * pushes stop reaching the device. Call before `supabase.auth.signOut()`: the
+ * RPC needs the session.
+ *
+ * Online only: offline it sends nothing, and the row stays until APNs reports
+ * the token gone (the sender deletes it on a 410) or another account
+ * registers the same token. Waits at most ~3 s and never throws: sign-out
+ * must not fail or hang on a push.
+ */
+export async function removePushRegistration(): Promise<void> {
+  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('PushNotifications')) return;
+  if (!isOnline()) return;
+  const token = storedToken();
+  if (!token) return;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timedOut = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), UNREGISTER_TIMEOUT_MS);
+    });
+    const outcome = await Promise.race([
+      Promise.resolve(supabase.rpc('unregister_push_device', { p_token: token })),
+      timedOut,
+    ]);
+    if (outcome === 'timeout') {
+      console.error('[Push] Removing the device registration timed out; signing out anyway');
+    } else if (outcome.error) {
+      console.error('[Push] Could not remove the device registration:', outcome.error.message);
+    }
+  } catch (error) {
+    console.error('[Push] Could not remove the device registration:', error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Stops this device's pushes natively: unregisters from APNs, clears the app
+ * icon's badge and forgets the stored token. Called on every transition to
+ * signed out (sign-out online or offline, and a boot that finds the session
+ * gone), never on sign-in or an account switch, so it cannot race
+ * `startPushRegistration`.
+ *
+ * Delivered notifications stay in Notification Center. Never throws; logs
+ * only failures.
+ */
+export async function stopDevicePushes(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+
+  if (Capacitor.isPluginAvailable('PushNotifications')) {
+    try {
+      await PushNotifications.unregister();
+    } catch (error) {
+      console.error('[Push] Could not unregister from APNs:', error);
+    }
+  }
+  // Not removeAllDeliveredNotifications(): it rejects unless register() ran
+  // this launch, and it would also empty Notification Center.
+  if (Capacitor.isPluginAvailable('AppBadge')) {
+    try {
+      await AppBadge.clear();
+    } catch (error) {
+      console.error('[Push] Could not clear the badge:', error);
+    }
+  }
+  forgetToken();
 }

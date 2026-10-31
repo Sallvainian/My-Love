@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import type { AuthError } from '@supabase/supabase-js';
+import { removePushRegistration } from '../../services/pushNotifications';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import { logger } from '../../utils/logger';
 import { supabase } from '../supabaseClient';
@@ -72,6 +73,12 @@ export const signUp = async (credentials: AuthCredentials): Promise<AuthResult> 
 
 export const signOut = async (): Promise<void> => {
   try {
+    // While the session still exists: the RPC that drops this device's push
+    // registration needs it. Online only, at most ~3 s, never throws. The
+    // native half (APNs unregister, badge) runs from clearAuth once the
+    // SIGNED_OUT event below arrives, offline too.
+    await removePushRegistration();
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {

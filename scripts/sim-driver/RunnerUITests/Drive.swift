@@ -10,6 +10,8 @@ import XCTest
 //   dump                    print the web view's elements as one JSON line,
 //                           frames in the same page points `tap` takes
 //   signin EMAIL PASSWORD   fill the login form and submit it
+//   signout                 tap Settings, then Sign out, and wait for the
+//                           login form
 // Every step brings the shell to the front first. Backgrounding is not a
 // step: XCUIDevice's Home press leaves the shell in front on the Duo
 // simulator, so `sim background` presses Device Hub's Home through ax.
@@ -51,6 +53,8 @@ final class Drive: XCTestCase {
             say(try dump(webView()))
         case ("signin", 3):
             try signIn(email: words[1], password: words[2])
+        case ("signout", 1):
+            signOut()
         default:
             XCTFail("unknown ACTION: \(words.joined(separator: " "))")
         }
@@ -96,6 +100,29 @@ final class Drive: XCTestCase {
             sleep(1)
         }
         if !home.waitForExistence(timeout: 10) { XCTFail("signed in, but the Home button never showed") }
+    }
+
+    // Settings is the header's gear in the bottom dock and the capsule's sixth
+    // button in the column form; both are labelled "Settings".
+    func signOut() {
+        let settings = app.webViews.buttons["Settings"].firstMatch
+        guard settings.waitForExistence(timeout: 15) else {
+            return XCTFail("no Settings button: signed out already, or the page did not load")
+        }
+        settings.tap()
+        let signOut = app.webViews.buttons["Sign out"].firstMatch
+        // The button sits at the end of Settings; swipe until it shows.
+        for _ in 0..<8 where !signOut.isHittable {
+            if !signOut.exists { _ = signOut.waitForExistence(timeout: 2) }
+            if signOut.isHittable { break }
+            app.webViews.firstMatch.swipeUp()
+        }
+        guard signOut.isHittable else { return XCTFail("no Sign out button in Settings") }
+        signOut.tap()
+        if !app.webViews.textFields.firstMatch.waitForExistence(timeout: 20) {
+            return XCTFail("tapped Sign out, but the login form never showed")
+        }
+        say("signed out")
     }
 
     // An empty web field may report its placeholder as its value.

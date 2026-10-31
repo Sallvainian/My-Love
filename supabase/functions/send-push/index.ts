@@ -58,6 +58,16 @@ const db: PushDb = {
     const { error } = await admin.from('push_requests').delete().eq('note_id', noteId).eq('token', token);
     if (error) throw new Error(error.message);
   },
+  async deleteGoneDevice(token, goneAt) {
+    // register_push_device bumps updated_at, so a row registered again after
+    // APNs found the token gone is kept.
+    const { error } = await admin
+      .from('push_devices')
+      .delete()
+      .eq('token', token)
+      .lte('updated_at', new Date(goneAt).toISOString());
+    if (error) throw new Error(error.message);
+  },
 };
 
 const apnsConfig = apnsConfigFromEnv((name) => Deno.env.get(name));

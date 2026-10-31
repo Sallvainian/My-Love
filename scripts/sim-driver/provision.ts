@@ -1,14 +1,17 @@
-// Provisions the sim driver's fixture pair on the local Supabase stack:
+// Provisions the sim driver's fixture pairs on the local Supabase stack:
 // two confirmed accounts with fictional names, linked as partners, and enough
 // rows that every view scrolls (events, moods, love notes, photos with their
-// images). No E2E worker slot (tests/support/auth/worker-pool.ts) uses them,
-// so a driver run never writes another worker's rows.
+// images); and a second linked pair, wiped of love notes and seeded with
+// nothing, for checks that sign the shell out and in as another couple (story
+// 3.2's push takeover). No E2E worker slot (tests/support/auth/worker-pool.ts)
+// uses them, so a driver run never writes another worker's rows.
 //
 //   node scripts/sim-driver/provision.ts   (run by `sim provision`)
 //
 // Idempotent, as ensureUser/linkUserPair in tests/support/auth/global-setup.ts
-// are: an existing account gets its password and name reset, and the pair's
-// rows and photo objects are wiped and seeded afresh. Needs
+// are: an existing account gets its password and name reset, the first pair's
+// rows and photo objects are wiped and seeded afresh, and the second pair's
+// love notes are wiped. Needs
 // SIM_SUPABASE_URL and SIM_SUPABASE_SECRET_KEY (`sim` reads both from
 // `supabase status`) and refuses any host but 127.0.0.1 or localhost.
 
@@ -20,6 +23,12 @@ import { TEST_USER_PASSWORD } from '../../tests/support/test-credentials.ts';
 const FIXTURE_PAIR = [
   { email: 'simdriver@test.example.com', displayName: 'Casey' },
   { email: 'simdriver-partner@test.example.com', displayName: 'Jessie' },
+] as const;
+
+/** `sim signin other` / `other-partner`: a second couple, with no seeded rows. */
+const OTHER_PAIR = [
+  { email: 'simdriver-other@test.example.com', displayName: 'Harper' },
+  { email: 'simdriver-other-partner@test.example.com', displayName: 'Morgan' },
 ] as const;
 
 function localConfig(): { url: string; key: string } {
@@ -246,13 +255,15 @@ async function seedPair(admin: SupabaseClient, [first, second]: readonly [string
   return { events: events.length, moods: moods.length, notes: notes.length, photos: photos.length };
 }
 
-async function main() {
-  const { url, key } = localConfig();
-  const admin = createClient(url, key, { auth: { persistSession: false } });
-  for (const { email, displayName } of FIXTURE_PAIR) {
+/** Creates or resets both accounts of a pair and links them; returns their ids. */
+async function ensureLinkedPair(
+  admin: SupabaseClient,
+  pair: readonly { email: string; displayName: string }[]
+): Promise<[string, string]> {
+  for (const { email, displayName } of pair) {
     console.log(`${email} (${displayName}): ${await ensureUser(admin, email, displayName)}`);
   }
-  const [first, second] = await Promise.all(FIXTURE_PAIR.map((u) => profileId(admin, u.email)));
+  const [first, second] = await Promise.all(pair.map((u) => profileId(admin, u.email)));
   for (const [id, partner] of [
     [first, second],
     [second, first],
@@ -260,6 +271,13 @@ async function main() {
     const { error } = await admin.from('users').update({ partner_id: partner }).eq('id', id);
     if (error) throw new Error(`linking ${id} to ${partner}: ${error.message}`);
   }
+  return [first, second];
+}
+
+async function main() {
+  const { url, key } = localConfig();
+  const admin = createClient(url, key, { auth: { persistSession: false } });
+  const [first, second] = await ensureLinkedPair(admin, FIXTURE_PAIR);
   console.log('linked as partners');
 
   await wipePair(admin, [first, second]);
@@ -267,6 +285,11 @@ async function main() {
   console.log(
     `seeded ${seeded.events} events, ${seeded.moods} moods, ${seeded.notes} love notes, ${seeded.photos} photos`
   );
+
+  const other = await ensureLinkedPair(admin, OTHER_PAIR);
+  check('wiping the second pair\'s sent notes', (await admin.from('love_notes').delete().in('from_user_id', other)).error);
+  check('wiping the second pair\'s received notes', (await admin.from('love_notes').delete().in('to_user_id', other)).error);
+  console.log('second pair linked as partners, love notes wiped');
 }
 
 main().catch((error: unknown) => {

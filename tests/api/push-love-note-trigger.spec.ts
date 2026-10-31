@@ -8,7 +8,8 @@
  * APNs key and records the request it would have sent (delivery `recorded`);
  * these cases read those rows. `supabase/functions/send-push/*.test.ts` proves
  * the payload and host rules; this file proves the trigger reaches the sender
- * and the sender reaches the right devices.
+ * and the sender reaches the right devices. Story 3.2 adds the sign-out
+ * RPC, unregister_push_device, over the same real JWTs.
  *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI) and `supabase/seed.sql` applied, which holds
@@ -231,6 +232,34 @@ test.describe('Love note push trigger', () => {
 
     const refused = await partner.rpc('register_push_device', { p_token: newToken(), p_environment: 'staging' });
     expect(refused.error?.code).toBe('23514');
+  });
+
+  test('[P0] unregister_push_device removes the caller\'s row and leaves another account\'s', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const partner = await clientFor(supabaseAdmin, partnerId);
+    const [own, partners] = [newToken(), newToken()];
+    cleanup.defer('remove push devices', async () => {
+      await supabaseAdmin.from('push_devices').delete().in('token', [own, partners]);
+    });
+
+    expect((await supabaseAsUser.rpc('register_push_device', { p_token: own, p_environment: 'sandbox' })).error).toBeNull();
+    expect((await partner.rpc('register_push_device', { p_token: partners, p_environment: 'sandbox' })).error).toBeNull();
+
+    // Sign-out sends this device's token; one held by another account is untouched.
+    expect((await supabaseAsUser.rpc('unregister_push_device', { p_token: partners })).error).toBeNull();
+    expect((await supabaseAsUser.rpc('unregister_push_device', { p_token: own })).error).toBeNull();
+
+    const { data, error } = await supabaseAdmin
+      .from('push_devices')
+      .select('token, user_id')
+      .in('token', [own, partners]);
+    expect(error).toBeNull();
+    expect(data).toEqual([{ token: partners, user_id: partnerId }]);
+    expect(userId).not.toBe(partnerId);
   });
 
   test('[P0] a sender that is down leaves the insert fast and committed', async ({

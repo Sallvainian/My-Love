@@ -105,6 +105,12 @@ export interface ApnsResult {
   status: number;
   /** APNs' `reason` on a refusal, e.g. `BadDeviceToken`. */
   reason: string | null;
+  /**
+   * On a 410, when APNs last confirmed the token was no longer valid, in ms
+   * since the epoch (the body's `timestamp`); null on any other answer or
+   * when the body carries none.
+   */
+  timestamp: number | null;
 }
 
 export interface ApnsClient {
@@ -144,16 +150,19 @@ export function createApnsClient(
       });
       if (response.ok) {
         await response.body?.cancel();
-        return { ok: true, status: response.status, reason: null };
+        return { ok: true, status: response.status, reason: null, timestamp: null };
       }
       let reason: string | null = null;
+      let timestamp: number | null = null;
       try {
-        const parsed = (await response.json()) as { reason?: unknown };
+        const parsed = (await response.json()) as { reason?: unknown; timestamp?: unknown };
         reason = typeof parsed.reason === 'string' ? parsed.reason : null;
+        timestamp =
+          typeof parsed.timestamp === 'number' && Number.isFinite(parsed.timestamp) ? parsed.timestamp : null;
       } catch {
         // An empty or non-JSON refusal carries no reason.
       }
-      return { ok: false, status: response.status, reason };
+      return { ok: false, status: response.status, reason, timestamp };
     },
   };
 }

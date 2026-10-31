@@ -27,6 +27,7 @@ function fakeDb(options: {
   secret?: string | null;
   claimed?: PushRequestRow[];
   released?: string[];
+  deletedGone?: [string, number][];
   failOn?: 'getNote';
 }): PushDb {
   const claimed = options.claimed ?? [];
@@ -48,6 +49,10 @@ function fakeDb(options: {
       options.released?.push(token);
       const index = claimed.findIndex((c) => c.token === token);
       if (index >= 0) claimed.splice(index, 1);
+      return Promise.resolve();
+    },
+    deleteGoneDevice: (token, goneAt) => {
+      options.deletedGone?.push([token, goneAt]);
       return Promise.resolve();
     },
   };
@@ -73,7 +78,7 @@ Deno.test('unconfigured: every device gets a recorded request and nothing is sen
     apns: null,
   });
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0 });
+  assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 });
   assertEquals(claimed.map((c) => [c.token, c.environment, c.delivery]), [
     ['tok-a', 'sandbox', 'recorded'],
     ['tok-b', 'production', 'recorded'],
@@ -101,7 +106,7 @@ Deno.test('a repeated call for the same note records nothing new', async () => {
   const deps = { db: fakeDb({ devices: TWO_DEVICES, claimed }), apns: null };
   await handleSendPush(request({ note_id: NOTE_ID }), deps);
   const second = await handleSendPush(request({ note_id: NOTE_ID }), deps);
-  assertEquals(await second.json(), { sent: 0, recorded: 0, skipped: 2, failed: 0 });
+  assertEquals(await second.json(), { sent: 0, recorded: 0, skipped: 2, failed: 0, gone: 0 });
   assertEquals(claimed.length, 2);
 });
 
@@ -110,7 +115,7 @@ Deno.test('configured: each device is sent to with its own environment', async (
   const apns: ApnsClient = {
     send: (token, environment) => {
       sends.push([token, environment]);
-      return Promise.resolve({ ok: true, status: 200, reason: null });
+      return Promise.resolve({ ok: true, status: 200, reason: null, timestamp: null });
     },
   };
   const claimed: PushRequestRow[] = [];
@@ -118,7 +123,7 @@ Deno.test('configured: each device is sent to with its own environment', async (
     db: fakeDb({ devices: TWO_DEVICES, claimed }),
     apns,
   });
-  assertEquals(await response.json(), { sent: 2, recorded: 0, skipped: 0, failed: 0 });
+  assertEquals(await response.json(), { sent: 2, recorded: 0, skipped: 0, failed: 0, gone: 0 });
   assertEquals(sends, [
     ['tok-a', 'sandbox'],
     ['tok-b', 'production'],
@@ -129,14 +134,14 @@ Deno.test('configured: each device is sent to with its own environment', async (
 Deno.test('a refused send releases its claim so a retry can send it', async () => {
   const released: string[] = [];
   const apns: ApnsClient = {
-    send: () => Promise.resolve({ ok: false, status: 400, reason: 'BadDeviceToken' }),
+    send: () => Promise.resolve({ ok: false, status: 400, reason: 'BadDeviceToken', timestamp: null }),
   };
   const claimed: PushRequestRow[] = [];
   const response = await handleSendPush(request({ note_id: NOTE_ID }), {
     db: fakeDb({ devices: [TWO_DEVICES[0]], claimed, released }),
     apns,
   });
-  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 1 });
+  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 1, gone: 0 });
   assertEquals(released, ['tok-a']);
   assertEquals(claimed.length, 0);
 });
@@ -146,7 +151,7 @@ Deno.test('a recipient with no devices sends nothing', async () => {
     db: fakeDb({ devices: [] }),
     apns: null,
   });
-  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0 });
+  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
 });
 
 Deno.test('a missing, wrong or unset secret is refused before anything is read', async () => {
@@ -202,7 +207,7 @@ Deno.test('one device\'s APNs rejection fails only that device', async () => {
     send: (token) =>
       token === 'tok-a'
         ? Promise.reject(new Error('network'))
-        : Promise.resolve({ ok: true, status: 200, reason: null }),
+        : Promise.resolve({ ok: true, status: 200, reason: null, timestamp: null }),
   };
   const claimed: PushRequestRow[] = [];
   const response = await handleSendPush(request({ note_id: NOTE_ID }), {
@@ -210,7 +215,7 @@ Deno.test('one device\'s APNs rejection fails only that device', async () => {
     apns,
   });
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 1 });
+  assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 1, gone: 0 });
   assertEquals(released, ['tok-a']);
   assertEquals(claimed.map((c) => c.token), ['tok-b']);
 });
@@ -220,15 +225,15 @@ Deno.test('a failing release does not turn the answer into a 500', async () => {
     send: (token) =>
       Promise.resolve(
         token === 'tok-a'
-          ? { ok: false, status: 400, reason: 'BadDeviceToken' }
-          : { ok: true, status: 200, reason: null }
+          ? { ok: false, status: 400, reason: 'BadDeviceToken', timestamp: null }
+          : { ok: true, status: 200, reason: null, timestamp: null }
       ),
   };
   const db = fakeDb({ devices: TWO_DEVICES });
   db.releaseRequest = () => Promise.reject(new Error('db down'));
   const response = await handleSendPush(request({ note_id: NOTE_ID }), { db, apns });
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 1 });
+  assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 1, gone: 0 });
 });
 
 Deno.test('a failing claim fails that device and keeps the others', async () => {
@@ -238,7 +243,7 @@ Deno.test('a failing claim fails that device and keeps the others', async () => 
     row.token === 'tok-a' ? Promise.reject(new Error('db down')) : claim(row);
   const response = await handleSendPush(request({ note_id: NOTE_ID }), { db, apns: null });
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 1 });
+  assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 1, gone: 0 });
 });
 
 Deno.test('a declared body over the limit is refused with 413', async () => {
@@ -248,4 +253,101 @@ Deno.test('a declared body over the limit is refused with 413', async () => {
   );
   assertEquals(response.status, 413);
   await response.body?.cancel();
+});
+
+Deno.test('a 410 deletes that registration, sends the others and counts it gone', async () => {
+  const released: string[] = [];
+  const deletedGone: [string, number][] = [];
+  const apns: ApnsClient = {
+    send: (token) =>
+      Promise.resolve(
+        token === 'tok-a'
+          ? { ok: false, status: 410, reason: 'Unregistered', timestamp: 1700000000000 }
+          : { ok: true, status: 200, reason: null, timestamp: null }
+      ),
+  };
+  const claimed: PushRequestRow[] = [];
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, claimed, released, deletedGone }),
+    apns,
+    now: () => 1800000000000,
+  });
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 0, gone: 1 });
+  // Deleted only if not registered again after APNs's timestamp.
+  assertEquals(deletedGone, [['tok-a', 1700000000000]]);
+  assertEquals(released, ['tok-a']);
+  assertEquals(claimed.map((c) => c.token), ['tok-b']);
+});
+
+Deno.test('a 410 with no timestamp keeps a registration made after the send started', async () => {
+  const deletedGone: [string, number][] = [];
+  const apns: ApnsClient = {
+    send: () => Promise.resolve({ ok: false, status: 410, reason: 'Unregistered', timestamp: null }),
+  };
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: [TWO_DEVICES[0]], deletedGone }),
+    apns,
+    now: () => 1800000000000,
+  });
+  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 1 });
+  assertEquals(deletedGone, [['tok-a', 1800000000000]]);
+});
+
+Deno.test('a 400 BadDeviceToken deletes no registration', async () => {
+  const deletedGone: [string, number][] = [];
+  const released: string[] = [];
+  const apns: ApnsClient = {
+    send: () => Promise.resolve({ ok: false, status: 400, reason: 'BadDeviceToken', timestamp: null }),
+  };
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, deletedGone, released }),
+    apns,
+  });
+  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 2, gone: 0 });
+  assertEquals(deletedGone, []);
+  assertEquals(released.sort(), ['tok-a', 'tok-b']);
+});
+
+Deno.test('a failed delete of a gone registration is counted failed', async () => {
+  const errors: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void errors.push(args);
+  try {
+    const apns: ApnsClient = {
+      send: (token) =>
+        Promise.resolve(
+          token === 'tok-a'
+            ? { ok: false, status: 410, reason: 'Unregistered', timestamp: 1700000000000 }
+            : { ok: true, status: 200, reason: null, timestamp: null }
+        ),
+    };
+    const db = fakeDb({ devices: TWO_DEVICES });
+    db.deleteGoneDevice = () => Promise.reject(new Error('db down'));
+    const response = await handleSendPush(request({ note_id: NOTE_ID }), { db, apns });
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 1, gone: 0 });
+    assertEquals(errors.length, 1);
+  } finally {
+    console.error = original;
+  }
+});
+
+Deno.test('a failing release on a 410 still deletes the registration (counted failed)', async () => {
+  const original = console.error;
+  console.error = () => {};
+  try {
+    const deletedGone: [string, number][] = [];
+    const apns: ApnsClient = {
+      send: () => Promise.resolve({ ok: false, status: 410, reason: 'Unregistered', timestamp: 1700000000000 }),
+    };
+    const db = fakeDb({ devices: [TWO_DEVICES[0]], deletedGone });
+    db.releaseRequest = () => Promise.reject(new Error('db down'));
+    const response = await handleSendPush(request({ note_id: NOTE_ID }), { db, apns });
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 1, gone: 0 });
+    assertEquals(deletedGone, [['tok-a', 1700000000000]]);
+  } finally {
+    console.error = original;
+  }
 });

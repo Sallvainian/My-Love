@@ -68,7 +68,12 @@ Deno.test('a send goes to the registration\'s host with the topic and the token'
     }
   );
   const payload = { aps: { alert: { title: 'A', body: 'B' } } };
-  assertEquals(await client.send('tok1', 'sandbox', payload), { ok: true, status: 200, reason: null });
+  assertEquals(await client.send('tok1', 'sandbox', payload), {
+    ok: true,
+    status: 200,
+    reason: null,
+    timestamp: null,
+  });
   await client.send('tok2', 'production', payload);
 
   assertEquals(calls[0].url, 'https://api.sandbox.push.apple.com/3/device/tok1');
@@ -91,7 +96,38 @@ Deno.test('a refusal reports its reason', async () => {
       nowSeconds: () => 1,
     }
   );
-  assertEquals(await client.send('tok', 'sandbox', {}), { ok: false, status: 400, reason: 'BadDeviceToken' });
+  assertEquals(await client.send('tok', 'sandbox', {}), {
+    ok: false,
+    status: 400,
+    reason: 'BadDeviceToken',
+    timestamp: null,
+  });
+});
+
+Deno.test('a 410 reports when APNs found the token gone', async () => {
+  const { pem } = await makeKey();
+  const bodies = [
+    JSON.stringify({ reason: 'Unregistered', timestamp: 1793475809123 }),
+    JSON.stringify({ reason: 'Unregistered', timestamp: 'yesterday' }),
+    '',
+  ];
+  let call = 0;
+  const client = createApnsClient(
+    { keyPem: pem, keyId: 'K', teamId: 'T', topic: 't' },
+    {
+      fetch: () => Promise.resolve(new Response(bodies[call++] || null, { status: 410 })),
+      nowSeconds: () => 1,
+    }
+  );
+  assertEquals(await client.send('tok', 'sandbox', {}), {
+    ok: false,
+    status: 410,
+    reason: 'Unregistered',
+    timestamp: 1793475809123,
+  });
+  // A timestamp that is not a number, or no body at all, gives none.
+  assertEquals((await client.send('tok', 'sandbox', {})).timestamp, null);
+  assertEquals(await client.send('tok', 'sandbox', {}), { ok: false, status: 410, reason: null, timestamp: null });
 });
 
 Deno.test('a partly set configuration says so and stays unconfigured', () => {
