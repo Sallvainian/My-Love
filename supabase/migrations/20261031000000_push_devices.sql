@@ -40,9 +40,10 @@
 --
 -- == Hosted catalog ==
 -- pg_net was dropped from the hosted project in 20251206024345_remote_schema.sql.
--- `create extension if not exists` covers both states; the hosted state is
--- read read-only in story 3.13 before anything is applied there. Every other
--- object here is new.
+-- `create extension if not exists` covers both states. deploy.yml applies
+-- this migration to the hosted project on merge to main; with no
+-- push_sender_settings row there the trigger returns before calling pg_net.
+-- Every other object here is new.
 --
 -- pgTAP: supabase/tests/database/35_push_devices.sql and
 -- 18_function_execute_grants.sql pin the policies and grants.
