@@ -6,7 +6,9 @@
 # (RunnerUITests/Drive.swift). `sim help` lists the commands.
 #
 # Every build happens in a staged copy outside the repo, in $SIM_DRIVER_WORK
-# (default ~/Library/Caches/my-love-sim-driver): `cap sync` copies dist/ into
+# (default ~/Library/Caches/my-love-sim-driver/<checkout>-<hash>, one per
+# checkout, so two stories in two worktrees, each on its own simulator clone,
+# never share a stage, runner, log or serve.pid): `cap sync` copies dist/ into
 # the app and `npx wrangler deploy` ships whatever dist/ holds, so a test build
 # never touches the repo's dist/ or ios/App/App/public/; and
 # ios/App/CapApp-SPM resolves ../../../node_modules, which a loop worktree
@@ -19,7 +21,7 @@ setopt errexit nounset pipefail
 
 TOOL=${0:A:h}
 REPO=$(git -C "$TOOL" rev-parse --show-toplevel)
-WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver}
+WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver/${REPO:t}-$(print -rn -- $REPO | shasum | cut -c1-8)}
 BUNDLE=dev.sallvain.mylove
 EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com)
 # A shell that must stay on its own web code checks an address nothing
@@ -67,7 +69,8 @@ Page (points from the web view's top-left):
 
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
 SIM_SUPABASE_URL overrides the local stack's URL (default: .env.test's).
-Work dir: $SIM_DRIVER_WORK, default ~/Library/Caches/my-love-sim-driver.
+Work dir: $SIM_DRIVER_WORK, default ~/Library/Caches/my-love-sim-driver/
+<checkout name>-<hash of its path>, one per checkout.
 EOF
 }
 
@@ -178,7 +181,11 @@ drive() {
     -only-testing:RunnerUITests/Drive/testDrive >$log 2>&1 || code=$?
   sed -n 's/^DRIVE //p' $log
   if (( code != 0 )); then
-    grep -E 'error:|XCTAssert|failed' $log | grep -v '^Test Suite' | head -n 5 >&2 || true
+    # A failure with no assertion (the runner never started, say) shows the
+    # log's tail instead, so it is never silent.
+    local -a why
+    why=(${(f)"$(grep -E 'error:|XCTAssert' $log || true)"})
+    if (( $#why )); then print -rl -- ${why[1,5]} >&2; else tail -n 15 $log >&2; fi
     die 1 "drive step '$1' failed (full log: $log)"
   fi
 }
@@ -351,8 +358,10 @@ cmd_serve_update() {
 
 # ---- accounts ----------------------------------------------------------------
 
+# supabase status reads the project from the current directory, so it runs in
+# the repo whatever directory sim was called from.
 stack_secret() {
-  supabase status -o env 2>/dev/null | sed -n 's/^SECRET_KEY="\(.*\)"$/\1/p'
+  (cd $REPO && supabase status -o env 2>/dev/null) | sed -n 's/^SECRET_KEY="\(.*\)"$/\1/p'
 }
 
 cmd_provision() {

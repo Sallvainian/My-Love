@@ -2838,7 +2838,8 @@ origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar 
 location: scripts/sim-driver/sim (WORK, sync_stage, ensure_runner, drive, SERVE_PID); AGENTS.md, Maintained by hand (the sim driver line)
 severity: medium
 reason: AGENTS.md says to run one Duo story at a time "or each on its own xcrun simctl clone", but every sim invocation defaults to the one $SIM_DRIVER_WORK: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, every drive step writes and then parses $WORK/logs/drive.log, and serve.pid is a single file. Two stories driving two clones at once would wipe each other's stage and runner and read each other's drive output. Fix by keying the work dir's per-run parts on the device UDID, or by having the AGENTS.md line and the sim header require a separate SIM_DRIVER_WORK per clone; deferred because the review workflow routes agent-context edits to the ledger.
-status: open
+status: done 2026-10-31
+resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): scripts/sim-driver/sim's default work dir is now ~/Library/Caches/my-love-sim-driver/<checkout name>-<8 hex of the checkout's path hash>, so two stories in two worktrees, each on its own simulator clone, never share a stage, runner, derived data, log or serve.pid, and a worktree no longer runs a runner another worktree built; SIM_DRIVER_WORK still overrides it. AGENTS.md's sim-driver line says so, and that each concurrent story needs its own clone and serve-update port. Checked on the iPhone Duo simulator: build, the runner build and every drive step ran in the worktree's own folder.
 
 ### DW-330: The sim driver's default work dir is shared by every run, so two stories driving two simulator clones at once (which AGENTS.md now allows) would clobber each other's stage, runner, drive log and
 origin: spec-deferred 9ebb86d180dd
@@ -2846,7 +2847,8 @@ location: scripts/sim-driver/sim (WORK, sync_stage, ensure_runner, drive, SERVE_
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-simulator-driver-is-a-repo-tool-plan.md`
 severity: medium
 reason: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, drive writes and parses $WORK/logs/drive.log, and serve.pid is one file; none is keyed on the device. The fix edits AGENTS.md (or keys the work dir on the UDID), so it is deferred; recorded as DW-329 in the deferred-work ledger.
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-329 (the same review finding, carried in from story 9's plan frontmatter); fixed by the same change: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): scripts/sim-driver/sim's default work dir is now ~/Library/Caches/my-love-sim-driver/<checkout name>-<8 hex of the checkout's path hash>, so two stories in two worktrees, each on its own simulator clone, never share a stage, runner, derived data, log or serve.pid, and a worktree no longer runs a runner another worktree built; SIM_DRIVER_WORK still overrides it. AGENTS.md's sim-driver line says so, and that each concurrent story needs its own clone and serve-update port. Checked on the iPhone Duo simulator: build, the runner build and every drive step ran in the worktree's own folder.
 
 ### DW-331: A browser that reports one small side inset (likely Android Chrome in landscape with a one-sided display cutout, under viewport-fit=cover) would get the column form, with 44 px buttons spilling out of
 origin: spec-deferred a700fe97b803
@@ -2862,7 +2864,8 @@ location: scripts/sim-driver/RunnerUITests/Drive.swift:59
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-settings-is-the-sixth-button-in-the-column-dock-plan.md`
 severity: medium
 reason: scripts/sim-driver/RunnerUITests/Drive.swift signIn taps the first web text field and calls typeText(email) with no clear first. In story 8's run `sim signin` exited 1 on its first try right after `sim build` on both the Duo and the iPhone 17 simulators (no assertion message in the drive log); on the iPhone 17 the retry produced `…comsest.example.com` and "Invalid email or password", and only `xcrun simctl terminate` plus `sim launch` recovered. The first-try failure itself is not yet explained.
-status: open
+status: done 2026-10-31
+resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): Drive.swift's signIn relaunches the shell (terminate, activate) when either login field holds text other than its placeholder, so a retry types into an empty form; clearing by keystrokes was tried and failed, because the leftover email overflows the field and no tap puts the cursor at its end. sim's drive prints the log's last 15 lines when a failed step has no error: or XCTAssert line, so a first-try failure like story 8's is no longer silent; it did not recur on the iPhone Duo simulator, where each of four sign-in attempts made straight after `sim build` reached and filled the form. Checked there: a wrong-password sign-in, then sim signin, exited 0 after relaunching, while the same sequence with the previous Drive.swift ended in "Invalid email or password".
 
 ### DW-333: Story 8's column-form clause on AGENTS.md's "A new view is registered in five hand-maintained places" line sits inside the bmad:context managed block, so a context refresh may drop it.
 origin: spec-deferred 4aaacfef0310
@@ -2870,4 +2873,34 @@ location: AGENTS.md:27
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-settings-is-the-sixth-button-in-the-column-dock-plan.md`
 severity: low
 reason: AGENTS.md lines 1-2 open the managed block ("edits inside this block are replaced on refresh") and it closes at line 90; the edited bullet is line 27. The Maintained-by-hand dock paragraph carries the same fact outside the block, so the rule survives there, but a refresh that rewrites line 27 from older wording would again say Settings is never a dock item. Fix by having the next refresh keep the column-form exception, or by dropping the clause from line 27 and relying on the hand-maintained paragraph; deferred because the fix edits agent-context files.
+status: done 2026-10-31
+resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): AGENTS.md's view-registration line no longer states where Settings sits; it points to the dock paragraph under Maintained by hand, outside the managed block, which carries both forms. A refresh that rewrites the line has no Settings fact to get wrong.
+
+### DW-334: The sim driver cannot switch Device Hub's window, so `ax` reaches a non-Duo simulator only after someone selects it there.
+origin: raised 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), from story 9's and story 2's residual risks
+location: scripts/sim-driver/sim (cmd_rotate, the pose and state commands, every `ax` call)
+severity: low
+reason: `ax` drives the device whose window Device Hub shows, and sim takes --device but never selects that device in Device Hub, so on an iPhone 17 beside the Duo, `sim rotate` and `sim state` act on whichever phone the window shows. Story 2 switched the window with System Events selecting the sidebar row for its iPhone 17 rotations and switched it back to the Duo afterwards, by hand; story 8 used the iPhone 17 in portrait only and recorded no switch. Fix by having sim select --device's row in Device Hub before an `ax` call (and saying so in its help), or by refusing when `ax state`'s device is not --device.
+status: open
+
+### DW-335: Story 9's frozen intent contract names the sim driver's two fixture email addresses inside `_bmad-output/`.
+origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (rejected there, because the fix edits that build's own plan); recorded 2026-10-31 by story 4 (the refactor sweep)
+location: _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-simulator-driver-is-a-repo-tool-plan.md (Boundaries & Constraints, Always, the fixture pair)
+severity: low
+reason: AGENTS.md Policy says never to write an email address into `_bmad-output/`. The two addresses are fictional (`test.example.com`, local stack only) and also appear in scripts/sim-driver/sim, provision.ts and AGENTS.md itself, and other epics' plans and findings files in `_bmad-output/` already hold fictional test addresses, so whether the rule covers fictional fixture addresses is the owner's call. The line sits inside the plan's `<intent-contract>`, which only a person may change; if the rule covers them, replace the addresses there with "the sim driver's two fixture accounts", or reword the Policy line to exempt fictional `test.example.com` fixtures.
+status: open
+
+### DW-336: The sim driver's old shared folders at the cache root are orphaned since the work dir became per checkout.
+origin: raised 2026-10-31 by the quick review of epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), which moved the default work dir (DW-329)
+location: ~/Library/Caches/my-love-sim-driver (stage/, runner/, derived/, logs/, serve/, serve.pid at its root)
+severity: low
+reason: Before story 4 every checkout used ~/Library/Caches/my-love-sim-driver itself; it now uses a <checkout>-<hash> folder inside it, so the root-level stage/, runner/, derived/, logs/ and serve/ (about 1.6 GB on 2026-10-31, mostly the stage's node_modules and derived data) are read by no code path. Story 4 ran unattended and left them, since deleting is the owner's call. Fix: once no update server started by the old driver runs (`pgrep -fl ThreadingHTTPServer` prints nothing), delete those five folders and serve.pid from the cache root, keeping every <checkout>-<hash> folder and any folder another session made there.
+status: open
+
+### DW-337: AGENTS.md's sim-driver line says concurrent Duo stories may each run in their own worktree on their own simulator clone, but the driver's `ax` commands may reach only the device Device Hub's window
+origin: spec-deferred f5609f6c2d08
+location: AGENTS.md, Maintained by hand (the sim-driver line); scripts/sim-driver/sim (cmd_rotate and the ax calls)
+source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-refactor-sweep-plan.md`
+severity: medium
+reason: Story 9's residual risks say a non-Duo phone is reachable by ax only while Device Hub's window shows it, and sim never selects --device's window (DW-334); pose, rotate, state, background and screenshot all go through ax. The "each on its own xcrun simctl clone" wording predates this change (story 9); story 4 split the work dir per checkout, which removes the shared-files clash only. Unverified: whether Device Hub can show two device windows at once and ax then drives each by --device. Settle it by booting a clone beside the Duo, opening both in Device Hub, and running `sim --device <clone> rotate` while the Duo's window is in front; if the clone does not rotate, AGENTS.md's line must say one Duo story at a time until DW-334 is fixed. The fix edits AGENTS.md, so it is deferred. (declared severity: medium (unverified))
 status: open

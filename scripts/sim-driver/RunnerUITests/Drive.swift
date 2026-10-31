@@ -61,9 +61,21 @@ final class Drive: XCTestCase {
         guard field.waitForExistence(timeout: 20) else {
             return XCTFail("login form not shown: already signed in, or the page did not load")
         }
+        let secret = app.webViews.secureTextFields.firstMatch
+        // A failed attempt leaves its text in the fields, and typing inserts
+        // wherever the cursor lands (long text overflows, so no tap reaches
+        // its end); a relaunch shows the form empty. It also swaps in a live
+        // update the shell has queued, as backgrounding would.
+        if holdsText(field) || holdsText(secret) {
+            app.terminate()
+            app.activate()
+            guard field.waitForExistence(timeout: 20) else {
+                return XCTFail("login form not shown after relaunching the shell")
+            }
+            say("relaunched the shell to empty the login form (a queued live update swaps in now)")
+        }
         field.tap()
         field.typeText(email)
-        let secret = app.webViews.secureTextFields.firstMatch
         secret.tap()
         // Return submits the form, so the keyboard cannot hide the button.
         secret.typeText(password + "\n")
@@ -84,6 +96,12 @@ final class Drive: XCTestCase {
             sleep(1)
         }
         if !home.waitForExistence(timeout: 10) { XCTFail("signed in, but the Home button never showed") }
+    }
+
+    // An empty web field may report its placeholder as its value.
+    func holdsText(_ field: XCUIElement) -> Bool {
+        let value = field.value as? String ?? ""
+        return !value.isEmpty && value != field.placeholderValue
     }
 
     // The web view's descendants from one snapshot; frames are relative to the
