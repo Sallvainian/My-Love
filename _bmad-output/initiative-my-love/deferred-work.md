@@ -2978,7 +2978,8 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium
 reason: First cold run in unfolded portrait: banner label read, before tap: notRunning, then "Failed to tap NotificationShortLookView ... No matches found"; the next three cold runs passed. banner is unchanged by this story, so the timing is pre-existing. Recorded as DW-344. Settle with ten cold runs unfolded and folded.
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-344 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
 
 ### DW-347: center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups never listed, undercounting silently.
 origin: spec-deferred 2e36cea7cace
@@ -2986,7 +2987,8 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium
 reason: At 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (DW-338) this is untested. Recorded as DW-345. Settle with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the pushes. (declared severity: medium (unverified))
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-345 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
 
 ### DW-348: center's restore on a Rotate-Left-only phone and tap(_:)'s coordinate fallback on the inner display have never been run.
 origin: spec-deferred c0f2e3e5b8e2
