@@ -2955,3 +2955,67 @@ severity: medium
 reason: MessageInput.tsx sends '' for a picture-only note; the table check requires char_length(content) >= 1; no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as text. Settle by sending a picture-only note from the app against the local stack and reading the row. (declared severity: medium (unverified))
 status: done 2026-10-31
 resolution: duplicate of DW-341 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
+
+### DW-344: sim banner --tap cold on the unfolded Duo can miss once: the banner is gone before the tap reaches it
+origin: spec-deferred story-3.14 review
+location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: In unfolded portrait, the first `sim banner FILE --host --tap cold` read the banner's label, printed `before tap: notRunning`, then failed with "Failed to tap NotificationShortLookView … No matches found": the banner had gone before the tap. The next three cold runs and the background run passed. `banner` was not changed by story 3.14, so this is pre-existing timing between the read, the state check and the tap, and a later story's unattended check could fail once on it. Settle it by running `--tap cold` ten times unfolded and folded; if misses recur, tap the element found at read time immediately, or re-wait for the banner before tapping.
+status: open
+
+### DW-345: sim center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups that are not listed, undercounting silently
+origin: spec-deferred story-3.14 review
+location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium (unverified)
+reason: Story 3.14 found that on the first opening after a delivery Notification Center keeps a summary cell (body `phraseThatEnumeratesAllRemainingNotificationsInSection`, "+6 from Runner") beside the 8 expanded groups, and `center` printed it as a 9th group; `screenGroups` now ignores such cells unless they are stacked "Grouped" cells. With 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (the DW-338 multi-screen case) a summary might stand for notifications never listed, and dropping it would undercount with no warning. Settle it with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the notifications pushed.
+status: open
+
+### DW-346: sim banner --tap cold on the unfolded Duo can miss once because the banner is gone before the tap reaches it.
+origin: spec-deferred 4e4a0337de4b
+location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: First cold run in unfolded portrait: banner label read, before tap: notRunning, then "Failed to tap NotificationShortLookView ... No matches found"; the next three cold runs passed. banner is unchanged by this story, so the timing is pre-existing. Recorded as DW-344. Settle with ten cold runs unfolded and folded.
+status: open
+
+### DW-347: center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups never listed, undercounting silently.
+origin: spec-deferred 2e36cea7cace
+location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: At 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (DW-338) this is untested. Recorded as DW-345. Settle with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the pushes. (declared severity: medium (unverified))
+status: open
+
+### DW-348: center's restore on a Rotate-Left-only phone and tap(_:)'s coordinate fallback on the inner display have never been run.
+origin: spec-deferred c0f2e3e5b8e2
+location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: No run so far has used either path. The 8-group runs passed, but nobody observed whether any tap went through displayInUse()'s coordinate fallback. The restore's rotate_to path through cmd_rotate on a phone with only Rotate Left (iPhone 17) was not run. If either is wrong, a read past a shrunk cell misses, or a phone is left turned. Settle it with one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (log whether the fallback ran), and one center --host started in landscape on an iPhone 17 simulator, comparing ax state before and after. (declared severity: medium (unverified))
+status: open
+
+### DW-349: AGENTS.md's sim-driver clause says center puts the pose and orientation back, without sim help's exception for a folded landscape.
+origin: spec-deferred 5cff3711aeb0
+location: AGENTS.md (Maintained by hand, sim-driver paragraph)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: low
+reason: sim help says a folded landscape comes back only when the shell, the host app, Settings or Safari was in front. With another app in front, center exits 1 after a good read and says why. The AGENTS.md clause states the restore with no exception, so an agent that reads only AGENTS.md expects the folded landscape back. The fix edits an agent-context file, so it is deferred rather than patched.
+status: open
+
+### DW-350: center leaves the Home Screen in front after a folded-portrait or unfolded start; only a folded-landscape start brings its front app back.
+origin: spec-deferred 14bd1d434eba
+location: scripts/sim-driver/sim (cmd_center, center_restore)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: low
+reason: center presses Home before its read and again after it, as story 12's center already did at the baseline (sim:641 and sim:648 at c9bf63ec), so the shell or host app that was in front is not brought back. The new restore relaunches the front app only for a folded landscape, because only there is it needed for the orientation. Neither sim help nor AGENTS.md says the front app is not restored. A check that expects the shell in front after center finds the Home Screen.
+status: open
+
+### DW-351: sim banner exits 130 on TERM as well as INT, while center now exits 143 on TERM.
+origin: spec-deferred 05678d9d50dc
+location: scripts/sim-driver/sim:600 (cmd_banner)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: low
+reason: banner's trap is `trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM` (sim:600), unchanged since the baseline c9bf63ec. center's traps set 130 for INT and 143 for TERM. A caller telling the two signals apart by exit code gets 130 from banner for both.
+status: open

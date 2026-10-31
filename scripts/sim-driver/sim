@@ -88,17 +88,26 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
   center [--host]        The app's Notification Center groups as one JSON
                          line: each group's text (its newest notification's
                          title and body) and notification count.
-                         Needs the device folded and in portrait.
+                         Unfolds the Duo and turns it to portrait to read
+                         (proven with 8 groups), then puts the pose and
+                         orientation back; a folded landscape comes back
+                         only when the shell, the host, Settings or Safari
+                         was in front.
   badge [--host]         The app icon's badge ("3 new items"), or none.
 
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
 SIM_SUPABASE_URL overrides the local stack's URL (default: .env.test's).
+SIM_IDLE_NAMES="Class,method,method" replaces the private XCUITest names the
+center patches to skip idle waits (to check the warning).
 Work dir: $SIM_DRIVER_WORK, default ~/Library/Caches/my-love-sim-driver/
 <checkout name>-<hash of its path>, one per checkout.
 EOF
 }
 
-die() { local code=$1; shift; print -u2 -- "sim: $*"; exit $code; }
+# die's code is kept in SIM_EXIT too: an EXIT trap set in a function (center's
+# restore) sees $? as 0 after exit, so it reads the code from here.
+SIM_EXIT=0
+die() { local code=$1; shift; print -u2 -- "sim: $*"; SIM_EXIT=$code; exit $code; }
 # Progress goes to stderr, so stdout carries only results (dump's JSON).
 say() { print -u2 -- "sim: $*"; }
 
@@ -211,10 +220,10 @@ start_step() {
   # "watching" at once, and an earlier run's line must not match.
   : >$log
   if [[ ${BG:-} == 1 ]]; then
-    TEST_RUNNER_ACTION=$action $cmd >$log 2>&1 &
+    TEST_RUNNER_ACTION=$action TEST_RUNNER_IDLE_NAMES=${SIM_IDLE_NAMES:-} $cmd >$log 2>&1 &
     STEP_PID=$!
   else
-    TEST_RUNNER_ACTION=$action $cmd >$log 2>&1
+    TEST_RUNNER_ACTION=$action TEST_RUNNER_IDLE_NAMES=${SIM_IDLE_NAMES:-} $cmd >$log 2>&1
   fi
 }
 
@@ -619,23 +628,106 @@ cmd_banner() {
   finish_step Notify banner $code
 }
 
+# ax state's value for one key (pose, orientation).
+state_value() { ax state --device $UDID | sed -n "s/^$1: //p"; }
+
+# Turns the device a quarter turn at a time (right through ax rotate, or left
+# where Device Hub has only Rotate Left) until its orientation is WANT (at
+# most four turns); folding or unfolding can change the orientation too.
+# cmd_rotate can die, so it runs in a subshell and only the final check
+# decides.
+rotate_to() {
+  local want=$1 i
+  for i in 1 2 3 4; do
+    [[ $(state_value orientation) == $want ]] && return 0
+    ( cmd_rotate 1 ) >/dev/null 2>&1 || true
+    sleep 1
+  done
+  [[ $(state_value orientation) == $want ]]
+}
+
+# center's way back: the pose first, then the orientation recorded at the
+# start. Runs as the EXIT trap, so success, failure, SIGINT and TERM all
+# restore; a restore that fails is reported and turns exit 0 into 1.
+# test-center-exit.zsh checks these exit codes with ax stubbed; run it after
+# changing center. ax state names the open pose "unfolded", ax pose "open".
+pose_arg() { [[ $1 == unfolded ]] && print open || print $1; }
+CENTER_POSE= CENTER_ORIENT= CENTER_FRONT= CENTER_MOVED=0 CENTER_SIGNAL=0 CENTER_DONE=
+# CENTER_SIGNAL holds the exit code of the signal that ended center (INT
+# 130, TERM 143), else 0. CENTER_DONE holds the code the restore exited with:
+# the EXIT trap belongs to cmd_center and survives a restore run from a
+# signal trap, so it runs the restore again on that exit, which then only
+# exits.
+center_restore() {
+  local code=$?
+  [[ -n $CENTER_DONE ]] && exit $CENTER_DONE
+  (( SIM_EXIT )) && code=$SIM_EXIT
+  # A second Ctrl-C must not cut the restore short.
+  trap '' INT TERM
+  if (( CENTER_SIGNAL )); then
+    # A step still running would race the restore; end this checkout's.
+    code=$CENTER_SIGNAL
+    pkill -f "xcodebuild test-without-building.*$RUNNER/dd" 2>/dev/null || true
+    sleep 1
+  fi
+  (( CENTER_MOVED )) || { CENTER_DONE=$code; exit $code; }
+  local bad=0
+  if [[ -n $CENTER_POSE ]] && [[ $(state_value pose) != $CENTER_POSE ]]; then
+    ax pose $(pose_arg $CENTER_POSE) --device $UDID >/dev/null 2>&1 || bad=1
+    sleep 1
+  fi
+  # ax state reports the front app's orientation, and the folded Home
+  # Screen is portrait only, so a folded landscape comes back only with the
+  # app that was in front (center pressed Home) brought back first.
+  if [[ -n $CENTER_FRONT && $CENTER_FRONT != none ]] && [[ $(state_value orientation) != $CENTER_ORIENT ]]; then
+    xcrun simctl launch $UDID $CENTER_FRONT >/dev/null 2>&1 || bad=1
+    sleep 2
+  fi
+  rotate_to $CENTER_ORIENT 2>/dev/null || bad=1
+  (( bad )) && print -u2 -- "sim: center could not restore pose ${CENTER_POSE:-none} and orientation $CENTER_ORIENT; ax state says: ${(j:, :)${(@M)${(@f)$(ax state --device $UDID 2>&1)}:#(pose|orientation):*}}"
+  (( bad && code == 0 )) && code=1
+  CENTER_DONE=$code
+  exit $code
+}
+
 # Notification Center opens with a drag from the top of the Home Screen;
 # XCUIDevice's Home press leaves the shell in front on the Duo, so Device
 # Hub's Home goes before each drag, and again after, to close it. A drag can
-# miss while the Home Screen settles, so it is tried three times.
+# miss while the Home Screen settles, so it is tried three times. The Duo is
+# unfolded and turned to portrait first, where 8 groups were proven to fit
+# the inner display, and put back (pose, then orientation) afterwards.
 cmd_center() {
   target_args "$@"
   (( $#REST == 0 )) || die 2 "center takes only --host"
   require_booted
-  # Proven only folded (or on a phone with no pose) and upright: unfolded,
-  # or rotated, the drag misses and Notification Center never opens.
-  local st
-  st=$(ax state --device $UDID)
-  if print -r -- $st | grep -E '^pose: ' | grep -vx 'pose: closed' >/dev/null ||
-    ! print -r -- $st | grep -x 'orientation: portrait' >/dev/null; then
-    die 1 "center needs the device folded and in portrait (sim pose closed, sim rotate); ax state says: ${(j:, :)${(f)st}[2,3]}"
-  fi
   ensure_runner
+  CENTER_POSE=$(state_value pose) CENTER_ORIENT=$(state_value orientation)
+  [[ -n $CENTER_ORIENT ]] || die 5 "center: ax state has no orientation"
+  # Only a start in landscape that is not unfolded (folded, or a phone with
+  # no pose) needs the front app back (see center_restore); asking costs one
+  # runner step, so only then.
+  if [[ $CENTER_POSE != unfolded && $CENTER_ORIENT != portrait ]]; then
+    local front_out front_code=0
+    front_out=$(notify front 2>/dev/null) || front_code=$?
+    if (( front_code )); then
+      say "the front step failed (log: $WORK/logs/notify.log); the folded $CENTER_ORIENT may not come back"
+    else
+      CENTER_FRONT=$(print -r -- $front_out | sed -n 's/^front: //p')
+      [[ -n $CENTER_FRONT && $CENTER_FRONT != none ]] ||
+        say "no known app in front; the folded $CENTER_ORIENT may not come back"
+    fi
+  fi
+  trap center_restore EXIT
+  trap 'CENTER_SIGNAL=130; center_restore' INT
+  trap 'CENTER_SIGNAL=143; center_restore' TERM
+  CENTER_MOVED=1
+  if [[ -n $CENTER_POSE && $CENTER_POSE != unfolded ]]; then
+    say "unfolding (was $CENTER_POSE)"
+    ax pose open --device $UDID >/dev/null || die 5 "center: could not unfold"
+    sleep 1
+  fi
+  rotate_to portrait ||
+    die 5 "center: could not turn to portrait; ax state says: pose ${$(state_value pose):-none}, orientation $(state_value orientation)"
   local out code try log=$WORK/logs/notify.log
   for try in 1 2 3; do
     ax control Home --device $UDID >/dev/null
@@ -649,7 +741,11 @@ cmd_center() {
   if (( code )); then
     finish_step Notify center $code
   fi
-  print -r -- $out
+  # The runner's warnings go to stderr, its one JSON line to stdout.
+  local line
+  for line in ${(f)out}; do
+    if [[ $line == warning:* ]]; then say ${line#warning: }; else print -r -- $line; fi
+  done
 }
 
 cmd_badge() {

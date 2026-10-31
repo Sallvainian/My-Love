@@ -18,6 +18,8 @@ import XCTest
 //   center                  open Notification Center (sim presses Home
 //                           first), print the app's groups as one JSON line
 //   badge                   print the app icon's value, or none
+//   front                   print the bundle of the known app in front, or
+//                           none
 // Elements are matched by identifier or label across every type, since
 // SpringBoard's types change between releases. Lines meant for the caller
 // start with "NOTIFY " and are flushed at once: a banner lasts seconds.
@@ -58,6 +60,8 @@ final class Notify: XCTestCase {
             try center(icon)
         case ("badge", 0):
             badge(icon)
+        case ("front", 0):
+            front(bundle)
         default:
             XCTFail("unknown ACTION: \(fields.joined(separator: " "))")
         }
@@ -141,8 +145,9 @@ final class Notify: XCTestCase {
         skipIdleWaits()
         let stacked = any(springboard, "identifier == 'NotificationShortLookView' AND label BEGINSWITH[c] %@", icon + ", Grouped,")
         let list = any(springboard, "identifier == 'combined-list-view'").firstMatch
-        springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.005))
-            .press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)))
+        let screen = displayInUse()
+        screen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.005))
+            .press(forDuration: 0.1, thenDragTo: screen.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)))
         guard list.waitForExistence(timeout: 5) else { return XCTFail("Notification Center did not open") }
         sleep(1)
         let step = list.frame.height * 0.4
@@ -219,16 +224,25 @@ final class Notify: XCTestCase {
         return try cellFrames().filter { $0.contains(centre) }.count == 1
     }
 
+    // SpringBoard's own frame is the outer display's even when the inner
+    // one is on, and a coordinate off it misses; the largest window is the
+    // display in use, so screen coordinates are made relative to it.
+    func displayInUse() -> XCUIElement {
+        springboard.windows.allElementsBoundByIndex
+            .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height } ?? springboard
+    }
+
     // Cells near the list's bottom edge are drawn shrunk, and XCUITest calls
-    // them not hittable; those are tapped at their centre through
-    // SpringBoard's coordinates (a coordinate on the cell itself makes
-    // XCUITest wait out the "banner" as an interruption).
+    // them not hittable; those are tapped at their centre through the
+    // display's coordinates (a coordinate on the cell itself makes XCUITest
+    // wait out the "banner" as an interruption).
     func tap(_ cell: XCUIElement) {
         if cell.isHittable {
             cell.tap()
         } else {
-            let at = cell.frame, screen = springboard.frame.origin
-            springboard.coordinate(withNormalizedOffset: .zero)
+            let display = displayInUse()
+            let at = cell.frame, screen = display.frame.origin
+            display.coordinate(withNormalizedOffset: .zero)
                 .withOffset(CGVector(dx: at.midX - screen.x, dy: at.midY - screen.y)).tap()
         }
         sleep(1)
@@ -239,15 +253,29 @@ final class Notify: XCTestCase {
     // tap and drag (a run took 376 s, the next never finished). Its private
     // XCUIApplicationProcess asks shouldSkipPre/PostEventQuiescence first;
     // answering yes skips those waits, and center pauses after each action
-    // itself. A release without those methods only brings the waits back.
+    // itself. A release without those methods brings the waits back, and
+    // this warns that it did.
     func skipIdleWaits() {
-        guard let process = NSClassFromString("XCUIApplicationProcess") else { return }
+        // IDLE_NAMES ("Class,method,method") replaces the names, so a check
+        // can make them missing.
+        var names = ["XCUIApplicationProcess", "shouldSkipPreEventQuiescence", "shouldSkipPostEventQuiescence"]
+        if let o = ProcessInfo.processInfo.environment["IDLE_NAMES"], !o.isEmpty {
+            names = o.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        }
         let yes: @convention(block) (AnyObject) -> Bool = { _ in true }
-        for name in ["shouldSkipPreEventQuiescence", "shouldSkipPostEventQuiescence"] {
-            if let method = class_getInstanceMethod(process, NSSelectorFromString(name)) {
-                method_setImplementation(method, imp_implementationWithBlock(yes))
+        // Each method found is patched; a missing class, a missing method or
+        // fewer than three names warns.
+        var missing = names.count < 3 || NSClassFromString(names[0]) == nil
+        if let process = names.first.flatMap({ NSClassFromString($0) }) {
+            for name in names.dropFirst() {
+                if let method = class_getInstanceMethod(process, NSSelectorFromString(name)) {
+                    method_setImplementation(method, imp_implementationWithBlock(yes))
+                } else {
+                    missing = true
+                }
             }
         }
+        if missing { say("warning: idle waits cannot be skipped on this Xcode; runs will be slow") }
     }
 
     // Merges one screen's items, top to bottom, into those seen so far in
@@ -299,11 +327,19 @@ final class Notify: XCTestCase {
             for c in n.children { if let hit = find(c, match) { return hit } }
             return nil
         }
-        func isCell(_ n: XCUIElementSnapshot) -> Bool {
-            n.identifier == "ListCell" && n.label.uppercased().hasPrefix(icon.uppercased() + ",")
+        // On the first opening after a delivery the list can keep a summary
+        // cell ("+6 from Runner", labelled like the newest notification it
+        // sits on) beside the expanded groups; it stands for notifications
+        // read as their own cells, so it is not one.
+        func isSummary(_ n: XCUIElementSnapshot) -> Bool {
+            find(n) { $0.identifier.contains("phraseThatEnumeratesAllRemainingNotificationsInSection") } != nil
         }
         func isStacked(_ n: XCUIElementSnapshot) -> Bool {
             n.label.uppercased().hasPrefix(icon.uppercased() + ", GROUPED,")
+        }
+        func isCell(_ n: XCUIElementSnapshot) -> Bool {
+            n.identifier == "ListCell" && n.label.uppercased().hasPrefix(icon.uppercased() + ",")
+                && (isStacked(n) || !isSummary(n))
         }
         func text(_ cell: XCUIElementSnapshot) -> String {
             let title = find(cell) { $0.identifier == "NotificationTitle" }?.label ?? ""
@@ -333,6 +369,17 @@ final class Notify: XCTestCase {
         guard icons.firstMatch.waitForExistence(timeout: 10) else { return XCTFail("no \(icon) icon on SpringBoard") }
         let values = icons.allElementsBoundByIndex.map { $0.value.map { "\($0)" } ?? "" }
         say("badge: " + (values.first { !$0.isEmpty } ?? "none"))
+    }
+
+    // Which known app is in front: center's target, the shell, the host,
+    // Settings or Safari, else none (the Home Screen or an app not listed).
+    // A folded Duo reports the front app's orientation, and the folded Home
+    // Screen is portrait only, so center brings this app back to restore a
+    // folded landscape.
+    func front(_ target: String) {
+        let known = [target, "dev.sallvain.mylove", host, "com.apple.Preferences", "com.apple.mobilesafari"]
+        let hit = known.first { XCUIApplication(bundleIdentifier: $0).state == .runningForeground }
+        say("front: " + (hit ?? "none"))
     }
 
     // Polls while turning the run loop: XCUIApplication.state is updated from
