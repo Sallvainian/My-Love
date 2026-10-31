@@ -12,7 +12,6 @@
  * teardown resets only this pair's own `birthday` columns and `wedding_date`,
  * and deletes the pair's `couple_settings` row when the test created it.
  */
-import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
