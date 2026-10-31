@@ -41,7 +41,7 @@ deferred:
 - A working-tree shell's `VITE_LIVE_UPDATE_URL` is unreachable (`http://127.0.0.1:9/updates/latest.json`) unless an update server is the point, so it stays on its own web code (story 7 Setup).
 - The readout is story 7's Setup `<script>` verbatim, kept in the tool's folder and injected before `</head>` of a stage's built `index.html` only when asked (`--readout`).
 - Device: `--device <udid|name>`, else `$SIM_DEVICE`, else the only booted simulator; refuse when ambiguous.
-- Fixture pair: `simdriver@test.example.com` and `simdriver-partner@test.example.com`, fictional display names (`Casey`, `Jessie`), password `TEST_USER_PASSWORD` from `tests/support/test-credentials.ts`, linked to each other, local stack only (refuse any non-`127.0.0.1`/`localhost` URL). Provisioning is idempotent, like `ensureUser`/`linkUserPair` in `tests/support/auth/global-setup.ts`.
+- Fixture pair: two accounts reserved for the driver (addresses in `FIXTURE_PAIR` in `scripts/sim-driver/provision.ts`), fictional display names (`Casey`, `Jessie`), password `TEST_USER_PASSWORD` from `tests/support/test-credentials.ts`, linked to each other, local stack only (refuse any non-`127.0.0.1`/`localhost` URL). Provisioning is idempotent, like `ensureUser`/`linkUserPair` in `tests/support/auth/global-setup.ts`.
 - Taps are page points offset from `app.webViews.firstMatch`'s origin; `dump` reports element frames in that same space plus the web view frame, so a frame's centre can be fed back to `tap`.
 - Comment style matches the prototype and `scripts/package-live-update.sh`: a header saying what and why, short lines.
 
