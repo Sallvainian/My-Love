@@ -741,7 +741,10 @@ function App() {
         {/* App chrome: a sticky top bar in normal flow above <main>, so no view
             needs a compensating top pad, and a fixed bottom dock, which layout
             cannot see -- hence <main>'s `--dock-clearance` bottom pad, or on
-            Love Notes `--dock-top`, which ends the view at the dock itself. */}
+            Love Notes `--dock-top`, which ends the view at the dock itself.
+            Where the dock is a capsule in a side column, those shrink to the
+            home-indicator band and `--dock-left`/`--dock-right` end <main> at
+            the column's edge instead (index.css). */}
         <AppNavigation currentView={currentView} onViewChange={setView} />
 
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
@@ -754,7 +757,9 @@ function App() {
 
         <main
           id="main-content"
-          className={isScreenView ? 'flex min-h-0 flex-1 flex-col pb-(--dock-top)' : 'pb-(--dock-clearance)'}
+          className={`pr-(--dock-right) pl-(--dock-left) ${
+            isScreenView ? 'flex min-h-0 flex-1 flex-col pb-(--dock-top)' : 'pb-(--dock-clearance)'
+          }`}
         >
           {/* Home view - inline, not lazy-loaded, always works offline */}
           {currentView === 'home' && (

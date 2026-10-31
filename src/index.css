@@ -177,6 +177,26 @@
        60px height, with no gap. Love Notes ends its view here so the composer
        sits just above the dock (the composer's own bottom pad is the gap). */
     --dock-top: calc(1rem + 60px + env(safe-area-inset-bottom));
+    /* Side space the dock takes; zero for the bottom dock. <main> pads by it. */
+    --dock-left: 0px;
+    --dock-right: 0px;
+  }
+
+  /* The column form (AppNavigation sets data-dock on <html> when exactly one
+     side inset is non-zero): the dock is a capsule filling that side's column,
+     so content clears it sideways, ending at the column's edge, and keeps only
+     the home-indicator band at the bottom. A bottom clearance would leave a
+     band as tall as the capsule (about 250px) under the last item. */
+  :root[data-dock='column-right'] {
+    --dock-clearance: env(safe-area-inset-bottom);
+    --dock-top: env(safe-area-inset-bottom);
+    --dock-right: env(safe-area-inset-right);
+  }
+
+  :root[data-dock='column-left'] {
+    --dock-clearance: env(safe-area-inset-bottom);
+    --dock-top: env(safe-area-inset-bottom);
+    --dock-left: env(safe-area-inset-left);
   }
 
   /* Safe area support for mobile */

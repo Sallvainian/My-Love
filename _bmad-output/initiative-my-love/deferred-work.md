@@ -2847,3 +2847,11 @@ source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-simulator
 severity: medium
 reason: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, drive writes and parses $WORK/logs/drive.log, and serve.pid is one file; none is keyed on the device. The fix edits AGENTS.md (or keys the work dir on the UDID), so it is deferred; recorded as DW-329 in the deferred-work ledger.
 status: open
+
+### DW-331: A browser that reports one small side inset (likely Android Chrome in landscape with a one-sided display cutout, under viewport-fit=cover) would get the column form, with 44 px buttons spilling out of
+origin: spec-deferred a700fe97b803
+location: src/hooks/useSideColumn.ts (sideColumnFromInsets); src/components/Navigation/AppNavigation.tsx (column capsule width)
+source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-dock-becomes-a-capsule-in-the-side-column-without-coveri-plan.md`
+severity: medium
+reason: sideColumnFromInsets switches to the column form for any single non-zero side inset, and the capsule is exactly w-[env(safe-area-inset-left|right)] while each button is w-11 (44 px); index.html sets viewport-fit=cover. Unverified: no Android device or emulator was measured. Settle it by reading env(safe-area-inset-left/right) in Android Chrome in landscape on a punch-hole phone; if one side is non-zero and small, add a minimum column width (for example a button's 44 px) to the rule, which the ticket's "exactly one non-zero" wording does not settle. (declared severity: medium (unverified))
+status: open
