@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuthBootstrapSession } from '../../../../tests/support/factories/auth-bootstrap-notification-order';
+import { PUSH_TOKEN_STORAGE_KEY } from '../../../services/pushNotifications';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
 
@@ -16,6 +17,8 @@ const {
   mockStoreAuthToken,
   mockClearAuthToken,
   mockUnsubscribe,
+  mockRpc,
+  mockCapacitor,
 } = vi.hoisted(() => ({
   mockSignInWithPassword: vi.fn(),
   mockSignUp: vi.fn(),
@@ -28,6 +31,20 @@ const {
   mockStoreAuthToken: vi.fn(),
   mockClearAuthToken: vi.fn(),
   mockUnsubscribe: vi.fn(),
+  mockRpc: vi.fn(),
+  // A browser unless a test says otherwise, so sign-out makes no push call.
+  mockCapacitor: {
+    isNativePlatform: vi.fn(() => false),
+    isPluginAvailable: vi.fn((_name: string) => true),
+  },
+}));
+
+vi.mock('@capacitor/core', () => ({
+  Capacitor: mockCapacitor,
+  registerPlugin: () => ({}),
+}));
+vi.mock('@capacitor/push-notifications', () => ({
+  PushNotifications: { unregister: vi.fn(() => Promise.resolve()) },
 }));
 
 let authStateCallback: ((event: string, session: Session | null) => void | Promise<void>) | null =
@@ -45,6 +62,7 @@ vi.mock('../../supabaseClient', () => ({
       getUser: mockGetUser,
       onAuthStateChange: mockOnAuthStateChange,
     },
+    rpc: mockRpc,
   },
 }));
 
@@ -158,6 +176,58 @@ describe('auth session/action services', () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
+  });
+
+  describe('push registration on sign-out', () => {
+    beforeEach(() => {
+      mockCapacitor.isNativePlatform.mockReturnValue(true);
+      mockSignOut.mockResolvedValue({ error: null });
+      mockRpc.mockResolvedValue({ error: null });
+      localStorage.setItem(PUSH_TOKEN_STORAGE_KEY, 'device-token-1');
+    });
+
+    afterEach(() => {
+      mockCapacitor.isNativePlatform.mockReturnValue(false);
+      localStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+      // happy-dom serves `onLine` from the Navigator prototype, so deleting
+      // the own property restores the real value.
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+
+    it('online: drops this device\'s registration before ending the session', async () => {
+      await signOut();
+
+      expect(mockRpc).toHaveBeenCalledExactlyOnceWith('unregister_push_device', {
+        p_token: 'device-token-1',
+      });
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      expect(mockRpc.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSignOut.mock.invocationCallOrder[0]!
+      );
+    });
+
+    it('offline: sends no request and still ends the session', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+      await signOut();
+
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
+    it('a refused removal is logged and sign-out carries on', async () => {
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockRpc.mockResolvedValue({ error: { message: 'nope' } });
+
+      await signOut();
+
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      expect(errorLog).toHaveBeenCalledWith(
+        '[Push] Could not remove the device registration:',
+        'nope'
+      );
+      errorLog.mockRestore();
+    });
   });
 
   async function fireSignInThenSignOut() {

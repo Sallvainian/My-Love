@@ -26,6 +26,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
+import { startPushRegistration } from './services/pushNotifications';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
@@ -411,6 +412,14 @@ function App() {
   useEffect(() => {
     if (!authUserId) return;
     void refreshLocalCopies();
+  }, [authUserId, authSessionVersion]);
+
+  // The native shell asks for notification permission once and registers this
+  // device for the signed-in account's pushes. A no-op on the web and in a
+  // shell installed before the push plugin existed.
+  useEffect(() => {
+    if (!authUserId) return;
+    void startPushRegistration();
   }, [authUserId, authSessionVersion]);
 
   // A sent partner request accepted while this device is on any screen. Called

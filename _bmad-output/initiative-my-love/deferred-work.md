@@ -2904,3 +2904,144 @@ source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-refactor-swee
 severity: medium
 reason: Story 9's residual risks say a non-Duo phone is reachable by ax only while Device Hub's window shows it, and sim never selects --device's window (DW-334); pose, rotate, state, background and screenshot all go through ax. The "each on its own xcrun simctl clone" wording predates this change (story 9); story 4 split the work dir per checkout, which removes the shared-files clash only. Unverified: whether Device Hub can show two device windows at once and ax then drives each by --device. Settle it by booting a clone beside the Duo, opening both in Device Hub, and running `sim --device <clone> rotate` while the Duo's window is in front; if the clone does not rotate, AGENTS.md's line must say one Duo story at a time until DW-334 is fixed. The fix edits AGENTS.md, so it is deferred. (declared severity: medium (unverified))
 status: open
+
+### DW-338: The sim driver's `center` reads Notification Center past one screen unreliably: its scroll-and-merge code is unproven and can merge, split or cut short groups
+origin: spec-deferred story-3.12 review
+location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
+severity: medium
+reason: Story 12's review found, by reading the code, that the multi-screen path has four faults. The read-and-scroll loop stops after 30 screens and still exits 0 with partial groups. Groups on different screens count as one when they share any notification text, so two threads with identical wording merge, and duplicates collapse. A stacked cell that is never reachable is reported as one notification. `merge`'s return value is unused, although the plan said to scroll "until none is new". The scrolling code changed after its only 8-group run, so none of this is proven either way. The owner moved the multi-group case to story 3.14 on 2026-10-31; 3.14 reads up to 8 groups unfolded in portrait, on one screen, so these faults stay open past 8 groups. Settle it with a run of more groups than fit on the unfolded inner display, plus one thread whose expanded group is taller than a drag step.
+status: open
+
+### DW-339: sim center's multi-screen read (scroll and merge) is unproven and can cut groups short, merge two threads with identical text, collapse duplicates, or count an unreachable stack as one notification.
+origin: spec-deferred cbe0cc5a3421
+location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
+severity: medium
+reason: By reading Notify.swift: the read-and-scroll loop stops at 30 screens and exits 0; cross-screen merge matches any shared text; an unreachable stacked cell is reported with count 1; merge's return value is unused. The scrolling code changed after its only 8-group run. The owner moved the multi-group case to story 3.14 (2026-10-31), which reads up to 8 groups on one unfolded screen, so these stay open past 8 groups. Recorded as DW-338. Settle with a run of more groups than fit on the unfolded inner display, including one group taller than a drag step.
+status: done 2026-10-31
+resolution: duplicate of DW-338 (the same review finding, carried in from story 3.12's plan frontmatter); tracked there.
+
+### DW-340: send-push claims a (note, device) row before the APNs call, so a sender killed mid-send drops that push and nothing retries
+origin: spec-deferred story-3.1 review
+location: supabase/functions/send-push/handler.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium
+reason: The handler inserts the push_requests row, then sends. If the isolate dies or times out between the two, the row blocks every later call for that note and device, and pg_net calls the sender once per insert, so no retry exists. A failed APNs answer releases its claim, but nothing calls again. Settle it with story 13's real APNs run and a choice between a pending state that a later call may retake and a retrier.
+status: open
+
+### DW-341: send-push treats a picture-only note as one with an image and blank text, but the real stand-in text is unverified
+origin: spec-deferred story-3.1 review
+location: supabase/functions/send-push/payload.ts (hasCaption)
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium (unverified)
+reason: MessageInput.tsx sends '' for a picture-only note, while love_notes_content_check needs at least one character, and no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as the note's text instead of "Sent you a picture". Settle it by sending a picture-only note from the app against the local stack and reading the stored content.
+status: open
+
+### DW-342: A send-push claim is inserted before the APNs call, so an isolate killed between claim and send drops that push for good, and nothing re-calls the sender for a released claim.
+origin: spec-deferred a15d99cc6689
+location: supabase/functions/send-push/handler.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium
+reason: handler.ts claims (note, token) before sending; pg_net fires once per insert and nothing retries. Settles with a real APNs run (story 13) and a decision on a pending state or a retrier.
+status: done 2026-10-31
+resolution: duplicate of DW-340 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
+
+### DW-343: Picture-only detection assumes the stand-in text is blank; the composer sends an empty string and love_notes_content_check needs at least one character, so the real stand-in is unverified.
+origin: spec-deferred 431bc8339dd8
+location: supabase/functions/send-push/payload.ts (hasCaption)
+source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
+severity: medium
+reason: MessageInput.tsx sends '' for a picture-only note; the table check requires char_length(content) >= 1; no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as text. Settle by sending a picture-only note from the app against the local stack and reading the row. (declared severity: medium (unverified))
+status: done 2026-10-31
+resolution: duplicate of DW-341 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
+
+### DW-344: sim banner --tap cold on the unfolded Duo can miss once: the banner is gone before the tap reaches it
+origin: spec-deferred story-3.14 review
+location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: In unfolded portrait, the first `sim banner FILE --host --tap cold` read the banner's label, printed `before tap: notRunning`, then failed with "Failed to tap NotificationShortLookView … No matches found": the banner had gone before the tap. The next three cold runs and the background run passed. `banner` was not changed by story 3.14, so this is pre-existing timing between the read, the state check and the tap, and a later story's unattended check could fail once on it. Settle it by running `--tap cold` ten times unfolded and folded; if misses recur, tap the element found at read time immediately, or re-wait for the banner before tapping.
+status: open
+
+### DW-345: sim center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups that are not listed, undercounting silently
+origin: spec-deferred story-3.14 review
+location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium (unverified)
+reason: Story 3.14 found that on the first opening after a delivery Notification Center keeps a summary cell (body `phraseThatEnumeratesAllRemainingNotificationsInSection`, "+6 from Runner") beside the 8 expanded groups, and `center` printed it as a 9th group; `screenGroups` now ignores such cells unless they are stacked "Grouped" cells. With 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (the DW-338 multi-screen case) a summary might stand for notifications never listed, and dropping it would undercount with no warning. Settle it with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the notifications pushed.
+status: open
+
+### DW-346: sim banner --tap cold on the unfolded Duo can miss once because the banner is gone before the tap reaches it.
+origin: spec-deferred 4e4a0337de4b
+location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: First cold run in unfolded portrait: banner label read, before tap: notRunning, then "Failed to tap NotificationShortLookView ... No matches found"; the next three cold runs passed. banner is unchanged by this story, so the timing is pre-existing. Recorded as DW-344. Settle with ten cold runs unfolded and folded.
+status: done 2026-10-31
+resolution: duplicate of DW-344 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
+
+### DW-347: center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups never listed, undercounting silently.
+origin: spec-deferred 2e36cea7cace
+location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: At 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (DW-338) this is untested. Recorded as DW-345. Settle with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the pushes. (declared severity: medium (unverified))
+status: done 2026-10-31
+resolution: duplicate of DW-345 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
+
+### DW-348: center's restore on a Rotate-Left-only phone and tap(_:)'s coordinate fallback on the inner display have never been run.
+origin: spec-deferred c0f2e3e5b8e2
+location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium
+reason: No run so far has used either path. The 8-group runs passed, but nobody observed whether any tap went through displayInUse()'s coordinate fallback. The restore's rotate_to path through cmd_rotate on a phone with only Rotate Left (iPhone 17) was not run. If either is wrong, a read past a shrunk cell misses, or a phone is left turned. Settle it with one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (log whether the fallback ran), and one center --host started in landscape on an iPhone 17 simulator, comparing ax state before and after. (declared severity: medium (unverified))
+status: open
+
+### DW-349: AGENTS.md's sim-driver clause says center puts the pose and orientation back, without sim help's exception for a folded landscape.
+origin: spec-deferred 5cff3711aeb0
+location: AGENTS.md (Maintained by hand, sim-driver paragraph)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: low
+reason: sim help says a folded landscape comes back only when the shell, the host app, Settings or Safari was in front. With another app in front, center exits 1 after a good read and says why. The AGENTS.md clause states the restore with no exception, so an agent that reads only AGENTS.md expects the folded landscape back. The fix edits an agent-context file, so it is deferred rather than patched.
+status: open
+
+### DW-350: center leaves the Home Screen in front after a folded-portrait or unfolded start; only a folded-landscape start brings its front app back.
+origin: spec-deferred 14bd1d434eba
+location: scripts/sim-driver/sim (cmd_center, center_restore)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: low
+reason: center presses Home before its read and again after it, as story 12's center already did at the baseline (sim:641 and sim:648 at c9bf63ec), so the shell or host app that was in front is not brought back. The new restore relaunches the front app only for a folded landscape, because only there is it needed for the orientation. Neither sim help nor AGENTS.md says the front app is not restored. A check that expects the shell in front after center finds the Home Screen.
+status: open
+
+### DW-351: sim banner exits 130 on TERM as well as INT, while center now exits 143 on TERM.
+origin: spec-deferred 05678d9d50dc
+location: scripts/sim-driver/sim:600 (cmd_banner)
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: low
+reason: banner's trap is `trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM` (sim:600), unchanged since the baseline c9bf63ec. center's traps set 130 for INT and 143 for TERM. A caller telling the two signals apart by exit code gets 130 from banner for both.
+status: open
+
+### DW-352: Sign-out leaves the outgoing account's delivered notifications in Notification Center, so the next person on a shared device can read them.
+origin: spec-deferred story-3.2 plan
+location: src/services/pushNotifications.ts (stopDevicePushes)
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+reason: Sign-out now removes the device's registration, unregisters from APNs and clears the badge, but the ticket does not ask for delivered notifications to go, and stopDevicePushes deliberately avoids the push plugin's removeAllDeliveredNotifications(), which rejects unless register() ran this launch. Each banner already delivered keeps its sender's name and note text in Notification Center after sign-out. Settle it in a later story with a native removal (UNUserNotificationCenter removeAllDeliveredNotifications) gated on its own plugin check, and a decision on whether a sign-out should empty the app's whole Notification Center group.
+status: open
+
+### DW-353: A reinstalled shell leaves its old token's push_devices row on the account, and only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
+origin: review story-3.2
+location: src/services/pushNotifications.ts (removePushRegistration); supabase/functions/send-push/handler.ts (410 branch)
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+reason: Sign-out removes only the row for the token this install stored. An uninstall and reinstall gets a new APNs token, so the old row stays registered to the account. With a real APNs key the next send to it answers 410 and the sender deletes it; on the local stack there is no key, so the stale row stays, and every `sim build` (which uninstalls first) leaves one. Story 3.2's simulator check deleted one such row by hand before it ran. Settle it with a decision: either the driver clears the fixture accounts' push_devices rows when it provisions or reinstalls, or registration drops the account's other rows for this device (which needs a device identity APNs does not give).
+status: open
+
+### DW-354: A reinstalled shell leaves its old token's push_devices row on the account; only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
+origin: spec-deferred 24a607eba37a
+location: src/services/pushNotifications.ts (removePushRegistration); supabase/functions/send-push/handler.ts (410 branch)
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+reason: Sign-out removes only the stored token's row; a reinstall gets a new APNs token. The story's simulator check found one such stale row from story 1's install and deleted it by hand. Ledger DW-353.
+status: open

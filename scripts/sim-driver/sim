@@ -3,7 +3,10 @@
 # simulator with no person: it builds and installs the shell against the local
 # Supabase stack, signs in a local fixture pair, folds and rotates with `ax`,
 # and taps, scrolls and reads the page through an XCUITest runner
-# (RunnerUITests/Drive.swift). `sim help` lists the commands.
+# (RunnerUITests/Drive.swift); it also answers the permission alert, pushes,
+# and reads banners, Notification Center and the badge (Notify.swift), for
+# the shell or, with --host, the runner's own host app. `sim help` lists the
+# commands.
 #
 # Every build happens in a staged copy outside the repo, in $SIM_DRIVER_WORK
 # (default ~/Library/Caches/my-love-sim-driver/<checkout>-<hash>, one per
@@ -23,7 +26,9 @@ TOOL=${0:A:h}
 REPO=$(git -C "$TOOL" rev-parse --show-toplevel)
 WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver/${REPO:t}-$(print -rn -- $REPO | shasum | cut -c1-8)}
 BUNDLE=dev.sallvain.mylove
-EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com)
+# The first pair (seeded), then the second (no rows): signin's targets in order.
+EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com
+  simdriver-other@test.example.com simdriver-other-partner@test.example.com)
 # A shell that must stay on its own web code checks an address nothing
 # answers: a failed check leaves it on the build it has (story 7's Setup).
 DEAD_UPDATE_URL=http://127.0.0.1:9/updates/latest.json
@@ -50,8 +55,13 @@ Shell:
   uninstall              Remove the shell and its data.
 
 Accounts (local stack only):
-  provision              Create or reset the fixture pair and link them.
-  signin [partner]       Sign in through the login form (default: the first).
+  provision              Create or reset both fixture pairs and link each:
+                         Casey and Jessie, seeded so every view scrolls;
+                         Harper and Morgan, love notes wiped, nothing seeded.
+  signin [partner|other|other-partner]
+                         Sign in through the login form (default: Casey;
+                         partner: Jessie; other: Harper; other-partner: Morgan).
+  signout                Sign out through Settings and wait for the login form.
 
 Device:
   pose closed|partial|open   Fold or unfold (ax pose).
@@ -67,14 +77,44 @@ Page (points from the web view's top-left):
   dump                   One JSON line: the web view's frame and its elements.
   readout                The readout's lines.
 
+Notifications (the shell, or with --host the runner's host app, "Runner"):
+  permission allow|deny [--host]
+                         Bring the app to the front (the host asks when
+                         launched), tap Allow or Don't Allow on the alert;
+                         with --host, print its status (authorized, denied).
+  permission reset [--host]
+                         Uninstall and reinstall the app so it asks again
+                         (the shell from the last sim build's App.app; it
+                         loses its sign-in, so run sim signin again).
+  push FILE [--host]     Send FILE, JSON with an aps object (simctl push).
+  banner FILE [--tap cold|background] [--host]
+                         Put Settings in front, push FILE, print the banner's
+                         label. --tap taps it, the app first terminated
+                         (cold) or launched (background), and prints the
+                         app's state before and after.
+  center [--host]        The app's Notification Center groups as one JSON
+                         line: each group's text (its newest notification's
+                         title and body) and notification count.
+                         Unfolds the Duo and turns it to portrait to read
+                         (proven with 8 groups), then puts the pose and
+                         orientation back; a folded landscape comes back
+                         only when the shell, the host, Settings or Safari
+                         was in front.
+  badge [--host]         The app icon's badge ("3 new items"), or none.
+
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
 SIM_SUPABASE_URL overrides the local stack's URL (default: .env.test's).
+SIM_IDLE_NAMES="Class,method,method" replaces the private XCUITest names the
+center patches to skip idle waits (to check the warning).
 Work dir: $SIM_DRIVER_WORK, default ~/Library/Caches/my-love-sim-driver/
 <checkout name>-<hash of its path>, one per checkout.
 EOF
 }
 
-die() { local code=$1; shift; print -u2 -- "sim: $*"; exit $code; }
+# die's code is kept in SIM_EXIT too: an EXIT trap set in a function (center's
+# restore) sees $? as 0 after exit, so it reads the code from here.
+SIM_EXIT=0
+die() { local code=$1; shift; print -u2 -- "sim: $*"; SIM_EXIT=$code; exit $code; }
 # Progress goes to stderr, so stdout carries only results (dump's JSON).
 say() { print -u2 -- "sim: $*"; }
 
@@ -170,24 +210,52 @@ ensure_runner() {
   mv $RUNNER/building.stamp $stamp
 }
 
-# Runs one Drive step and prints its DRIVE lines without the prefix.
-drive() {
-  require_booted
-  ensure_runner
-  local log=$WORK/logs/drive.log code=0
-  TEST_RUNNER_ACTION="$*" xcodebuild test-without-building \
-    -project $RUNNER/src/SimDriver.xcodeproj -scheme RunnerUITests \
-    -destination "id=$UDID" -derivedDataPath $RUNNER/dd \
-    -only-testing:RunnerUITests/Drive/testDrive >$log 2>&1 || code=$?
-  sed -n 's/^DRIVE //p' $log
+# Starts one runner step, Drive/testDrive or Notify/testStep, with ACTION
+# in its environment and its output in $WORK/logs/<class>.log; with BG=1 in
+# the background, its pid in $STEP_PID.
+STEP_PID=
+start_step() {
+  local class=$1 action=$2 log=$WORK/logs/${(L)1}.log
+  local method=testStep
+  [[ $class == Drive ]] && method=testDrive
+  local -a cmd=(xcodebuild test-without-building
+    -project $RUNNER/src/SimDriver.xcodeproj -scheme RunnerUITests
+    -destination "id=$UDID" -derivedDataPath $RUNNER/dd
+    -only-testing:RunnerUITests/$class/$method)
+  mkdir -p $WORK/logs
+  # Emptied here, not by the child's redirect: banner polls this log for
+  # "watching" at once, and an earlier run's line must not match.
+  : >$log
+  if [[ ${BG:-} == 1 ]]; then
+    TEST_RUNNER_ACTION=$action TEST_RUNNER_IDLE_NAMES=${SIM_IDLE_NAMES:-} $cmd >$log 2>&1 &
+    STEP_PID=$!
+  else
+    TEST_RUNNER_ACTION=$action TEST_RUNNER_IDLE_NAMES=${SIM_IDLE_NAMES:-} $cmd >$log 2>&1
+  fi
+}
+
+# Prints a finished step's lines without their prefix (DRIVE, NOTIFY) and,
+# when CODE is non-zero, why it failed, then exits naming the step.
+finish_step() {
+  local class=$1 name=$2 code=$3 log=$WORK/logs/${(L)1}.log
+  sed -n "s/^${(U)class} //p" $log
   if (( code != 0 )); then
     # A failure with no assertion (the runner never started, say) shows the
     # log's tail instead, so it is never silent.
     local -a why
     why=(${(f)"$(grep -E 'error:|XCTAssert' $log || true)"})
     if (( $#why )); then print -rl -- ${why[1,5]} >&2; else tail -n 15 $log >&2; fi
-    die 1 "drive step '$1' failed (full log: $log)"
+    die 1 "${(L)class} step '$name' failed (full log: $log)"
   fi
+}
+
+# Runs one Drive step and prints its DRIVE lines without the prefix.
+drive() {
+  require_booted
+  ensure_runner
+  local code=0
+  start_step Drive "$*" || code=$?
+  finish_step Drive $1 $code
 }
 
 # ---- stage and build ---------------------------------------------------------
@@ -374,10 +442,15 @@ cmd_provision() {
 
 cmd_signin() {
   local which=${1:-}
-  [[ -z $which || $which == partner ]] || die 2 "signin takes nothing or 'partner'"
   require_stack
-  local email=${EMAILS[1]}
-  [[ $which == partner ]] && email=${EMAILS[2]}
+  local email
+  case $which in
+    '') email=${EMAILS[1]} ;;
+    partner) email=${EMAILS[2]} ;;
+    other) email=${EMAILS[3]} ;;
+    other-partner) email=${EMAILS[4]} ;;
+    *) die 2 "signin takes nothing, 'partner', 'other' or 'other-partner'" ;;
+  esac
   local password
   password=$(node --input-type=module -e '
     const m = await import(process.argv[1]); console.log(m.TEST_USER_PASSWORD);
@@ -452,6 +525,247 @@ cmd_screenshot() {
   say "saved $out${which:+ ($which display)}"
 }
 
+# ---- notifications -----------------------------------------------------------
+
+HOST_BUNDLE=dev.sallvain.simdriver.runner
+# A notification step's app: the shell, or with --host the runner's host app;
+# ICON is its Home Screen name (the shell's CFBundleDisplayName).
+TARGET=$BUNDLE ICON="My Love" IS_HOST=0
+REST=()
+
+# Takes --host out of the arguments and leaves the others in REST.
+target_args() {
+  REST=()
+  local a
+  for a in "$@"; do
+    if [[ $a == --host ]]; then
+      TARGET=$HOST_BUNDLE ICON=Runner IS_HOST=1
+    else
+      REST+=$a
+    fi
+  done
+}
+
+# Runs one Notify step for the target; its fields go tab-separated, since
+# an icon name can hold a space.
+notify() {
+  require_booted
+  ensure_runner
+  local -a fields=($1 $TARGET "$ICON" "${@[2,-1]}")
+  local code=0
+  start_step Notify "${(pj:\t:)fields}" || code=$?
+  finish_step Notify $1 $code
+}
+
+# Exits 2 unless FILE is JSON holding an aps object, before anything runs.
+check_payload() {
+  local file=$1 why
+  [[ -f $file ]] || die 2 "no payload file $file"
+  why=$(node -e '
+    let doc;
+    try { doc = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); }
+    catch (e) { console.log("not JSON: " + e.message.replace(/\s+/g, " ")); process.exit(1); }
+    const aps = doc && doc.aps;
+    if (!aps || typeof aps !== "object" || Array.isArray(aps)) { console.log("no aps object"); process.exit(1); }
+  ' $file) || die 2 "payload $file: $why"
+}
+
+cmd_permission() {
+  target_args "$@"
+  (( $#REST == 1 )) && [[ $REST[1] == (allow|deny|reset) ]] ||
+    die 2 "permission takes allow, deny or reset (and --host)"
+  [[ $REST[1] != reset ]] && { notify permission $REST[1]; return; }
+  # Uninstalling drops the app's section from the device's BulletinBoard
+  # VersionedSectionInfo.plist, so the reinstalled app asks again.
+  local app
+  if (( IS_HOST )); then
+    require_booted
+    ensure_runner
+    app=$RUNNER/dd/Build/Products/Debug-iphonesimulator/Runner.app
+  else
+    app=$WORK/derived/app/Build/Products/Debug-iphonesimulator/App.app
+    [[ -d $app ]] || die 1 "no shell build at $app: run sim build first"
+    require_booted
+  fi
+  [[ -d $app ]] || die 1 "no build of $TARGET at $app"
+  stage simctl-uninstall xcrun simctl uninstall $UDID $TARGET
+  stage simctl-install xcrun simctl install $UDID $app
+  say "reinstalled $TARGET: it has no notification permission until asked"
+}
+
+cmd_push() {
+  target_args "$@"
+  (( $#REST == 1 )) || die 2 "push takes FILE (and --host)"
+  check_payload $REST[1]
+  require_booted
+  xcrun simctl push $UDID $TARGET $REST[1] >&2 || die 6 "simctl push failed"
+}
+
+# The watch must run before the push, since a banner lasts seconds and a
+# runner step takes 6-12 s to start: the step goes to the background, its
+# log is polled for "watching", then the push goes, then the step ends.
+cmd_banner() {
+  target_args "$@"
+  local file=${REST[1]:-} tap=
+  [[ -n $file ]] || die 2 "banner takes FILE [--tap cold|background] (and --host)"
+  if (( $#REST > 1 )); then
+    (( $#REST == 3 )) && [[ $REST[2] == --tap && $REST[3] == (cold|background) ]] ||
+      die 2 "banner: --tap takes cold or background"
+    tap=$REST[3]
+  fi
+  check_payload $file
+  require_booted
+  ensure_runner
+  local -a fields=(banner $TARGET "$ICON" ${tap:+$tap})
+  local log=$WORK/logs/notify.log code=0 tries=0
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM
+  BG=1 start_step Notify "${(pj:\t:)fields}"
+  until grep '^NOTIFY watching' $log >/dev/null; do
+    if ! kill -0 $STEP_PID 2>/dev/null; then
+      wait $STEP_PID || code=$?
+      finish_step Notify banner $(( code ? code : 1 ))
+    fi
+    if (( ++tries > 360 )); then
+      kill $STEP_PID 2>/dev/null
+      wait $STEP_PID || true
+      die 1 "the banner watch never started (log: $log)"
+    fi
+    sleep 0.25
+  done
+  # A refused push (an app with permission denied) leaves the watch to end
+  # in "no banner", which is what a check of that case looks for.
+  xcrun simctl push $UDID $TARGET $file >&2 || say "simctl push failed; the watch will see no banner"
+  wait $STEP_PID || code=$?
+  STEP_PID=
+  finish_step Notify banner $code
+}
+
+# ax state's value for one key (pose, orientation).
+state_value() { ax state --device $UDID | sed -n "s/^$1: //p"; }
+
+# Turns the device a quarter turn at a time (right through ax rotate, or left
+# where Device Hub has only Rotate Left) until its orientation is WANT (at
+# most four turns); folding or unfolding can change the orientation too.
+# cmd_rotate can die, so it runs in a subshell and only the final check
+# decides.
+rotate_to() {
+  local want=$1 i
+  for i in 1 2 3 4; do
+    [[ $(state_value orientation) == $want ]] && return 0
+    ( cmd_rotate 1 ) >/dev/null 2>&1 || true
+    sleep 1
+  done
+  [[ $(state_value orientation) == $want ]]
+}
+
+# center's way back: the pose first, then the orientation recorded at the
+# start. Runs as the EXIT trap, so success, failure, SIGINT and TERM all
+# restore; a restore that fails is reported and turns exit 0 into 1.
+# test-center-exit.zsh checks these exit codes with ax stubbed; run it after
+# changing center. ax state names the open pose "unfolded", ax pose "open".
+pose_arg() { [[ $1 == unfolded ]] && print open || print $1; }
+CENTER_POSE= CENTER_ORIENT= CENTER_FRONT= CENTER_MOVED=0 CENTER_SIGNAL=0 CENTER_DONE=
+# CENTER_SIGNAL holds the exit code of the signal that ended center (INT
+# 130, TERM 143), else 0. CENTER_DONE holds the code the restore exited with:
+# the EXIT trap belongs to cmd_center and survives a restore run from a
+# signal trap, so it runs the restore again on that exit, which then only
+# exits.
+center_restore() {
+  local code=$?
+  [[ -n $CENTER_DONE ]] && exit $CENTER_DONE
+  (( SIM_EXIT )) && code=$SIM_EXIT
+  # A second Ctrl-C must not cut the restore short.
+  trap '' INT TERM
+  if (( CENTER_SIGNAL )); then
+    # A step still running would race the restore; end this checkout's.
+    code=$CENTER_SIGNAL
+    pkill -f "xcodebuild test-without-building.*$RUNNER/dd" 2>/dev/null || true
+    sleep 1
+  fi
+  (( CENTER_MOVED )) || { CENTER_DONE=$code; exit $code; }
+  local bad=0
+  if [[ -n $CENTER_POSE ]] && [[ $(state_value pose) != $CENTER_POSE ]]; then
+    ax pose $(pose_arg $CENTER_POSE) --device $UDID >/dev/null 2>&1 || bad=1
+    sleep 1
+  fi
+  # ax state reports the front app's orientation, and the folded Home
+  # Screen is portrait only, so a folded landscape comes back only with the
+  # app that was in front (center pressed Home) brought back first.
+  if [[ -n $CENTER_FRONT && $CENTER_FRONT != none ]] && [[ $(state_value orientation) != $CENTER_ORIENT ]]; then
+    xcrun simctl launch $UDID $CENTER_FRONT >/dev/null 2>&1 || bad=1
+    sleep 2
+  fi
+  rotate_to $CENTER_ORIENT 2>/dev/null || bad=1
+  (( bad )) && print -u2 -- "sim: center could not restore pose ${CENTER_POSE:-none} and orientation $CENTER_ORIENT; ax state says: ${(j:, :)${(@M)${(@f)$(ax state --device $UDID 2>&1)}:#(pose|orientation):*}}"
+  (( bad && code == 0 )) && code=1
+  CENTER_DONE=$code
+  exit $code
+}
+
+# Notification Center opens with a drag from the top of the Home Screen;
+# XCUIDevice's Home press leaves the shell in front on the Duo, so Device
+# Hub's Home goes before each drag, and again after, to close it. A drag can
+# miss while the Home Screen settles, so it is tried three times. The Duo is
+# unfolded and turned to portrait first, where 8 groups were proven to fit
+# the inner display, and put back (pose, then orientation) afterwards.
+cmd_center() {
+  target_args "$@"
+  (( $#REST == 0 )) || die 2 "center takes only --host"
+  require_booted
+  ensure_runner
+  CENTER_POSE=$(state_value pose) CENTER_ORIENT=$(state_value orientation)
+  [[ -n $CENTER_ORIENT ]] || die 5 "center: ax state has no orientation"
+  # Only a start in landscape that is not unfolded (folded, or a phone with
+  # no pose) needs the front app back (see center_restore); asking costs one
+  # runner step, so only then.
+  if [[ $CENTER_POSE != unfolded && $CENTER_ORIENT != portrait ]]; then
+    local front_out front_code=0
+    front_out=$(notify front 2>/dev/null) || front_code=$?
+    if (( front_code )); then
+      say "the front step failed (log: $WORK/logs/notify.log); the folded $CENTER_ORIENT may not come back"
+    else
+      CENTER_FRONT=$(print -r -- $front_out | sed -n 's/^front: //p')
+      [[ -n $CENTER_FRONT && $CENTER_FRONT != none ]] ||
+        say "no known app in front; the folded $CENTER_ORIENT may not come back"
+    fi
+  fi
+  trap center_restore EXIT
+  trap 'CENTER_SIGNAL=130; center_restore' INT
+  trap 'CENTER_SIGNAL=143; center_restore' TERM
+  CENTER_MOVED=1
+  if [[ -n $CENTER_POSE && $CENTER_POSE != unfolded ]]; then
+    say "unfolding (was $CENTER_POSE)"
+    ax pose open --device $UDID >/dev/null || die 5 "center: could not unfold"
+    sleep 1
+  fi
+  rotate_to portrait ||
+    die 5 "center: could not turn to portrait; ax state says: pose ${$(state_value pose):-none}, orientation $(state_value orientation)"
+  local out code try log=$WORK/logs/notify.log
+  for try in 1 2 3; do
+    ax control Home --device $UDID >/dev/null
+    sleep 1
+    code=0
+    out=$(notify center 2>/dev/null) || code=$?
+    (( code == 0 )) || ! grep 'Notification Center did not open' $log >/dev/null && break
+    say "Notification Center did not open (try $try of 3)"
+  done
+  ax control Home --device $UDID >/dev/null
+  if (( code )); then
+    finish_step Notify center $code
+  fi
+  # The runner's warnings go to stderr, its one JSON line to stdout.
+  local line
+  for line in ${(f)out}; do
+    if [[ $line == warning:* ]]; then say ${line#warning: }; else print -r -- $line; fi
+  done
+}
+
+cmd_badge() {
+  target_args "$@"
+  (( $#REST == 0 )) || die 2 "badge takes only --host"
+  notify badge
+}
+
 # ---- main --------------------------------------------------------------------
 
 args=()
@@ -471,6 +785,7 @@ case $cmd in
   build) cmd_build "$@" ;;
   serve-update) cmd_serve_update "$@" ;;
   signin) cmd_signin "$@" ;;
+  signout) (( $# == 0 )) || die 2 "signout takes nothing"; drive signout ;;
   pose)
     [[ ${1:-} == (closed|partial|open) ]] || die 2 "pose takes closed, partial or open"
     require_booted; ax pose $1 --device $UDID ;;
@@ -490,5 +805,10 @@ case $cmd in
   launch) require_booted; xcrun simctl launch $UDID $BUNDLE >/dev/null; say "launched $BUNDLE" ;;
   screenshot) cmd_screenshot "$@" ;;
   uninstall) require_booted; xcrun simctl uninstall $UDID $BUNDLE; say "uninstalled $BUNDLE" ;;
+  permission) cmd_permission "$@" ;;
+  push) cmd_push "$@" ;;
+  banner) cmd_banner "$@" ;;
+  center) cmd_center "$@" ;;
+  badge) cmd_badge "$@" ;;
   *) usage >&2; die 2 "unknown command $cmd" ;;
 esac

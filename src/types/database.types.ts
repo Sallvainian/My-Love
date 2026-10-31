@@ -459,6 +459,96 @@ export type Database = {
         }
         Relationships: []
       }
+      push_devices: {
+        Row: {
+          created_at: string
+          environment: string
+          id: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          id?: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          id?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_requests: {
+        Row: {
+          created_at: string
+          delivery: string
+          environment: string
+          id: string
+          note_id: string
+          payload: NonNullable<Json>
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          delivery: string
+          environment: string
+          id?: string
+          note_id: string
+          payload: NonNullable<Json>
+          token: string
+        }
+        Update: {
+          created_at?: string
+          delivery?: string
+          environment?: string
+          id?: string
+          note_id?: string
+          payload?: NonNullable<Json>
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_requests_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "love_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "love_notes_visible"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_sender_settings: {
+        Row: {
+          sender_secret: string
+          sender_url: string
+          singleton: boolean
+        }
+        Insert: {
+          sender_secret: string
+          sender_url: string
+          singleton?: boolean
+        }
+        Update: {
+          sender_secret?: string
+          sender_url?: string
+          singleton?: boolean
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           birthday: string | null
@@ -507,13 +597,13 @@ export type Database = {
     Views: {
       love_notes_visible: {
         Row: {
-          content: string | null
-          created_at: string | null
-          from_user_id: string | null
-          id: string | null
-          idempotency_key: string | null
+          content: string
+          created_at: string
+          from_user_id: string
+          id: string
+          idempotency_key: string
           image_url: string | null
-          to_user_id: string | null
+          to_user_id: string
           written_at: string | null
         }
         Insert: {
@@ -575,6 +665,14 @@ export type Database = {
           to_user_id: string
         }[]
       }
+      register_push_device: {
+        Args: { p_environment: string; p_token: string }
+        Returns: undefined
+      }
+      unregister_push_device: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -620,8 +718,7 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -645,8 +742,7 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -670,8 +766,7 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }

@@ -14,6 +14,7 @@
 import { deleteAccountImages } from '../../services/imageCache';
 import { deleteAccountCopies } from '../../services/localCopy';
 import { moodService } from '../../services/moodService';
+import { stopDevicePushes } from '../../services/pushNotifications';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
 
@@ -71,6 +72,25 @@ function deleteAccountData(userId: string): void {
   });
   moodService.deleteSyncedForUser(userId).catch((error: unknown) => {
     console.error('[AuthSlice] Failed to delete the outgoing account\'s synced moods:', error);
+  });
+}
+
+/**
+ * Stop this device's pushes for the account that just signed out: unregister
+ * from APNs, clear the app icon's badge, forget the stored token
+ * (`stopDevicePushes`). The server row is removed earlier, by
+ * `actionService.signOut` while the session still exists; offline, or on a
+ * boot that finds the session gone, this native half is all that runs.
+ *
+ * Only on a transition to signed out, beside `deleteAccountData` — never on
+ * sign-in or an in-place account switch, where `startPushRegistration` is
+ * registering the same device for the incoming account and an unregister
+ * would race it. Fire-and-forget like `deleteAccountData`; it never throws,
+ * and the catch only guards the contract.
+ */
+function stopPushesForSignOut(): void {
+  stopDevicePushes().catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to stop this device\'s pushes:', error);
   });
 }
 
@@ -300,6 +320,9 @@ function discardAccountState(
   // stay for their owner (deleteAccountData).
   if (outgoingUserId && outgoingUserId !== identity.userId) {
     deleteAccountData(outgoingUserId);
+    // Signed out (sign-out, or a boot whose marker names an account), not a
+    // switch to another account: this device's pushes stop too.
+    if (identity.userId === null) stopPushesForSignOut();
   }
 
   // `messages` is the daily-rotation pool: the shared bundled messages PLUS

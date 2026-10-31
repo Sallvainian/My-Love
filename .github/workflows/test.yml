@@ -202,7 +202,9 @@ jobs:
       # and an untested lockfile could change what `supabase functions deploy`
       # resolves.
       - name: Edge Function tests
-        run: deno test --no-lock supabase/functions/upload-love-note-image/
+        run: |
+          deno test --no-lock supabase/functions/upload-love-note-image/
+          deno test --no-lock supabase/functions/send-push/
 
   # ============================================
   # Stage 2: Unit Tests (Vitest)

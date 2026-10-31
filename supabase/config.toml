@@ -368,6 +368,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# The love-note insert trigger (notify_love_note_push) has no user JWT, so it
+# authenticates to send-push with the shared secret in push_sender_settings,
+# which the function checks itself. upload-love-note-image's section arrives
+# with story 3.3.
+[functions.send-push]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = false
 port = 54327
