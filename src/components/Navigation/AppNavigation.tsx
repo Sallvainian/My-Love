@@ -20,8 +20,8 @@
  * The dock has a second form. Where the screen keeps a column beside the page
  * (the iPhone Duo shell: folded, unfolded landscape, the right pane side by
  * side -- `useSideColumn`), the same <nav> becomes an icon-only vertical
- * capsule at that column's bottom, as wide as the column's `env()` inset and
- * flush with the screen edge, so it covers nothing the page lays out. The form
+ * capsule at that column's bottom, 40px wide and centred in the column's
+ * `env()` inset, so it covers nothing the page lays out. The form
  * is published as `data-dock="column-left|column-right"` on <html>, and
  * index.css switches the dock variables on it: no bottom band, and
  * `--dock-left`/`--dock-right`, which <main> applies as side padding, so
@@ -162,13 +162,15 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
       <nav
         className={
           column
-            ? // The column's own width (its `env()` inset, never a literal), flush
-              // with the screen edge, its bottom where the bottom dock's sits.
+            ? // 40px wide, as Apple's and Instagram's side bars are: a 36px
+              // button (h-9 w-9) and a 2px rim. Centred in the column (its
+              // `env()` inset, never a literal) so it clears the screen edge;
+              // its bottom where the bottom dock's sits.
               `fixed ${
                 column === 'right'
-                  ? 'right-0 w-[env(safe-area-inset-right)]'
-                  : 'left-0 w-[env(safe-area-inset-left)]'
-              } bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-1 rounded-full py-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`
+                  ? 'right-[calc((env(safe-area-inset-right)_-_2.5rem)/2)]'
+                  : 'left-[calc((env(safe-area-inset-left)_-_2.5rem)/2)]'
+              } bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex w-10 flex-col items-center gap-2 rounded-full py-0.5 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`
             : `fixed inset-x-4 mx-auto max-w-md bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-15 items-center justify-between gap-1 rounded-full px-2 shadow-float ring-1 ring-line backdrop-saturate-[1.4] ${GLASS}`
         }
         aria-label="Primary"
@@ -186,12 +188,12 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
               key={view}
               type="button"
               onClick={() => onViewChange(view)}
-              className={`relative flex h-11 items-center justify-center rounded-full transition-colors ${
+              className={`relative flex items-center justify-center rounded-full transition-colors ${
                 column
-                  ? `w-11 shrink-0 ${isActive ? 'bg-tint text-accent' : 'text-muted hover:text-ink'}`
+                  ? `h-9 w-9 shrink-0 ${isActive ? 'bg-tint text-accent' : 'text-muted hover:text-ink'}`
                   : isActive
-                    ? 'min-w-0 shrink gap-1.5 bg-tint px-3.5 text-sm font-semibold text-accent'
-                    : 'w-11 shrink-0 text-muted hover:text-ink'
+                    ? 'h-11 min-w-0 shrink gap-1.5 bg-tint px-3.5 text-sm font-semibold text-accent'
+                    : 'h-11 w-11 shrink-0 text-muted hover:text-ink'
               }`}
               data-testid={`nav-${view}`}
               // The label replaces the button's content as its accessible name,
