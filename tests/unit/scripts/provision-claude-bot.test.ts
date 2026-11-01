@@ -6,10 +6,10 @@
  * GoTrue endpoints it calls. Nothing here touches a real Supabase project, and
  * the fake password below is not a secret.
  */
-import { spawn } from 'node:child_process';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readBody, runNodeScript } from '../../support/helpers/node-script';
 
 // vitest runs with the project root as cwd; happy-dom rewrites import.meta.url
 // to an http: URL, so the repo path is resolved from cwd instead.
@@ -44,17 +44,6 @@ interface StubOptions {
 }
 
 const HALF_DONE_WARNING = 'the password was already rotated but existing sessions were NOT revoked';
-
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
-    let data = '';
-    req.setEncoding('utf8');
-    req.on('data', (chunk: string) => {
-      data += chunk;
-    });
-    req.on('end', () => resolve(data));
-  });
-}
 
 async function startStub(options: StubOptions = {}): Promise<{ server: Server; url: string; seen: SeenRequest[] }> {
   const seen: SeenRequest[] = [];
@@ -101,33 +90,7 @@ async function startStub(options: StubOptions = {}): Promise<{ server: Server; u
 }
 
 function runScript(env: Record<string, string>): Promise<{ status: number | null; output: string }> {
-  // The environment is built from scratch so a real CLAUDE_BOT_PASSWORD or
-  // service key in the developer's shell can never leak into the run. Only the
-  // non-secret variables Node itself needs pass through (Windows networking
-  // requires SYSTEMROOT).
-  // The child is spawned asynchronously: a blocking spawnSync would freeze this
-  // worker's event loop and the stub server above could never answer it.
-  const passthrough: Record<string, string> = {};
-  for (const name of ['PATH', 'SYSTEMROOT', 'TEMP', 'TMP']) {
-    const value = process.env[name];
-    if (value !== undefined) passthrough[name] = value;
-  }
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [SCRIPT], {
-      env: { ...passthrough, ...env },
-    });
-    let output = '';
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => {
-      output += chunk;
-    });
-    child.stderr.on('data', (chunk: string) => {
-      output += chunk;
-    });
-    child.on('error', reject);
-    child.on('close', (status) => resolve({ status, output }));
-  });
+  return runNodeScript(SCRIPT, env);
 }
 
 /**
