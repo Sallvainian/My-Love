@@ -3094,7 +3094,8 @@ location: src/types/database.types.ts
 source_spec: `tickets/epic-push-notifications/tickets/story-each-push-type-has-a-settings-switch-plan.md`
 severity: low
 reason: supabase gen types typescript --local (CLI 2.122.0) emits the same push_preferences fields but with ComputedFields lines and inline quoted keys; pre-existing drift already in the ledger as DW-357.
-status: open
+status: done 2026-11-01
+resolution: duplicate of DW-357 (the same pre-existing database.types.ts drift, carried in from story 3.7's plan frontmatter); tracked there.
 
 ### DW-361: A push that arrives while Love Notes is in front can leave its badge showing on a real iPhone, because the second badge clear waits a fixed 1 s that was measured only on the simulator.
 origin: review story-3.8
@@ -3110,4 +3111,5 @@ location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
 source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
 severity: medium
 reason: The plugin's willPresent notifies the web view and then returns the badge option, so iOS applies the badge after the first clear. On the Duo simulator a clear 1 s later held on every run; no device was checked. Settle on the owner's iPhone in story 3.11 (Love Notes in front, a partner note leaves the badge clear). Ledger DW-361. (declared severity: medium (unverified))
-status: open
+status: done 2026-11-01
+resolution: duplicate of DW-361 (the same review finding, carried in from story 3.8's plan frontmatter); tracked there.
