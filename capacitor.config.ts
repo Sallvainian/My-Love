@@ -8,6 +8,12 @@ const config: CapacitorConfig = {
   appName: 'My Love',
   webDir: 'dist',
   plugins: {
+    // R8: with the app in front a push shows no banner and plays no sound, but
+    // it still sets the badge. Unset, the plugin's willPresent returns no
+    // options, so iOS shows nothing and sets no badge in front.
+    PushNotifications: {
+      presentationOptions: ['badge'],
+    },
     // Updates come from the Cloudflare site, not Capgo's cloud:
     // src/services/nativeUpdates.ts checks updates/latest.json and downloads
     // the bundle that scripts/package-live-update.sh published.

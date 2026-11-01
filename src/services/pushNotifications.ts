@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { isOnline } from '../api/errorHandlers';
 import { supabase } from '../api/supabaseClient';
+import type { ViewType } from '../stores/slices/navigationSlice';
 
 /**
  * Push registration for the native iOS shell.
@@ -24,8 +25,23 @@ import { supabase } from '../api/supabaseClient';
  * checked on its own: a shell from story 3.1 has `PushNotifications` but no
  * `AppBadge`.
  *
- * Not here yet: the Settings switches, badge counts, tap handling and
- * foreground suppression (later stories of the epic).
+ * The Settings switches (story 3.7) read the same gate through
+ * `hasNativePush()` and ask iOS for the permission state through
+ * `getPushPermission()`; their data is `pushPreferencesService`.
+ *
+ * Story 3.8 adds `clearAppBadge()` (the badge half of sign-out, reused by Love
+ * Notes when it marks notes read) and `onForegroundPush(handler)`, which the
+ * `pushNotificationReceived` listener fans out to: a push that arrives while
+ * the app is in front. The shell shows it badge-only (`capacitor.config.ts`).
+ *
+ * Story 3.9 adds tap routing. The sender puts the push's kind in a top-level
+ * `kind` key; `viewForPush(data)` maps a tapped payload to a `ViewType`, and the
+ * `pushNotificationActionPerformed` listener hands it to `onPushTap`'s handlers
+ * (App subscribes and calls `setView`). The plugin keeps a tap until a listener
+ * exists, so a cold-start tap arrives once `listenOnce` runs on the signed-in
+ * start. This module must not import the store: `authSlice` imports it.
+ *
+ * Not here yet: date reminders (story 4.6 reuses `viewForPush` and `onPushTap`).
  */
 
 type ApnsEnvironment = 'sandbox' | 'production';
@@ -84,8 +100,87 @@ export type PushRegistrationOutcome = 'unavailable' | 'denied' | 'registering';
 
 let listening: Promise<void> | null = null;
 
-/** Whether this shell carries both native pieces push needs. */
-function hasNativePush(): boolean {
+const foregroundPushHandlers = new Set<() => void>();
+
+/**
+ * Calls `handler` for every push the shell reports while the app is in front.
+ * Returns the function that stops it. Handlers may be added before the
+ * listener exists; they hear pushes once registration has started.
+ */
+export function onForegroundPush(handler: () => void): () => void {
+  foregroundPushHandlers.add(handler);
+  return () => {
+    foregroundPushHandlers.delete(handler);
+  };
+}
+
+/** The view each `kind` the sender stamps on a payload opens (`send-push/payload.ts`, `withKind`). */
+const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
+  love_note: 'notes',
+  mood: 'partner',
+  interaction: 'partner',
+  partner_request: 'partner',
+  partner_accept: 'partner',
+  photo: 'photos',
+  date: 'home',
+};
+
+/** `aps.thread-id` of a love note; a push sent before `kind` existed is told apart by it alone. */
+const LOVE_NOTES_THREAD_ID = 'love-notes';
+
+/**
+ * The view a tapped push opens, from the payload the plugin reports as
+ * `notification.data`. A known `kind` decides; with none, thread id
+ * `love-notes` opens Love Notes (a push sent before the sender added `kind`).
+ * Anything else, including junk, answers null and the tap navigates nowhere.
+ * Never throws.
+ */
+export function viewForPush(data: unknown): ViewType | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const { kind, aps } = data as { kind?: unknown; aps?: unknown };
+  if (typeof kind === 'string' && Object.hasOwn(VIEW_FOR_KIND, kind)) return VIEW_FOR_KIND[kind];
+  if (typeof aps === 'object' && aps !== null) {
+    if ((aps as { 'thread-id'?: unknown })['thread-id'] === LOVE_NOTES_THREAD_ID) return 'notes';
+  }
+  return null;
+}
+
+const pushTapHandlers = new Set<(view: ViewType) => void>();
+
+/** The latest tap that arrived while no handler was subscribed; at most one. */
+let pendingTapView: ViewType | null = null;
+
+function deliverTap(handler: (view: ViewType) => void, view: ViewType): void {
+  try {
+    handler(view);
+  } catch (error) {
+    console.error('[Push] A push tap handler failed:', error);
+  }
+}
+
+/**
+ * Calls `handler` with the view of every push the person taps. Returns the
+ * function that stops it. A tap that arrived while nobody was subscribed (the
+ * latest one only) is delivered to the first handler that subscribes, once.
+ */
+export function onPushTap(handler: (view: ViewType) => void): () => void {
+  pushTapHandlers.add(handler);
+  if (pendingTapView !== null) {
+    const view = pendingTapView;
+    pendingTapView = null;
+    deliverTap(handler, view);
+  }
+  return () => {
+    pushTapHandlers.delete(handler);
+  };
+}
+
+/**
+ * Whether this shell carries both native pieces push needs. False on the
+ * website, in the Home Screen web app and in a shell installed before the
+ * push plugins existed.
+ */
+export function hasNativePush(): boolean {
   return (
     Capacitor.isNativePlatform() &&
     Capacitor.isPluginAvailable('PushNotifications') &&
@@ -116,12 +211,55 @@ function listenOnce(): Promise<void> {
     await PushNotifications.addListener('registrationError', (error) => {
       console.error('[Push] APNs registration failed:', error.error);
     });
+    await PushNotifications.addListener('pushNotificationReceived', () => {
+      for (const handler of [...foregroundPushHandlers]) {
+        try {
+          handler();
+        } catch (error) {
+          console.error('[Push] A foreground push handler failed:', error);
+        }
+      }
+    });
+    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      try {
+        if (action.actionId !== 'tap') return;
+        const view = viewForPush(action.notification?.data);
+        if (view === null) return;
+        if (pushTapHandlers.size === 0) {
+          pendingTapView = view;
+          return;
+        }
+        for (const handler of [...pushTapHandlers]) deliverTap(handler, view);
+      } catch (error) {
+        console.error('[Push] Could not route a push tap:', error);
+      }
+    });
   })().catch((error: unknown) => {
     // A failed setup must not stay cached: the next start tries again.
     listening = null;
     throw error;
   });
   return listening;
+}
+
+/** What iOS says about notification permission; `unavailable` when this shell cannot say. */
+export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unavailable';
+
+/**
+ * iOS's notification permission for this app, without asking for it. Never
+ * throws: a shell with no push plugins, or a plugin that fails, answers
+ * `unavailable`.
+ */
+export async function getPushPermission(): Promise<PushPermission> {
+  if (!hasNativePush()) return 'unavailable';
+  try {
+    const { receive } = await PushNotifications.checkPermissions();
+    if (receive === 'granted' || receive === 'denied') return receive;
+    return 'prompt';
+  } catch (error) {
+    console.error('[Push] Could not read the notification permission:', error);
+    return 'unavailable';
+  }
 }
 
 /**
@@ -212,12 +350,21 @@ export async function stopDevicePushes(): Promise<void> {
   }
   // Not removeAllDeliveredNotifications(): it rejects unless register() ran
   // this launch, and it would also empty Notification Center.
-  if (Capacitor.isPluginAvailable('AppBadge')) {
-    try {
-      await AppBadge.clear();
-    } catch (error) {
-      console.error('[Push] Could not clear the badge:', error);
-    }
-  }
+  await clearAppBadge();
   forgetToken();
+}
+
+/**
+ * Clears the app icon's badge. Does nothing outside the native shell or in a
+ * shell with no `AppBadge` plugin (one installed before story 3.2). Never
+ * throws; logs only failures. Delivered notifications stay in Notification
+ * Center.
+ */
+export async function clearAppBadge(): Promise<void> {
+  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('AppBadge')) return;
+  try {
+    await AppBadge.clear();
+  } catch (error) {
+    console.error('[Push] Could not clear the badge:', error);
+  }
 }

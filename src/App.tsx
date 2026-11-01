@@ -26,7 +26,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
-import { startPushRegistration } from './services/pushNotifications';
+import { onPushTap, startPushRegistration } from './services/pushNotifications';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
@@ -421,6 +421,20 @@ function App() {
     if (!authUserId) return;
     void startPushRegistration();
   }, [authUserId, authSessionVersion]);
+
+  // Story 3.9: tapping a push opens the view it is about, with history, so the
+  // URL matches. A tap the shell kept from a cold start arrives once the
+  // signed-in start above has added the listener. The welcome splash replaces
+  // the whole tree, so a tap also dismisses it, without stamping
+  // `lastWelcomeView`: the person did not see it.
+  useEffect(
+    () =>
+      onPushTap((view) => {
+        setShowSplash(false);
+        setView(view);
+      }),
+    [setView]
+  );
 
   // A sent partner request accepted while this device is on any screen. Called
   // after the refresh above on purpose: that effect starts the partner load in

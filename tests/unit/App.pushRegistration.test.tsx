@@ -12,14 +12,23 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/App';
 import { eventsService } from '../../src/services/eventsService';
+import type { ViewType } from '../../src/stores/slices/navigationSlice';
 import { useAppStore } from '../../src/stores/useAppStore';
 import { createAuthBootstrapSession } from '../support/factories/auth-bootstrap-notification-order';
 
 const push = vi.hoisted(() => ({
   startPushRegistration: vi.fn(async () => 'registering' as const),
+  tapHandler: null as ((view: ViewType) => void) | null,
+  onPushTap: vi.fn((handler: (view: ViewType) => void) => {
+    push.tapHandler = handler;
+    return () => {
+      if (push.tapHandler === handler) push.tapHandler = null;
+    };
+  }),
 }));
 vi.mock('../../src/services/pushNotifications', () => ({
   startPushRegistration: push.startPushRegistration,
+  onPushTap: push.onPushTap,
 }));
 
 vi.mock('../../src/services/localCopy', () => ({
@@ -98,6 +107,11 @@ vi.mock('../../src/components/DisplayNameSetup', () => ({
   ),
 }));
 vi.mock('../../src/components/PhotoUpload/PhotoUpload', () => ({ PhotoUpload: () => null }));
+// The real splash needs more of the motion mock than this file provides; a stub
+// makes "the splash is showing" deterministic.
+vi.mock('../../src/components/WelcomeSplash/WelcomeSplash', () => ({
+  WelcomeSplash: () => <p data-testid="welcome-splash">Welcome</p>,
+}));
 vi.mock('../../src/components/shared', () => ({
   NetworkStatusIndicator: () => null,
   SyncToast: () => null,
@@ -149,6 +163,7 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
+  push.tapHandler = null;
   auth.getSession.mockResolvedValue(session());
   profile.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Copy User' });
   vi.mocked(eventsService.getEvents).mockResolvedValue([]);
@@ -201,5 +216,44 @@ describe('App registers for push', () => {
 
     expect(screen.getByTestId('login-screen')).toBeInTheDocument();
     expect(push.startPushRegistration).not.toHaveBeenCalled();
+  });
+});
+
+describe('App opens the view a tapped push is about', () => {
+  it('sets currentView, and the URL with it, when a tap is reported', async () => {
+    await renderApp();
+    expect(useAppStore.getState().currentView).toBe('home');
+    expect(push.tapHandler).not.toBeNull();
+
+    await act(async () => push.tapHandler!('notes'));
+
+    expect(useAppStore.getState().currentView).toBe('notes');
+    expect(window.location.pathname).toBe('/notes');
+  });
+
+  it('dismisses the welcome splash a cold start would show, without stamping it as seen', async () => {
+    const stale = String(NOW.getTime() - 61 * 60 * 1000);
+    localStorage.setItem('lastWelcomeView', stale);
+    render(<App />);
+    await act(async () => {});
+    expect(await screen.findByTestId('welcome-splash')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-container')).not.toBeInTheDocument();
+    expect(push.tapHandler).not.toBeNull();
+
+    await act(async () => push.tapHandler!('notes'));
+
+    expect(screen.queryByTestId('welcome-splash')).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(useAppStore.getState().currentView).toBe('notes');
+    expect(localStorage.getItem('lastWelcomeView')).toBe(stale);
+  });
+
+  it('stops listening when App unmounts', async () => {
+    await renderApp();
+    expect(push.tapHandler).not.toBeNull();
+
+    cleanup();
+
+    expect(push.tapHandler).toBeNull();
   });
 });

@@ -9,7 +9,11 @@ import XCTest
 //   scroll up|down          swipe the web view to show what is above or below
 //   dump                    print the web view's elements as one JSON line,
 //                           frames in the same page points `tap` takes
-//   signin EMAIL PASSWORD   fill the login form and submit it
+//   signin EMAIL PASSWORD [decline-push]
+//                           fill the login form and submit it; with
+//                           decline-push, answer the notification permission
+//                           alert Don't Allow (XCUITest's own handling taps
+//                           Allow on the first interaction after sign-in)
 //   signout                 tap Settings, then Sign out, and wait for the
 //                           login form
 // Every step brings the shell to the front first. Backgrounding is not a
@@ -52,7 +56,9 @@ final class Drive: XCTestCase {
         case ("dump", 1):
             say(try dump(webView()))
         case ("signin", 3):
-            try signIn(email: words[1], password: words[2])
+            try signIn(email: words[1], password: words[2], declinePush: false)
+        case ("signin", 4) where words[3] == "decline-push":
+            try signIn(email: words[1], password: words[2], declinePush: true)
         case ("signout", 1):
             signOut()
         default:
@@ -60,7 +66,21 @@ final class Drive: XCTestCase {
         }
     }
 
-    func signIn(email: String, password: String) throws {
+    // SpringBoard's alert writes Don't with either apostrophe.
+    func declineNotificationAlert() {
+        let names = ["Don't Allow", "Don\u{2019}t Allow"]
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let button = springboard.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier IN %@ OR label IN %@", names, names)).firstMatch
+        if button.waitForExistence(timeout: 20) {
+            button.tap()
+            say("tapped Don't Allow")
+        } else {
+            say("no permission alert to decline (an app that has already answered is not asked again: sim permission reset)")
+        }
+    }
+
+    func signIn(email: String, password: String, declinePush: Bool) throws {
         let field = app.webViews.textFields.firstMatch
         guard field.waitForExistence(timeout: 20) else {
             return XCTFail("login form not shown: already signed in, or the page did not load")
@@ -83,6 +103,9 @@ final class Drive: XCTestCase {
         secret.tap()
         // Return submits the form, so the keyboard cannot hide the button.
         secret.typeText(password + "\n")
+        // Before any other query of the app: the first interaction after the
+        // alert shows would make XCUITest answer it Allow.
+        if declinePush { declineNotificationAlert() }
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: secret)
         if XCTWaiter.wait(for: [gone], timeout: 20) != .completed {
             let texts = app.webViews.staticTexts.allElementsBoundByIndex.prefix(40).map(\.label)

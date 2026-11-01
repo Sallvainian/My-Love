@@ -28,6 +28,8 @@ vi.mock('../../../api/supabaseClient', () => ({
 vi.mock('../../../api/authService', () => ({
   authService: { getUser: api.getUser },
 }));
+// Marking notes read is covered by useLoveNotesReadMarker.test.ts; here it must make no request.
+vi.mock('../../../hooks/useLoveNotesReadMarker', () => ({ useLoveNotesReadMarker: () => {} }));
 vi.mock('../../../hooks/useLoveNotes', () => ({
   useLoveNotes: () => ({
     notes: [],

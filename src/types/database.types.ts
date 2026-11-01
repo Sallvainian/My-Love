@@ -163,6 +163,48 @@ export type Database = {
         }
         Relationships: []
       }
+      date_changes: {
+        Row: {
+          action: string
+          created_at: string
+          event_id: string | null
+          id: string
+          sender_id: string
+          subject: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          sender_id: string
+          subject: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          sender_id?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "date_changes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "date_changes_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string
@@ -319,6 +361,21 @@ export type Database = {
           image_url?: string | null
           to_user_id?: string
           written_at?: string | null
+        }
+        Relationships: []
+      }
+      love_notes_read_markers: {
+        Row: {
+          last_opened_at: string
+          user_id: string
+        }
+        Insert: {
+          last_opened_at?: string
+          user_id: string
+        }
+        Update: {
+          last_opened_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -486,35 +543,107 @@ export type Database = {
         }
         Relationships: []
       }
+      push_preferences: {
+        Row: {
+          created_at: string
+          dates: boolean
+          love_notes: boolean
+          moods: boolean
+          partner_requests: boolean
+          photos: boolean
+          pokes_and_kisses: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dates?: boolean
+          love_notes?: boolean
+          moods?: boolean
+          partner_requests?: boolean
+          photos?: boolean
+          pokes_and_kisses?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dates?: boolean
+          love_notes?: boolean
+          moods?: boolean
+          partner_requests?: boolean
+          photos?: boolean
+          pokes_and_kisses?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       push_requests: {
         Row: {
           created_at: string
+          date_change_id: string | null
           delivery: string
           environment: string
           id: string
-          note_id: string
+          interaction_id: string | null
+          mood_id: string | null
+          note_id: string | null
+          partner_accept_id: string | null
+          partner_request_id: string | null
           payload: NonNullable<Json>
+          photo_id: string | null
           token: string
         }
         Insert: {
           created_at?: string
+          date_change_id?: string | null
           delivery: string
           environment: string
           id?: string
-          note_id: string
+          interaction_id?: string | null
+          mood_id?: string | null
+          note_id?: string | null
+          partner_accept_id?: string | null
+          partner_request_id?: string | null
           payload: NonNullable<Json>
+          photo_id?: string | null
           token: string
         }
         Update: {
           created_at?: string
+          date_change_id?: string | null
           delivery?: string
           environment?: string
           id?: string
-          note_id?: string
+          interaction_id?: string | null
+          mood_id?: string | null
+          note_id?: string | null
+          partner_accept_id?: string | null
+          partner_request_id?: string | null
           payload?: NonNullable<Json>
+          photo_id?: string | null
           token?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "push_requests_date_change_id_fkey"
+            columns: ["date_change_id"]
+            isOneToOne: false
+            referencedRelation: "date_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_mood_id_fkey"
+            columns: ["mood_id"]
+            isOneToOne: false
+            referencedRelation: "moods"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "push_requests_note_id_fkey"
             columns: ["note_id"]
@@ -527,6 +656,27 @@ export type Database = {
             columns: ["note_id"]
             isOneToOne: false
             referencedRelation: "love_notes_visible"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_partner_accept_id_fkey"
+            columns: ["partner_accept_id"]
+            isOneToOne: false
+            referencedRelation: "partner_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_partner_request_id_fkey"
+            columns: ["partner_request_id"]
+            isOneToOne: false
+            referencedRelation: "partner_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
             referencedColumns: ["id"]
           },
         ]
@@ -665,10 +815,12 @@ export type Database = {
           to_user_id: string
         }[]
       }
+      mark_love_notes_read: { Args: Record<PropertyKey, never>; Returns: string }
       register_push_device: {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
+      unread_love_note_count: { Args: { p_user_id: string }; Returns: number }
       unregister_push_device: {
         Args: { p_token: string }
         Returns: undefined

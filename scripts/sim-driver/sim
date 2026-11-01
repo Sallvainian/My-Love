@@ -26,9 +26,11 @@ TOOL=${0:A:h}
 REPO=$(git -C "$TOOL" rev-parse --show-toplevel)
 WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver/${REPO:t}-$(print -rn -- $REPO | shasum | cut -c1-8)}
 BUNDLE=dev.sallvain.mylove
-# The first pair (seeded), then the second (no rows): signin's targets in order.
+# The first pair (seeded), the second (no rows), then the unlinked pair (no
+# partner, no requests): signin's targets in order.
 EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com
-  simdriver-other@test.example.com simdriver-other-partner@test.example.com)
+  simdriver-other@test.example.com simdriver-other-partner@test.example.com
+  simdriver-unlinked@test.example.com simdriver-unlinked-other@test.example.com)
 # A shell that must stay on its own web code checks an address nothing
 # answers: a failed check leaves it on the build it has (story 7's Setup).
 DEAD_UPDATE_URL=http://127.0.0.1:9/updates/latest.json
@@ -55,12 +57,17 @@ Shell:
   uninstall              Remove the shell and its data.
 
 Accounts (local stack only):
-  provision              Create or reset both fixture pairs and link each:
-                         Casey and Jessie, seeded so every view scrolls;
-                         Harper and Morgan, love notes wiped, nothing seeded.
-  signin [partner|other|other-partner]
+  provision              Create or reset the fixture accounts: Casey and Jessie,
+                         linked and seeded so every view scrolls; Harper and
+                         Morgan, linked, love notes wiped, nothing seeded; Riley
+                         and Quinn, unlinked, partner requests deleted.
+  signin [partner|other|other-partner|unlinked|unlinked-other] [--decline-push]
                          Sign in through the login form (default: Casey;
-                         partner: Jessie; other: Harper; other-partner: Morgan).
+                         partner: Jessie; other: Harper; other-partner: Morgan;
+                         unlinked: Riley; unlinked-other: Quinn). The runner
+                         answers a notification permission alert Allow when it
+                         next touches the app; --decline-push answers it Don't
+                         Allow instead (after sim permission reset).
   signout                Sign out through Settings and wait for the login form.
 
 Device:
@@ -87,11 +94,15 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          (the shell from the last sim build's App.app; it
                          loses its sign-in, so run sim signin again).
   push FILE [--host]     Send FILE, JSON with an aps object (simctl push).
-  banner FILE [--tap cold|background] [--host]
+  banner FILE [--tap cold|background | --front] [--host]
                          Put Settings in front, push FILE, print the banner's
                          label. --tap taps it, the app first terminated
                          (cold) or launched (background), and prints the
-                         app's state before and after.
+                         app's state before and after. --front puts the app
+                         itself in front instead of Settings, pushes FILE and
+                         watches: the shell shows no banner for a foreground
+                         push, so a pass ends in "no banner" (exit 1). It
+                         cannot be combined with --tap (exit 2).
   center [--host]        The app's Notification Center groups as one JSON
                          line: each group's text (its newest notification's
                          title and body) and notification count.
@@ -99,7 +110,9 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          (proven with 8 groups), then puts the pose and
                          orientation back; a folded landscape comes back
                          only when the shell, the host, Settings or Safari
-                         was in front.
+                         was in front. It ends on the Home Screen, except
+                         that a folded-landscape start gets its front app
+                         back.
   badge [--host]         The app icon's badge ("3 new items"), or none.
 
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
@@ -441,6 +454,11 @@ cmd_provision() {
 }
 
 cmd_signin() {
+  local decline=''
+  if [[ ${@[-1]:-} == --decline-push ]]; then
+    decline=decline-push
+    set -- ${@[1,-2]}
+  fi
   local which=${1:-}
   require_stack
   local email
@@ -449,13 +467,15 @@ cmd_signin() {
     partner) email=${EMAILS[2]} ;;
     other) email=${EMAILS[3]} ;;
     other-partner) email=${EMAILS[4]} ;;
-    *) die 2 "signin takes nothing, 'partner', 'other' or 'other-partner'" ;;
+    unlinked) email=${EMAILS[5]} ;;
+    unlinked-other) email=${EMAILS[6]} ;;
+    *) die 2 "signin takes nothing, 'partner', 'other', 'other-partner', 'unlinked' or 'unlinked-other'" ;;
   esac
   local password
   password=$(node --input-type=module -e '
     const m = await import(process.argv[1]); console.log(m.TEST_USER_PASSWORD);
   ' $REPO/tests/support/test-credentials.ts)
-  drive signin $email $password
+  drive signin $email $password $decline
 }
 
 # ---- page --------------------------------------------------------------------
@@ -606,19 +626,29 @@ cmd_push() {
 # log is polled for "watching", then the push goes, then the step ends.
 cmd_banner() {
   target_args "$@"
-  local file=${REST[1]:-} tap=
-  [[ -n $file ]] || die 2 "banner takes FILE [--tap cold|background] (and --host)"
+  local file=${REST[1]:-} tap= front=
+  [[ -n $file ]] || die 2 "banner takes FILE [--tap cold|background | --front] (and --host)"
   if (( $#REST > 1 )); then
-    (( $#REST == 3 )) && [[ $REST[2] == --tap && $REST[3] == (cold|background) ]] ||
+    if (( ${REST[(I)--front]} && ${REST[(I)--tap]} )); then
+      die 2 "banner: --front and --tap cannot be combined"
+    elif [[ $REST[2] == --front ]] && (( $#REST == 2 )); then
+      front=1
+    elif [[ $REST[2] == --tap ]] && (( $#REST == 3 )) && [[ $REST[3] == (cold|background) ]]; then
+      tap=$REST[3]
+    elif [[ $REST[2] == --tap ]]; then
       die 2 "banner: --tap takes cold or background"
-    tap=$REST[3]
+    else
+      die 2 "banner takes FILE [--tap cold|background | --front] (and --host)"
+    fi
   fi
   check_payload $file
   require_booted
   ensure_runner
-  local -a fields=(banner $TARGET "$ICON" ${tap:+$tap})
+  local -a fields=(banner $TARGET "$ICON" ${tap:+$tap} ${front:+front})
   local log=$WORK/logs/notify.log code=0 tries=0
-  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM
+  # 130 for INT and 143 for TERM, as center exits.
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 143' TERM
   BG=1 start_step Notify "${(pj:\t:)fields}"
   until grep '^NOTIFY watching' $log >/dev/null; do
     if ! kill -0 $STEP_PID 2>/dev/null; then

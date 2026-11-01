@@ -5,8 +5,9 @@
  * name, your own birthday, the couple's shared "Together since" start and
  * wedding date), the couple's
  * countdowns (events and anniversaries), photos (this device's mobile-data
- * choice for the offline album), about (with the welcome-message replay) and
- * sign out.
+ * choice for the offline album), push and reminders (a switch for each kind of
+ * push; the native shell only, see `PushSettings`), about (with the
+ * welcome-message replay) and sign out.
  *
  * @component
  */
@@ -51,8 +52,8 @@ import {
 } from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
-
-const ROW_BUTTON = `${ROW} w-full rounded-[14px] text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent`;
+import { PushSettings } from './PushSettings';
+import { ROW_BUTTON, SwitchRow } from './SwitchRow';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -444,45 +445,14 @@ function MobileDataPhotosRow() {
     : "This phone doesn't tell the app whether it's on Wi-Fi, so photos are saved on any connection.";
 
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={allowed}
-      aria-labelledby="settings-mobile-data-photos-label"
-      aria-describedby="settings-mobile-data-photos-helper"
-      onClick={() => setPhotosOverMobileData(!allowed)}
-      className={ROW_BUTTON}
-      data-testid="settings-mobile-data-photos"
-    >
-      <span className={TILE} aria-hidden="true">
-        <Signal className="h-4.25 w-4.25" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span id="settings-mobile-data-photos-label" className="text-[15px] font-medium text-ink">
-          Download photos over mobile data
-        </span>
-        <span
-          id="settings-mobile-data-photos-helper"
-          className="text-[13px] wrap-break-word text-muted"
-          data-testid="settings-mobile-data-photos-helper"
-        >
-          {helper}
-        </span>
-      </span>
-      {/* The switch's track and thumb; the state itself is `aria-checked`. */}
-      <span
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
-          allowed ? 'bg-fill' : 'bg-line-strong'
-        }`}
-        aria-hidden="true"
-      >
-        <span
-          className={`inline-block h-5 w-5 rounded-full bg-card shadow transition-transform ${
-            allowed ? 'translate-x-6' : 'translate-x-1'
-          }`}
-        />
-      </span>
-    </button>
+    <SwitchRow
+      id="settings-mobile-data-photos"
+      icon={Signal}
+      label="Download photos over mobile data"
+      helper={helper}
+      checked={allowed}
+      onChange={setPhotosOverMobileData}
+    />
   );
 }
 
@@ -688,6 +658,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           <MobileDataPhotosRow />
         </div>
       </section>
+
+      {/* Push and reminders — only in the native shell with the push plugins. */}
+      <PushSettings />
 
       {/* About */}
       <section className="flex flex-col gap-2" aria-labelledby="settings-about-label">

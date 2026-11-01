@@ -64,6 +64,8 @@ vi.mock('../../../stores/useAppStore', () => ({
 }));
 // The hook's fetching and realtime are not under test; its notes and its
 // removeFailedMessage are the real slice's.
+// Marking notes read is covered by useLoveNotesReadMarker.test.ts; here it must make no request.
+vi.mock('../../../hooks/useLoveNotesReadMarker', () => ({ useLoveNotesReadMarker: () => {} }));
 vi.mock('../../../hooks/useLoveNotes', () => ({
   useLoveNotes: () => ({
     notes: useStore(holder.store, (state) => state.notes),
