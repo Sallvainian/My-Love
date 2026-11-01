@@ -66,6 +66,14 @@
  * read answers 500 and claims nothing. Opening Love Notes writes the marker
  * (`mark_love_notes_read`), which resets the count.
  *
+ * ## The kind
+ *
+ * Every payload also carries a top-level `kind` (`withKind`), the `PushKind`
+ * handled: `love_note`, `mood`, `photo`, `interaction` (poke and kiss alike),
+ * `date`, `partner_request` or `partner_accept`. It is the web code's tap
+ * routing key (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is
+ * not touched.
+ *
  * ## Dedupe and the recorded path
  *
  * `push_requests` is unique on (source row, device token), one column per
@@ -98,6 +106,7 @@ import {
   type PushDateChange,
   type PushMood,
   withBadge,
+  withKind,
 } from './payload.ts';
 
 /** What a push is about; each kind has its own column in `push_requests`. */
@@ -421,7 +430,7 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
       deps.db.listDevices(source.recipientId),
       deps.db.countUnreadNotes(source.recipientId),
     ]);
-    const payload = withBadge(source.buildPayload(senderName), unread);
+    const payload = withKind(withBadge(source.buildPayload(senderName), unread), source.kind);
     const now = deps.now ?? Date.now;
 
     await Promise.all(

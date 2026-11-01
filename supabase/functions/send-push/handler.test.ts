@@ -1,4 +1,4 @@
-import { assertEquals } from 'jsr:@std/assert@1';
+import { assertEquals, assertFalse } from 'jsr:@std/assert@1';
 
 import type { ApnsClient } from './apns.ts';
 import {
@@ -173,6 +173,7 @@ Deno.test('unconfigured: every device gets a recorded request and nothing is sen
     ['tok-b', 'production', 'recorded'],
   ]);
   assertEquals(claimed[0].payload, {
+    kind: 'love_note',
     aps: { alert: { title: 'Casey', body: 'Thinking of you' }, 'thread-id': 'love-notes', badge: 0 },
   });
 });
@@ -458,6 +459,7 @@ Deno.test('a mood records one request per partner device with the mood labels', 
     ['mood', MOOD_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
+    kind: 'mood',
     aps: { alert: { title: 'Casey', body: 'Logged a mood: Happy, Grateful' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
 });
@@ -476,6 +478,7 @@ Deno.test('a photo, a poke and a kiss record their R7 text', async () => {
     });
     assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 0, gone: 0 });
     assertEquals(claimed[0].payload, {
+      kind: body.kind as string,
       aps: { alert: { title: 'Casey', body: text }, 'thread-id': PARTNER_THREAD, badge: 0 },
     });
   }
@@ -621,6 +624,7 @@ Deno.test('a date change records the R7 body for every partner device, on the pa
     ['date', DATE_CHANGE_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
+    kind: 'date',
     aps: { alert: { title: 'Casey', body: 'Added an event: Paris trip' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
 });
@@ -741,6 +745,7 @@ Deno.test('a partner request records the asker\'s name and R7 body on the asked 
     ['partner_request', PARTNER_REQUEST_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
+    kind: 'partner_request',
     aps: { alert: { title: 'Casey', body: 'Sent you a partner request' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
   // The asker is not a partner yet: no partner lookup, and only the asked person's devices.
@@ -766,7 +771,7 @@ Deno.test('a partner request pushes whatever its status, and carries no sound or
     });
     assertEquals(claimed.length, 1, status);
     const { payload } = claimed[0];
-    assertEquals(Object.keys(payload), ['aps']);
+    assertEquals(Object.keys(payload).sort(), ['aps', 'kind']);
     assertEquals(Object.keys(payload.aps).sort(), ['alert', 'badge', 'thread-id']);
   }
 });
@@ -791,6 +796,7 @@ Deno.test('an acceptance records the accepter\'s name and R7 body on the asker\'
     ['partner_accept', PARTNER_REQUEST_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
+    kind: 'partner_accept',
     aps: { alert: { title: 'Casey', body: 'Accepted your partner request' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
   assertEquals(lookups, []);
@@ -1067,7 +1073,36 @@ Deno.test('every kind records the recipient\'s unread count as aps.badge, zero i
   }
 });
 
-Deno.test('the badge reaches APNs in the payload it sends', async () => {
+// ---- Story 3.9: the kind ----
+
+Deno.test('every kind records its own kind beside aps, and aps carries no kind', async () => {
+  for (const { kind, body, rows } of KIND_CASES) {
+    const claimed: PushRequestRow[] = [];
+    await handleSendPush(request(body), {
+      db: fakeDb({ ...rows, devices: TWO_DEVICES, claimed }),
+      apns: null,
+    });
+    assertEquals(claimed.length, 2, kind);
+    for (const row of claimed) {
+      assertEquals(row.payload.kind, kind);
+      assertEquals(Object.keys(row.payload).sort(), ['aps', 'kind'], kind);
+      assertFalse('kind' in row.payload.aps, kind);
+    }
+  }
+});
+
+Deno.test('a poke and a kiss are both the interaction kind', async () => {
+  for (const type of ['poke', 'kiss']) {
+    const claimed: PushRequestRow[] = [];
+    await handleSendPush(request({ kind: 'interaction', id: INTERACTION_ID }), {
+      db: fakeDb({ interaction: { ...poke, type }, devices: [TWO_DEVICES[0]], claimed }),
+      apns: null,
+    });
+    assertEquals(claimed[0].payload.kind, 'interaction', type);
+  }
+});
+
+Deno.test('the badge and the kind reach APNs in the payload it sends', async () => {
   const sent: unknown[] = [];
   const apns: ApnsClient = {
     send: (_token, _environment, payload) => {
@@ -1080,6 +1115,7 @@ Deno.test('the badge reaches APNs in the payload it sends', async () => {
     apns,
   });
   assertEquals((sent[0] as { aps: { badge: number } }).aps.badge, 2);
+  assertEquals((sent[0] as { kind: string }).kind, 'mood');
 });
 
 Deno.test('the count is looked up for the recipient and never the sender', async () => {

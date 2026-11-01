@@ -135,6 +135,7 @@ test.describe('Love note push trigger', () => {
     expect(rows.some((r) => r.token === senderPhone)).toBe(false);
     for (const row of rows) {
       expect(row.payload).toEqual({
+        kind: 'love_note',
         aps: {
           alert: { title: sender?.display_name?.trim() || 'Your partner', body: 'Thinking of you' },
           'thread-id': 'love-notes',
@@ -351,8 +352,9 @@ test.describe('Love note push trigger', () => {
   });
 });
 
-/** The R7 text each partner-activity push carries. */
-const partnerPayload = (title: string, body: string) => ({
+/** The R7 text each partner-activity push carries, and the `kind` the tap routes on (story 3.9). */
+const partnerPayload = (kind: string, title: string, body: string) => ({
+  kind,
   aps: { alert: { title, body }, 'thread-id': 'partner-activity', badge: expect.any(Number) },
 });
 
@@ -420,7 +422,7 @@ test.describe('Mood, photo, poke and kiss push', () => {
       ].sort()
     );
     for (const row of rows) {
-      expect(row.payload).toEqual(partnerPayload(title, 'Logged a mood: Happy, Grateful'));
+      expect(row.payload).toEqual(partnerPayload('mood', title, 'Logged a mood: Happy, Grateful'));
     }
 
     // The same (user_id, created_at) sent again is merged into the row: no INSERT, no push.
@@ -489,7 +491,7 @@ test.describe('Mood, photo, poke and kiss push', () => {
       .toBe(1);
     const [row] = await requestsFor(supabaseAdmin, photoId, 'photo_id');
     expect(row.token).toBe(token);
-    expect(row.payload).toEqual(partnerPayload(sender?.display_name?.trim() || 'Your partner', 'Added a photo'));
+    expect(row.payload).toEqual(partnerPayload('photo', sender?.display_name?.trim() || 'Your partner', 'Added a photo'));
 
     const retry = await send();
     expect(retry.error).toBeNull();
@@ -538,7 +540,7 @@ test.describe('Mood, photo, poke and kiss push', () => {
         .toBe(1);
       const [row] = await requestsFor(supabaseAdmin, interaction!.id, 'interaction_id');
       expect(row.token).toBe(token);
-      expect(row.payload).toEqual(partnerPayload(title, body));
+      expect(row.payload).toEqual(partnerPayload('interaction', title, body));
 
       // The same {kind, id} posted again is skipped.
       const replay = await postToSender(supabaseAdmin, { kind: 'interaction', id: interaction!.id });
@@ -654,7 +656,7 @@ test.describe('Date change push', () => {
       ].sort()
     );
     expect(rows.some((r) => r.token === devices.senderPhone)).toBe(false);
-    for (const row of rows) expect(row.payload).toEqual(partnerPayload(title, body));
+    for (const row of rows) expect(row.payload).toEqual(partnerPayload('date', title, body));
   }
 
   /**
@@ -1021,7 +1023,7 @@ test.describe('Partner request push', () => {
       ].sort()
     );
     for (const row of requestRows) {
-      expect(row.payload).toEqual(partnerPayload(asker.name, 'Sent you a partner request'));
+      expect(row.payload).toEqual(partnerPayload('partner_request', asker.name, 'Sent you a partner request'));
     }
     expect(await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).toEqual([]);
 
@@ -1048,7 +1050,7 @@ test.describe('Partner request push', () => {
     expect(accept.error).toBeNull();
     const acceptRows = await awaitRequests(supabaseAdmin, accepted, 'partner_accept_id', 1);
     expect(acceptRows.map((r) => [r.token, r.environment, r.delivery])).toEqual([[askerPhone, 'sandbox', 'recorded']]);
-    expect(acceptRows[0].payload).toEqual(partnerPayload(asked.name, 'Accepted your partner request'));
+    expect(acceptRows[0].payload).toEqual(partnerPayload('partner_accept', asked.name, 'Accepted your partner request'));
 
     // A replayed acceptance is skipped.
     const acceptReplay = await postToSender(supabaseAdmin, { kind: 'partner_accept', id: accepted });

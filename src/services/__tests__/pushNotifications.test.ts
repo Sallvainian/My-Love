@@ -125,7 +125,7 @@ describe('startPushRegistration', () => {
     await startPushRegistration();
     await startPushRegistration();
 
-    expect(push.addListener).toHaveBeenCalledTimes(3); // registration, registrationError, pushNotificationReceived, once
+    expect(push.addListener).toHaveBeenCalledTimes(4); // registration, registrationError, pushNotificationReceived, pushNotificationActionPerformed, once
     expect(push.register).toHaveBeenCalledTimes(2);
   });
 
@@ -500,6 +500,213 @@ describe('onForegroundPush', () => {
     handlerFor('pushNotificationReceived')({});
 
     expect(after).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+});
+
+describe('viewForPush', () => {
+  const thread = (id: string) => ({ aps: { 'thread-id': id } });
+
+  it('maps every kind to its view', async () => {
+    const { viewForPush } = await freshModule();
+    const cases: [string, string][] = [
+      ['love_note', 'notes'],
+      ['mood', 'partner'],
+      ['interaction', 'partner'],
+      ['partner_request', 'partner'],
+      ['partner_accept', 'partner'],
+      ['photo', 'photos'],
+      ['date', 'home'],
+    ];
+    for (const [kind, view] of cases) {
+      expect(viewForPush({ kind, aps: thread('partner-activity').aps }), kind).toBe(view);
+    }
+  });
+
+  it('lets a known kind win over the thread id', async () => {
+    const { viewForPush } = await freshModule();
+
+    expect(viewForPush({ kind: 'mood', ...thread('love-notes') })).toBe('partner');
+  });
+
+  it('opens Love Notes for an old payload with no kind and thread love-notes', async () => {
+    const { viewForPush } = await freshModule();
+
+    expect(viewForPush(thread('love-notes'))).toBe('notes');
+  });
+
+  it('navigates nowhere for an old payload on another thread', async () => {
+    const { viewForPush } = await freshModule();
+
+    expect(viewForPush(thread('partner-activity'))).toBeNull();
+  });
+
+  it('navigates nowhere for junk, and never throws', async () => {
+    const { viewForPush } = await freshModule();
+    const junk: unknown[] = [
+      undefined,
+      null,
+      'love_note',
+      42,
+      [],
+      {},
+      { kind: 'x' },
+      { kind: 42 },
+      { kind: 'toString' },
+      { kind: '__proto__' },
+      { aps: null },
+      { aps: 'love-notes' },
+      { aps: { 'thread-id': 7 } },
+    ];
+    for (const data of junk) expect(viewForPush(data), JSON.stringify(data)).toBeNull();
+  });
+});
+
+describe('onPushTap', () => {
+  const tap = (kind: string, actionId = 'tap') => ({
+    actionId,
+    notification: { data: { kind, aps: { 'thread-id': 'partner-activity' } } },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    push.checkPermissions.mockResolvedValue({ receive: 'granted' });
+  });
+
+  it('adds no listener until registration starts', async () => {
+    const { onPushTap } = await freshModule();
+    onPushTap(vi.fn());
+
+    expect(push.addListener).not.toHaveBeenCalled();
+  });
+
+  it('hands a tapped push\'s view to every handler', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    const first = vi.fn();
+    const second = vi.fn();
+    onPushTap(first);
+    onPushTap(second);
+    await startPushRegistration();
+
+    handlerFor('pushNotificationActionPerformed')(tap('love_note'));
+
+    expect(first).toHaveBeenCalledExactlyOnceWith('notes');
+    expect(second).toHaveBeenCalledExactlyOnceWith('notes');
+  });
+
+  it('ignores a dismiss and any other action', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    const handler = vi.fn();
+    onPushTap(handler);
+    await startPushRegistration();
+
+    handlerFor('pushNotificationActionPerformed')(tap('love_note', 'dismiss'));
+    handlerFor('pushNotificationActionPerformed')(tap('love_note', 'reply'));
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('navigates nowhere for a tap it cannot route, and never throws', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    const handler = vi.fn();
+    onPushTap(handler);
+    await startPushRegistration();
+    const listener = handlerFor('pushNotificationActionPerformed');
+
+    expect(() => {
+      listener({ actionId: 'tap', notification: { data: { kind: 'x' } } });
+      listener({ actionId: 'tap', notification: {} });
+      listener({ actionId: 'tap' });
+      listener(undefined);
+    }).not.toThrow();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('keeps a tap that arrives before anyone subscribes, and delivers it once', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    await startPushRegistration();
+
+    handlerFor('pushNotificationActionPerformed')(tap('photo'));
+    const handler = vi.fn();
+    const stop = onPushTap(handler);
+
+    expect(handler).toHaveBeenCalledExactlyOnceWith('photos');
+
+    stop();
+    const later = vi.fn();
+    onPushTap(later);
+    expect(later).not.toHaveBeenCalled();
+  });
+
+  it('keeps only the latest tap while nobody is subscribed', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    await startPushRegistration();
+
+    handlerFor('pushNotificationActionPerformed')(tap('photo'));
+    handlerFor('pushNotificationActionPerformed')(tap('love_note'));
+    handlerFor('pushNotificationActionPerformed')(tap('x'));
+    const handler = vi.fn();
+    onPushTap(handler);
+
+    expect(handler).toHaveBeenCalledExactlyOnceWith('notes');
+  });
+
+  it('keeps nothing for a tap a handler already received', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    await startPushRegistration();
+    const stop = onPushTap(vi.fn());
+
+    handlerFor('pushNotificationActionPerformed')(tap('mood'));
+    stop();
+    const handler = vi.fn();
+    onPushTap(handler);
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('stops calling a handler once it is removed', async () => {
+    const { onPushTap, startPushRegistration } = await freshModule();
+    const handler = vi.fn();
+    const stop = onPushTap(handler);
+    await startPushRegistration();
+
+    stop();
+    handlerFor('pushNotificationActionPerformed')(tap('mood'));
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('a throwing handler is logged and does not stop the others', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { onPushTap, startPushRegistration } = await freshModule();
+    const after = vi.fn();
+    onPushTap(() => {
+      throw new Error('boom');
+    });
+    onPushTap(after);
+    await startPushRegistration();
+
+    expect(() => handlerFor('pushNotificationActionPerformed')(tap('mood'))).not.toThrow();
+
+    expect(after).toHaveBeenCalledExactlyOnceWith('partner');
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+
+  it('a handler that throws on a kept tap is logged, not rethrown', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { onPushTap, startPushRegistration } = await freshModule();
+    await startPushRegistration();
+    handlerFor('pushNotificationActionPerformed')(tap('mood'));
+
+    expect(() =>
+      onPushTap(() => {
+        throw new Error('boom');
+      })
+    ).not.toThrow();
     expect(errorLog).toHaveBeenCalledTimes(1);
     errorLog.mockRestore();
   });

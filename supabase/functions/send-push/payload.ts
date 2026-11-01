@@ -26,6 +26,12 @@
  * `payload.test.ts`: `love-notes` (`LOVE_NOTES_THREAD_ID`) for a love note and
  * `partner-activity` (`PARTNER_ACTIVITY_THREAD_ID`) for every other kind,
  * which story 4.6's reminders will use too.
+ *
+ * Story 3.9 adds `kind`, a top-level key beside `aps` (an APNs custom key): the
+ * `PushKind` the sender handled (`love_note`, `mood`, `photo`, `interaction`,
+ * `date`, `partner_request`, `partner_accept`). `withKind` puts it on every
+ * payload. The web code reads it on a tap to choose the view to open
+ * (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is unchanged.
  */
 
 export const LOVE_NOTES_THREAD_ID = 'love-notes';
@@ -78,6 +84,8 @@ export interface PushNote {
 }
 
 export interface ApnsPayload {
+  /** The `PushKind` this push is about; the web code's tap routing key. Set by `withKind`. */
+  kind?: string;
   aps: {
     alert: { title: string; body: string };
     'thread-id': string;
@@ -88,7 +96,12 @@ export interface ApnsPayload {
 
 /** A copy of the payload carrying `aps.badge`; the input is not changed. */
 export function withBadge(payload: ApnsPayload, count: number): ApnsPayload {
-  return { aps: { ...payload.aps, badge: count } };
+  return { ...payload, aps: { ...payload.aps, badge: count } };
+}
+
+/** A copy of the payload carrying the top-level `kind`; the input is not changed. */
+export function withKind(payload: ApnsPayload, kind: string): ApnsPayload {
+  return { ...payload, kind };
 }
 
 /**

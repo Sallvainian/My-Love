@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { isOnline } from '../api/errorHandlers';
 import { supabase } from '../api/supabaseClient';
+import type { ViewType } from '../stores/slices/navigationSlice';
 
 /**
  * Push registration for the native iOS shell.
@@ -33,7 +34,14 @@ import { supabase } from '../api/supabaseClient';
  * `pushNotificationReceived` listener fans out to: a push that arrives while
  * the app is in front. The shell shows it badge-only (`capacitor.config.ts`).
  *
- * Not here yet: tap handling (a later story of the epic).
+ * Story 3.9 adds tap routing. The sender puts the push's kind in a top-level
+ * `kind` key; `viewForPush(data)` maps a tapped payload to a `ViewType`, and the
+ * `pushNotificationActionPerformed` listener hands it to `onPushTap`'s handlers
+ * (App subscribes and calls `setView`). The plugin keeps a tap until a listener
+ * exists, so a cold-start tap arrives once `listenOnce` runs on the signed-in
+ * start. This module must not import the store: `authSlice` imports it.
+ *
+ * Not here yet: date reminders (story 4.6 reuses `viewForPush` and `onPushTap`).
  */
 
 type ApnsEnvironment = 'sandbox' | 'production';
@@ -106,6 +114,67 @@ export function onForegroundPush(handler: () => void): () => void {
   };
 }
 
+/** The view each `kind` the sender stamps on a payload opens (`send-push/payload.ts`, `withKind`). */
+const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
+  love_note: 'notes',
+  mood: 'partner',
+  interaction: 'partner',
+  partner_request: 'partner',
+  partner_accept: 'partner',
+  photo: 'photos',
+  date: 'home',
+};
+
+/** `aps.thread-id` of a love note; a push sent before `kind` existed is told apart by it alone. */
+const LOVE_NOTES_THREAD_ID = 'love-notes';
+
+/**
+ * The view a tapped push opens, from the payload the plugin reports as
+ * `notification.data`. A known `kind` decides; with none, thread id
+ * `love-notes` opens Love Notes (a push sent before the sender added `kind`).
+ * Anything else, including junk, answers null and the tap navigates nowhere.
+ * Never throws.
+ */
+export function viewForPush(data: unknown): ViewType | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const { kind, aps } = data as { kind?: unknown; aps?: unknown };
+  if (typeof kind === 'string' && Object.hasOwn(VIEW_FOR_KIND, kind)) return VIEW_FOR_KIND[kind];
+  if (typeof aps === 'object' && aps !== null) {
+    if ((aps as { 'thread-id'?: unknown })['thread-id'] === LOVE_NOTES_THREAD_ID) return 'notes';
+  }
+  return null;
+}
+
+const pushTapHandlers = new Set<(view: ViewType) => void>();
+
+/** The latest tap that arrived while no handler was subscribed; at most one. */
+let pendingTapView: ViewType | null = null;
+
+function deliverTap(handler: (view: ViewType) => void, view: ViewType): void {
+  try {
+    handler(view);
+  } catch (error) {
+    console.error('[Push] A push tap handler failed:', error);
+  }
+}
+
+/**
+ * Calls `handler` with the view of every push the person taps. Returns the
+ * function that stops it. A tap that arrived while nobody was subscribed (the
+ * latest one only) is delivered to the first handler that subscribes, once.
+ */
+export function onPushTap(handler: (view: ViewType) => void): () => void {
+  pushTapHandlers.add(handler);
+  if (pendingTapView !== null) {
+    const view = pendingTapView;
+    pendingTapView = null;
+    deliverTap(handler, view);
+  }
+  return () => {
+    pushTapHandlers.delete(handler);
+  };
+}
+
 /**
  * Whether this shell carries both native pieces push needs. False on the
  * website, in the Home Screen web app and in a shell installed before the
@@ -149,6 +218,20 @@ function listenOnce(): Promise<void> {
         } catch (error) {
           console.error('[Push] A foreground push handler failed:', error);
         }
+      }
+    });
+    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      try {
+        if (action.actionId !== 'tap') return;
+        const view = viewForPush(action.notification?.data);
+        if (view === null) return;
+        if (pushTapHandlers.size === 0) {
+          pendingTapView = view;
+          return;
+        }
+        for (const handler of [...pushTapHandlers]) deliverTap(handler, view);
+      } catch (error) {
+        console.error('[Push] Could not route a push tap:', error);
       }
     });
   })().catch((error: unknown) => {

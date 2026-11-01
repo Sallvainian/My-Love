@@ -15,6 +15,7 @@ import {
   PARTNER_ACTIVITY_THREAD_ID,
   PICTURE_ONLY_BODY,
   withBadge,
+  withKind,
 } from './payload.ts';
 
 Deno.test('a text note is titled with the sender and carries its text', () => {
@@ -211,4 +212,23 @@ Deno.test('withBadge puts the count in aps.badge, zero included, and does not ch
   assertEquals(withBadge(payload, 3).aps['thread-id'], payload.aps['thread-id']);
   assertEquals(payload, before);
   assertFalse('badge' in payload.aps);
+});
+
+Deno.test('withKind puts a top-level kind beside aps and does not change its input', () => {
+  const payload = buildPhotoPayload('Casey');
+  const before = structuredClone(payload);
+  const tagged = withKind(payload, 'photo');
+  assertEquals(tagged.kind, 'photo');
+  assertEquals(tagged.aps, payload.aps);
+  assertFalse('kind' in tagged.aps);
+  assertEquals(payload, before);
+  assertFalse('kind' in payload);
+});
+
+Deno.test('withBadge keeps a kind already on the payload', () => {
+  const payload = withKind(buildPhotoPayload('Casey'), 'photo');
+  const badged = withBadge(payload, 4);
+  assertEquals(badged.kind, 'photo');
+  assertEquals(badged.aps.badge, 4);
+  assertEquals(withKind(badged, 'photo').aps.badge, 4);
 });
