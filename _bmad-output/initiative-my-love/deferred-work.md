@@ -3076,4 +3076,5 @@ location: src/types/database.types.ts
 source_spec: `tickets/epic-push-notifications/tickets/story-moods-photos-pokes-and-kisses-push-plan.md`
 severity: low
 reason: CLI 2.122 raw output differs from the committed file by 1268 diff lines, at baseline 74897fd9 too; this story's change to the file is only the push_requests block. Fix is a decision on AGENTS.md or a one-time raw regeneration. Ledger DW-357.
-status: open
+status: done 2026-10-31
+resolution: duplicate of DW-357 (the same review finding, carried in from story 3.4's plan frontmatter); tracked there.
