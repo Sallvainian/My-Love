@@ -3070,33 +3070,6 @@ severity: low
 reason: On 2026-10-31 with CLI 2.122, `supabase gen types typescript --local | grep -v '^Connecting to'` differed from the committed file by 1268 diff lines, both at the story's baseline (74897fd9) and after it. Story 3.4's diff to the file is only the `push_requests` columns and relationships, matching the migration. Stories 3.1, 3.2 and 3.4 all reformatted the output by hand, against "never hand-edit" and the Prettier rule against reformatting untouched code, because the raw output would rewrite the whole file. Settle it with a decision: commit the raw output once, as its own commit, and keep it raw from then on; or document the formatting step in AGENTS.md beside the command.
 status: open
 
-### DW-358: src/types/database.types.ts is not the raw output of AGENTS.md's regeneration command; it is reformatted by hand, as stories 3.1 and 3.2 did, so the documented command rewrites the whole file.
-origin: spec-deferred ef58bf38f143
-location: src/types/database.types.ts
-source_spec: `tickets/epic-push-notifications/tickets/story-moods-photos-pokes-and-kisses-push-plan.md`
-severity: low
-reason: CLI 2.122 raw output differs from the committed file by 1268 diff lines, at baseline 74897fd9 too; this story's change to the file is only the push_requests block. Fix is a decision on AGENTS.md or a one-time raw regeneration. Ledger DW-357.
-status: done 2026-10-31
-resolution: duplicate of DW-357 (the same review finding, carried in from story 3.4's plan frontmatter); tracked there.
-
-### DW-359: src/types/database.types.ts is not the raw output of AGENTS.md's regeneration command; this story took only its own hunks from reformatted CLI output, as stories 3.1-3.4 did.
-origin: spec-deferred e51f625afab3
-location: src/types/database.types.ts
-source_spec: `tickets/epic-push-notifications/tickets/story-date-changes-push-plan.md`
-severity: low
-reason: Pre-existing drift already in the ledger as DW-357 (raw CLI 2.122 output differs from the committed file by 1268 diff lines). This story's change to the file is only the date_changes block and push_requests.date_change_id. The fix is an AGENTS.md decision or a one-time raw regeneration.
-status: done 2026-10-31
-resolution: duplicate of DW-357 (the same pre-existing database.types.ts drift, carried in from story 3.5's plan frontmatter); tracked there.
-
-### DW-360: src/types/database.types.ts is not the raw output of AGENTS.md's regeneration command; this story copied only the push_preferences block, in the file's format, from CLI output whose layout is
-origin: spec-deferred 42ce66f42fd1
-location: src/types/database.types.ts
-source_spec: `tickets/epic-push-notifications/tickets/story-each-push-type-has-a-settings-switch-plan.md`
-severity: low
-reason: supabase gen types typescript --local (CLI 2.122.0) emits the same push_preferences fields but with ComputedFields lines and inline quoted keys; pre-existing drift already in the ledger as DW-357.
-status: done 2026-11-01
-resolution: duplicate of DW-357 (the same pre-existing database.types.ts drift, carried in from story 3.7's plan frontmatter); tracked there.
-
 ### DW-361: A push that arrives while Love Notes is in front can leave its badge showing on a real iPhone, because the second badge clear waits a fixed 1 s that was measured only on the simulator.
 origin: review story-3.8
 location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
@@ -3104,12 +3077,3 @@ source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apa
 severity: medium (unverified)
 reason: The push plugin's willPresent tells the web view about the push and then returns the badge option, and iOS applies the payload's badge after the first clear. On the iPhone Duo simulator a second `AppBadge.clear()` 1 s later left the badge clear on every run. No device has been checked, and a slower one could apply the badge after the second clear; the badge would then show until Love Notes is next opened or brought to the front. Settle it on the owner's iPhone in story 3.11: with Love Notes in front, a note from the partner must leave the badge clear. If it does not, clear the badge natively (for example in a willPresent wrapper told by the web view that Love Notes is on screen) rather than lengthening the wait.
 status: open
-
-### DW-362: A push arriving while Love Notes is in front may leave its badge showing on a real iPhone, because the second clear waits a fixed 1 s measured only on the simulator.
-origin: spec-deferred fc588628987f
-location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
-source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
-severity: medium
-reason: The plugin's willPresent notifies the web view and then returns the badge option, so iOS applies the badge after the first clear. On the Duo simulator a clear 1 s later held on every run; no device was checked. Settle on the owner's iPhone in story 3.11 (Love Notes in front, a partner note leaves the badge clear). Ledger DW-361. (declared severity: medium (unverified))
-status: done 2026-11-01
-resolution: duplicate of DW-361 (the same review finding, carried in from story 3.8's plan frontmatter); tracked there.
