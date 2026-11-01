@@ -3099,3 +3099,43 @@ source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.
 severity: low
 reason: cmd_center asks for the front app whenever `$CENTER_POSE != unfolded && $CENTER_ORIENT != portrait`, which includes an empty pose (a phone with no pose, such as an iPhone 17). center_restore relaunches only when CENTER_FRONT is set and not `none`, so when `notify front` fails nothing is relaunched; center only says the folded landscape may not come back. Found by story 3.10's review. The fix edits AGENTS.md, so it is deferred: reword both to "a landscape start that is not unfolded gets back the shell, the host app, Settings or Safari when the front step found one".
 status: open
+
+### DW-365: `scripts/sim-driver/pending.py` checks no record-level schema marker, so an iOS release that keeps the pending archive's key names but changes their meaning would decode without error
+origin: story-4.7
+location: scripts/sim-driver/pending.py (pending, trigger_of)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: medium (unverified)
+reason: Found by story 4.7's review. Each record in the fixture `PendingNotifications.plist` carries about 60 keys, `SchemaVersion` 11 and `TriggerRepeatInterval` 0 among them, but the mapper reads only the identifier, text, thread and trigger keys and fails loudly only when one of those is missing or holds an unknown shape. Whether an iOS release changes a key's meaning while keeping its name is UNVERIFIED. To settle it, decode a pending archive from a later simulator runtime (`python3 -I scripts/sim-driver/pending.py --raw FILE`) and compare it with the fixture. If it is real, the fix is to require the measured `SchemaVersion` and `TriggerRepeatInterval` 0.
+status: open
+
+### DW-366: AGENTS.md's sentence on `sim schedule`/`sim unschedule` omits two side effects: both launch the host app and bring it to the front, and `sim permission reset --host` uninstalls the host and so wipes its pending requests
+origin: story-4.7
+location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (host_apply, cmd_permission)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: low
+reason: Found by story 4.7's review. `host_apply` runs `xcrun simctl launch --terminate-running-process` on the host, which leaves the host in front where a check may expect the shell, and `permission reset` runs `simctl uninstall`. Both appear in `sim help`, not in AGENTS.md. The fix edits AGENTS.md, so it is deferred: add both to the sim-driver paragraph.
+status: open
+
+### DW-367: pending.py checks no record-level schema marker (SchemaVersion, TriggerRepeatInterval and about 55 other keys), so an iOS release that keeps the key names but changes their meaning would decode
+origin: spec-deferred ac8027c97154
+location: scripts/sim-driver/pending.py (pending, trigger_of)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: medium
+reason: maybe-false. The fixture records carry SchemaVersion 11 and TriggerRepeatInterval 0, and the mapper reads neither. Whether any iOS release changes a key's meaning while keeping its name is unverified. To settle it, decode a pending archive from a later simulator runtime and compare its keys and values against the fixture. (declared severity: medium (unverified))
+status: open
+
+### DW-368: The AGENTS.md sim-driver sentence on schedule/unschedule omits two side effects later stories will hit: both launch the host and bring it to the front, and `sim permission reset --host` uninstalls the
+origin: spec-deferred a66b5e30b950
+location: AGENTS.md (Maintained by hand, sim-driver paragraph)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: low
+reason: host_apply runs `xcrun simctl launch --terminate-running-process` on the host, and cmd_permission reset runs `simctl uninstall`. Both facts are in `sim help` and the plan's Implementation Notes, but not in AGENTS.md. The fix edits AGENTS.md, so it is deferred.
+status: open
+
+### DW-369: The AGENTS.md sentence on `sim schedule` does not say the host needs `sim permission allow --host` first, so a later story's first schedule exits 1 and has to be rerun.
+origin: spec-deferred e0029a1bba77
+location: AGENTS.md (Maintained by hand, sim-driver paragraph)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: low
+reason: host_apply dies with "the host has no notification permission: run sim permission allow --host" when the host's result file reads "not authorized", and `sim help` says so, but AGENTS.md's sim-driver paragraph does not. The fix edits AGENTS.md, so it is deferred.
+status: open
