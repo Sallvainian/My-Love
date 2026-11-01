@@ -3116,22 +3116,6 @@ severity: low
 reason: Found by story 4.7's review. `host_apply` runs `xcrun simctl launch --terminate-running-process` on the host, which leaves the host in front where a check may expect the shell, and `permission reset` runs `simctl uninstall`. Both appear in `sim help`, not in AGENTS.md. The fix edits AGENTS.md, so it is deferred: add both to the sim-driver paragraph.
 status: open
 
-### DW-367: pending.py checks no record-level schema marker (SchemaVersion, TriggerRepeatInterval and about 55 other keys), so an iOS release that keeps the key names but changes their meaning would decode
-origin: spec-deferred ac8027c97154
-location: scripts/sim-driver/pending.py (pending, trigger_of)
-source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
-severity: medium
-reason: maybe-false. The fixture records carry SchemaVersion 11 and TriggerRepeatInterval 0, and the mapper reads neither. Whether any iOS release changes a key's meaning while keeping its name is unverified. To settle it, decode a pending archive from a later simulator runtime and compare its keys and values against the fixture. (declared severity: medium (unverified))
-status: open
-
-### DW-368: The AGENTS.md sim-driver sentence on schedule/unschedule omits two side effects later stories will hit: both launch the host and bring it to the front, and `sim permission reset --host` uninstalls the
-origin: spec-deferred a66b5e30b950
-location: AGENTS.md (Maintained by hand, sim-driver paragraph)
-source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
-severity: low
-reason: host_apply runs `xcrun simctl launch --terminate-running-process` on the host, and cmd_permission reset runs `simctl uninstall`. Both facts are in `sim help` and the plan's Implementation Notes, but not in AGENTS.md. The fix edits AGENTS.md, so it is deferred.
-status: open
-
 ### DW-369: The AGENTS.md sentence on `sim schedule` does not say the host needs `sim permission allow --host` first, so a later story's first schedule exits 1 and has to be rerun.
 origin: spec-deferred e0029a1bba77
 location: AGENTS.md (Maintained by hand, sim-driver paragraph)
