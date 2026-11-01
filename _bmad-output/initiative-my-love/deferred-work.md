@@ -3061,3 +3061,19 @@ source_spec: `tickets/epic-push-notifications/tickets/story-pushes-arrive-throug
 severity: low
 reason: Story 3.13's device run on 2026-11-01: after two offline sign-outs, the iPhone got a new APNs token on each sign-in, and the fixture account kept both old rows. For about 30 minutes, APNs answered 200 to every push for them, never 410, while the phone showed nothing for them, so nothing leaked on screen. Each stale row costs one APNs request per note, and any further rows a reinstall leaves (DW-353) add to that. A row deleted only on a 410 may never be deleted. Settle it with a decision: prune a registration not re-registered within some age (registration bumps `updated_at` on every signed-in start), or have the client remove its previous token's row on the next online sign-in (it would need to keep that token across sign-out). Whether APNs ever answers 410 for these tokens is unverified; re-read the fixture rows' send results after a day.
 status: open
+
+### DW-357: `src/types/database.types.ts` is not what AGENTS.md's regeneration command writes: since story 3.1 each regeneration has been reformatted to the file's style with the CLI's `ComputedFields: never` lines dropped, so the documented command now rewrites the whole file.
+origin: review story-3.4
+location: src/types/database.types.ts; AGENTS.md (Policy, the regeneration command)
+source_spec: `tickets/epic-push-notifications/tickets/story-moods-photos-pokes-and-kisses-push-plan.md`
+severity: low
+reason: On 2026-10-31 with CLI 2.122, `supabase gen types typescript --local | grep -v '^Connecting to'` differed from the committed file by 1268 diff lines, both at the story's baseline (74897fd9) and after it. Story 3.4's diff to the file is only the `push_requests` columns and relationships, matching the migration. Stories 3.1, 3.2 and 3.4 all reformatted the output by hand, against "never hand-edit" and the Prettier rule against reformatting untouched code, because the raw output would rewrite the whole file. Settle it with a decision: commit the raw output once, as its own commit, and keep it raw from then on; or document the formatting step in AGENTS.md beside the command.
+status: open
+
+### DW-358: src/types/database.types.ts is not the raw output of AGENTS.md's regeneration command; it is reformatted by hand, as stories 3.1 and 3.2 did, so the documented command rewrites the whole file.
+origin: spec-deferred ef58bf38f143
+location: src/types/database.types.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-moods-photos-pokes-and-kisses-push-plan.md`
+severity: low
+reason: CLI 2.122 raw output differs from the committed file by 1268 diff lines, at baseline 74897fd9 too; this story's change to the file is only the push_requests block. Fix is a decision on AGENTS.md or a one-time raw regeneration. Ledger DW-357.
+status: open

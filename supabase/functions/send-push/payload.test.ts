@@ -1,6 +1,14 @@
 import { assertEquals, assertFalse } from 'jsr:@std/assert@1';
 
-import { buildLoveNotePayload, FALLBACK_SENDER_NAME, PICTURE_ONLY_BODY } from './payload.ts';
+import {
+  buildInteractionPayload,
+  buildLoveNotePayload,
+  buildMoodPayload,
+  buildPhotoPayload,
+  FALLBACK_SENDER_NAME,
+  MOOD_LABELS,
+  PICTURE_ONLY_BODY,
+} from './payload.ts';
 
 Deno.test('a text note is titled with the sender and carries its text', () => {
   assertEquals(buildLoveNotePayload({ content: 'Thinking of you', image_url: null }, 'Casey'), {
@@ -32,4 +40,83 @@ Deno.test('the payload carries no badge, sound or image', () => {
   assertEquals(Object.keys(payload), ['aps']);
   assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
   assertFalse('badge' in payload.aps);
+});
+
+// ---- Story 3.4 ----
+
+const thread = 'partner-activity';
+
+Deno.test('a mood lists its labels in stored order, joined by a comma', () => {
+  assertEquals(
+    buildMoodPayload({ mood_type: 'happy', mood_types: ['happy', 'grateful'] }, 'Casey'),
+    { aps: { alert: { title: 'Casey', body: 'Logged a mood: Happy, Grateful' }, 'thread-id': thread } }
+  );
+  assertEquals(
+    buildMoodPayload({ mood_type: 'tired', mood_types: ['tired', 'sad', 'loved'] }, 'Casey').aps.alert.body,
+    'Logged a mood: Tired, Sad, Loved'
+  );
+});
+
+Deno.test('a mood with no mood_types uses mood_type', () => {
+  assertEquals(buildMoodPayload({ mood_type: 'angry', mood_types: null }, 'Casey').aps.alert.body, 'Logged a mood: Angry');
+  assertEquals(buildMoodPayload({ mood_type: 'angry', mood_types: [] }, 'Casey').aps.alert.body, 'Logged a mood: Angry');
+});
+
+Deno.test('unrecognised mood_types are dropped, and none valid falls back to mood_type', () => {
+  assertEquals(
+    buildMoodPayload({ mood_type: 'happy', mood_types: ['bogus', 'sad'] }, 'Casey').aps.alert.body,
+    'Logged a mood: Sad'
+  );
+  assertEquals(
+    buildMoodPayload({ mood_type: 'happy', mood_types: ['bogus'] }, 'Casey').aps.alert.body,
+    'Logged a mood: Happy'
+  );
+});
+
+Deno.test('a mood with no valid value says only that a mood was logged', () => {
+  assertEquals(buildMoodPayload({ mood_type: 'bogus', mood_types: ['nope'] }, 'Casey').aps.alert.body, 'Logged a mood');
+  assertEquals(buildMoodPayload({ mood_type: null, mood_types: null }, 'Casey').aps.alert.body, 'Logged a mood');
+});
+
+Deno.test('the 12 mood labels match MOOD_DISPLAY', () => {
+  assertEquals(Object.keys(MOOD_LABELS).length, 12);
+  assertEquals(
+    Object.entries(MOOD_LABELS).map(([key, label]) => `${key}=${label}`),
+    [
+      'loved=Loved', 'happy=Happy', 'content=Content', 'excited=Excited', 'thoughtful=Thoughtful',
+      'grateful=Grateful', 'sad=Sad', 'anxious=Anxious', 'frustrated=Frustrated', 'angry=Angry',
+      'lonely=Lonely', 'tired=Tired',
+    ]
+  );
+});
+
+Deno.test('a photo, a poke and a kiss carry their R7 text on the partner thread', () => {
+  assertEquals(buildPhotoPayload('Casey'), {
+    aps: { alert: { title: 'Casey', body: 'Added a photo' }, 'thread-id': thread },
+  });
+  assertEquals(buildInteractionPayload('poke', 'Casey'), {
+    aps: { alert: { title: 'Casey', body: 'Poked you' }, 'thread-id': thread },
+  });
+  assertEquals(buildInteractionPayload('kiss', 'Casey'), {
+    aps: { alert: { title: 'Casey', body: 'Sent you a kiss' }, 'thread-id': thread },
+  });
+  assertEquals(buildInteractionPayload('fart', 'Casey'), null);
+});
+
+Deno.test('the partner payloads fall back to Your partner and carry no badge, sound or image', () => {
+  for (const payload of [
+    buildMoodPayload({ mood_type: 'happy', mood_types: null }, null),
+    buildPhotoPayload('  '),
+    buildInteractionPayload('poke', null)!,
+  ]) {
+    assertEquals(payload.aps.alert.title, FALLBACK_SENDER_NAME);
+    assertEquals(Object.keys(payload), ['aps']);
+    assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
+    assertFalse('badge' in payload.aps || 'sound' in payload.aps);
+  }
+});
+
+Deno.test('a mood\'s note is never part of the payload', () => {
+  const mood = { mood_type: 'happy', mood_types: ['happy'], note: 'private thoughts' };
+  assertFalse(JSON.stringify(buildMoodPayload(mood, 'Casey')).includes('private'));
 });

@@ -492,8 +492,11 @@ export type Database = {
           delivery: string
           environment: string
           id: string
-          note_id: string
+          interaction_id: string | null
+          mood_id: string | null
+          note_id: string | null
           payload: NonNullable<Json>
+          photo_id: string | null
           token: string
         }
         Insert: {
@@ -501,8 +504,11 @@ export type Database = {
           delivery: string
           environment: string
           id?: string
-          note_id: string
+          interaction_id?: string | null
+          mood_id?: string | null
+          note_id?: string | null
           payload: NonNullable<Json>
+          photo_id?: string | null
           token: string
         }
         Update: {
@@ -510,11 +516,28 @@ export type Database = {
           delivery?: string
           environment?: string
           id?: string
-          note_id?: string
+          interaction_id?: string | null
+          mood_id?: string | null
+          note_id?: string | null
           payload?: NonNullable<Json>
+          photo_id?: string | null
           token?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "push_requests_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_mood_id_fkey"
+            columns: ["mood_id"]
+            isOneToOne: false
+            referencedRelation: "moods"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "push_requests_note_id_fkey"
             columns: ["note_id"]
@@ -527,6 +550,13 @@ export type Database = {
             columns: ["note_id"]
             isOneToOne: false
             referencedRelation: "love_notes_visible"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
             referencedColumns: ["id"]
           },
         ]

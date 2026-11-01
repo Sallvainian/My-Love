@@ -1,9 +1,10 @@
 /**
  * Edge Function: send-push
  *
- * Sends the push a new love note becomes, to every device registered to the
- * recipient. Called by the `love_notes` insert trigger; see `handler.ts` for
- * the contract. This file is only the serve binding and the real database and
+ * Sends the push a new love note, mood, photo, poke or kiss becomes, to every
+ * device registered to the recipient. Called by the insert triggers on
+ * `love_notes`, `moods`, `photos` and `interactions`; see `handler.ts` for the
+ * contract. This file is only the serve binding and the real database and
  * APNs wiring.
  *
  * Secrets (never in source): APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, and
@@ -15,7 +16,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { apnsConfigFromEnv, createApnsClient } from './apns.ts';
-import { handleSendPush, type PushDb } from './handler.ts';
+import { handleSendPush, type PushDb, type PushKind } from './handler.ts';
+
+/** The `push_requests` column that holds each kind's source row id. */
+const SOURCE_COLUMN: Record<PushKind, string> = {
+  love_note: 'note_id',
+  mood: 'mood_id',
+  photo: 'photo_id',
+  interaction: 'interaction_id',
+};
 
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -36,6 +45,34 @@ const db: PushDb = {
     if (error) throw new Error(error.message);
     return data;
   },
+  async getMood(moodId) {
+    const { data, error } = await admin
+      .from('moods')
+      .select('id, user_id, mood_type, mood_types')
+      .eq('id', moodId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async getPhoto(photoId) {
+    const { data, error } = await admin.from('photos').select('id, user_id').eq('id', photoId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async getInteraction(interactionId) {
+    const { data, error } = await admin
+      .from('interactions')
+      .select('id, from_user_id, to_user_id, type')
+      .eq('id', interactionId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async getPartnerId(userId) {
+    const { data, error } = await admin.from('users').select('partner_id').eq('id', userId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.partner_id ?? null;
+  },
   async getDisplayName(userId) {
     const { data, error } = await admin.from('users').select('display_name').eq('id', userId).maybeSingle();
     if (error) throw new Error(error.message);
@@ -47,15 +84,21 @@ const db: PushDb = {
     return data ?? [];
   },
   async claimRequest(row) {
+    const column = SOURCE_COLUMN[row.kind];
+    const { kind: _kind, source_id, ...rest } = row;
     const { data, error } = await admin
       .from('push_requests')
-      .upsert(row, { onConflict: 'note_id,token', ignoreDuplicates: true })
+      .upsert({ ...rest, [column]: source_id }, { onConflict: `${column},token`, ignoreDuplicates: true })
       .select('id');
     if (error) throw new Error(error.message);
     return (data?.length ?? 0) > 0;
   },
-  async releaseRequest(noteId, token) {
-    const { error } = await admin.from('push_requests').delete().eq('note_id', noteId).eq('token', token);
+  async releaseRequest(kind, sourceId, token) {
+    const { error } = await admin
+      .from('push_requests')
+      .delete()
+      .eq(SOURCE_COLUMN[kind], sourceId)
+      .eq('token', token);
     if (error) throw new Error(error.message);
   },
   async deleteGoneDevice(token, goneAt) {

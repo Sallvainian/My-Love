@@ -1,7 +1,8 @@
 -- ============================================
 -- pgTAP: push_devices, push_requests, push_sender_settings, register_push_device
 -- and the love-note push trigger (20261031000000); unregister_push_device
--- (20261031010000)
+-- (20261031010000); the mood, photo and interaction triggers and the
+-- one-source check on push_requests (20261031020000)
 --
 -- Pinned here: the exact policy sets (a policy added, renamed or dropped fails
 -- this file), who can touch each table, the register RPC (reassignment by
@@ -20,7 +21,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(41);
+select plan(57);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -334,6 +335,169 @@ select is(
     where note_id = '99999999-0000-4000-8000-000000000001'),
   0,
   'PUSH-DB-033: deleting a note deletes its recorded requests'
+);
+
+-- ============================================
+-- Moods, photos and interactions (20261031020000, story 3.4)
+-- ============================================
+-- notify_push() posts {kind, id}; the love-note trigger is untouched.
+select ok(
+  not has_function_privilege('authenticated', 'public.notify_push()', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.notify_push()', 'EXECUTE')
+  and not has_function_privilege('public', 'public.notify_push()', 'EXECUTE'),
+  'PUSH-DB-042: notify_push() is executable by no API role'
+);
+
+select is(
+  (select count(*)::int from pg_trigger
+    where tgname in ('moods_push_after_insert', 'photos_push_after_insert', 'interactions_push_after_insert')
+      and tgenabled = 'O'),
+  3,
+  'PUSH-DB-043: the mood, photo and interaction triggers exist and are enabled'
+);
+
+delete from net.http_request_queue;
+
+-- A new mood queues one call with its kind and id, and the shared secret.
+insert into public.moods (id, user_id, mood_type, mood_types, created_at)
+select '99999999-0000-4000-8000-000000000011', a_id, 'happy', array['happy', 'grateful'], '2026-10-31 12:00:00+00' from t_ids;
+
+select results_eq(
+  $$select url, convert_from(body, 'UTF8')::jsonb, headers->>'x-push-secret'
+      from net.http_request_queue$$,
+  $$values ('http://sender.test/send-push'::text,
+            '{"kind": "mood", "id": "99999999-0000-4000-8000-000000000011"}'::jsonb,
+            'trigger-test-secret-1234'::text)$$,
+  'PUSH-DB-044: a new mood queues one {kind, id} call with the shared secret'
+);
+
+-- The same (user_id, created_at) upserted again takes the DO UPDATE path:
+-- the row changes, no INSERT trigger fires, no second call is queued.
+insert into public.moods (user_id, mood_type, mood_types, note, created_at)
+select a_id, 'sad', array['sad'], 'edited', '2026-10-31 12:00:00+00' from t_ids
+on conflict (user_id, created_at) do update
+  set mood_type = excluded.mood_type, mood_types = excluded.mood_types, note = excluded.note;
+
+select is(
+  (select count(*)::int from net.http_request_queue),
+  1,
+  'PUSH-DB-045: a mood re-sent with the same (user_id, created_at) queues no second call'
+);
+select results_eq(
+  $$select mood_type, note from public.moods where id = '99999999-0000-4000-8000-000000000011'$$,
+  $$values ('sad'::text, 'edited'::text)$$,
+  'PUSH-DB-046: and the re-sent mood did update the existing row'
+);
+
+-- A plain UPDATE pushes nothing either.
+update public.moods set note = 'edited again' where id = '99999999-0000-4000-8000-000000000011';
+select is(
+  (select count(*)::int from net.http_request_queue),
+  1,
+  'PUSH-DB-047: updating a mood queues nothing'
+);
+
+-- A new photo queues one call; a retry ignored on storage_path queues none.
+insert into public.photos (id, user_id, storage_path, filename, file_size, width, height)
+select '99999999-0000-4000-8000-000000000012', a_id, 'push-test/one.jpg', 'one.jpg', 1000, 10, 10 from t_ids;
+
+select results_eq(
+  $$select convert_from(body, 'UTF8')::jsonb from net.http_request_queue
+     where convert_from(body, 'UTF8')::jsonb->>'kind' = 'photo'$$,
+  $$values ('{"kind": "photo", "id": "99999999-0000-4000-8000-000000000012"}'::jsonb)$$,
+  'PUSH-DB-048: a new photo queues one {kind, id} call'
+);
+
+insert into public.photos (user_id, storage_path, filename, file_size, width, height)
+select a_id, 'push-test/one.jpg', 'one.jpg', 1000, 10, 10 from t_ids
+on conflict (storage_path) do nothing;
+
+select is(
+  (select count(*)::int from net.http_request_queue),
+  2,
+  'PUSH-DB-049: a photo insert ignored on storage_path queues no second call'
+);
+
+-- A new interaction queues one call.
+insert into public.interactions (id, from_user_id, to_user_id, type)
+select '99999999-0000-4000-8000-000000000013', a_id, b_id, 'poke' from t_ids;
+
+select results_eq(
+  $$select convert_from(body, 'UTF8')::jsonb from net.http_request_queue
+     where convert_from(body, 'UTF8')::jsonb->>'kind' = 'interaction'$$,
+  $$values ('{"kind": "interaction", "id": "99999999-0000-4000-8000-000000000013"}'::jsonb)$$,
+  'PUSH-DB-050: a new interaction queues one {kind, id} call'
+);
+
+-- A failing sender call never fails a mood, photo or interaction insert.
+update public.push_sender_settings set sender_url = '';
+
+select lives_ok(
+  $$insert into public.moods (user_id, mood_type, created_at)
+      select a_id, 'tired', '2026-10-31 13:00:00+00' from t_ids;
+    insert into public.photos (user_id, storage_path, filename, file_size, width, height)
+      select a_id, 'push-test/two.jpg', 'two.jpg', 1000, 10, 10 from t_ids;
+    insert into public.interactions (from_user_id, to_user_id, type)
+      select a_id, b_id, 'kiss' from t_ids$$,
+  'PUSH-DB-051: the inserts succeed when the pg_net call itself raises'
+);
+
+update public.push_sender_settings set sender_url = 'http://sender.test/send-push';
+
+select is(
+  (select count(*)::int from public.moods
+    where user_id = (select a_id from t_ids) and created_at = '2026-10-31 13:00:00+00')
+  + (select count(*)::int from public.photos where storage_path = 'push-test/two.jpg')
+  + (select count(*)::int from public.interactions
+    where from_user_id = (select a_id from t_ids) and type = 'kiss'),
+  3,
+  'PUSH-DB-052: and all three rows are committed'
+);
+
+-- push_requests takes exactly one source.
+select lives_ok(
+  $$insert into public.push_requests (mood_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000011', 'token-m', 'sandbox', '{"aps":{}}', 'recorded');
+    insert into public.push_requests (photo_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000012', 'token-p', 'sandbox', '{"aps":{}}', 'recorded');
+    insert into public.push_requests (interaction_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000013', 'token-i', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  'PUSH-DB-053: a request can belong to a mood, a photo or an interaction'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (token, environment, payload, delivery)
+      values ('token-none', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  '23514',
+  null,
+  'PUSH-DB-054: a request with no source id is refused'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (mood_id, photo_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000011', '99999999-0000-4000-8000-000000000012',
+              'token-both', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  '23514',
+  null,
+  'PUSH-DB-055: a request with two source ids is refused'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (mood_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000011', 'token-m', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  '23505',
+  null,
+  'PUSH-DB-056: the same mood and device token cannot be claimed twice'
+);
+
+-- Deleting the source row deletes its requests.
+delete from public.moods where id = '99999999-0000-4000-8000-000000000011';
+delete from public.photos where id = '99999999-0000-4000-8000-000000000012';
+delete from public.interactions where id = '99999999-0000-4000-8000-000000000013';
+select is(
+  (select count(*)::int from public.push_requests where token in ('token-m', 'token-p', 'token-i')),
+  0,
+  'PUSH-DB-057: deleting a mood, photo or interaction deletes its recorded requests'
 );
 
 select * from finish();

@@ -1,10 +1,16 @@
 /**
  * Request handling for the `send-push` Edge Function.
  *
- * Called by the `love_notes` AFTER INSERT trigger (`notify_love_note_push`,
- * 20261031000000_push_devices.sql) with `{ "note_id": "<uuid>" }` and the
- * shared secret in `x-push-secret`. Split out of `index.ts` so `deno test`
- * can drive it with a fake database and a fake APNs client.
+ * Called by database triggers with the shared secret in `x-push-secret`:
+ *
+ * - `love_notes` AFTER INSERT (`notify_love_note_push`,
+ *   20261031000000_push_devices.sql) posts `{ "note_id": "<uuid>" }`;
+ * - `moods`, `photos` and `interactions` AFTER INSERT (`notify_push`,
+ *   20261031020000_push_moods_photos_interactions.sql) post
+ *   `{ "kind": "mood" | "photo" | "interaction", "id": "<uuid>" }`.
+ *
+ * Split out of `index.ts` so `deno test` can drive it with a fake database
+ * and a fake APNs client.
  *
  * ## Authentication
  *
@@ -14,17 +20,21 @@
  * sender reads with the service role. No secret on record answers 401, so an
  * unconfigured stack accepts nothing.
  *
- * ## Why only a note id is accepted
+ * ## Why only a row id is accepted
  *
- * The sender reads the note itself with the service role and derives the
+ * The sender reads the row itself with the service role and derives the
  * sender's name and the recipient from it, so a forged call can name no target
- * beyond an existing note.
+ * beyond an existing row. The recipient of a note is its `to_user_id`, of an
+ * interaction its `to_user_id`, and of a mood or photo the owner's
+ * `users.partner_id`. An owner with no partner, or a recipient equal to the
+ * sender, answers 200 with every count 0 and claims nothing. An interaction
+ * whose type is not `poke` or `kiss` does the same.
  *
  * ## Dedupe and the recorded path
  *
- * `push_requests` is unique on (note, device token). A row is claimed before
- * the send, and a second call for the same note finds every claim taken and
- * sends nothing. With no APNs key the claimed row is the output (delivery
+ * `push_requests` is unique on (source row, device token), one column per
+ * kind. A row is claimed before the send, and a second call for the same row
+ * finds every claim taken and sends nothing. With no APNs key the claimed row is the output (delivery
  * `recorded`): the request that would have been sent, for `sim push` to
  * deliver. A failed APNs send releases its claim so a later call can retry.
  *
@@ -40,7 +50,20 @@
  */
 
 import type { ApnsClient, ApnsResult } from './apns.ts';
-import { buildLoveNotePayload, type ApnsPayload } from './payload.ts';
+import {
+  buildInteractionPayload,
+  buildLoveNotePayload,
+  buildMoodPayload,
+  buildPhotoPayload,
+  type ApnsPayload,
+  type PushMood,
+} from './payload.ts';
+
+/** What a push is about; each kind has its own column in `push_requests`. */
+export type PushKind = 'love_note' | 'mood' | 'photo' | 'interaction';
+
+/** The kinds the triggers post as `{kind, id}`; a love note posts `{note_id}`. */
+const POSTED_KINDS = ['mood', 'photo', 'interaction'] as const;
 
 export interface NoteRow {
   id: string;
@@ -50,13 +73,32 @@ export interface NoteRow {
   image_url: string | null;
 }
 
+export interface MoodRow extends PushMood {
+  id: string;
+  user_id: string;
+}
+
+export interface PhotoRow {
+  id: string;
+  user_id: string;
+}
+
+export interface InteractionRow {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  type: string;
+}
+
 export interface DeviceRow {
   token: string;
   environment: string;
 }
 
 export interface PushRequestRow {
-  note_id: string;
+  kind: PushKind;
+  /** The id of the note, mood, photo or interaction. */
+  source_id: string;
   token: string;
   environment: string;
   payload: ApnsPayload;
@@ -67,11 +109,16 @@ export interface PushRequestRow {
 export interface PushDb {
   getSenderSecret(): Promise<string | null>;
   getNote(noteId: string): Promise<NoteRow | null>;
+  getMood(moodId: string): Promise<MoodRow | null>;
+  getPhoto(photoId: string): Promise<PhotoRow | null>;
+  getInteraction(interactionId: string): Promise<InteractionRow | null>;
+  /** The account's linked partner, or null when it has none. */
+  getPartnerId(userId: string): Promise<string | null>;
   getDisplayName(userId: string): Promise<string | null>;
   listDevices(userId: string): Promise<DeviceRow[]>;
-  /** Inserts the row unless (note, token) exists; true when this call inserted it. */
+  /** Inserts the row unless (source, token) exists; true when this call inserted it. */
   claimRequest(row: PushRequestRow): Promise<boolean>;
-  releaseRequest(noteId: string, token: string): Promise<void>;
+  releaseRequest(kind: PushKind, sourceId: string, token: string): Promise<void>;
   /**
    * Deletes the registration of a token APNs reports gone, unless it was
    * registered again after `goneAt` (ms since the epoch).
@@ -89,6 +136,95 @@ export interface SendPushDeps {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 1024;
+
+/** What a request resolves to: who it is from and for, and what it says. */
+interface PushSource {
+  kind: PushKind;
+  id: string;
+  senderId: string;
+  /** Null when the sender has no one to push to. */
+  recipientId: string | null;
+  /** Null when this row is not a push (an interaction type that is neither poke nor kiss). */
+  buildPayload: ((senderName: string | null) => ApnsPayload) | null;
+}
+
+type Parsed =
+  | { ok: true; kind: PushKind; id: string }
+  | { ok: false; message: string };
+
+/** `{kind, id}` from a `notify_push` trigger, else `{note_id}` from the love-note trigger. */
+function parseBody(body: { note_id?: unknown; kind?: unknown; id?: unknown }): Parsed {
+  if (body.kind !== undefined) {
+    if (typeof body.kind !== 'string' || !(POSTED_KINDS as readonly string[]).includes(body.kind)) {
+      return { ok: false, message: 'kind must be mood, photo or interaction' };
+    }
+    if (typeof body.id !== 'string' || !UUID.test(body.id)) {
+      return { ok: false, message: 'id must be a uuid' };
+    }
+    return { ok: true, kind: body.kind as PushKind, id: body.id };
+  }
+  if (typeof body.note_id !== 'string' || !UUID.test(body.note_id)) {
+    return { ok: false, message: 'note_id must be a uuid' };
+  }
+  return { ok: true, kind: 'love_note', id: body.note_id };
+}
+
+function isPushInteraction(type: string): boolean {
+  return buildInteractionPayload(type, null) !== null;
+}
+
+/** Reads the row and finds its sender and recipient; null when the row is gone. */
+async function resolveSource(db: PushDb, kind: PushKind, id: string): Promise<PushSource | null> {
+  switch (kind) {
+    case 'love_note': {
+      const note = await db.getNote(id);
+      if (!note) return null;
+      return {
+        kind,
+        id,
+        senderId: note.from_user_id,
+        recipientId: note.to_user_id,
+        buildPayload: (name) => buildLoveNotePayload(note, name),
+      };
+    }
+    case 'mood': {
+      const mood = await db.getMood(id);
+      if (!mood) return null;
+      return {
+        kind,
+        id,
+        senderId: mood.user_id,
+        recipientId: await db.getPartnerId(mood.user_id),
+        buildPayload: (name) => buildMoodPayload(mood, name),
+      };
+    }
+    case 'photo': {
+      const photo = await db.getPhoto(id);
+      if (!photo) return null;
+      return {
+        kind,
+        id,
+        senderId: photo.user_id,
+        recipientId: await db.getPartnerId(photo.user_id),
+        buildPayload: (name) => buildPhotoPayload(name),
+      };
+    }
+    case 'interaction': {
+      const interaction = await db.getInteraction(id);
+      if (!interaction) return null;
+      return {
+        kind,
+        id,
+        senderId: interaction.from_user_id,
+        recipientId: interaction.to_user_id,
+        // Only poke and kiss are pushes; any other type has no payload.
+        buildPayload: isPushInteraction(interaction.type)
+          ? (name) => buildInteractionPayload(interaction.type, name) as ApnsPayload
+          : null,
+      };
+    }
+  }
+}
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -121,30 +257,36 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
     const declared = Number(req.headers.get('content-length') ?? '0');
     if (declared > MAX_BODY_BYTES) return json(413, { error: 'Body too large' });
 
-    let noteId: unknown;
+    let parsed: Parsed;
     try {
-      noteId = ((await req.json()) as { note_id?: unknown }).note_id;
+      const body = await req.json();
+      if (typeof body !== 'object' || body === null) return json(400, { error: 'Body must be a JSON object' });
+      parsed = parseBody(body);
     } catch {
       return json(400, { error: 'Body must be JSON' });
     }
-    if (typeof noteId !== 'string' || !UUID.test(noteId)) {
-      return json(400, { error: 'note_id must be a uuid' });
-    }
-
-    const note = await deps.db.getNote(noteId);
-    if (!note) return json(404, { error: 'Note not found' });
-
-    const [senderName, devices] = await Promise.all([
-      deps.db.getDisplayName(note.from_user_id),
-      deps.db.listDevices(note.to_user_id),
-    ]);
-    const payload = buildLoveNotePayload(note, senderName);
+    if (!parsed.ok) return json(400, { error: parsed.message });
 
     let sent = 0;
     let recorded = 0;
     let skipped = 0;
     let failed = 0;
     let gone = 0;
+
+    const source = await resolveSource(deps.db, parsed.kind, parsed.id);
+    if (!source) return json(404, { error: 'Not found' });
+
+    // Nobody to tell: an unlinked owner, a self-addressed row or a type that
+    // is not a push. Nothing is claimed.
+    if (!source.recipientId || source.recipientId === source.senderId || !source.buildPayload) {
+      return json(200, { sent, recorded, skipped, failed, gone });
+    }
+
+    const [senderName, devices] = await Promise.all([
+      deps.db.getDisplayName(source.senderId),
+      deps.db.listDevices(source.recipientId),
+    ]);
+    const payload = source.buildPayload(senderName);
     const now = deps.now ?? Date.now;
 
     await Promise.all(
@@ -153,7 +295,8 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
         let counted = false;
         try {
           const claimed = await deps.db.claimRequest({
-            note_id: note.id,
+            kind: source.kind,
+            source_id: source.id,
             token: device.token,
             environment: device.environment,
             payload,
@@ -182,14 +325,14 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
             // Delete first, so a failed release cannot keep a dead registration.
             // A failure from here on is counted failed by the catch below.
             await deps.db.deleteGoneDevice(device.token, result.timestamp ?? startedAt);
-            await deps.db.releaseRequest(note.id, device.token);
+            await deps.db.releaseRequest(source.kind, source.id, device.token);
             gone++;
             return;
           }
           if (result) console.error('[send-push] APNs refused a push:', result.status, result.reason);
           failed++;
           counted = true;
-          await deps.db.releaseRequest(note.id, device.token);
+          await deps.db.releaseRequest(source.kind, source.id, device.token);
         } catch (error) {
           console.error('[send-push] device failed:', error instanceof Error ? error.message : error);
           if (!counted) failed++;
