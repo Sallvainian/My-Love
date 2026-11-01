@@ -3,7 +3,7 @@ title: 'Pushes arrive through APNs on a device and from the hosted project'
 type: 'feature'
 ticket: '13'
 created: '2026-10-31'
-status: 'built'
+status: done
 baseline_revision: '56c1aaa37b13084ca0c0b2bf71bb5466f041c5c0'
 route: 'full'
 route_source: 'auto'
