@@ -88,6 +88,10 @@ function fakeDb(options: {
   preferences?: Partial<Record<PushPreference, boolean>>;
   /** Every switch looked up, as `[userId, preference]`. */
   preferenceLookups?: [string, PushPreference][];
+  /** The recipient's unread love-note count (the badge); defaults to 0. An Error makes the read fail. */
+  unreadCount?: number | Error;
+  /** Every user whose unread count was looked up. */
+  countLookups?: string[];
 }): PushDb {
   const claimed = options.claimed ?? [];
   const note = options.note === undefined ? textNote : options.note;
@@ -117,6 +121,11 @@ function fakeDb(options: {
     listDevices: (userId) => {
       options.listed?.push(userId);
       return Promise.resolve(userId === 'recipient' ? (options.devices ?? []) : []);
+    },
+    countUnreadNotes: (userId) => {
+      options.countLookups?.push(userId);
+      const count = options.unreadCount ?? 0;
+      return count instanceof Error ? Promise.reject(count) : Promise.resolve(count);
     },
     claimRequest: (row) => {
       if (claimed.some((c) => c.kind === row.kind && c.source_id === row.source_id && c.token === row.token)) {
@@ -164,7 +173,7 @@ Deno.test('unconfigured: every device gets a recorded request and nothing is sen
     ['tok-b', 'production', 'recorded'],
   ]);
   assertEquals(claimed[0].payload, {
-    aps: { alert: { title: 'Casey', body: 'Thinking of you' }, 'thread-id': 'love-notes' },
+    aps: { alert: { title: 'Casey', body: 'Thinking of you' }, 'thread-id': 'love-notes', badge: 0 },
   });
 });
 
@@ -449,7 +458,7 @@ Deno.test('a mood records one request per partner device with the mood labels', 
     ['mood', MOOD_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
-    aps: { alert: { title: 'Casey', body: 'Logged a mood: Happy, Grateful' }, 'thread-id': PARTNER_THREAD },
+    aps: { alert: { title: 'Casey', body: 'Logged a mood: Happy, Grateful' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
 });
 
@@ -467,7 +476,7 @@ Deno.test('a photo, a poke and a kiss record their R7 text', async () => {
     });
     assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 0, gone: 0 });
     assertEquals(claimed[0].payload, {
-      aps: { alert: { title: 'Casey', body: text }, 'thread-id': PARTNER_THREAD },
+      aps: { alert: { title: 'Casey', body: text }, 'thread-id': PARTNER_THREAD, badge: 0 },
     });
   }
 });
@@ -612,7 +621,7 @@ Deno.test('a date change records the R7 body for every partner device, on the pa
     ['date', DATE_CHANGE_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
-    aps: { alert: { title: 'Casey', body: 'Added an event: Paris trip' }, 'thread-id': PARTNER_THREAD },
+    aps: { alert: { title: 'Casey', body: 'Added an event: Paris trip' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
 });
 
@@ -732,7 +741,7 @@ Deno.test('a partner request records the asker\'s name and R7 body on the asked 
     ['partner_request', PARTNER_REQUEST_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
-    aps: { alert: { title: 'Casey', body: 'Sent you a partner request' }, 'thread-id': PARTNER_THREAD },
+    aps: { alert: { title: 'Casey', body: 'Sent you a partner request' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
   // The asker is not a partner yet: no partner lookup, and only the asked person's devices.
   assertEquals(lookups, []);
@@ -748,7 +757,7 @@ Deno.test('a partner request from someone with no name is titled Someone', async
   assertEquals(claimed[0].payload.aps.alert.title, 'Someone');
 });
 
-Deno.test('a partner request pushes whatever its status, and carries no badge, sound or image', async () => {
+Deno.test('a partner request pushes whatever its status, and carries no sound or image', async () => {
   for (const status of ['pending', 'accepted', 'declined']) {
     const claimed: PushRequestRow[] = [];
     await handleSendPush(request({ kind: 'partner_request', id: PARTNER_REQUEST_ID }), {
@@ -758,7 +767,7 @@ Deno.test('a partner request pushes whatever its status, and carries no badge, s
     assertEquals(claimed.length, 1, status);
     const { payload } = claimed[0];
     assertEquals(Object.keys(payload), ['aps']);
-    assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
+    assertEquals(Object.keys(payload.aps).sort(), ['alert', 'badge', 'thread-id']);
   }
 });
 
@@ -782,7 +791,7 @@ Deno.test('an acceptance records the accepter\'s name and R7 body on the asker\'
     ['partner_accept', PARTNER_REQUEST_ID, 'tok-b'],
   ]);
   assertEquals(claimed[0].payload, {
-    aps: { alert: { title: 'Casey', body: 'Accepted your partner request' }, 'thread-id': PARTNER_THREAD },
+    aps: { alert: { title: 'Casey', body: 'Accepted your partner request' }, 'thread-id': PARTNER_THREAD, badge: 0 },
   });
   assertEquals(lookups, []);
   assertEquals(listed, ['recipient']);
@@ -1040,4 +1049,70 @@ Deno.test('a failed switch read answers 500 and claims nothing', async () => {
   await response.body?.cancel();
   assertEquals(claimed.length, 0);
   assertEquals(listed, []);
+});
+
+// ---- Story 3.8: the badge ----
+
+Deno.test('every kind records the recipient\'s unread count as aps.badge, zero included', async () => {
+  for (const unreadCount of [0, 1, 7]) {
+    for (const { kind, body, rows } of KIND_CASES) {
+      const claimed: PushRequestRow[] = [];
+      await handleSendPush(request(body), {
+        db: fakeDb({ ...rows, devices: TWO_DEVICES, claimed, unreadCount }),
+        apns: null,
+      });
+      assertEquals(claimed.length, 2, kind);
+      for (const row of claimed) assertEquals(row.payload.aps.badge, unreadCount, `${kind} ${unreadCount}`);
+    }
+  }
+});
+
+Deno.test('the badge reaches APNs in the payload it sends', async () => {
+  const sent: unknown[] = [];
+  const apns: ApnsClient = {
+    send: (_token, _environment, payload) => {
+      sent.push(payload);
+      return Promise.resolve({ ok: true, status: 200, reason: null, timestamp: null });
+    },
+  };
+  await handleSendPush(request({ kind: 'mood', id: MOOD_ID }), {
+    db: fakeDb({ mood: happyGrateful, devices: [TWO_DEVICES[0]], unreadCount: 2 }),
+    apns,
+  });
+  assertEquals((sent[0] as { aps: { badge: number } }).aps.badge, 2);
+});
+
+Deno.test('the count is looked up for the recipient and never the sender', async () => {
+  for (const { kind, body, rows } of KIND_CASES) {
+    const countLookups: string[] = [];
+    await handleSendPush(request(body), {
+      db: fakeDb({ ...rows, devices: TWO_DEVICES, countLookups }),
+      apns: null,
+    });
+    assertEquals(countLookups, ['recipient'], kind);
+  }
+});
+
+Deno.test('nobody to tell, or a switch that is off, reads no count', async () => {
+  const countLookups: string[] = [];
+  await handleSendPush(request({ kind: 'mood', id: MOOD_ID }), {
+    db: fakeDb({ mood: happyGrateful, partnerId: null, devices: TWO_DEVICES, countLookups }),
+    apns: null,
+  });
+  await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, countLookups, preferences: { love_notes: false } }),
+    apns: null,
+  });
+  assertEquals(countLookups, []);
+});
+
+Deno.test('a failed count read answers 500 and claims nothing', async () => {
+  const claimed: PushRequestRow[] = [];
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, claimed, unreadCount: new Error('db down') }),
+    apns: null,
+  });
+  assertEquals(response.status, 500);
+  await response.body?.cancel();
+  assertEquals(claimed.length, 0);
 });

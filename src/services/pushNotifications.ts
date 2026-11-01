@@ -28,8 +28,12 @@ import { supabase } from '../api/supabaseClient';
  * `hasNativePush()` and ask iOS for the permission state through
  * `getPushPermission()`; their data is `pushPreferencesService`.
  *
- * Not here yet: badge counts, tap handling and foreground suppression (later
- * stories of the epic).
+ * Story 3.8 adds `clearAppBadge()` (the badge half of sign-out, reused by Love
+ * Notes when it marks notes read) and `onForegroundPush(handler)`, which the
+ * `pushNotificationReceived` listener fans out to: a push that arrives while
+ * the app is in front. The shell shows it badge-only (`capacitor.config.ts`).
+ *
+ * Not here yet: tap handling (a later story of the epic).
  */
 
 type ApnsEnvironment = 'sandbox' | 'production';
@@ -88,6 +92,20 @@ export type PushRegistrationOutcome = 'unavailable' | 'denied' | 'registering';
 
 let listening: Promise<void> | null = null;
 
+const foregroundPushHandlers = new Set<() => void>();
+
+/**
+ * Calls `handler` for every push the shell reports while the app is in front.
+ * Returns the function that stops it. Handlers may be added before the
+ * listener exists; they hear pushes once registration has started.
+ */
+export function onForegroundPush(handler: () => void): () => void {
+  foregroundPushHandlers.add(handler);
+  return () => {
+    foregroundPushHandlers.delete(handler);
+  };
+}
+
 /**
  * Whether this shell carries both native pieces push needs. False on the
  * website, in the Home Screen web app and in a shell installed before the
@@ -123,6 +141,15 @@ function listenOnce(): Promise<void> {
     });
     await PushNotifications.addListener('registrationError', (error) => {
       console.error('[Push] APNs registration failed:', error.error);
+    });
+    await PushNotifications.addListener('pushNotificationReceived', () => {
+      for (const handler of [...foregroundPushHandlers]) {
+        try {
+          handler();
+        } catch (error) {
+          console.error('[Push] A foreground push handler failed:', error);
+        }
+      }
     });
   })().catch((error: unknown) => {
     // A failed setup must not stay cached: the next start tries again.
@@ -240,12 +267,21 @@ export async function stopDevicePushes(): Promise<void> {
   }
   // Not removeAllDeliveredNotifications(): it rejects unless register() ran
   // this launch, and it would also empty Notification Center.
-  if (Capacitor.isPluginAvailable('AppBadge')) {
-    try {
-      await AppBadge.clear();
-    } catch (error) {
-      console.error('[Push] Could not clear the badge:', error);
-    }
-  }
+  await clearAppBadge();
   forgetToken();
+}
+
+/**
+ * Clears the app icon's badge. Does nothing outside the native shell or in a
+ * shell with no `AppBadge` plugin (one installed before story 3.2). Never
+ * throws; logs only failures. Delivered notifications stay in Notification
+ * Center.
+ */
+export async function clearAppBadge(): Promise<void> {
+  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('AppBadge')) return;
+  try {
+    await AppBadge.clear();
+  } catch (error) {
+    console.error('[Push] Could not clear the badge:', error);
+  }
 }

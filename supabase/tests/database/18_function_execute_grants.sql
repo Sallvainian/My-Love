@@ -26,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(23);
+select plan(24);
 
 create or replace function tests.create_test_user(test_email text default 'test@example.com')
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -111,7 +111,7 @@ select is(
       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       and has_function_privilege('authenticated', p.oid, 'EXECUTE')
   ),
-  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests, register_push_device, unregister_push_device',
+  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests, mark_love_notes_read, register_push_device, unregister_push_device',
   'FN-GRANT-008: authenticated holds EXECUTE on exactly the app RPCs'
 );
 
@@ -165,6 +165,13 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.unregister_push_device(text)', 'EXECUTE'),
   'FN-GRANT-014: unregister_push_device is executable by authenticated'
+);
+
+-- 20261101000000, same shape: Love Notes stamps its read marker through it, so
+-- without the grant every open answers 42501 and the badge never clears.
+select ok(
+  has_function_privilege('authenticated', 'public.mark_love_notes_read()', 'EXECUTE'),
+  'FN-GRANT-015: mark_love_notes_read is executable by authenticated'
 );
 
 -- ============================================

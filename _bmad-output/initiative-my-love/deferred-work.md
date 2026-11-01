@@ -3095,3 +3095,19 @@ source_spec: `tickets/epic-push-notifications/tickets/story-each-push-type-has-a
 severity: low
 reason: supabase gen types typescript --local (CLI 2.122.0) emits the same push_preferences fields but with ComputedFields lines and inline quoted keys; pre-existing drift already in the ledger as DW-357.
 status: open
+
+### DW-361: A push that arrives while Love Notes is in front can leave its badge showing on a real iPhone, because the second badge clear waits a fixed 1 s that was measured only on the simulator.
+origin: review story-3.8
+location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
+source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
+severity: medium (unverified)
+reason: The push plugin's willPresent tells the web view about the push and then returns the badge option, and iOS applies the payload's badge after the first clear. On the iPhone Duo simulator a second `AppBadge.clear()` 1 s later left the badge clear on every run. No device has been checked, and a slower one could apply the badge after the second clear; the badge would then show until Love Notes is next opened or brought to the front. Settle it on the owner's iPhone in story 3.11: with Love Notes in front, a note from the partner must leave the badge clear. If it does not, clear the badge natively (for example in a willPresent wrapper told by the web view that Love Notes is on screen) rather than lengthening the wait.
+status: open
+
+### DW-362: A push arriving while Love Notes is in front may leave its badge showing on a real iPhone, because the second clear waits a fixed 1 s measured only on the simulator.
+origin: spec-deferred fc588628987f
+location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
+source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
+severity: medium
+reason: The plugin's willPresent notifies the web view and then returns the badge option, so iOS applies the badge after the first clear. On the Duo simulator a clear 1 s later held on every run; no device was checked. Settle on the owner's iPhone in story 3.11 (Love Notes in front, a partner note leaves the badge clear). Ledger DW-361. (declared severity: medium (unverified))
+status: open

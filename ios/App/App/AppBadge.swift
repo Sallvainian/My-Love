@@ -8,7 +8,9 @@ import UserNotifications
 /// the outgoing account's count does not stay on the icon. Notification
 /// Center is left as it is: the push plugin's removeAllDeliveredNotifications
 /// would empty it too, and it rejects unless register() ran this launch.
-/// Story 3.8 adds `set`.
+/// Love Notes clears it too when it marks notes read
+/// (src/hooks/useLoveNotesReadMarker.ts); the count itself arrives in each
+/// push's `aps.badge`.
 @objc(AppBadgePlugin)
 public class AppBadgePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "AppBadgePlugin"

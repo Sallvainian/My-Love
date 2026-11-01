@@ -364,6 +364,21 @@ export type Database = {
         }
         Relationships: []
       }
+      love_notes_read_markers: {
+        Row: {
+          last_opened_at: string
+          user_id: string
+        }
+        Insert: {
+          last_opened_at?: string
+          user_id: string
+        }
+        Update: {
+          last_opened_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_favorites: {
         Row: {
           created_at: string
@@ -800,10 +815,12 @@ export type Database = {
           to_user_id: string
         }[]
       }
+      mark_love_notes_read: { Args: Record<PropertyKey, never>; Returns: string }
       register_push_device: {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
+      unread_love_note_count: { Args: { p_user_id: string }; Returns: number }
       unregister_push_device: {
         Args: { p_token: string }
         Returns: undefined

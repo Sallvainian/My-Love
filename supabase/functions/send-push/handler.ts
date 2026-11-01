@@ -52,6 +52,20 @@
  * kinds share `partner_requests`). A switch that is off answers 200 with every
  * count 0, claims nothing and lists no devices. A failed read answers 500.
  *
+ * ## The badge
+ *
+ * Every payload carries `aps.badge`: the recipient's unread love notes, read
+ * through `PushDb.countUnreadNotes` (`unread_love_note_count`,
+ * 20261101000000_love_notes_read_markers.sql: partner notes newer than the
+ * recipient's `love_notes_read_markers` row, every note when they have none).
+ * `0` is sent as well, because it clears the badge. A love note's push counts
+ * the note it announces, unless the recipient had Love Notes on screen and
+ * marked it read before the sender ran (the note can reach them over Broadcast
+ * ahead of pg_net's call), in which case the badge is 0. The count is read
+ * after the switch check, with the sender's name and the devices; a failed
+ * read answers 500 and claims nothing. Opening Love Notes writes the marker
+ * (`mark_love_notes_read`), which resets the count.
+ *
  * ## Dedupe and the recorded path
  *
  * `push_requests` is unique on (source row, device token), one column per
@@ -83,6 +97,7 @@ import {
   type ApnsPayload,
   type PushDateChange,
   type PushMood,
+  withBadge,
 } from './payload.ts';
 
 /** What a push is about; each kind has its own column in `push_requests`. */
@@ -188,6 +203,8 @@ export interface PushDb {
   isPushEnabled(userId: string, preference: PushPreference): Promise<boolean>;
   getDisplayName(userId: string): Promise<string | null>;
   listDevices(userId: string): Promise<DeviceRow[]>;
+  /** The partner love notes the user has not opened (the badge), 0 or more. */
+  countUnreadNotes(userId: string): Promise<number>;
   /** Inserts the row unless (source, token) exists; true when this call inserted it. */
   claimRequest(row: PushRequestRow): Promise<boolean>;
   releaseRequest(kind: PushKind, sourceId: string, token: string): Promise<void>;
@@ -399,11 +416,12 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
       return json(200, { sent, recorded, skipped, failed, gone });
     }
 
-    const [senderName, devices] = await Promise.all([
+    const [senderName, devices, unread] = await Promise.all([
       deps.db.getDisplayName(source.senderId),
       deps.db.listDevices(source.recipientId),
+      deps.db.countUnreadNotes(source.recipientId),
     ]);
-    const payload = source.buildPayload(senderName);
+    const payload = withBadge(source.buildPayload(senderName), unread);
     const now = deps.now ?? Date.now;
 
     await Promise.all(

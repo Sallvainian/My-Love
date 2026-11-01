@@ -10,8 +10,11 @@ import {
   buildPhotoPayload,
   FALLBACK_REQUESTER_NAME,
   FALLBACK_SENDER_NAME,
+  LOVE_NOTES_THREAD_ID,
   MOOD_LABELS,
+  PARTNER_ACTIVITY_THREAD_ID,
   PICTURE_ONLY_BODY,
+  withBadge,
 } from './payload.ts';
 
 Deno.test('a text note is titled with the sender and carries its text', () => {
@@ -181,4 +184,31 @@ Deno.test('the partner request payloads carry no badge, sound or image', () => {
     assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
     assertFalse('badge' in payload.aps || 'sound' in payload.aps);
   }
+});
+
+Deno.test('a love note stacks on love-notes and every other kind on partner-activity', () => {
+  assertEquals(LOVE_NOTES_THREAD_ID, 'love-notes');
+  assertEquals(PARTNER_ACTIVITY_THREAD_ID, 'partner-activity');
+  assertEquals(buildLoveNotePayload({ content: 'Hi', image_url: null }, 'Casey').aps['thread-id'], 'love-notes');
+  const others = [
+    buildMoodPayload({ mood_type: 'happy', mood_types: null }, 'Casey'),
+    buildPhotoPayload('Casey'),
+    buildInteractionPayload('poke', 'Casey')!,
+    buildInteractionPayload('kiss', 'Casey')!,
+    buildDatePayload({ subject: 'wedding_date', action: 'added', event_label: null }, 'Casey'),
+    buildPartnerRequestPayload('Casey'),
+    buildPartnerAcceptPayload('Casey'),
+  ];
+  for (const payload of others) assertEquals(payload.aps['thread-id'], 'partner-activity');
+});
+
+Deno.test('withBadge puts the count in aps.badge, zero included, and does not change its input', () => {
+  const payload = buildPhotoPayload('Casey');
+  const before = structuredClone(payload);
+  assertEquals(withBadge(payload, 3).aps.badge, 3);
+  assertEquals(withBadge(payload, 0).aps.badge, 0);
+  assertEquals(withBadge(payload, 3).aps.alert, payload.aps.alert);
+  assertEquals(withBadge(payload, 3).aps['thread-id'], payload.aps['thread-id']);
+  assertEquals(payload, before);
+  assertFalse('badge' in payload.aps);
 });

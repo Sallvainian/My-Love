@@ -14,6 +14,11 @@
  * partner's `love_notes` off a note records nothing on any of their devices,
  * and with it back on the next note records on both; one account cannot read or
  * write another's row.
+ * Story 3.8 adds a sixth: every push carries the recipient's unread love-note
+ * count as `aps.badge`, counted from the partner's `love_notes_read_markers`
+ * row, which only `mark_love_notes_read()` writes. The other describes assert
+ * only that the badge is a number, since their recipients' markers are not
+ * theirs to set.
  *
  * Path under test: register_push_device (RPC, real user JWTs) -> the
  * `love_notes` AFTER INSERT trigger -> pg_net -> Kong -> the `send-push` Edge
@@ -133,6 +138,7 @@ test.describe('Love note push trigger', () => {
         aps: {
           alert: { title: sender?.display_name?.trim() || 'Your partner', body: 'Thinking of you' },
           'thread-id': 'love-notes',
+          badge: expect.any(Number),
         },
       });
     }
@@ -347,7 +353,7 @@ test.describe('Love note push trigger', () => {
 
 /** The R7 text each partner-activity push carries. */
 const partnerPayload = (title: string, body: string) => ({
-  aps: { alert: { title, body }, 'thread-id': 'partner-activity' },
+  aps: { alert: { title, body }, 'thread-id': 'partner-activity', badge: expect.any(Number) },
 });
 
 /** Posts `{kind, id}` to the sender as the trigger does, with the secret from the settings row. */
@@ -1195,5 +1201,96 @@ test.describe('Push switches', () => {
     await expect
       .poll(async () => (await requestsFor(supabaseAdmin, afterwards)).length, { timeout: 20_000 })
       .toBe(2);
+  });
+});
+
+/** What the sender recorded as the first row's `aps.badge` and `aps['thread-id']`. */
+async function recordedAps(supabaseAdmin: TypedSupabaseClient, sourceId: string, column: SourceColumn) {
+  const [row] = await requestsFor(supabaseAdmin, sourceId, column);
+  const { badge, 'thread-id': threadId } = (row.payload as { aps: { badge: number; 'thread-id': string } }).aps;
+  return { badge, threadId };
+}
+
+test.describe('Badge', () => {
+  test('[P0] every push carries the partner\'s unread love notes, and opening Love Notes resets the count', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const partner = await clientFor(supabaseAdmin, partnerId);
+    const device = newToken();
+    const noteKeys = [randomUUID(), randomUUID(), randomUUID()];
+    const moodTime = uniqueMoodTime();
+    cleanup.defer('remove push devices, notes, the mood and the partner\'s marker', async () => {
+      await supabaseAdmin.from('love_notes_read_markers').delete().eq('user_id', partnerId);
+      await supabaseAdmin.from('push_devices').delete().eq('token', device);
+      await supabaseAdmin.from('love_notes').delete().in('idempotency_key', noteKeys);
+      await supabaseAdmin.from('moods').delete().eq('user_id', userId).eq('created_at', moodTime);
+    });
+    expect((await partner.rpc('register_push_device', { p_token: device, p_environment: 'sandbox' })).error).toBeNull();
+
+    /** Sends a note from the user and waits for the sender's recorded request, so counts cannot overlap. */
+    const sendNote = async (idempotencyKey: string) => {
+      const { data, error } = await supabaseAsUser
+        .from('love_notes')
+        .insert({ from_user_id: userId, to_user_id: partnerId, content: 'Badge test', idempotency_key: idempotencyKey })
+        .select('id')
+        .single();
+      expect(error).toBeNull();
+      await expect
+        .poll(async () => (await requestsFor(supabaseAdmin, data!.id)).length, {
+          message: 'the sender records the note\'s push',
+          timeout: 20_000,
+        })
+        .toBe(1);
+      return data!.id;
+    };
+
+    // The partner opens Love Notes: the marker is the server's now.
+    expect((await partner.rpc('mark_love_notes_read')).error).toBeNull();
+
+    // ---- two notes from the user: the badge counts them as they arrive ----
+    const first = await sendNote(noteKeys[0]);
+    expect(await recordedAps(supabaseAdmin, first, 'note_id')).toEqual({ badge: 1, threadId: 'love-notes' });
+    const second = await sendNote(noteKeys[1]);
+    expect(await recordedAps(supabaseAdmin, second, 'note_id')).toEqual({ badge: 2, threadId: 'love-notes' });
+
+    // ---- a mood carries the same count, on the other thread ----
+    const { data: mood, error } = await supabaseAsUser
+      .from('moods')
+      .upsert(
+        { user_id: userId, mood_type: 'happy', mood_types: ['happy'], created_at: moodTime },
+        { onConflict: 'user_id,created_at' }
+      )
+      .select('id')
+      .single();
+    expect(error).toBeNull();
+    await expect
+      .poll(async () => (await requestsFor(supabaseAdmin, mood!.id, 'mood_id')).length, {
+        message: 'the sender records the mood\'s push',
+        timeout: 20_000,
+      })
+      .toBe(1);
+    expect(await recordedAps(supabaseAdmin, mood!.id, 'mood_id')).toEqual({
+      badge: 2,
+      threadId: 'partner-activity',
+    });
+
+    // ---- the partner opens Love Notes again: the next note counts 1 ----
+    expect((await partner.rpc('mark_love_notes_read')).error).toBeNull();
+    const third = await sendNote(noteKeys[2]);
+    expect(await recordedAps(supabaseAdmin, third, 'note_id')).toEqual({ badge: 1, threadId: 'love-notes' });
+
+    // ---- the marker is the partner's own, and no client can write it ----
+    const peek = await supabaseAsUser.from('love_notes_read_markers').select('*').eq('user_id', partnerId);
+    expect(peek.error).toBeNull();
+    expect(peek.data).toEqual([]);
+    const forge = await partner
+      .from('love_notes_read_markers')
+      .upsert({ user_id: partnerId, last_opened_at: '2000-01-01T00:00:00Z' }, { onConflict: 'user_id' });
+    expect(forge.error).not.toBeNull();
+    const count = await partner.rpc('unread_love_note_count', { p_user_id: partnerId });
+    expect(count.error).not.toBeNull();
   });
 });

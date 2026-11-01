@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import { authService } from '../../api/authService';
 import { getOwnDisplayName, getPartnerDisplayName } from '../../api/supabaseClient';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
+import { useLoveNotesReadMarker } from '../../hooks/useLoveNotesReadMarker';
 import type { LoveNote } from '../../types/models';
 import { useAppStore } from '../../stores/useAppStore';
 import { MessageInput } from './MessageInput';
@@ -72,6 +73,10 @@ export function LoveNotes(): ReactElement {
   // userId and the removal action from the store
   const currentUserId = useAppStore((state) => state.userId) ?? '';
   const removeNote = useAppStore((state) => state.removeNote);
+
+  // Story 3.8: while this screen is in front, keep the server's read marker
+  // (and so the push badge) current. Renders nothing.
+  useLoveNotesReadMarker(notes, currentUserId);
 
   // The confirmation lives here rather than inside a message row: rows sit in
   // MessageList's overflow-hidden virtualized container and Motion puts a

@@ -94,11 +94,15 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          (the shell from the last sim build's App.app; it
                          loses its sign-in, so run sim signin again).
   push FILE [--host]     Send FILE, JSON with an aps object (simctl push).
-  banner FILE [--tap cold|background] [--host]
+  banner FILE [--tap cold|background | --front] [--host]
                          Put Settings in front, push FILE, print the banner's
                          label. --tap taps it, the app first terminated
                          (cold) or launched (background), and prints the
-                         app's state before and after.
+                         app's state before and after. --front puts the app
+                         itself in front instead of Settings, pushes FILE and
+                         watches: the shell shows no banner for a foreground
+                         push, so a pass ends in "no banner" (exit 1). It
+                         cannot be combined with --tap (exit 2).
   center [--host]        The app's Notification Center groups as one JSON
                          line: each group's text (its newest notification's
                          title and body) and notification count.
@@ -620,17 +624,25 @@ cmd_push() {
 # log is polled for "watching", then the push goes, then the step ends.
 cmd_banner() {
   target_args "$@"
-  local file=${REST[1]:-} tap=
-  [[ -n $file ]] || die 2 "banner takes FILE [--tap cold|background] (and --host)"
+  local file=${REST[1]:-} tap= front=
+  [[ -n $file ]] || die 2 "banner takes FILE [--tap cold|background | --front] (and --host)"
   if (( $#REST > 1 )); then
-    (( $#REST == 3 )) && [[ $REST[2] == --tap && $REST[3] == (cold|background) ]] ||
+    if (( ${REST[(I)--front]} && ${REST[(I)--tap]} )); then
+      die 2 "banner: --front and --tap cannot be combined"
+    elif [[ $REST[2] == --front ]] && (( $#REST == 2 )); then
+      front=1
+    elif [[ $REST[2] == --tap ]] && (( $#REST == 3 )) && [[ $REST[3] == (cold|background) ]]; then
+      tap=$REST[3]
+    elif [[ $REST[2] == --tap ]]; then
       die 2 "banner: --tap takes cold or background"
-    tap=$REST[3]
+    else
+      die 2 "banner takes FILE [--tap cold|background | --front] (and --host)"
+    fi
   fi
   check_payload $file
   require_booted
   ensure_runner
-  local -a fields=(banner $TARGET "$ICON" ${tap:+$tap})
+  local -a fields=(banner $TARGET "$ICON" ${tap:+$tap} ${front:+front})
   local log=$WORK/logs/notify.log code=0 tries=0
   trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM
   BG=1 start_step Notify "${(pj:\t:)fields}"

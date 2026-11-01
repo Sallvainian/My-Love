@@ -9,12 +9,16 @@ import XCTest
 //                           with PROBE=request, so it asks), then tap Allow or
 //                           Don't Allow on SpringBoard's alert; for the host,
 //                           print its status line
-//   banner [cold|background] put Settings in front, say "watching" once no
+//   banner [cold|background|front]
+//                           put Settings in front, say "watching" once no
 //                           earlier banner remains (sim then pushes), print
 //                           the banner's label; cold terminates the app
 //                           first, background launches it first, and both
 //                           tap the banner, printing the app's state before
-//                           and after
+//                           and after; front puts the app itself in front
+//                           instead of Settings, which is how a push to the
+//                           app in front is checked (it ends in "no banner"
+//                           when the shell shows none)
 //   center                  open Notification Center (sim presses Home
 //                           first), print the app's groups as one JSON line
 //   badge                   print the app icon's value, or none
@@ -54,6 +58,8 @@ final class Notify: XCTestCase {
             try permission(app, isHost: bundle == host, allow: args[0] == "allow")
         case ("banner", 0):
             try banner(app, icon, tap: nil)
+        case ("banner", 1) where args[0] == "front":
+            try banner(app, icon, tap: nil, front: true)
         case ("banner", 1) where ["cold", "background"].contains(args[0]):
             try banner(app, icon, tap: args[0])
         case ("center", 0):
@@ -92,7 +98,7 @@ final class Notify: XCTestCase {
         say("status: \(status.label)")
     }
 
-    func banner(_ app: XCUIApplication, _ icon: String, tap: String?) throws {
+    func banner(_ app: XCUIApplication, _ icon: String, tap: String?, front: Bool = false) throws {
         if tap == "cold" { app.terminate() }
         // activate, not launch: launch would end a running instance, and
         // "background" means the app the caller left running.
@@ -100,12 +106,21 @@ final class Notify: XCTestCase {
             app.activate()
             _ = app.wait(for: .runningForeground, timeout: 10)
         }
-        // A banner never shows for the app in front, and a test run leaves its
-        // target there; a push sent before the app has left shows none later.
-        settings.activate()
-        _ = settings.wait(for: .runningForeground, timeout: 10)
-        if !until(15, { app.state != .runningForeground }) {
-            return XCTFail("the app stayed in front of Settings")
+        if front {
+            // The app in front is the case under test: bring it there and keep
+            // it, so a push shows whatever the shell does for a foreground push.
+            app.activate()
+            if !app.wait(for: .runningForeground, timeout: 10) {
+                return XCTFail("the app did not come to the front")
+            }
+        } else {
+            // A banner never shows for the app in front, and a test run leaves its
+            // target there; a push sent before the app has left shows none later.
+            settings.activate()
+            _ = settings.wait(for: .runningForeground, timeout: 10)
+            if !until(15, { app.state != .runningForeground }) {
+                return XCTFail("the app stayed in front of Settings")
+            }
         }
         let banners = any(springboard, "identifier == 'NotificationShortLookView'")
         if !until(20, { banners.count == 0 }) { return XCTFail("an earlier banner never went away") }

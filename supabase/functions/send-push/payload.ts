@@ -4,11 +4,11 @@
  * Payload contract (story 3.1): `aps.alert.title` is the sender's display
  * name, `body` the note's text or "Sent you a picture" for a picture-only
  * note, `thread-id` is `love-notes` so love notes stack apart from every other
- * push. No image, and no `badge` (the unread count arrives in story 3.8).
+ * push. No image.
  *
  * Story 3.4 adds the partner's mood, photo, poke and kiss. They share one
  * thread, `partner-activity`, so they stack apart from love notes; the title
- * is again the sender's display name; no image, no `badge`, no `sound`.
+ * is again the sender's display name; no image, no `sound`.
  *
  * Story 3.5 adds the date changes (an event added or changed, the wedding
  * date, the date the couple got together, a birthday) on the same
@@ -19,6 +19,13 @@
  * `partner-activity`. The title is the other person's display name. A request
  * comes from someone who is not a partner yet, so with no name it falls back to
  * `Someone`; an acceptance comes from a linked partner, so it keeps `Your partner`.
+ *
+ * Story 3.8 adds the badge. The builders leave it out; `withBadge` puts the
+ * recipient's unread love-note count in `aps.badge` of every payload, `0`
+ * included (0 clears the icon's badge). There are two thread ids, pinned by
+ * `payload.test.ts`: `love-notes` (`LOVE_NOTES_THREAD_ID`) for a love note and
+ * `partner-activity` (`PARTNER_ACTIVITY_THREAD_ID`) for every other kind,
+ * which story 4.6's reminders will use too.
  */
 
 export const LOVE_NOTES_THREAD_ID = 'love-notes';
@@ -74,7 +81,14 @@ export interface ApnsPayload {
   aps: {
     alert: { title: string; body: string };
     'thread-id': string;
+    /** The app icon's badge: the recipient's unread love notes. Set by `withBadge`. */
+    badge?: number;
   };
+}
+
+/** A copy of the payload carrying `aps.badge`; the input is not changed. */
+export function withBadge(payload: ApnsPayload, count: number): ApnsPayload {
+  return { aps: { ...payload.aps, badge: count } };
 }
 
 /**

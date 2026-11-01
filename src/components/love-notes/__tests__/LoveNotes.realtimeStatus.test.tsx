@@ -24,6 +24,8 @@ const api = vi.hoisted(() => ({
   getUser: vi.fn(),
 }));
 
+const readMarker = vi.hoisted(() => vi.fn());
+
 const feed = vi.hoisted(() => ({
   status: 'connected' as NoteFeedStatus,
   error: null as string | null,
@@ -36,6 +38,8 @@ vi.mock('../../../api/supabaseClient', () => ({
 vi.mock('../../../api/authService', () => ({
   authService: { getUser: api.getUser },
 }));
+// Marking notes read is covered by useLoveNotesReadMarker.test.ts; here it must make no request.
+vi.mock('../../../hooks/useLoveNotesReadMarker', () => ({ useLoveNotesReadMarker: readMarker }));
 vi.mock('../../../hooks/useLoveNotes', () => ({
   useLoveNotes: () => ({
     notes: [],
@@ -117,6 +121,12 @@ describe('LoveNotes realtime notice', () => {
       expect(row).toHaveTextContent(/^PPartner$/);
       expect(row).not.toHaveTextContent(/Connected|Reconnecting|Not receiving/);
     });
+  });
+
+  it('hands the thread and the signed-in user to the read marker', async () => {
+    await renderWith('connected');
+
+    expect(readMarker).toHaveBeenCalledWith([], 'user-a');
   });
 
   describe('the partner row', () => {

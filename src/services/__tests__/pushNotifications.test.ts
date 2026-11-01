@@ -125,7 +125,7 @@ describe('startPushRegistration', () => {
     await startPushRegistration();
     await startPushRegistration();
 
-    expect(push.addListener).toHaveBeenCalledTimes(2); // registration + registrationError, once
+    expect(push.addListener).toHaveBeenCalledTimes(3); // registration, registrationError, pushNotificationReceived, once
     expect(push.register).toHaveBeenCalledTimes(2);
   });
 
@@ -400,6 +400,106 @@ describe('getPushPermission', () => {
     const { getPushPermission } = await freshModule();
 
     await expect(getPushPermission()).resolves.toBe('unavailable');
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+});
+
+describe('clearAppBadge', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+  });
+
+  it('clears the icon badge in the shell', async () => {
+    const { clearAppBadge } = await freshModule();
+
+    await clearAppBadge();
+
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing in a browser, and logs nothing', async () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const errorLog = vi.spyOn(console, 'error');
+    const { clearAppBadge } = await freshModule();
+
+    await clearAppBadge();
+
+    expect(badge.clear).not.toHaveBeenCalled();
+    expect(errorLog).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it('makes no badge call in a shell without the AppBadge plugin', async () => {
+    capacitor.isPluginAvailable.mockImplementation((name: string) => name !== 'AppBadge');
+    const { clearAppBadge } = await freshModule();
+
+    await clearAppBadge();
+
+    expect(badge.clear).not.toHaveBeenCalled();
+  });
+
+  it('logs a failing plugin and resolves', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    badge.clear.mockRejectedValueOnce(new Error('no badge'));
+    const { clearAppBadge } = await freshModule();
+
+    await expect(clearAppBadge()).resolves.toBeUndefined();
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+});
+
+describe('onForegroundPush', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    push.checkPermissions.mockResolvedValue({ receive: 'granted' });
+  });
+
+  it('calls every handler for a push that arrives in front', async () => {
+    const { onForegroundPush, startPushRegistration } = await freshModule();
+    const first = vi.fn();
+    const second = vi.fn();
+    onForegroundPush(first);
+    onForegroundPush(second);
+    await startPushRegistration();
+
+    handlerFor('pushNotificationReceived')({ title: 'Casey' });
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops calling a handler once it is removed', async () => {
+    const { onForegroundPush, startPushRegistration } = await freshModule();
+    const handler = vi.fn();
+    const stop = onForegroundPush(handler);
+    await startPushRegistration();
+
+    stop();
+    handlerFor('pushNotificationReceived')({});
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('a throwing handler does not stop the others', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { onForegroundPush, startPushRegistration } = await freshModule();
+    const after = vi.fn();
+    onForegroundPush(() => {
+      throw new Error('boom');
+    });
+    onForegroundPush(after);
+    await startPushRegistration();
+
+    handlerFor('pushNotificationReceived')({});
+
+    expect(after).toHaveBeenCalledTimes(1);
     expect(errorLog).toHaveBeenCalledTimes(1);
     errorLog.mockRestore();
   });
