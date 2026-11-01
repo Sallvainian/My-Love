@@ -2936,7 +2936,8 @@ location: supabase/functions/send-push/payload.ts (hasCaption)
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium (unverified)
 reason: MessageInput.tsx sends '' for a picture-only note, while love_notes_content_check needs at least one character, and no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as the note's text instead of "Sent you a picture". Settle it by sending a picture-only note from the app against the local stack and reading the stored content.
-status: open
+status: done 2026-11-01
+resolution: settled by story 3.10's sweep from the code and the local database rather than a send from the app: no stand-in exists. `MessageInput.tsx` (`handleSend`) passes '' for a picture-only note, `notesSlice.sendNote` inserts it unchanged, and a rolled-back local insert of '' with an `image_url` fails `love_notes_content_check` (23514). So no picture-only note reaches `love_notes` from the app, and send-push's picture-only branch is reached only by rows a test inserts with ' '. The refused send is DW-363.
 
 ### DW-342: A send-push claim is inserted before the APNs call, so an isolate killed between claim and send drops that push for good, and nothing re-calls the sender for a released claim.
 origin: spec-deferred a15d99cc6689
@@ -3004,7 +3005,8 @@ location: AGENTS.md (Maintained by hand, sim-driver paragraph)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: low
 reason: sim help says a folded landscape comes back only when the shell, the host app, Settings or Safari was in front. With another app in front, center exits 1 after a good read and says why. The AGENTS.md clause states the restore with no exception, so an agent that reads only AGENTS.md expects the folded landscape back. The fix edits an agent-context file, so it is deferred rather than patched.
-status: open
+status: done 2026-11-01
+resolution: AGENTS.md's sim-driver clause now states the folded-landscape exception (story 3.10).
 
 ### DW-350: center leaves the Home Screen in front after a folded-portrait or unfolded start; only a folded-landscape start brings its front app back.
 origin: spec-deferred 14bd1d434eba
@@ -3012,7 +3014,8 @@ location: scripts/sim-driver/sim (cmd_center, center_restore)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: low
 reason: center presses Home before its read and again after it, as story 12's center already did at the baseline (sim:641 and sim:648 at c9bf63ec), so the shell or host app that was in front is not brought back. The new restore relaunches the front app only for a folded landscape, because only there is it needed for the orientation. Neither sim help nor AGENTS.md says the front app is not restored. A check that expects the shell in front after center finds the Home Screen.
-status: open
+status: done 2026-11-01
+resolution: documented in `sim help`'s center line and AGENTS.md's sim-driver clause (story 3.10). Behavior kept: only a folded-landscape start relaunches the front app, because only there does the orientation need it, and asking for the front app costs a runner step.
 
 ### DW-351: sim banner exits 130 on TERM as well as INT, while center now exits 143 on TERM.
 origin: spec-deferred 05678d9d50dc
@@ -3020,7 +3023,8 @@ location: scripts/sim-driver/sim:600 (cmd_banner)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: low
 reason: banner's trap is `trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM` (sim:600), unchanged since the baseline c9bf63ec. center's traps set 130 for INT and 143 for TERM. A caller telling the two signals apart by exit code gets 130 from banner for both.
-status: open
+status: done 2026-11-01
+resolution: banner's trap is split: INT exits 130 and TERM 143, as center does (story 3.10).
 
 ### DW-352: Sign-out leaves the outgoing account's delivered notifications in Notification Center, so the next person on a shared device can read them.
 origin: spec-deferred story-3.2 plan
@@ -3044,7 +3048,8 @@ location: src/services/pushNotifications.ts (removePushRegistration); supabase/f
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
 reason: Sign-out removes only the stored token's row; a reinstall gets a new APNs token. The story's simulator check found one such stale row from story 1's install and deleted it by hand. Ledger DW-353.
-status: open
+status: done 2026-11-01
+resolution: duplicate of DW-353 (the same review finding, carried in from story 3.2's plan frontmatter); tracked there.
 
 ### DW-355: Every push to main now rebuilds both Edge Functions from the unpinned esm.sh import, so production functions can change with no reviewed change, and an esm.sh outage blocks a frontend-only site deploy.
 origin: review story-3.3
@@ -3076,4 +3081,20 @@ location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
 source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
 severity: medium (unverified)
 reason: The push plugin's willPresent tells the web view about the push and then returns the badge option, and iOS applies the payload's badge after the first clear. On the iPhone Duo simulator a second `AppBadge.clear()` 1 s later left the badge clear on every run. No device has been checked, and a slower one could apply the badge after the second clear; the badge would then show until Love Notes is next opened or brought to the front. Settle it on the owner's iPhone in story 3.11: with Love Notes in front, a note from the partner must leave the badge clear. If it does not, clear the badge natively (for example in a willPresent wrapper told by the web view that Love Notes is on screen) rather than lengthening the wait.
+status: open
+
+### DW-363: A picture-only love note sent from the app is refused by love_notes_content_check: the composer clears as if it sent, the note shows as failed, and Retry fails the same way
+origin: story-3.10
+location: src/components/love-notes/MessageInput.tsx (handleSend); src/stores/slices/notesSlice.ts (sendNote, picture path); supabase/migrations/20251206024345_remote_schema.sql (love_notes_content_check)
+source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
+severity: medium
+reason: Found while settling DW-341. With no text, `handleSend` passes '' as the content beside the picture, and `sendNote` uploads the picture and then inserts '' unchanged. `love_notes_content_check` requires `char_length(content) >= 1`, so the insert fails with 23514. `sendNote` removes the uploaded object, sets `notesError` to `CHECK_CONSTRAINT_MESSAGE` ("Some values are not allowed - check length and format limits"), marks the note failed and returns without throwing, so `handleSend` fires the success vibration and clears the text and the picture as if the note had gone; the message shows only in Love Notes' page banner (`notes-error-banner`). `retryFailedMessage` re-inserts the same '' and fails the same way, so the note can never be sent. A rolled-back insert of '' with an `image_url` on the local stack, run on 2026-11-01, failed the constraint. No E2E or api spec sends a picture-only note through the app: the push spec inserts ' '. That the hosted constraint is the same is UNVERIFIED; read `pg_get_constraintdef` for `love_notes_content_check` read-only to settle it. Fixing it is a behavior change, outside a cleanup sweep, and needs a choice: allow empty content when `image_url` is set (a migration, plus `love_notes_visible` and every reader of `content`), or have the client send a stand-in, which send-push's `hasCaption` would then push as text.
+status: open
+
+### DW-364: The new center wording in sim help and AGENTS.md ("ends on the Home Screen, except that a folded-landscape start gets its front app back") misses two cases: a landscape start on a phone with no pose
+origin: spec-deferred 608c912c1e07
+location: scripts/sim-driver/sim (help, center line; cmd_center; center_restore); AGENTS.md (Maintained by hand, sim-driver paragraph)
+source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
+severity: low
+reason: cmd_center asks for the front app whenever `$CENTER_POSE != unfolded && $CENTER_ORIENT != portrait`, which includes an empty pose (a phone with no pose, such as an iPhone 17). center_restore relaunches only when CENTER_FRONT is set and not `none`, so when `notify front` fails nothing is relaunched; center only says the folded landscape may not come back. Found by story 3.10's review. The fix edits AGENTS.md, so it is deferred: reword both to "a landscape start that is not unfolded gets back the shell, the host app, Settings or Safari when the front step found one".
 status: open

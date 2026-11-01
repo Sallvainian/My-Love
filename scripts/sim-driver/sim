@@ -110,7 +110,9 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          (proven with 8 groups), then puts the pose and
                          orientation back; a folded landscape comes back
                          only when the shell, the host, Settings or Safari
-                         was in front.
+                         was in front. It ends on the Home Screen, except
+                         that a folded-landscape start gets its front app
+                         back.
   badge [--host]         The app icon's badge ("3 new items"), or none.
 
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
@@ -644,7 +646,9 @@ cmd_banner() {
   ensure_runner
   local -a fields=(banner $TARGET "$ICON" ${tap:+$tap} ${front:+front})
   local log=$WORK/logs/notify.log code=0 tries=0
-  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM
+  # 130 for INT and 143 for TERM, as center exits.
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 143' TERM
   BG=1 start_step Notify "${(pj:\t:)fields}"
   until grep '^NOTIFY watching' $log >/dev/null; do
     if ! kill -0 $STEP_PID 2>/dev/null; then
