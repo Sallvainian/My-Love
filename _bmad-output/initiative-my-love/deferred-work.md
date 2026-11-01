@@ -3123,3 +3123,27 @@ source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lis
 severity: low
 reason: host_apply dies with "the host has no notification permission: run sim permission allow --host" when the host's result file reads "not authorized", and `sim help` says so, but AGENTS.md's sim-driver paragraph does not. The fix edits AGENTS.md, so it is deferred.
 status: open
+
+### DW-370: On a first sign-in the launch plan can find notification permission not yet granted, and nothing re-plans once the person taps Allow until the next launch.
+origin: spec-deferred ec751e5258fa
+location: src/App.tsx:418-424, src/services/dateReminders.ts scheduleDateReminders
+source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
+severity: low
+reason: dateReminders.ts schedules only when checkPermissions().display is 'granted' and never prompts; story 3.1's alert is often still up when refreshLocalCopies() resolves on the first signed-in start. Story 4.6 owns the re-plan triggers (foreground, sign-in, date change). Whether its foreground trigger fires when the system permission alert closes is unverified; story 4.6 should check a re-plan after the first-sign-in permission answer.
+status: open
+
+### DW-371: The `sim help` text and the AGENTS.md sim-driver sentence say `sim dates kinds|many` replace only the seeded events, but they first clear both people's anniversaries, the pair's couple_settings row
+origin: spec-deferred 356b1422e4d3
+location: scripts/sim-driver/sim:67-75, AGENTS.md (sim-driver paragraph)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
+severity: low
+reason: scripts/sim-driver/sim:71-72 reads "kinds and many first remove the seeded events"; AGENTS.md's sim-driver paragraph reads "replacing the seeded events"; scripts/sim-driver/dates.ts runs clearDates before kinds and many, as its own header states. The fix edits AGENTS.md, an agent-context file.
+status: open
+
+### DW-372: `sim pending` can report "nothing has been scheduled since ... installed" (and []) while requests are pending, because the simulator writes PendingNotifications.plist some time after `schedule`
+origin: spec-deferred 533ac45bf375
+location: scripts/sim-driver/sim cmd_pending
+source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
+severity: low
+reason: Found during this pass's simulator verification, not by a review lens. After the first sign-in and a network-off relaunch, `sim pending` 15 s after launch said the plist did not exist; the next launch's console showed LocalNotifications.getPending returning 11 pending requests. Later launches rewrote the plist within 25 s. A check that reads the list right after the first schedule on a fresh install can see a false empty list. Story 7's reader (scripts/sim-driver) could wait for the plist's mtime to pass the launch, as the previous pass did by hand.
+status: open

@@ -29,6 +29,13 @@ vi.mock('../../src/services/localCopy', () => ({
   deleteAccountCopies: vi.fn(async () => {}),
 }));
 
+const dateReminders = vi.hoisted(() => ({
+  scheduleDateRemindersAtLaunch: vi.fn(async (_owner: { userId: string; authSessionVersion: number }) => {}),
+}));
+vi.mock('../../src/services/dateRemindersAtLaunch', () => ({
+  scheduleDateRemindersAtLaunch: dateReminders.scheduleDateRemindersAtLaunch,
+}));
+
 const auth = vi.hoisted(() => ({
   getSession: vi.fn(),
   listener: null as ((session: Session | null) => void) | null,
@@ -210,6 +217,84 @@ describe('App refreshes the local copies', () => {
     await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(localCopy.refreshLocalCopies).not.toHaveBeenCalled();
+  });
+});
+
+describe('App plans the date reminders once the local copies have loaded', () => {
+  /** Makes the next `refreshLocalCopies()` wait until the returned function is called. */
+  function holdNextRefresh() {
+    let settle: () => void = () => {};
+    localCopy.refreshLocalCopies.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { settle = resolve; })
+    );
+    return () => settle();
+  }
+
+  it("after the refresh resolves, with the start's identity", async () => {
+    const settle = holdNextRefresh();
+
+    await renderApp();
+    expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(1);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).not.toHaveBeenCalled();
+
+    await act(async () => settle());
+
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledWith({
+      userId: USER_ID,
+      authSessionVersion: useAppStore.getState().authSessionVersion,
+    });
+  });
+
+  it('again, with the new identity, on an in-place account switch', async () => {
+    await renderApp();
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
+
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(2);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenLastCalledWith({
+      userId: OTHER_USER_ID,
+      authSessionVersion: useAppStore.getState().authSessionVersion,
+    });
+  });
+
+  it("with the first start's identity when that refresh settles after an in-place account switch", async () => {
+    const settle = holdNextRefresh();
+    await renderApp();
+    const first = { userId: USER_ID, authSessionVersion: useAppStore.getState().authSessionVersion };
+
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+    // The switch's own refresh resolves at once, so its run comes first.
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenLastCalledWith({
+      userId: OTHER_USER_ID,
+      authSessionVersion: useAppStore.getState().authSessionVersion,
+    });
+
+    await act(async () => settle());
+
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(2);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenNthCalledWith(2, first);
+  });
+
+  it('not on the window online event: only a signed-in start plans', async () => {
+    await renderApp();
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
+
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
+
+    expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(2);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it('not at all while signed out', async () => {
+    auth.getSession.mockResolvedValue(null);
+    await renderApp();
+
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
+
+    expect(dateReminders.scheduleDateRemindersAtLaunch).not.toHaveBeenCalled();
   });
 });
 

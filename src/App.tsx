@@ -25,6 +25,7 @@ import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
+import { scheduleDateRemindersAtLaunch } from './services/dateRemindersAtLaunch';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
 import { onPushTap, startPushRegistration } from './services/pushNotifications';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
@@ -409,9 +410,17 @@ function App() {
   // Shared per-account local copies (services/localCopy.ts): refresh every
   // registered kind on each signed-in start, including an in-place account
   // switch. Each kind shows its saved copy first and keeps it if the read fails.
+  //
+  // The native shell's date reminders are planned once those copies have
+  // loaded, because refreshLocalCopies() resolves only after every kind has
+  // applied its copy to the store; the step reads the dates the app last loaded
+  // and is a no-op on the web.
   useEffect(() => {
     if (!authUserId) return;
-    void refreshLocalCopies();
+    // The identity this start belongs to: a refresh that settles after an
+    // account switch must not plan for the next identity, which has its own run.
+    const owner = { userId: authUserId, authSessionVersion };
+    void refreshLocalCopies().then(() => scheduleDateRemindersAtLaunch(owner));
   }, [authUserId, authSessionVersion]);
 
   // The native shell asks for notification permission once and registers this

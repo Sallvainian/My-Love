@@ -64,6 +64,15 @@ Accounts (local stack only):
                          linked and seeded so every view scrolls; Harper and
                          Morgan, linked, love notes wiped, nothing seeded; Riley
                          and Quinn, unlinked, partner requests deleted.
+  dates kinds|many|clear
+                         Set the dates the date reminders are planned from, for
+                         Casey and Jessie only. kinds: one date of each kind,
+                         3 to 8 days ahead. many: 50 events and 10 anniversaries
+                         (70 reminders). clear: remove every date. kinds and many
+                         first remove the seeded events. sim provision restores
+                         only those events, not anniversaries, couple settings or
+                         birthdays: run sim dates clear, then sim provision, to
+                         get back the provisioned state.
   signin [partner|other|other-partner|unlinked|unlinked-other] [--decline-push]
                          Sign in through the login form (default: Casey;
                          partner: Jessie; other: Harper; other-partner: Morgan;
@@ -474,6 +483,15 @@ cmd_provision() {
   [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
   (cd $REPO && SIM_SUPABASE_URL=$(supabase_url) SIM_SUPABASE_SECRET_KEY=$key \
     node scripts/sim-driver/provision.ts) || die 1 "provision failed"
+}
+
+cmd_dates() {
+  [[ ${1:-} == (kinds|many|clear) && $# -eq 1 ]] || die 2 "dates takes kinds, many or clear"
+  require_stack
+  local key=$(stack_secret)
+  [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
+  (cd $REPO && SIM_SUPABASE_URL=$(supabase_url) SIM_SUPABASE_SECRET_KEY=$key \
+    node scripts/sim-driver/dates.ts $1) || die 1 "dates failed"
 }
 
 cmd_signin() {
@@ -1014,6 +1032,7 @@ cmd=$1; shift
 case $cmd in
   help|-h|--help) usage ;;
   provision) cmd_provision ;;
+  dates) cmd_dates "$@" ;;
   build) cmd_build "$@" ;;
   serve-update) cmd_serve_update "$@" ;;
   signin) cmd_signin "$@" ;;
