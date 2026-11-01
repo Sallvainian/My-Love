@@ -26,6 +26,13 @@ vi.mock('@capacitor/core', () => ({
   registerPlugin: () => ({}),
 }));
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: push }));
+// Sign-out (beforeEach's clearAuth) cancels the date reminders through this plugin.
+vi.mock('@capacitor/local-notifications', () => ({
+  LocalNotifications: {
+    getPending: vi.fn(() => Promise.resolve({ notifications: [] })),
+    cancel: vi.fn(() => Promise.resolve()),
+  },
+}));
 vi.mock('../../../api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn(), rpc: vi.fn() },
   getPartnerId: vi.fn(),

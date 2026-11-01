@@ -1,6 +1,9 @@
 /**
- * The launch step for date reminders (story 4.1): a real store, a real events
- * copy in fake-indexeddb, and the Capacitor plugin mocked.
+ * The re-plan for date reminders and its triggers (stories 4.1 and 4.6): a real
+ * store, real local copies of all five date kinds in fake-indexeddb, and the
+ * Capacitor plugin mocked. The sign-out cancel is stubbed here (a switch of
+ * account in these cases would otherwise call the plugin); its own cases are in
+ * `signOutCancelsDateReminders.test.ts` and `dateReminders.test.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
@@ -15,8 +18,16 @@ const localNotifications = vi.hoisted(() => ({
   ),
 }));
 const readLocalCopySpy = vi.hoisted(() => vi.fn());
+const cancelSpy = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+// Answers a read in place of the real one, as readLocalCopy does on a failed read: null.
+const readFailure = vi.hoisted(() => ({ kind: null as string | null }));
 
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: localNotifications }));
+
+vi.mock('../../../src/services/dateReminders', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/services/dateReminders')>()),
+  cancelDateReminders: cancelSpy,
+}));
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -31,18 +42,31 @@ vi.mock('../../../src/services/localCopy', async (importOriginal) => {
     ...original,
     readLocalCopy: (...args: Parameters<typeof original.readLocalCopy>) => {
       readLocalCopySpy(...args);
+      if (args[1] === readFailure.kind) return Promise.resolve(null);
       return original.readLocalCopy(...args);
     },
   };
 });
 
 import { Capacitor } from '@capacitor/core';
-import { scheduleDateRemindersAtLaunch } from '../../../src/services/dateRemindersAtLaunch';
+import { partnerService } from '../../../src/api/partnerService';
+import {
+  replanDateReminders,
+  scheduleDateRemindersAtLaunch,
+  startDateReminderTriggers,
+} from '../../../src/services/dateRemindersAtLaunch';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
-import { writeLocalCopy } from '../../../src/services/localCopy';
+import { anniversariesService } from '../../../src/services/anniversariesService';
+import { refreshLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { EVENTS_COPY_KIND } from '../../../src/stores/slices/eventsSlice';
+import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
+import {
+  ANNIVERSARIES_COPY_KIND,
+  COUPLE_SETTINGS_COPY_KIND,
+  PROFILE_COPY_KIND,
+} from '../../../src/stores/slices/settingsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { setAnniversaries, setOnline, type StoreState } from './accountDataFixtures';
+import { deferred, setOnline, type StoreState } from './accountDataFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -81,27 +105,52 @@ function savedEvent(label: string, date: string) {
   };
 }
 
-/** One date of each kind, 3 to 8 days ahead of `NOW`. */
-async function seedOneOfEachKind(): Promise<void> {
-  await writeLocalCopy(A, EVENTS_COPY_KIND, [savedEvent('Trip', '2026-11-04')]);
-  setAnniversaries([{ id: 1, date: '2021-11-05', label: 'Dinner' }]);
-  useAppStore.setState({
-    coupleSettings: {
+const DATE_KINDS = [
+  EVENTS_COPY_KIND,
+  ANNIVERSARIES_COPY_KIND,
+  COUPLE_SETTINGS_COPY_KIND,
+  PROFILE_COPY_KIND,
+  PARTNER_COPY_KIND,
+] as const;
+
+function partnerInfo(birthday: string | null = '1995-11-09') {
+  return {
+    id: P,
+    email: 'jessie@test.example.com',
+    displayName: 'Jessie',
+    connectedAt: null,
+    birthday,
+  };
+}
+
+/** One date of each kind, 3 to 8 days ahead of `NOW`, as the five saved copies. */
+function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
+  return {
+    [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04')],
+    [ANNIVERSARIES_COPY_KIND]: [{ id: 1, date: '2021-11-05', label: 'Dinner' }],
+    [COUPLE_SETTINGS_COPY_KIND]: {
       status: 'linked',
       partnerId: P,
       relationshipStart: new Date(2018, 10, 6, 20, 0).toISOString(),
       weddingDate: '2026-11-07',
     },
-    ownProfile: { displayName: null, birthday: '1996-11-08' },
-    partner: {
-      id: P,
-      email: 'jessie@test.example.com',
-      displayName: 'Jessie',
-      connectedAt: null,
-      birthday: '1995-11-09',
-    },
-  } as StoreState);
+    [PROFILE_COPY_KIND]: { displayName: null, birthday: '1996-11-08' },
+    [PARTNER_COPY_KIND]: { status: 'linked', partner: partnerInfo() },
+  };
 }
+
+/** Writes the five copies for A; `overrides` replaces a kind's value, `omit` leaves a kind unsaved. */
+async function seedCopies(
+  overrides: Partial<Record<(typeof DATE_KINDS)[number], unknown>> = {},
+  omit: readonly string[] = []
+): Promise<void> {
+  const copies = { ...defaultCopies(), ...overrides };
+  for (const kind of DATE_KINDS) {
+    if (!omit.includes(kind)) await writeLocalCopy(A, kind, copies[kind]);
+  }
+}
+
+const seedOneOfEachKind = () => seedCopies();
 
 /** The scheduled notifications as `title @ month/day hour:minute`. */
 function scheduledTitles(): string[] {
@@ -123,6 +172,8 @@ beforeEach(async () => {
   localNotifications.cancel.mockResolvedValue(undefined);
   localNotifications.checkPermissions.mockResolvedValue({ display: 'granted' });
   localNotifications.schedule.mockResolvedValue({ notifications: [] });
+  cancelSpy.mockResolvedValue(undefined);
+  readFailure.kind = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   state().clearAuth();
@@ -138,8 +189,12 @@ afterEach(async () => {
 });
 
 describe('scheduleDateRemindersAtLaunch', () => {
-  it('schedules one date of each kind from the saved events copy and the store', async () => {
+  it('schedules one date of each kind from the five saved copies, not the store', async () => {
     await seedOneOfEachKind();
+    // The store holds none of these dates: only the copies are read.
+    expect(state().partner).toBeNull();
+    expect(state().coupleSettings).toBeNull();
+    expect(state().settings?.relationship.anniversaries).toEqual([]);
 
     await scheduleDateRemindersAtLaunch(owner());
 
@@ -166,32 +221,30 @@ describe('scheduleDateRemindersAtLaunch', () => {
   });
 
   it('names an own birthday after a chosen display name', async () => {
-    await seedOneOfEachKind();
-    useAppStore.setState({
-      ownProfile: { displayName: 'Casey', birthday: '1996-11-08' },
-    } as StoreState);
+    await seedCopies({ [PROFILE_COPY_KIND]: { displayName: 'Casey', birthday: '1996-11-08' } });
 
     await scheduleDateRemindersAtLaunch(owner());
 
     expect(scheduledTitles()).toContain('Today: Casey turns 30 @ 11/8 9:00');
   });
 
-  it('plans the other dates when there is no saved events copy', async () => {
-    await seedOneOfEachKind();
-    await clearCopies();
+  it('makes no plugin call when there is no saved events copy', async () => {
+    await seedCopies({}, [EVENTS_COPY_KIND]);
+    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }] });
 
     await scheduleDateRemindersAtLaunch(owner());
 
-    expect(scheduledTitles()).not.toContain('Tomorrow: Trip @ 11/3 9:00');
-    expect(scheduledTitles()).toContain('Today: Wedding day @ 11/7 9:00');
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.cancel).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
   });
 
   it('ignores the couple settings of an unlinked account but plans its own dates', async () => {
-    setAnniversaries([{ id: 1, date: '2021-11-05', label: 'Dinner' }]);
-    useAppStore.setState({
-      coupleSettings: { status: 'unlinked' },
-      ownProfile: { displayName: null, birthday: '1996-11-08' },
-    } as StoreState);
+    await seedCopies({
+      [EVENTS_COPY_KIND]: [],
+      [COUPLE_SETTINGS_COPY_KIND]: { status: 'unlinked' },
+      [PARTNER_COPY_KIND]: { status: 'unlinked' },
+    });
 
     await scheduleDateRemindersAtLaunch(owner());
 
@@ -292,5 +345,309 @@ describe('scheduleDateRemindersAtLaunch', () => {
     expect(localNotifications.cancel).not.toHaveBeenCalled();
     expect(localNotifications.checkPermissions).not.toHaveBeenCalled();
     expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+});
+
+describe('replanDateReminders reads only loaded copies', () => {
+  it.each(DATE_KINDS)('makes no plugin call, and keeps the pending list, when the %s copy is missing', async (kind) => {
+    await seedCopies({}, [kind]);
+    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }, { id: 2 }] });
+
+    await replanDateReminders();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.cancel).not.toHaveBeenCalled();
+    expect(localNotifications.checkPermissions).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [ANNIVERSARIES_COPY_KIND, 'not a list'],
+    [COUPLE_SETTINGS_COPY_KIND, { status: 'linked' }],
+    [PROFILE_COPY_KIND, 'not a profile'],
+    [PARTNER_COPY_KIND, { status: 'linked' }],
+    [EVENTS_COPY_KIND, { not: 'a list' }],
+  ] as const)('treats a malformed %s copy as missing', async (kind, value) => {
+    await seedCopies({ [kind]: value });
+
+    await replanDateReminders();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it.each(DATE_KINDS)('treats a %s copy whose read failed as missing', async (kind) => {
+    await seedCopies();
+    readFailure.kind = kind;
+
+    await replanDateReminders();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('plans an unlinked, empty account once every copy has loaded', async () => {
+    await seedCopies({
+      [EVENTS_COPY_KIND]: [],
+      [ANNIVERSARIES_COPY_KIND]: [],
+      [COUPLE_SETTINGS_COPY_KIND]: { status: 'unlinked' },
+      [PROFILE_COPY_KIND]: { displayName: null, birthday: null },
+      [PARTNER_COPY_KIND]: { status: 'unlinked' },
+    });
+    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 4 }] });
+
+    await replanDateReminders();
+
+    // Loaded and empty is an answer: the stale reminder goes, nothing is scheduled.
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [{ id: 4 }] });
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('stamps thread id partner-activity on what it schedules', async () => {
+    await seedOneOfEachKind();
+
+    await replanDateReminders();
+
+    const [options] = localNotifications.schedule.mock.calls[0] as [
+      { notifications: { threadIdentifier?: string }[] },
+    ];
+    expect(options.notifications.length).toBeGreaterThan(0);
+    expect(new Set(options.notifications.map((n) => n.threadIdentifier))).toEqual(
+      new Set(['partner-activity'])
+    );
+  });
+
+  it('does nothing when signed out, with no owner given', async () => {
+    await seedOneOfEachKind();
+    state().clearAuth();
+    readLocalCopySpy.mockClear();
+
+    await replanDateReminders();
+
+    expect(readLocalCopySpy).not.toHaveBeenCalled();
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+  });
+});
+
+describe('replanDateReminders is single-flight', () => {
+  it('collapses a burst into the run in flight plus one follow-up, never overlapping', async () => {
+    await seedOneOfEachKind();
+    let active = 0;
+    let maxActive = 0;
+    const gate = deferred<void>();
+    let first = true;
+    localNotifications.getPending.mockImplementation(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      if (first) {
+        first = false;
+        await gate.promise;
+      }
+      return { notifications: [] };
+    });
+    localNotifications.schedule.mockImplementation(() => {
+      active -= 1;
+      return Promise.resolve({ notifications: [] });
+    });
+
+    const runs = [replanDateReminders()];
+    await vi.waitFor(() => expect(localNotifications.getPending).toHaveBeenCalledTimes(1));
+    for (let i = 0; i < 5; i++) runs.push(replanDateReminders());
+    runs.push(scheduleDateRemindersAtLaunch(owner()));
+    gate.settle();
+    await Promise.all(runs);
+
+    expect(localNotifications.getPending).toHaveBeenCalledTimes(2);
+    expect(localNotifications.schedule).toHaveBeenCalledTimes(2);
+    expect(maxActive).toBe(1);
+  });
+
+  it('runs the follow-up from the copies as they are then', async () => {
+    await seedOneOfEachKind();
+    const gate = deferred<void>();
+    localNotifications.getPending.mockImplementationOnce(async () => {
+      await gate.promise;
+      return { notifications: [] };
+    });
+
+    const firstRun = replanDateReminders();
+    await vi.waitFor(() => expect(localNotifications.getPending).toHaveBeenCalledTimes(1));
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, [{ id: 1, date: '2021-11-05', label: 'Picnic' }]);
+    const followUp = replanDateReminders();
+    gate.settle();
+    await Promise.all([firstRun, followUp]);
+
+    expect(localNotifications.schedule).toHaveBeenCalledTimes(2);
+    const titles = (call: number) =>
+      localNotifications.schedule.mock.calls[call][0].notifications.map((n) => n.title);
+    expect(titles(0)).toContain('Today: Dinner');
+    expect(titles(1)).toContain('Today: Picnic');
+    expect(titles(1)).not.toContain('Today: Dinner');
+  });
+
+  it("does not let a replaced start's request take over the queued follow-up", async () => {
+    await seedOneOfEachKind();
+    const replaced = { userId: A, authSessionVersion: state().authSessionVersion - 1 };
+    const gate = deferred<void>();
+    localNotifications.getPending.mockImplementationOnce(async () => {
+      await gate.promise;
+      return { notifications: [] };
+    });
+
+    const firstRun = replanDateReminders();
+    await vi.waitFor(() => expect(localNotifications.getPending).toHaveBeenCalledTimes(1));
+    const followUp = replanDateReminders();
+    const stale = replanDateReminders(replaced);
+    gate.settle();
+    await Promise.all([firstRun, followUp, stale]);
+
+    expect(localNotifications.schedule).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('startDateReminderTriggers', () => {
+  let stop: () => void = () => {};
+
+  /** Waits for `count` schedules, since a trigger starts its run without returning it. */
+  async function scheduledTimes(count: number) {
+    await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalledTimes(count));
+  }
+
+  /** Lets a trigger that should do nothing have its chance. */
+  async function settle() {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
+  function setVisibility(value: 'visible' | 'hidden') {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(value);
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  beforeEach(async () => {
+    await seedOneOfEachKind();
+    stop = startDateReminderTriggers();
+  });
+
+  afterEach(async () => {
+    stop();
+    await settle();
+  });
+
+  it('re-plans when the app returns to the foreground, and not when it is hidden', async () => {
+    setVisibility('hidden');
+    await settle();
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+
+    setVisibility('visible');
+    await scheduledTimes(1);
+
+    expect(localNotifications.getPending).toHaveBeenCalledTimes(1);
+    expect(scheduledTitles()).toContain('Today: Wedding day @ 11/7 9:00');
+  });
+
+  it('re-plans on every return to the foreground, from the copies and not the server', async () => {
+    const getPartner = vi.spyOn(partnerService, 'getPartner');
+    const fetchAnniversaries = vi.spyOn(anniversariesService, 'fetchAnniversaries');
+    setVisibility('visible');
+    await scheduledTimes(1);
+    setVisibility('visible');
+    await scheduledTimes(2);
+
+    expect(localNotifications.getPending).toHaveBeenCalledTimes(2);
+    expect(getPartner).not.toHaveBeenCalled();
+    expect(fetchAnniversaries).not.toHaveBeenCalled();
+  });
+
+  it('re-plans with an own edit: a real addAnniversary writes its copy and the plan includes it', async () => {
+    vi.spyOn(anniversariesService, 'createAnniversary').mockResolvedValue({
+      serverId: 'ann-new',
+      date: '2022-11-04',
+      label: 'Picnic',
+    });
+    await useAppStore.getState().addAnniversary({ date: '2022-11-04', label: 'Picnic' });
+    await scheduledTimes(1);
+
+    expect(scheduledTitles()).toEqual(
+      expect.arrayContaining(['Tomorrow: Picnic @ 11/3 9:00', 'Today: Picnic @ 11/4 9:00'])
+    );
+  });
+
+  it("re-plans with a partner's change: a refresh writes the partner copy", async () => {
+    vi.spyOn(partnerService, 'getPartner').mockResolvedValue({
+      status: 'linked',
+      partner: partnerInfo('1995-11-12'),
+    });
+
+    await refreshLocalCopy(PARTNER_COPY_KIND);
+    await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalled());
+
+    expect(scheduledTitles()).toContain('Today: Jessie turns 31 @ 11/12 9:00');
+    expect(scheduledTitles()).not.toContain('Today: Jessie turns 31 @ 11/9 9:00');
+  });
+
+  it.each(DATE_KINDS)('re-plans when the %s copy is written', async (kind) => {
+    await writeLocalCopy(A, kind, defaultCopies()[kind]);
+    await scheduledTimes(1);
+  });
+
+  it('does not re-plan for a kind that holds no date', async () => {
+    await writeLocalCopy(A, 'love-notes', []);
+    await writeLocalCopy(A, 'interactions', []);
+    await settle();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+  });
+
+  it('does not re-plan for a copy written for another account', async () => {
+    await writeLocalCopy(B, EVENTS_COPY_KIND, []);
+    await settle();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('does nothing once stopped', async () => {
+    stop();
+
+    setVisibility('visible');
+    await writeLocalCopy(A, EVENTS_COPY_KIND, defaultCopies()[EVENTS_COPY_KIND]);
+    await settle();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('a throwing plugin call is logged and the next trigger still runs', async () => {
+    localNotifications.getPending.mockRejectedValueOnce(new Error('bridge gone'));
+
+    setVisibility('visible');
+    await vi.waitFor(() => expect(console.error).toHaveBeenCalled());
+    setVisibility('visible');
+    await scheduledTimes(1);
+  });
+});
+
+describe('startDateReminderTriggers off native', () => {
+  it.each([
+    ['on the web', () => vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(false)],
+    [
+      'in a shell without the plugin',
+      () => vi.spyOn(Capacitor, 'isPluginAvailable').mockReturnValue(false),
+    ],
+  ])('adds no listener and plans nothing %s', async (_name, arrange) => {
+    await seedOneOfEachKind();
+    arrange();
+    const addListener = vi.spyOn(document, 'addEventListener');
+    readLocalCopySpy.mockClear();
+
+    const stop = startDateReminderTriggers();
+    document.dispatchEvent(new Event('visibilitychange'));
+    await writeLocalCopy(A, EVENTS_COPY_KIND, []);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stop();
+
+    expect(addListener).not.toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+    expect(readLocalCopySpy).not.toHaveBeenCalled();
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
   });
 });

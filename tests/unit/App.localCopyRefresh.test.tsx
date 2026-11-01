@@ -31,9 +31,28 @@ vi.mock('../../src/services/localCopy', () => ({
 
 const dateReminders = vi.hoisted(() => ({
   scheduleDateRemindersAtLaunch: vi.fn(async (_owner: { userId: string; authSessionVersion: number }) => {}),
+  replanDateReminders: vi.fn(async (_owner?: { userId: string; authSessionVersion: number }) => {}),
+  stopTriggers: vi.fn(),
+  startDateReminderTriggers: vi.fn(),
+  listenForReminderTaps: vi.fn(async () => {}),
 }));
+dateReminders.startDateReminderTriggers.mockImplementation(() => dateReminders.stopTriggers);
 vi.mock('../../src/services/dateRemindersAtLaunch', () => ({
   scheduleDateRemindersAtLaunch: dateReminders.scheduleDateRemindersAtLaunch,
+  replanDateReminders: dateReminders.replanDateReminders,
+  startDateReminderTriggers: dateReminders.startDateReminderTriggers,
+}));
+vi.mock('../../src/services/dateReminders', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/dateReminders')>()),
+  listenForReminderTaps: dateReminders.listenForReminderTaps,
+}));
+
+const push = vi.hoisted(() => ({
+  startPushRegistration: vi.fn(async (): Promise<'unavailable' | 'denied' | 'registering'> => 'unavailable'),
+}));
+vi.mock('../../src/services/pushNotifications', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/pushNotifications')>()),
+  startPushRegistration: push.startPushRegistration,
 }));
 
 const auth = vi.hoisted(() => ({
@@ -151,6 +170,8 @@ const NOW = new Date('2026-09-15T16:00:00.000Z');
 beforeEach(() => {
   vi.setSystemTime(NOW);
   vi.clearAllMocks();
+  dateReminders.startDateReminderTriggers.mockImplementation(() => dateReminders.stopTriggers);
+  push.startPushRegistration.mockResolvedValue('unavailable');
   localStorage.clear();
   localStorage.setItem('lastWelcomeView', String(NOW.getTime()));
   window.history.replaceState({}, '', '/');
@@ -295,6 +316,78 @@ describe('App plans the date reminders once the local copies have loaded', () =>
     await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
 
     expect(dateReminders.scheduleDateRemindersAtLaunch).not.toHaveBeenCalled();
+  });
+});
+
+describe('App wires the date reminders beyond the launch plan', () => {
+  it('starts the foreground and date-write triggers once on mount, and stops them on unmount', async () => {
+    const { unmount } = render(<App />);
+    await act(async () => {});
+
+    expect(dateReminders.startDateReminderTriggers).toHaveBeenCalledTimes(1);
+    expect(dateReminders.stopTriggers).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(dateReminders.stopTriggers).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restart the triggers on an account switch', async () => {
+    await renderApp();
+
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+
+    expect(dateReminders.startDateReminderTriggers).toHaveBeenCalledTimes(1);
+  });
+
+  it('listens for reminder taps once on mount', async () => {
+    await renderApp();
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+
+    expect(dateReminders.listenForReminderTaps).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-plans with the start's identity when the push registration starts", async () => {
+    push.startPushRegistration.mockResolvedValue('registering');
+
+    await renderApp();
+
+    expect(dateReminders.replanDateReminders).toHaveBeenCalledTimes(1);
+    expect(dateReminders.replanDateReminders).toHaveBeenCalledWith({
+      userId: USER_ID,
+      authSessionVersion: useAppStore.getState().authSessionVersion,
+    });
+  });
+
+  it('re-plans again, with the new identity, on an in-place account switch', async () => {
+    push.startPushRegistration.mockResolvedValue('registering');
+    await renderApp();
+
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+
+    expect(dateReminders.replanDateReminders).toHaveBeenCalledTimes(2);
+    expect(dateReminders.replanDateReminders).toHaveBeenLastCalledWith({
+      userId: OTHER_USER_ID,
+      authSessionVersion: useAppStore.getState().authSessionVersion,
+    });
+  });
+
+  it.each(['denied', 'unavailable'] as const)('does not re-plan when the push registration is %s', async (outcome) => {
+    push.startPushRegistration.mockResolvedValue(outcome);
+
+    await renderApp();
+
+    expect(dateReminders.replanDateReminders).not.toHaveBeenCalled();
+  });
+
+  it('does not start a push registration or a re-plan while signed out', async () => {
+    auth.getSession.mockResolvedValue(null);
+    push.startPushRegistration.mockResolvedValue('registering');
+
+    await renderApp();
+
+    expect(push.startPushRegistration).not.toHaveBeenCalled();
+    expect(dateReminders.replanDateReminders).not.toHaveBeenCalled();
   });
 });
 

@@ -271,6 +271,24 @@ function parseSavedAnniversaries(value: unknown): Anniversary[] | null {
   return valid;
 }
 
+/**
+ * The saved anniversaries copy for `userId`, or `null` when there is none, the
+ * read failed or the copy is malformed. Reads only; the store is untouched.
+ */
+export async function readSavedAnniversaries(userId: string): Promise<Anniversary[] | null> {
+  return parseSavedAnniversaries(await readLocalCopy<unknown>(userId, ANNIVERSARIES_COPY_KIND));
+}
+
+/** The saved couple-settings copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedCoupleSettings(userId: string): Promise<CoupleSettings | null> {
+  return parseSavedCoupleSettings(await readLocalCopy<unknown>(userId, COUPLE_SETTINGS_COPY_KIND));
+}
+
+/** The saved own-profile copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedOwnProfile(userId: string): Promise<OwnProfile | null> {
+  return parseSavedOwnProfile(await readLocalCopy<unknown>(userId, PROFILE_COPY_KIND));
+}
+
 const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
 
 /** Validate a form's anniversary before it is sent, with the form's error shape. */

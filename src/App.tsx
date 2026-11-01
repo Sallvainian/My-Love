@@ -25,7 +25,12 @@ import { DisplayNameSetup } from './components/DisplayNameSetup';
 import { LoginScreen } from './components/LoginScreen';
 import { NetworkStatusIndicator, SyncToast, type SyncResult } from './components/shared';
 import { isServiceWorkerSupported } from './utils/backgroundSync';
-import { scheduleDateRemindersAtLaunch } from './services/dateRemindersAtLaunch';
+import { listenForReminderTaps } from './services/dateReminders';
+import {
+  replanDateReminders,
+  scheduleDateRemindersAtLaunch,
+  startDateReminderTriggers,
+} from './services/dateRemindersAtLaunch';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
 import { onPushTap, startPushRegistration } from './services/pushNotifications';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
@@ -411,10 +416,10 @@ function App() {
   // registered kind on each signed-in start, including an in-place account
   // switch. Each kind shows its saved copy first and keeps it if the read fails.
   //
-  // The native shell's date reminders are planned once those copies have
-  // loaded, because refreshLocalCopies() resolves only after every kind has
-  // applied its copy to the store; the step reads the dates the app last loaded
-  // and is a no-op on the web.
+  // The native shell's date reminders re-plan once the refreshers have saved
+  // their copies. The re-plan reads the five saved copies, not the store, and
+  // this launch run also covers an offline start, when no copy is written (each
+  // copy written triggers its own re-plan). A no-op on the web.
   useEffect(() => {
     if (!authUserId) return;
     // The identity this start belongs to: a refresh that settles after an
@@ -426,10 +431,28 @@ function App() {
   // The native shell asks for notification permission once and registers this
   // device for the signed-in account's pushes. A no-op on the web and in a
   // shell installed before the push plugin existed.
+  //
+  // Date reminders schedule only once that permission is granted, and the launch
+  // plan above may have run before the person answered the prompt (first
+  // sign-in), so a granted answer plans them again for this start's identity.
   useEffect(() => {
     if (!authUserId) return;
-    void startPushRegistration();
+    const owner = { userId: authUserId, authSessionVersion };
+    void startPushRegistration().then((outcome) => {
+      if (outcome === 'registering') void replanDateReminders(owner);
+    });
   }, [authUserId, authSessionVersion]);
+
+  // Date reminders re-plan from the saved copies on every return to the
+  // foreground and every date copy written for the signed-in account. A no-op
+  // on the web and in a shell without the local-notifications plugin.
+  useEffect(() => startDateReminderTriggers(), []);
+
+  // A tapped date reminder opens Home through the push taps below. Added once;
+  // the shell keeps a cold-start tap until the listener exists.
+  useEffect(() => {
+    void listenForReminderTaps();
+  }, []);
 
   // Story 3.9: tapping a push opens the view it is about, with history, so the
   // URL matches. A tap the shell kept from a cold start arrives once the

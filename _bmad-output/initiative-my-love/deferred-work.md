@@ -3130,7 +3130,8 @@ location: src/App.tsx:418-424, src/services/dateReminders.ts scheduleDateReminde
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
 reason: dateReminders.ts schedules only when checkPermissions().display is 'granted' and never prompts; story 3.1's alert is often still up when refreshLocalCopies() resolves on the first signed-in start. Story 4.6 owns the re-plan triggers (foreground, sign-in, date change). Whether its foreground trigger fires when the system permission alert closes is unverified; story 4.6 should check a re-plan after the first-sign-in permission answer.
-status: open
+status: done 2026-11-01
+resolution: story 4.6: App's push effect re-plans the date reminders, with the start's captured identity, when `startPushRegistration()` resolves 'registering' (the permission is granted), covered by `tests/unit/App.localCopyRefresh.test.tsx`.
 
 ### DW-371: The `sim help` text and the AGENTS.md sim-driver sentence say `sim dates kinds|many` replace only the seeded events, but they first clear both people's anniversaries, the pair's couple_settings row
 origin: spec-deferred 356b1422e4d3
@@ -3146,4 +3147,12 @@ location: scripts/sim-driver/sim cmd_pending
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
 reason: Found during this pass's simulator verification, not by a review lens. After the first sign-in and a network-off relaunch, `sim pending` 15 s after launch said the plist did not exist; the next launch's console showed LocalNotifications.getPending returning 11 pending requests. Later launches rewrote the plist within 25 s. A check that reads the list right after the first schedule on a fresh install can see a false empty list. Story 7's reader (scripts/sim-driver) could wait for the plist's mtime to pass the launch, as the previous pass did by hand.
+status: open
+
+### DW-373: A re-plan cancels only the ids `getPending` reports, so if a follow-up re-plan's `getPending` misses requests the previous run just scheduled, ids above the new N stay pending.
+origin: spec-deferred 4cdc45753d6d
+location: src/services/dateReminders.ts scheduleDateReminders
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-re-plan-on-every-change-stop-at-sign-out-stack-wit-plan.md`
+severity: medium
+reason: Quick review finding, verdict maybe-false. The plugin's `schedule` calls `center.add` and resolves without waiting for its completion (LocalNotificationsPlugin.swift:211-227), and this story makes back-to-back re-plans routine (single-flight follow-up, copy-write bursts). Whether a `getPendingNotificationRequests` issued right after can miss an `add` still in flight is undocumented. On the simulator in this pass, a delete took the list from 12 to 10 and both stale ids were cancelled, but a single run does not settle the race. To settle it, schedule N and then immediately run getPending in a loop on a device or simulator and check whether it ever lists fewer than N. The fix, if needed, is the sign-out cancel's id union (1..64 plus pending) in scheduleDateReminders' cancel step. (declared severity: medium (unverified))
 status: open

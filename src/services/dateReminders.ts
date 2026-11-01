@@ -8,16 +8,24 @@ import {
 } from '../utils/countdownService';
 import { formatDateISO } from '../utils/dateUtils';
 import { parseEventDate } from './eventsService';
+import { routeNotificationTap } from './pushNotifications';
 
 /**
  * Date reminders for the native iOS shell (epic 4).
  *
  * `planDateReminders` is pure: it turns the dates the app shows countdowns to
  * into the local notifications that should be pending, and
- * `scheduleDateReminders` hands that list to the shell. The launch step that
- * feeds them from the store is `dateRemindersAtLaunch.ts`; this module must not
- * import the store, so later callers (a re-plan on foreground, the Settings
- * switch) can share it.
+ * `scheduleDateReminders` hands that list to the shell. The re-plan that feeds
+ * them from the saved local copies, and its triggers (launch, foreground, a
+ * date copy written), is `dateRemindersAtLaunch.ts`; this module must not
+ * import the store, so later callers (the Settings switch) can share it.
+ *
+ * Every native reminder call runs in one serial chain (`runSerial`), so a
+ * sign-out `cancelDateReminders()` never interleaves with a schedule: a cancel
+ * requested while a schedule is in flight runs after it. Every reminder carries
+ * thread id `partner-activity`, which stacks it with the non-love-note pushes
+ * on the lock screen. A tapped reminder opens Home through the push taps'
+ * fan-out (`listenForReminderTaps`).
  *
  * Every date gets a "Tomorrow: ..." reminder and, except an event, a
  * "Today: ..." one, both at 9:00 local time. Each is a dated calendar trigger
@@ -44,6 +52,13 @@ export const REMINDER_HOUR = 9;
 
 /** iOS keeps at most this many pending local notifications for an app. */
 export const MAX_SCHEDULED_REMINDERS = 64;
+
+/**
+ * `threadIdentifier` of every reminder: the lock-screen stack of a partner's
+ * mood, photo, poke and kiss. Keep equal to `PARTNER_ACTIVITY_THREAD_ID` in
+ * `supabase/functions/send-push/payload.ts`.
+ */
+export const REMINDER_THREAD_ID = 'partner-activity';
 
 /** One person's birthday; `name` `null` reads as "You" (Home's own card with no name chosen). */
 export interface ReminderBirthday {
@@ -164,41 +179,115 @@ export function hasNativeReminders(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('LocalNotifications');
 }
 
+/** Tail of the serial chain; every native reminder call runs behind it. */
+let chain: Promise<void> = Promise.resolve();
+
+/** Runs `task` after every task queued before it has settled. `task` must not throw. */
+function runSerial(task: () => Promise<void>): Promise<void> {
+  const run = chain.then(task);
+  chain = run;
+  return run;
+}
+
 /**
  * Replaces the shell's pending local notifications with `reminders`: cancels
  * every pending one, then schedules the list if permission is already granted.
  * Never asks for permission (`schedule` would prompt when it is undetermined,
  * hence the check). `isCurrent` is asked before each plugin call so an account
- * switch stops the run. Failures are logged, never thrown.
+ * switch stops the run. Runs in the serial chain. Failures are logged, never
+ * thrown.
  */
-export async function scheduleDateReminders(
+export function scheduleDateReminders(
   reminders: PlannedReminder[],
   isCurrent: () => boolean
 ): Promise<void> {
-  try {
-    if (!isCurrent()) return;
-    const { notifications: pending } = await LocalNotifications.getPending();
-
-    if (pending.length > 0) {
+  return runSerial(async () => {
+    try {
       if (!isCurrent()) return;
-      // `cancel` rejects an empty list.
-      await LocalNotifications.cancel({ notifications: pending.map(({ id }) => ({ id })) });
+      const { notifications: pending } = await LocalNotifications.getPending();
+
+      if (pending.length > 0) {
+        if (!isCurrent()) return;
+        // `cancel` rejects an empty list.
+        await LocalNotifications.cancel({ notifications: pending.map(({ id }) => ({ id })) });
+      }
+
+      if (!isCurrent()) return;
+      const { display } = await LocalNotifications.checkPermissions();
+      if (display !== 'granted' || reminders.length === 0) return;
+
+      if (!isCurrent()) return;
+      await LocalNotifications.schedule({
+        notifications: reminders.map((reminder, index) => ({
+          id: index + 1,
+          title: reminder.text,
+          body: '',
+          threadIdentifier: REMINDER_THREAD_ID,
+          schedule: { on: reminder.on },
+        })),
+      });
+    } catch (error) {
+      console.error('[DateReminders] Could not schedule the date reminders:', error);
     }
+  });
+}
 
-    if (!isCurrent()) return;
-    const { display } = await LocalNotifications.checkPermissions();
-    if (display !== 'granted' || reminders.length === 0) return;
+/**
+ * Cancels every date reminder: ids `1..MAX_SCHEDULED_REMINDERS` (ids are
+ * positional) plus every id `getPending` reports, because `schedule` resolves
+ * before iOS's add completes and the pending list can lag a fresh schedule.
+ * Called on sign-out, an account switch and a no-session boot
+ * (`deleteAccountData`). Does nothing on the web or in a shell without the
+ * plugin. Runs in the serial chain, after any schedule in flight. Never
+ * throws.
+ */
+export function cancelDateReminders(): Promise<void> {
+  if (!hasNativeReminders()) return Promise.resolve();
+  return runSerial(async () => {
+    const ids = new Set<number>();
+    for (let id = 1; id <= MAX_SCHEDULED_REMINDERS; id++) ids.add(id);
+    try {
+      const { notifications: pending } = await LocalNotifications.getPending();
+      for (const { id } of pending) ids.add(id);
+    } catch (error) {
+      console.error('[DateReminders] Could not list the pending date reminders:', error);
+    }
+    try {
+      await LocalNotifications.cancel({ notifications: [...ids].map((id) => ({ id })) });
+    } catch (error) {
+      console.error('[DateReminders] Could not cancel the date reminders:', error);
+    }
+  });
+}
 
-    if (!isCurrent()) return;
-    await LocalNotifications.schedule({
-      notifications: reminders.map((reminder, index) => ({
-        id: index + 1,
-        title: reminder.text,
-        body: '',
-        schedule: { on: reminder.on },
-      })),
-    });
-  } catch (error) {
-    console.error('[DateReminders] Could not schedule the date reminders:', error);
-  }
+let tapListening: Promise<void> | null = null;
+
+/**
+ * Opens Home when a date reminder is tapped, through the push taps' fan-out
+ * (`routeNotificationTap`): a handler subscribed with `onPushTap` hears it,
+ * and a tap that arrives before any subscribes (a cold start) is held. The
+ * plugin keeps the event until a listener exists. Only `actionId` `'tap'`
+ * counts; a dismiss or a custom action does nothing.
+ *
+ * Adds the listener once per page load; a failed add is tried again by the next
+ * call. Does nothing on the web or in a shell without the plugin. Never throws.
+ */
+export function listenForReminderTaps(): Promise<void> {
+  if (!hasNativeReminders()) return Promise.resolve();
+  tapListening ??= LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+    try {
+      if (action.actionId !== 'tap') return;
+      routeNotificationTap('home');
+    } catch (error) {
+      console.error('[DateReminders] Could not route a reminder tap:', error);
+    }
+  }).then(
+    () => {},
+    (error: unknown) => {
+      // A failed add must not stay cached: the next call tries again.
+      tapListening = null;
+      console.error('[DateReminders] Could not listen for reminder taps:', error);
+    }
+  );
+  return tapListening;
 }
