@@ -9,6 +9,11 @@
  * Story 3.4 adds the partner's mood, photo, poke and kiss. They share one
  * thread, `partner-activity`, so they stack apart from love notes; the title
  * is again the sender's display name; no image, no `badge`, no `sound`.
+ *
+ * Story 3.5 adds the date changes (an event added or changed, the wedding
+ * date, the date the couple got together, a birthday) on the same
+ * `partner-activity` thread. The text never carries a date value, because the
+ * recipient's timezone is unknown; an event's label is the only data in it.
  */
 
 export const LOVE_NOTES_THREAD_ID = 'love-notes';
@@ -21,6 +26,14 @@ export const MOOD_BODY_PREFIX = 'Logged a mood';
 export const PHOTO_BODY = 'Added a photo';
 export const POKE_BODY = 'Poked you';
 export const KISS_BODY = 'Sent you a kiss';
+export const EVENT_ADDED_PREFIX = 'Added an event';
+export const EVENT_CHANGED_PREFIX = 'Changed an event';
+export const WEDDING_DATE_SET_BODY = 'Set the wedding date';
+export const WEDDING_DATE_CHANGED_BODY = 'Changed the wedding date';
+export const RELATIONSHIP_START_SET_BODY = 'Set the date you got together';
+export const RELATIONSHIP_START_CHANGED_BODY = 'Changed the date you got together';
+export const BIRTHDAY_ADDED_BODY = 'Added their birthday';
+export const BIRTHDAY_CHANGED_BODY = 'Changed their birthday';
 
 /**
  * Display labels for the 12 mood types, in `MOOD_TYPES` order. A copy: this
@@ -122,4 +135,33 @@ export function buildInteractionPayload(type: string, senderName: string | null)
   if (type === 'poke') return partnerActivityPayload(POKE_BODY, senderName);
   if (type === 'kiss') return partnerActivityPayload(KISS_BODY, senderName);
   return null;
+}
+
+/** The columns of `date_changes` the payload is built from, plus the event's label as it is now. */
+export interface PushDateChange {
+  subject: 'event' | 'wedding_date' | 'relationship_start' | 'birthday';
+  action: 'added' | 'changed';
+  /** `events.label` when the subject is an event, else null. */
+  event_label: string | null;
+}
+
+/** `Added an event: Paris trip`, `Set the wedding date`, `Changed their birthday`, and so on. */
+export function buildDatePayload(change: PushDateChange, senderName: string | null): ApnsPayload {
+  const added = change.action === 'added';
+  switch (change.subject) {
+    case 'event':
+      return partnerActivityPayload(
+        `${added ? EVENT_ADDED_PREFIX : EVENT_CHANGED_PREFIX}: ${change.event_label ?? ''}`,
+        senderName
+      );
+    case 'wedding_date':
+      return partnerActivityPayload(added ? WEDDING_DATE_SET_BODY : WEDDING_DATE_CHANGED_BODY, senderName);
+    case 'relationship_start':
+      return partnerActivityPayload(
+        added ? RELATIONSHIP_START_SET_BODY : RELATIONSHIP_START_CHANGED_BODY,
+        senderName
+      );
+    case 'birthday':
+      return partnerActivityPayload(added ? BIRTHDAY_ADDED_BODY : BIRTHDAY_CHANGED_BODY, senderName);
+  }
 }

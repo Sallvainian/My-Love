@@ -163,6 +163,48 @@ export type Database = {
         }
         Relationships: []
       }
+      date_changes: {
+        Row: {
+          action: string
+          created_at: string
+          event_id: string | null
+          id: string
+          sender_id: string
+          subject: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          sender_id: string
+          subject: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          event_id?: string | null
+          id?: string
+          sender_id?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "date_changes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "date_changes_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string
@@ -489,6 +531,7 @@ export type Database = {
       push_requests: {
         Row: {
           created_at: string
+          date_change_id: string | null
           delivery: string
           environment: string
           id: string
@@ -501,6 +544,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          date_change_id?: string | null
           delivery: string
           environment: string
           id?: string
@@ -513,6 +557,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          date_change_id?: string | null
           delivery?: string
           environment?: string
           id?: string
@@ -524,6 +569,13 @@ export type Database = {
           token?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "push_requests_date_change_id_fkey"
+            columns: ["date_change_id"]
+            isOneToOne: false
+            referencedRelation: "date_changes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "push_requests_interaction_id_fkey"
             columns: ["interaction_id"]

@@ -1,9 +1,10 @@
 /**
  * Edge Function: send-push
  *
- * Sends the push a new love note, mood, photo, poke or kiss becomes, to every
- * device registered to the recipient. Called by the insert triggers on
- * `love_notes`, `moods`, `photos` and `interactions`; see `handler.ts` for the
+ * Sends the push a new love note, mood, photo, poke, kiss or date change
+ * becomes, to every device registered to the recipient. Called by the triggers
+ * on `love_notes`, `moods`, `photos`, `interactions`, `events`,
+ * `couple_settings` and `users`; see `handler.ts` for the
  * contract. This file is only the serve binding and the real database and
  * APNs wiring.
  *
@@ -16,7 +17,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import { apnsConfigFromEnv, createApnsClient } from './apns.ts';
-import { handleSendPush, type PushDb, type PushKind } from './handler.ts';
+import { handleSendPush, type DateChangeRow, type PushDb, type PushKind } from './handler.ts';
 
 /** The `push_requests` column that holds each kind's source row id. */
 const SOURCE_COLUMN: Record<PushKind, string> = {
@@ -24,6 +25,7 @@ const SOURCE_COLUMN: Record<PushKind, string> = {
   mood: 'mood_id',
   photo: 'photo_id',
   interaction: 'interaction_id',
+  date: 'date_change_id',
 };
 
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
@@ -67,6 +69,28 @@ const db: PushDb = {
       .maybeSingle();
     if (error) throw new Error(error.message);
     return data;
+  },
+  async getDateChange(changeId) {
+    const { data, error } = await admin
+      .from('date_changes')
+      .select('id, sender_id, subject, action, event_id')
+      .eq('id', changeId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+    let eventLabel: string | null = null;
+    if (data.event_id) {
+      const event = await admin.from('events').select('label').eq('id', data.event_id).maybeSingle();
+      if (event.error) throw new Error(event.error.message);
+      eventLabel = event.data?.label ?? null;
+    }
+    return {
+      id: data.id,
+      sender_id: data.sender_id,
+      subject: data.subject as DateChangeRow['subject'],
+      action: data.action as DateChangeRow['action'],
+      event_label: eventLabel,
+    };
   },
   async getPartnerId(userId) {
     const { data, error } = await admin.from('users').select('partner_id').eq('id', userId).maybeSingle();

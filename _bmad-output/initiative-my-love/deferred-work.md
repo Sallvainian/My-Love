@@ -3078,3 +3078,11 @@ severity: low
 reason: CLI 2.122 raw output differs from the committed file by 1268 diff lines, at baseline 74897fd9 too; this story's change to the file is only the push_requests block. Fix is a decision on AGENTS.md or a one-time raw regeneration. Ledger DW-357.
 status: done 2026-10-31
 resolution: duplicate of DW-357 (the same review finding, carried in from story 3.4's plan frontmatter); tracked there.
+
+### DW-359: src/types/database.types.ts is not the raw output of AGENTS.md's regeneration command; this story took only its own hunks from reformatted CLI output, as stories 3.1-3.4 did.
+origin: spec-deferred e51f625afab3
+location: src/types/database.types.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-date-changes-push-plan.md`
+severity: low
+reason: Pre-existing drift already in the ledger as DW-357 (raw CLI 2.122 output differs from the committed file by 1268 diff lines). This story's change to the file is only the date_changes block and push_requests.date_change_id. The fix is an AGENTS.md decision or a one-time raw regeneration.
+status: open

@@ -4,6 +4,9 @@
  * a kiss do too (`{kind, id}` through `notify_push`). It lives in this file, not
  * a new one, because the "sender is down" test rewrites the one
  * `push_sender_settings` row and a parallel file's triggers would miss the sender.
+ * Story 3.5 adds a third: an event added or changed, the wedding date, the date
+ * the couple got together and a birthday each log a `date_changes` row and post
+ * `{kind: 'date', id}`.
  *
  * Path under test: register_push_device (RPC, real user JWTs) -> the
  * `love_notes` AFTER INSERT trigger -> pg_net -> Kong -> the `send-push` Edge
@@ -31,7 +34,7 @@ import { getUserAccessToken } from '../support/helpers/supabase';
 import { test, expect } from '../support/merged-fixtures';
 
 /** The `push_requests` column that holds each kind of source row's id. */
-type SourceColumn = 'note_id' | 'mood_id' | 'photo_id' | 'interaction_id';
+type SourceColumn = 'note_id' | 'mood_id' | 'photo_id' | 'interaction_id' | 'date_change_id';
 
 /** Rows the sender records for a note (or another source row), ordered by token. */
 async function requestsFor(
@@ -529,9 +532,390 @@ test.describe('Mood, photo, poke and kiss push', () => {
     expect(unknownKind.status).toBe(400);
     const badId = await postToSender(supabaseAdmin, { kind: 'mood', id: 'not-a-uuid' });
     expect(badId.status).toBe(400);
-    for (const kind of ['mood', 'photo', 'interaction']) {
+    for (const kind of ['mood', 'photo', 'interaction', 'date']) {
       const missing = await postToSender(supabaseAdmin, { kind, id: randomUUID() });
       expect(missing.status, kind).toBe(404);
     }
+  });
+});
+
+type DateSubject = 'event' | 'wedding_date' | 'relationship_start' | 'birthday';
+interface ChangeFilter {
+  senderId: string;
+  subject: DateSubject;
+  eventId?: string;
+}
+
+/** The `date_changes` rows matching the filter, oldest first. */
+async function changesFor(supabaseAdmin: TypedSupabaseClient, filter: ChangeFilter) {
+  let query = supabaseAdmin
+    .from('date_changes')
+    .select('id, action, created_at')
+    .eq('sender_id', filter.senderId)
+    .eq('subject', filter.subject);
+  if (filter.eventId) query = query.eq('event_id', filter.eventId);
+  const { data, error } = await query.order('created_at').order('id');
+  if (error) throw new Error(`Failed to read date_changes: ${error.message}`);
+  return data ?? [];
+}
+
+/**
+ * Waits for exactly one change that is not in `known`, adds it to `known` and
+ * returns it. Rows the worker's pair already held before the test are in `known`.
+ */
+async function awaitNewChange(supabaseAdmin: TypedSupabaseClient, filter: ChangeFilter, known: string[]) {
+  let fresh: Awaited<ReturnType<typeof changesFor>> = [];
+  await expect
+    .poll(
+      async () => {
+        fresh = (await changesFor(supabaseAdmin, filter)).filter((c) => !known.includes(c.id));
+        return fresh.length;
+      },
+      { message: `one new ${filter.subject} change is logged`, timeout: 20_000 }
+    )
+    .toBe(1);
+  known.push(fresh[0].id);
+  return fresh[0];
+}
+
+/** The trigger's call is asynchronous, so give a (wrongly) fired one time to land before asserting none did. */
+async function expectNoNewChange(supabaseAdmin: TypedSupabaseClient, filter: ChangeFilter, known: string[]) {
+  await new Promise((resolve) => setTimeout(resolve, 3_000));
+  const fresh = (await changesFor(supabaseAdmin, filter)).filter((c) => !known.includes(c.id));
+  expect(fresh).toEqual([]);
+}
+
+/** Waits for the sender to record `count` requests for a change and returns them. */
+async function awaitDateRequests(supabaseAdmin: TypedSupabaseClient, changeId: string, count: number) {
+  await expect
+    .poll(async () => (await requestsFor(supabaseAdmin, changeId, 'date_change_id')).length, {
+      message: `the sender records ${count} request(s) for the change`,
+      timeout: 20_000,
+    })
+    .toBe(count);
+  return requestsFor(supabaseAdmin, changeId, 'date_change_id');
+}
+
+test.describe('Date change push', () => {
+  /** Registers two devices for the partner and one for the sender; removed at the end. */
+  async function registerDevices(
+    supabaseAdmin: TypedSupabaseClient,
+    supabaseAsUser: TypedSupabaseClient,
+    partnerId: string,
+    cleanup: { defer: (name: string, fn: () => Promise<void>) => void }
+  ) {
+    const partner = await clientFor(supabaseAdmin, partnerId);
+    const [phone, tablet, senderPhone] = [newToken(), newToken(), newToken()];
+    cleanup.defer('remove push devices', async () => {
+      await supabaseAdmin.from('push_devices').delete().in('token', [phone, tablet, senderPhone]);
+    });
+    expect((await partner.rpc('register_push_device', { p_token: phone, p_environment: 'sandbox' })).error).toBeNull();
+    expect((await partner.rpc('register_push_device', { p_token: tablet, p_environment: 'production' })).error).toBeNull();
+    expect(
+      (await supabaseAsUser.rpc('register_push_device', { p_token: senderPhone, p_environment: 'sandbox' })).error
+    ).toBeNull();
+    return { phone, tablet, senderPhone };
+  }
+
+  /** Expects one recorded request per partner device carrying `body`, none for the sender's. */
+  function expectPartnerRequests(
+    rows: Awaited<ReturnType<typeof requestsFor>>,
+    devices: { phone: string; tablet: string; senderPhone: string },
+    title: string,
+    body: string
+  ) {
+    expect(rows.map((r) => [r.token, r.environment, r.delivery]).sort()).toEqual(
+      [
+        [devices.phone, 'sandbox', 'recorded'],
+        [devices.tablet, 'production', 'recorded'],
+      ].sort()
+    );
+    expect(rows.some((r) => r.token === devices.senderPhone)).toBe(false);
+    for (const row of rows) expect(row.payload).toEqual(partnerPayload(title, body));
+  }
+
+  /**
+   * Puts the pair's `couple_settings` row in a known state (both dates NULL, as
+   * the service role, which logs nothing) and restores what it held at the end.
+   * Returns the pair's key and the ids of changes that already exist.
+   */
+  async function prepareCoupleSettings(
+    supabaseAdmin: TypedSupabaseClient,
+    userId: string,
+    partnerId: string,
+    cleanup: { defer: (name: string, fn: () => Promise<void>) => void }
+  ) {
+    const [userA, userB] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
+    const { data: original, error } = await supabaseAdmin
+      .from('couple_settings')
+      .select('relationship_start, wedding_date')
+      .eq('user_a', userA)
+      .eq('user_b', userB)
+      .maybeSingle();
+    expect(error).toBeNull();
+    const knownBefore = await Promise.all(
+      (['wedding_date', 'relationship_start'] as const).map((subject) =>
+        changesFor(supabaseAdmin, { senderId: userId, subject })
+      )
+    );
+    const known = knownBefore.flat().map((c) => c.id);
+    cleanup.defer('restore the pair\'s couple_settings', async () => {
+      // As the service role (no session), so the restore logs and pushes nothing.
+      if (original) {
+        await supabaseAdmin.from('couple_settings').update(original).eq('user_a', userA).eq('user_b', userB);
+      } else {
+        await supabaseAdmin.from('couple_settings').delete().eq('user_a', userA).eq('user_b', userB);
+      }
+    });
+    const { error: resetError } = await supabaseAdmin
+      .from('couple_settings')
+      .upsert(
+        { user_a: userA, user_b: userB, relationship_start: null, wedding_date: null },
+        { onConflict: 'user_a,user_b' }
+      );
+    expect(resetError).toBeNull();
+    return { userA, userB, known };
+  }
+
+  test('[P0] an event added then edited records both for the partner only; unchanged saves, deletes and anniversaries record none', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const devices = await registerDevices(supabaseAdmin, supabaseAsUser, partnerId, cleanup);
+    const { data: sender } = await supabaseAdmin.from('users').select('display_name').eq('id', userId).single();
+    const title = sender?.display_name?.trim() || 'Your partner';
+    const anniversaryKey = randomUUID();
+    let eventId: string | null = null;
+    cleanup.defer('remove the event and anniversary', async () => {
+      if (eventId) await supabaseAdmin.from('events').delete().eq('id', eventId);
+      await supabaseAdmin.from('anniversaries').delete().eq('client_key', anniversaryKey);
+    });
+
+    const { data: event, error } = await supabaseAsUser
+      .from('events')
+      .insert({ user_id: userId, label: 'Paris trip', event_date: '2027-05-01' })
+      .select('id')
+      .single();
+    expect(error).toBeNull();
+    eventId = event!.id;
+    const filter: ChangeFilter = { senderId: userId, subject: 'event', eventId: eventId! };
+    const known: string[] = [];
+
+    const added = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(added.action).toBe('added');
+    expectPartnerRequests(await awaitDateRequests(supabaseAdmin, added.id, 2), devices, title, 'Added an event: Paris trip');
+
+    // An edit is a new change for the same event.
+    const edit = await supabaseAsUser.from('events').update({ event_date: '2027-05-02' }).eq('id', eventId!);
+    expect(edit.error).toBeNull();
+    const changed = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(changed.action).toBe('changed');
+    expectPartnerRequests(
+      await awaitDateRequests(supabaseAdmin, changed.id, 2),
+      devices,
+      title,
+      'Changed an event: Paris trip'
+    );
+
+    // A save that rewrites the same values with a new updated_at records nothing.
+    const unchanged = await supabaseAsUser
+      .from('events')
+      .update({
+        label: 'Paris trip',
+        event_date: '2027-05-02',
+        description: null,
+        icon: 'calendar',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', eventId!);
+    expect(unchanged.error).toBeNull();
+    await expectNoNewChange(supabaseAdmin, filter, known);
+
+    // A replay of the trigger's own call is skipped for every device.
+    const replay = await postToSender(supabaseAdmin, { kind: 'date', id: added.id });
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 2 });
+
+    // An anniversary has no trigger.
+    const changesBefore = await supabaseAdmin
+      .from('date_changes')
+      .select('id', { count: 'exact', head: true })
+      .eq('sender_id', userId);
+    const anniversary = await supabaseAsUser
+      .from('anniversaries')
+      .insert({ user_id: userId, label: 'First date', event_date: '2026-01-01', client_key: anniversaryKey });
+    expect(anniversary.error).toBeNull();
+
+    // Deleting the event deletes its changes and their requests, and pushes nothing.
+    const deleted = await supabaseAsUser.from('events').delete().eq('id', eventId!);
+    expect(deleted.error).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    const changesAfter = await supabaseAdmin
+      .from('date_changes')
+      .select('id', { count: 'exact', head: true })
+      .eq('sender_id', userId);
+    expect(changesAfter.count).toBe((changesBefore.count ?? 0) - 2);
+    expect(await changesFor(supabaseAdmin, filter)).toEqual([]);
+    expect(await requestsFor(supabaseAdmin, added.id, 'date_change_id')).toEqual([]);
+    expect(await requestsFor(supabaseAdmin, changed.id, 'date_change_id')).toEqual([]);
+  });
+
+  test('[P0] the wedding date set, changed and cleared records the first two only; a write with no session records none', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const devices = await registerDevices(supabaseAdmin, supabaseAsUser, partnerId, cleanup);
+    const { data: sender } = await supabaseAdmin.from('users').select('display_name').eq('id', userId).single();
+    const title = sender?.display_name?.trim() || 'Your partner';
+    const { userA, userB, known } = await prepareCoupleSettings(supabaseAdmin, userId, partnerId, cleanup);
+    const baseline = [...known];
+    const own = await clientFor(supabaseAdmin, userId);
+    const filter: ChangeFilter = { senderId: userId, subject: 'wedding_date' };
+    const write = (wedding_date: string | null) =>
+      own.from('couple_settings').upsert({ user_a: userA, user_b: userB, wedding_date }, { onConflict: 'user_a,user_b' });
+    cleanup.defer('remove the wedding date changes', async () => {
+      await supabaseAdmin
+        .from('date_changes')
+        .delete()
+        .eq('sender_id', userId)
+        .eq('subject', 'wedding_date')
+        .not('id', 'in', `(${baseline.join(',') || randomUUID()})`);
+    });
+
+    expect((await write('2027-06-12')).error).toBeNull();
+    const set = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(set.action).toBe('added');
+    expectPartnerRequests(await awaitDateRequests(supabaseAdmin, set.id, 2), devices, title, 'Set the wedding date');
+
+    expect((await write('2027-06-13')).error).toBeNull();
+    const changed = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(changed.action).toBe('changed');
+    expectPartnerRequests(
+      await awaitDateRequests(supabaseAdmin, changed.id, 2),
+      devices,
+      title,
+      'Changed the wedding date'
+    );
+
+    // Cleared to NULL: nothing.
+    expect((await write(null)).error).toBeNull();
+    await expectNoNewChange(supabaseAdmin, filter, known);
+
+    // The service role has no session, so the writer is unknown: nothing.
+    const service = await supabaseAdmin
+      .from('couple_settings')
+      .update({ wedding_date: '2027-07-01' })
+      .eq('user_a', userA)
+      .eq('user_b', userB);
+    expect(service.error).toBeNull();
+    await expectNoNewChange(supabaseAdmin, filter, known);
+  });
+
+  test('[P0] the start date set then changed records "Set …" then "Changed …" for the partner', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const devices = await registerDevices(supabaseAdmin, supabaseAsUser, partnerId, cleanup);
+    const { data: sender } = await supabaseAdmin.from('users').select('display_name').eq('id', userId).single();
+    const title = sender?.display_name?.trim() || 'Your partner';
+    const { userA, userB, known } = await prepareCoupleSettings(supabaseAdmin, userId, partnerId, cleanup);
+    const baseline = [...known];
+    const own = await clientFor(supabaseAdmin, userId);
+    const filter: ChangeFilter = { senderId: userId, subject: 'relationship_start' };
+    const write = (relationship_start: string) =>
+      own
+        .from('couple_settings')
+        .upsert({ user_a: userA, user_b: userB, relationship_start }, { onConflict: 'user_a,user_b' });
+    cleanup.defer('remove the start date changes', async () => {
+      await supabaseAdmin
+        .from('date_changes')
+        .delete()
+        .eq('sender_id', userId)
+        .eq('subject', 'relationship_start')
+        .not('id', 'in', `(${baseline.join(',') || randomUUID()})`);
+    });
+
+    expect((await write('2026-01-01T00:00:00Z')).error).toBeNull();
+    const set = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(set.action).toBe('added');
+    expectPartnerRequests(
+      await awaitDateRequests(supabaseAdmin, set.id, 2),
+      devices,
+      title,
+      'Set the date you got together'
+    );
+
+    expect((await write('2026-02-02T00:00:00Z')).error).toBeNull();
+    const changed = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(changed.action).toBe('changed');
+    expectPartnerRequests(
+      await awaitDateRequests(supabaseAdmin, changed.id, 2),
+      devices,
+      title,
+      'Changed the date you got together'
+    );
+  });
+
+  test('[P0] a birthday set, saved again, changed and cleared records the first and third only', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const devices = await registerDevices(supabaseAdmin, supabaseAsUser, partnerId, cleanup);
+    const { data: sender } = await supabaseAdmin
+      .from('users')
+      .select('display_name, birthday')
+      .eq('id', userId)
+      .single();
+    const title = sender?.display_name?.trim() || 'Your partner';
+    const filter: ChangeFilter = { senderId: userId, subject: 'birthday' };
+    const known = (await changesFor(supabaseAdmin, filter)).map((c) => c.id);
+    const baseline = [...known];
+    cleanup.defer('restore the birthday and remove its changes', async () => {
+      await supabaseAdmin.from('users').update({ birthday: sender?.birthday ?? null }).eq('id', userId);
+      // Restoring a non-NULL birthday logs a change of its own; drop it with the test's.
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      await supabaseAdmin
+        .from('date_changes')
+        .delete()
+        .eq('sender_id', userId)
+        .eq('subject', 'birthday')
+        .not('id', 'in', `(${baseline.join(',') || randomUUID()})`);
+    });
+    const own = await clientFor(supabaseAdmin, userId);
+    const write = (birthday: string | null) => own.from('users').update({ birthday }).eq('id', userId);
+
+    // Start from no birthday (a NULL write logs nothing).
+    expect((await supabaseAdmin.from('users').update({ birthday: null }).eq('id', userId)).error).toBeNull();
+
+    expect((await write('1990-05-01')).error).toBeNull();
+    const added = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(added.action).toBe('added');
+    expectPartnerRequests(await awaitDateRequests(supabaseAdmin, added.id, 2), devices, title, 'Added their birthday');
+
+    // The same value again: nothing.
+    expect((await write('1990-05-01')).error).toBeNull();
+    await expectNoNewChange(supabaseAdmin, filter, known);
+
+    expect((await write('1990-05-02')).error).toBeNull();
+    const changed = await awaitNewChange(supabaseAdmin, filter, known);
+    expect(changed.action).toBe('changed');
+    expectPartnerRequests(
+      await awaitDateRequests(supabaseAdmin, changed.id, 2),
+      devices,
+      title,
+      'Changed their birthday'
+    );
+
+    // Cleared to NULL: nothing.
+    expect((await write(null)).error).toBeNull();
+    await expectNoNewChange(supabaseAdmin, filter, known);
   });
 });

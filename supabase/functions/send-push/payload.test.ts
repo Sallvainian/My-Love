@@ -1,6 +1,7 @@
 import { assertEquals, assertFalse } from 'jsr:@std/assert@1';
 
 import {
+  buildDatePayload,
   buildInteractionPayload,
   buildLoveNotePayload,
   buildMoodPayload,
@@ -119,4 +120,37 @@ Deno.test('the partner payloads fall back to Your partner and carry no badge, so
 Deno.test('a mood\'s note is never part of the payload', () => {
   const mood = { mood_type: 'happy', mood_types: ['happy'], note: 'private thoughts' };
   assertFalse(JSON.stringify(buildMoodPayload(mood, 'Casey')).includes('private'));
+});
+
+// ---- Story 3.5 ----
+
+Deno.test('an event is named by its label, added or changed', () => {
+  assertEquals(
+    buildDatePayload({ subject: 'event', action: 'added', event_label: 'Paris trip' }, 'Casey'),
+    { aps: { alert: { title: 'Casey', body: 'Added an event: Paris trip' }, 'thread-id': thread } }
+  );
+  assertEquals(
+    buildDatePayload({ subject: 'event', action: 'changed', event_label: 'Paris trip' }, 'Casey').aps.alert.body,
+    'Changed an event: Paris trip'
+  );
+});
+
+Deno.test('the wedding date, the start date and a birthday each have a set and a changed body', () => {
+  const body = (subject: 'wedding_date' | 'relationship_start' | 'birthday', action: 'added' | 'changed') =>
+    buildDatePayload({ subject, action, event_label: null }, 'Casey').aps.alert.body;
+  assertEquals(body('wedding_date', 'added'), 'Set the wedding date');
+  assertEquals(body('wedding_date', 'changed'), 'Changed the wedding date');
+  assertEquals(body('relationship_start', 'added'), 'Set the date you got together');
+  assertEquals(body('relationship_start', 'changed'), 'Changed the date you got together');
+  assertEquals(body('birthday', 'added'), 'Added their birthday');
+  assertEquals(body('birthday', 'changed'), 'Changed their birthday');
+});
+
+Deno.test('a date payload falls back to Your partner and carries no badge, sound, image or date value', () => {
+  const payload = buildDatePayload({ subject: 'wedding_date', action: 'added', event_label: null }, null);
+  assertEquals(payload.aps.alert.title, FALLBACK_SENDER_NAME);
+  assertEquals(Object.keys(payload), ['aps']);
+  assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
+  assertEquals(payload.aps['thread-id'], thread);
+  assertFalse(/\d/.test(payload.aps.alert.body));
 });

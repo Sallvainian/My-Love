@@ -2,7 +2,8 @@
 -- pgTAP: push_devices, push_requests, push_sender_settings, register_push_device
 -- and the love-note push trigger (20261031000000); unregister_push_device
 -- (20261031010000); the mood, photo and interaction triggers and the
--- one-source check on push_requests (20261031020000)
+-- one-source check on push_requests (20261031020000); the date_changes log, its
+-- five triggers and the fifth push_requests source (20261031030000)
 --
 -- Pinned here: the exact policy sets (a policy added, renamed or dropped fails
 -- this file), who can touch each table, the register RPC (reassignment by
@@ -21,7 +22,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(57);
+select plan(94);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -498,6 +499,373 @@ select is(
   (select count(*)::int from public.push_requests where token in ('token-m', 'token-p', 'token-i')),
   0,
   'PUSH-DB-057: deleting a mood, photo or interaction deletes its recorded requests'
+);
+
+-- ============================================
+-- Date changes (20261031030000, story 3.5)
+-- ============================================
+-- notify_date_change() logs each push-worthy change in date_changes and posts
+-- {kind: 'date', id: <change id>}. Helpers and fixtures first.
+create temporary table t_pair as
+select least(a_id, b_id) as lo, greatest(a_id, b_id) as hi from t_ids;
+grant select on t_pair to authenticated, anon;
+
+create temporary table t_c as select tests.create_test_user('push-c@example.com') as c_id;
+
+-- The queued call count and every non-event change by this file's three accounts (the
+-- database is shared, so other rows are ignored), as 'N | subject action who, ...'.
+create or replace function tests.date_state()
+returns text language sql as $$
+  select (select count(*) from net.http_request_queue)::text || ' | ' || coalesce(
+    (select string_agg(s, ', ' order by s) from (
+       select c.subject || ' ' || c.action || ' ' ||
+              case c.sender_id when (select a_id from t_ids) then 'a'
+                               when (select b_id from t_ids) then 'b' else 'c' end as s
+         from public.date_changes c
+        where c.subject <> 'event'
+          and c.sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c)) q), '');
+$$;
+
+-- The two accounts are partners (set as superuser: users.partner_id has no client write).
+update public.users set partner_id = (select b_id from t_ids) where id = (select a_id from t_ids);
+update public.users set partner_id = (select a_id from t_ids) where id = (select b_id from t_ids);
+
+select has_table('public', 'date_changes', 'PUSH-DB-058: date_changes exists');
+
+select ok(
+  (select relrowsecurity from pg_class where oid = 'public.date_changes'::regclass),
+  'PUSH-DB-059: RLS is enabled on date_changes'
+);
+select policies_are('public', 'date_changes', array[]::text[],
+  'PUSH-DB-060: date_changes carries no policies');
+
+select ok(
+  not has_table_privilege('anon', 'public.date_changes', 'SELECT, INSERT, UPDATE, DELETE')
+  and not has_table_privilege('authenticated', 'public.date_changes', 'SELECT, INSERT, UPDATE, DELETE')
+  and has_table_privilege('service_role', 'public.date_changes', 'SELECT'),
+  'PUSH-DB-061: date_changes is closed to anon and authenticated, readable by the sender (service_role)'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.notify_date_change()', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.notify_date_change()', 'EXECUTE')
+  and not has_function_privilege('public', 'public.notify_date_change()', 'EXECUTE'),
+  'PUSH-DB-062: notify_date_change() is executable by no API role'
+);
+
+select is(
+  (select count(*)::int from pg_trigger
+    where tgname in ('events_push_after_insert', 'events_push_after_update',
+                     'couple_settings_push_after_insert', 'couple_settings_push_after_update',
+                     'users_push_after_birthday')
+      and tgenabled = 'O'),
+  5,
+  'PUSH-DB-063: the five date triggers exist and are enabled'
+);
+
+-- ---- events ----
+delete from net.http_request_queue;
+
+insert into public.events (id, user_id, label, event_date)
+select '99999999-0000-4000-8000-000000000021', a_id, 'Paris trip', '2027-05-01' from t_ids;
+
+select results_eq(
+  $$select url, convert_from(body, 'UTF8')::jsonb, headers->>'x-push-secret' from net.http_request_queue$$,
+  $$select 'http://sender.test/send-push'::text, jsonb_build_object('kind', 'date', 'id', c.id),
+           'trigger-test-secret-1234'::text
+      from public.date_changes c where c.event_id = '99999999-0000-4000-8000-000000000021'$$,
+  'PUSH-DB-064: a new event queues one {kind: date, id} call naming its logged change'
+);
+
+select results_eq(
+  $$select subject, action, sender_id from public.date_changes
+     where event_id = '99999999-0000-4000-8000-000000000021'$$,
+  $$select 'event'::text, 'added'::text, a_id from t_ids$$,
+  'PUSH-DB-065: and the change is logged as the creator adding the event'
+);
+
+-- A save that changes only updated_at, or rewrites the same values, logs nothing.
+update public.events set updated_at = now() + interval '1 minute'
+ where id = '99999999-0000-4000-8000-000000000021';
+update public.events
+   set label = 'Paris trip', event_date = '2027-05-01', description = null, icon = 'calendar',
+       updated_at = now() + interval '2 minutes'
+ where id = '99999999-0000-4000-8000-000000000021';
+
+select results_eq(
+  $$select (select count(*)::int from net.http_request_queue),
+           (select count(*)::int from public.date_changes where event_id = '99999999-0000-4000-8000-000000000021')$$,
+  $$values (1, 1)$$,
+  'PUSH-DB-066: updated_at alone, or the same label, date, description and icon, logs and queues nothing'
+);
+
+update public.events set event_date = '2027-05-02' where id = '99999999-0000-4000-8000-000000000021';
+
+select results_eq(
+  $$select (select count(*)::int from net.http_request_queue),
+           (select count(*)::int from public.date_changes
+             where event_id = '99999999-0000-4000-8000-000000000021' and action = 'changed')$$,
+  $$values (2, 1)$$,
+  'PUSH-DB-067: changing the event date logs a change and queues a call'
+);
+
+update public.events set label = 'Rome trip' where id = '99999999-0000-4000-8000-000000000021';
+update public.events set description = 'Flights booked' where id = '99999999-0000-4000-8000-000000000021';
+update public.events set icon = 'plane' where id = '99999999-0000-4000-8000-000000000021';
+
+select results_eq(
+  $$select (select count(*)::int from net.http_request_queue),
+           (select count(*)::int from public.date_changes where event_id = '99999999-0000-4000-8000-000000000021'),
+           (select count(*)::int from public.date_changes
+             where event_id = '99999999-0000-4000-8000-000000000021' and action = 'changed')$$,
+  $$values (5, 5, 4)$$,
+  'PUSH-DB-068: a changed label, description or icon each log a change too'
+);
+
+-- No trigger exists on anniversaries.
+insert into public.anniversaries (user_id, label, event_date)
+select a_id, 'First date', '2026-01-01' from t_ids;
+
+select is(
+  (select count(*)::int from net.http_request_queue),
+  5,
+  'PUSH-DB-069: an anniversary write queues nothing'
+);
+
+-- push_requests takes a date change as its fifth source.
+select lives_ok(
+  $$insert into public.push_requests (date_change_id, token, environment, payload, delivery)
+      select c.id, 'token-d', 'sandbox', '{"aps":{}}', 'recorded'
+        from public.date_changes c
+       where c.event_id = '99999999-0000-4000-8000-000000000021' limit 1$$,
+  'PUSH-DB-070: a request can belong to a date change'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (note_id, date_change_id, token, environment, payload, delivery)
+      select gen_random_uuid(), c.id, 'token-two-src', 'sandbox', '{"aps":{}}', 'recorded'
+        from public.date_changes c
+       where c.event_id = '99999999-0000-4000-8000-000000000021' limit 1$$,
+  '23514',
+  null,
+  'PUSH-DB-071: a request with a date change and another source is refused'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (date_change_id, token, environment, payload, delivery)
+      select c.id, 'token-d', 'sandbox', '{"aps":{}}', 'recorded'
+        from public.date_changes c
+       where c.event_id = '99999999-0000-4000-8000-000000000021' limit 1$$,
+  '23505',
+  null,
+  'PUSH-DB-072: the same date change and device token cannot be claimed twice'
+);
+
+-- Deleting the event takes its changes and their requests with it, and pushes nothing.
+delete from public.events where id = '99999999-0000-4000-8000-000000000021';
+
+select results_eq(
+  $$select (select count(*)::int from public.push_requests where token = 'token-d'),
+           (select count(*)::int from public.date_changes where event_id = '99999999-0000-4000-8000-000000000021'),
+           (select count(*)::int from net.http_request_queue)$$,
+  $$values (0, 0, 5)$$,
+  'PUSH-DB-073: deleting an event deletes its changes and requests and queues nothing'
+);
+
+-- ---- couple_settings ----
+-- The writer is auth.uid(); the row does not record it.
+delete from net.http_request_queue;
+
+select tests.authenticate_as((select a_id from t_ids));
+insert into public.couple_settings (user_a, user_b, wedding_date)
+select lo, hi, '2027-06-12' from t_pair;
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '1 | wedding_date added a',
+  'PUSH-DB-074: a first couple write with a wedding date logs that date as added by the writer');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.couple_settings set wedding_date = '2027-06-13' where user_a = (select lo from t_pair);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '2 | wedding_date added a, wedding_date changed a',
+  'PUSH-DB-075: a different wedding date logs a change');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.couple_settings set wedding_date = null where user_a = (select lo from t_pair);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '2 | wedding_date added a, wedding_date changed a',
+  'PUSH-DB-076: clearing the wedding date logs and queues nothing');
+
+select tests.authenticate_as((select b_id from t_ids));
+update public.couple_settings set relationship_start = '2026-01-01 00:00:00+00' where user_a = (select lo from t_pair);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(),
+  '3 | relationship_start added b, wedding_date added a, wedding_date changed a',
+  'PUSH-DB-077: the partner setting the start date on an existing row is logged under the partner');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.couple_settings set relationship_start = '2026-02-02 00:00:00+00' where user_a = (select lo from t_pair);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(),
+  '4 | relationship_start added b, relationship_start changed a, wedding_date added a, wedding_date changed a',
+  'PUSH-DB-078: a different start date logs a change');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.couple_settings
+   set updated_at = now() + interval '1 minute', relationship_start = relationship_start
+ where user_a = (select lo from t_pair);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(),
+  '4 | relationship_start added b, relationship_start changed a, wedding_date added a, wedding_date changed a',
+  'PUSH-DB-079: updated_at alone, or the same start date, logs nothing');
+
+-- A write with no session (the service role) and one by a non-member log nothing.
+update public.couple_settings set wedding_date = '2027-07-01' where user_a = (select lo from t_pair);
+select is(tests.date_state(),
+  '4 | relationship_start added b, relationship_start changed a, wedding_date added a, wedding_date changed a',
+  'PUSH-DB-080: a couple write with no session logs nothing');
+
+select set_config('request.jwt.claims',
+  json_build_object('sub', (select c_id from t_c)::text, 'role', 'authenticated', 'aud', 'authenticated')::text, true);
+update public.couple_settings set wedding_date = '2027-07-02' where user_a = (select lo from t_pair);
+select tests.clear_jwt();
+select is(tests.date_state(),
+  '4 | relationship_start added b, relationship_start changed a, wedding_date added a, wedding_date changed a',
+  'PUSH-DB-081: a couple write by an account outside the pair logs nothing');
+
+-- An insert carrying both dates logs one change per date.
+delete from net.http_request_queue;
+delete from public.date_changes
+ where subject <> 'event'
+   and sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c);
+delete from public.couple_settings where user_a = (select lo from t_pair);
+
+select tests.authenticate_as((select a_id from t_ids));
+insert into public.couple_settings (user_a, user_b, relationship_start, wedding_date)
+select lo, hi, '2026-01-01 00:00:00+00', '2027-06-12' from t_pair;
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '2 | relationship_start added a, wedding_date added a',
+  'PUSH-DB-082: an insert carrying both dates logs and queues one change per date');
+
+-- ---- birthdays ----
+delete from net.http_request_queue;
+delete from public.date_changes
+ where subject <> 'event'
+   and sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c);
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.users set birthday = '1990-05-01' where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '1 | birthday added a',
+  'PUSH-DB-083: setting a birthday logs it as added by its owner');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.users set birthday = '1990-05-01' where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '1 | birthday added a',
+  'PUSH-DB-084: saving the same birthday again logs nothing');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.users set birthday = '1990-05-02' where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '2 | birthday added a, birthday changed a',
+  'PUSH-DB-085: a different birthday logs a change');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.users set birthday = null where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '2 | birthday added a, birthday changed a',
+  'PUSH-DB-086: clearing the birthday logs and queues nothing');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.users set display_name = 'Casey' where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '2 | birthday added a, birthday changed a',
+  'PUSH-DB-087: an update that does not touch the birthday logs nothing');
+
+select tests.authenticate_as((select a_id from t_ids));
+update public.users set birthday = '1990-05-03' where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+select is(tests.date_state(), '3 | birthday added a, birthday added a, birthday changed a',
+  'PUSH-DB-088: a birthday set again after being cleared is added again');
+
+-- ---- no settings, and a failing call ----
+-- Every trigger is checked: an event, a couple write by a pair member and a birthday.
+delete from public.push_sender_settings;
+delete from net.http_request_queue;
+delete from public.date_changes
+ where sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c);
+delete from public.couple_settings where user_a = (select lo from t_pair);
+
+insert into public.events (id, user_id, label, event_date)
+select '99999999-0000-4000-8000-000000000022', a_id, 'No settings', '2027-05-01' from t_ids;
+
+select tests.authenticate_as((select a_id from t_ids));
+insert into public.couple_settings (user_a, user_b, relationship_start, wedding_date)
+select lo, hi, '2026-01-01 00:00:00+00', '2027-06-12' from t_pair;
+update public.users set birthday = '1990-06-01' where id = (select a_id from t_ids);
+reset role;
+select tests.clear_jwt();
+
+select results_eq(
+  $$select tests.date_state(),
+           (select count(*)::int from public.date_changes
+             where sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c))$$,
+  $$values ('0 | '::text, 0)$$,
+  'PUSH-DB-089: with no sender settings an event, a couple write and a birthday log and queue nothing'
+);
+
+insert into public.push_sender_settings (sender_url, sender_secret)
+values ('', 'trigger-test-secret-1234');
+delete from public.couple_settings where user_a = (select lo from t_pair);
+
+select lives_ok(
+  $$insert into public.events (id, user_id, label, event_date)
+      select '99999999-0000-4000-8000-000000000023', a_id, 'Still lands', '2027-05-01' from t_ids$$,
+  'PUSH-DB-090: an event insert succeeds when the pg_net call itself raises'
+);
+
+select tests.authenticate_as((select a_id from t_ids));
+select lives_ok(
+  $$insert into public.couple_settings (user_a, user_b, relationship_start, wedding_date)
+      select lo, hi, '2026-01-01 00:00:00+00', '2027-06-12' from t_pair$$,
+  'PUSH-DB-091: a couple write succeeds when the pg_net call itself raises'
+);
+select lives_ok(
+  $$update public.users set birthday = '1990-06-02' where id = (select a_id from t_ids)$$,
+  'PUSH-DB-092: a birthday write succeeds when the pg_net call itself raises'
+);
+reset role;
+select tests.clear_jwt();
+
+select results_eq(
+  $$select (select count(*)::int from public.events where id = '99999999-0000-4000-8000-000000000023'),
+           (select count(*)::int from public.couple_settings
+             where user_a = (select lo from t_pair) and wedding_date = '2027-06-12'),
+           (select birthday from public.users where id = (select a_id from t_ids))$$,
+  $$values (1, 1, '1990-06-02'::date)$$,
+  'PUSH-DB-093: and the event, the couple row and the birthday are committed'
+);
+
+-- The raising post rolls back the change rows logged in the same call.
+select results_eq(
+  $$select (select count(*)::int from public.date_changes where event_id = '99999999-0000-4000-8000-000000000023'),
+           (select count(*)::int from public.date_changes
+             where sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c))$$,
+  $$values (0, 0)$$,
+  'PUSH-DB-094: and no change row survives for those writes'
 );
 
 select * from finish();

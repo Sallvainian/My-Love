@@ -7,7 +7,10 @@
  *   20261031000000_push_devices.sql) posts `{ "note_id": "<uuid>" }`;
  * - `moods`, `photos` and `interactions` AFTER INSERT (`notify_push`,
  *   20261031020000_push_moods_photos_interactions.sql) post
- *   `{ "kind": "mood" | "photo" | "interaction", "id": "<uuid>" }`.
+ *   `{ "kind": "mood" | "photo" | "interaction", "id": "<uuid>" }`;
+ * - `events`, `couple_settings` and `users` (`notify_date_change`,
+ *   20261031030000_push_date_changes.sql) log each push-worthy change in
+ *   `date_changes` and post `{ "kind": "date", "id": "<date_changes id>" }`.
  *
  * Split out of `index.ts` so `deno test` can drive it with a fake database
  * and a fake APNs client.
@@ -25,10 +28,12 @@
  * The sender reads the row itself with the service role and derives the
  * sender's name and the recipient from it, so a forged call can name no target
  * beyond an existing row. The recipient of a note is its `to_user_id`, of an
- * interaction its `to_user_id`, and of a mood or photo the owner's
- * `users.partner_id`. An owner with no partner, or a recipient equal to the
- * sender, answers 200 with every count 0 and claims nothing. An interaction
- * whose type is not `poke` or `kiss` does the same.
+ * interaction its `to_user_id`, and of a mood, photo or date change the
+ * sender's `users.partner_id` (a date change names its sender in
+ * `date_changes.sender_id`; an event change whose event is gone is a 404). An
+ * owner with no partner, or a recipient equal to the sender, answers 200 with
+ * every count 0 and claims nothing. An interaction whose type is not `poke` or
+ * `kiss` does the same.
  *
  * ## Dedupe and the recorded path
  *
@@ -51,19 +56,21 @@
 
 import type { ApnsClient, ApnsResult } from './apns.ts';
 import {
+  buildDatePayload,
   buildInteractionPayload,
   buildLoveNotePayload,
   buildMoodPayload,
   buildPhotoPayload,
   type ApnsPayload,
+  type PushDateChange,
   type PushMood,
 } from './payload.ts';
 
 /** What a push is about; each kind has its own column in `push_requests`. */
-export type PushKind = 'love_note' | 'mood' | 'photo' | 'interaction';
+export type PushKind = 'love_note' | 'mood' | 'photo' | 'interaction' | 'date';
 
 /** The kinds the triggers post as `{kind, id}`; a love note posts `{note_id}`. */
-const POSTED_KINDS = ['mood', 'photo', 'interaction'] as const;
+const POSTED_KINDS = ['mood', 'photo', 'interaction', 'date'] as const;
 
 export interface NoteRow {
   id: string;
@@ -90,6 +97,12 @@ export interface InteractionRow {
   type: string;
 }
 
+/** A `date_changes` row, with the event's label as it is when read. */
+export interface DateChangeRow extends PushDateChange {
+  id: string;
+  sender_id: string;
+}
+
 export interface DeviceRow {
   token: string;
   environment: string;
@@ -112,6 +125,8 @@ export interface PushDb {
   getMood(moodId: string): Promise<MoodRow | null>;
   getPhoto(photoId: string): Promise<PhotoRow | null>;
   getInteraction(interactionId: string): Promise<InteractionRow | null>;
+  /** The change with its event's label when it is about an event; null when the change is gone. */
+  getDateChange(changeId: string): Promise<DateChangeRow | null>;
   /** The account's linked partner, or null when it has none. */
   getPartnerId(userId: string): Promise<string | null>;
   getDisplayName(userId: string): Promise<string | null>;
@@ -156,7 +171,7 @@ type Parsed =
 function parseBody(body: { note_id?: unknown; kind?: unknown; id?: unknown }): Parsed {
   if (body.kind !== undefined) {
     if (typeof body.kind !== 'string' || !(POSTED_KINDS as readonly string[]).includes(body.kind)) {
-      return { ok: false, message: 'kind must be mood, photo or interaction' };
+      return { ok: false, message: 'kind must be mood, photo, interaction or date' };
     }
     if (typeof body.id !== 'string' || !UUID.test(body.id)) {
       return { ok: false, message: 'id must be a uuid' };
@@ -221,6 +236,18 @@ async function resolveSource(db: PushDb, kind: PushKind, id: string): Promise<Pu
         buildPayload: isPushInteraction(interaction.type)
           ? (name) => buildInteractionPayload(interaction.type, name) as ApnsPayload
           : null,
+      };
+    }
+    case 'date': {
+      const change = await db.getDateChange(id);
+      // An event change whose event is gone has no label to push.
+      if (!change || (change.subject === 'event' && change.event_label === null)) return null;
+      return {
+        kind,
+        id,
+        senderId: change.sender_id,
+        recipientId: await db.getPartnerId(change.sender_id),
+        buildPayload: (name) => buildDatePayload(change, name),
       };
     }
   }
