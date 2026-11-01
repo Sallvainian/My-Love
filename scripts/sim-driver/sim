@@ -26,9 +26,11 @@ TOOL=${0:A:h}
 REPO=$(git -C "$TOOL" rev-parse --show-toplevel)
 WORK=${SIM_DRIVER_WORK:-$HOME/Library/Caches/my-love-sim-driver/${REPO:t}-$(print -rn -- $REPO | shasum | cut -c1-8)}
 BUNDLE=dev.sallvain.mylove
-# The first pair (seeded), then the second (no rows): signin's targets in order.
+# The first pair (seeded), the second (no rows), then the unlinked pair (no
+# partner, no requests): signin's targets in order.
 EMAILS=(simdriver@test.example.com simdriver-partner@test.example.com
-  simdriver-other@test.example.com simdriver-other-partner@test.example.com)
+  simdriver-other@test.example.com simdriver-other-partner@test.example.com
+  simdriver-unlinked@test.example.com simdriver-unlinked-other@test.example.com)
 # A shell that must stay on its own web code checks an address nothing
 # answers: a failed check leaves it on the build it has (story 7's Setup).
 DEAD_UPDATE_URL=http://127.0.0.1:9/updates/latest.json
@@ -55,12 +57,14 @@ Shell:
   uninstall              Remove the shell and its data.
 
 Accounts (local stack only):
-  provision              Create or reset both fixture pairs and link each:
-                         Casey and Jessie, seeded so every view scrolls;
-                         Harper and Morgan, love notes wiped, nothing seeded.
-  signin [partner|other|other-partner]
+  provision              Create or reset the fixture accounts: Casey and Jessie,
+                         linked and seeded so every view scrolls; Harper and
+                         Morgan, linked, love notes wiped, nothing seeded; Riley
+                         and Quinn, unlinked, partner requests deleted.
+  signin [partner|other|other-partner|unlinked|unlinked-other]
                          Sign in through the login form (default: Casey;
-                         partner: Jessie; other: Harper; other-partner: Morgan).
+                         partner: Jessie; other: Harper; other-partner: Morgan;
+                         unlinked: Riley; unlinked-other: Quinn).
   signout                Sign out through Settings and wait for the login form.
 
 Device:
@@ -449,7 +453,9 @@ cmd_signin() {
     partner) email=${EMAILS[2]} ;;
     other) email=${EMAILS[3]} ;;
     other-partner) email=${EMAILS[4]} ;;
-    *) die 2 "signin takes nothing, 'partner', 'other' or 'other-partner'" ;;
+    unlinked) email=${EMAILS[5]} ;;
+    unlinked-other) email=${EMAILS[6]} ;;
+    *) die 2 "signin takes nothing, 'partner', 'other', 'other-partner', 'unlinked' or 'unlinked-other'" ;;
   esac
   local password
   password=$(node --input-type=module -e '

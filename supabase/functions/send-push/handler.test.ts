@@ -9,6 +9,7 @@ import {
   type InteractionRow,
   type MoodRow,
   type NoteRow,
+  type PartnerRequestRow,
   type PhotoRow,
   type PushDb,
   type PushRequestRow,
@@ -19,6 +20,7 @@ const MOOD_ID = '22222222-2222-4222-8222-222222222222';
 const PHOTO_ID = '33333333-3333-4333-8333-333333333333';
 const INTERACTION_ID = '44444444-4444-4444-8444-444444444444';
 const DATE_CHANGE_ID = '55555555-5555-4555-8555-555555555555';
+const PARTNER_REQUEST_ID = '66666666-6666-4666-8666-666666666666';
 const SECRET = 'a-shared-secret-for-tests';
 
 const textNote: NoteRow = {
@@ -43,6 +45,20 @@ const eventAdded: DateChangeRow = {
   action: 'added',
   event_label: 'Paris trip',
 };
+/** Asked by `sender` (Casey) of `recipient`; the fake lists devices only for `recipient`. */
+const pendingRequest: PartnerRequestRow = {
+  id: PARTNER_REQUEST_ID,
+  from_user_id: 'sender',
+  to_user_id: 'recipient',
+  status: 'pending',
+};
+/** Asked by `recipient`, accepted by `sender`: the acceptance goes to `recipient`. */
+const acceptedRequest: PartnerRequestRow = {
+  id: PARTNER_REQUEST_ID,
+  from_user_id: 'recipient',
+  to_user_id: 'sender',
+  status: 'accepted',
+};
 const poke: InteractionRow = { id: INTERACTION_ID, from_user_id: 'sender', to_user_id: 'recipient', type: 'poke' };
 
 function fakeDb(options: {
@@ -51,6 +67,11 @@ function fakeDb(options: {
   photo?: PhotoRow | null;
   interaction?: InteractionRow | null;
   dateChange?: DateChangeRow | null;
+  partnerRequest?: PartnerRequestRow | null;
+  /** The display name of every account; defaults to Casey for `sender` and Jessie for the rest. */
+  displayName?: string | null;
+  /** The user ids whose devices were listed. */
+  listed?: string[];
   /** The owner's partner; defaults to the recipient. `null` is an unlinked owner. */
   partnerId?: string | null;
   partnerLookups?: string[];
@@ -71,12 +92,20 @@ function fakeDb(options: {
     getPhoto: () => Promise.resolve(options.photo === undefined ? null : options.photo),
     getInteraction: () => Promise.resolve(options.interaction === undefined ? null : options.interaction),
     getDateChange: () => Promise.resolve(options.dateChange === undefined ? null : options.dateChange),
+    getPartnerRequest: () =>
+      Promise.resolve(options.partnerRequest === undefined ? null : options.partnerRequest),
     getPartnerId: (userId) => {
       options.partnerLookups?.push(userId);
       return Promise.resolve(options.partnerId === undefined ? 'recipient' : options.partnerId);
     },
-    getDisplayName: (userId) => Promise.resolve(userId === 'sender' ? 'Casey' : 'Jessie'),
-    listDevices: (userId) => Promise.resolve(userId === 'recipient' ? (options.devices ?? []) : []),
+    getDisplayName: (userId) =>
+      Promise.resolve(
+        options.displayName !== undefined ? options.displayName : userId === 'sender' ? 'Casey' : 'Jessie'
+      ),
+    listDevices: (userId) => {
+      options.listed?.push(userId);
+      return Promise.resolve(userId === 'recipient' ? (options.devices ?? []) : []);
+    },
     claimRequest: (row) => {
       if (claimed.some((c) => c.kind === row.kind && c.source_id === row.source_id && c.token === row.token)) {
         return Promise.resolve(false);
@@ -540,7 +569,7 @@ Deno.test('an unknown kind or a non-uuid id is a 400', async () => {
 });
 
 Deno.test('a valid kind with a missing row is a 404', async () => {
-  for (const kind of ['mood', 'photo', 'interaction', 'date']) {
+  for (const kind of ['mood', 'photo', 'interaction', 'date', 'partner_request', 'partner_accept']) {
     const response = await handleSendPush(request({ kind, id: MOOD_ID }), { db: fakeDb({}), apns: null });
     assertEquals(response.status, 404, kind);
     await response.body?.cancel();
@@ -666,4 +695,187 @@ Deno.test('a date change with a non-uuid id is a 400', async () => {
   });
   assertEquals(response.status, 400);
   await response.body?.cancel();
+});
+
+// ---- Story 3.6: partner requests ----
+
+Deno.test('a partner request records the asker\'s name and R7 body on the asked person\'s devices', async () => {
+  const claimed: PushRequestRow[] = [];
+  const listed: string[] = [];
+  const lookups: string[] = [];
+  const response = await handleSendPush(request({ kind: 'partner_request', id: PARTNER_REQUEST_ID }), {
+    db: fakeDb({
+      partnerRequest: pendingRequest,
+      devices: TWO_DEVICES,
+      claimed,
+      listed,
+      partnerLookups: lookups,
+    }),
+    apns: null,
+  });
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 });
+  assertEquals(claimed.map((c) => [c.kind, c.source_id, c.token]), [
+    ['partner_request', PARTNER_REQUEST_ID, 'tok-a'],
+    ['partner_request', PARTNER_REQUEST_ID, 'tok-b'],
+  ]);
+  assertEquals(claimed[0].payload, {
+    aps: { alert: { title: 'Casey', body: 'Sent you a partner request' }, 'thread-id': PARTNER_THREAD },
+  });
+  // The asker is not a partner yet: no partner lookup, and only the asked person's devices.
+  assertEquals(lookups, []);
+  assertEquals(listed, ['recipient']);
+});
+
+Deno.test('a partner request from someone with no name is titled Someone', async () => {
+  const claimed: PushRequestRow[] = [];
+  await handleSendPush(request({ kind: 'partner_request', id: PARTNER_REQUEST_ID }), {
+    db: fakeDb({ partnerRequest: pendingRequest, displayName: null, devices: [TWO_DEVICES[0]], claimed }),
+    apns: null,
+  });
+  assertEquals(claimed[0].payload.aps.alert.title, 'Someone');
+});
+
+Deno.test('a partner request pushes whatever its status, and carries no badge, sound or image', async () => {
+  for (const status of ['pending', 'accepted', 'declined']) {
+    const claimed: PushRequestRow[] = [];
+    await handleSendPush(request({ kind: 'partner_request', id: PARTNER_REQUEST_ID }), {
+      db: fakeDb({ partnerRequest: { ...pendingRequest, status }, devices: [TWO_DEVICES[0]], claimed }),
+      apns: null,
+    });
+    assertEquals(claimed.length, 1, status);
+    const { payload } = claimed[0];
+    assertEquals(Object.keys(payload), ['aps']);
+    assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
+  }
+});
+
+Deno.test('an acceptance records the accepter\'s name and R7 body on the asker\'s devices', async () => {
+  const claimed: PushRequestRow[] = [];
+  const listed: string[] = [];
+  const lookups: string[] = [];
+  const response = await handleSendPush(request({ kind: 'partner_accept', id: PARTNER_REQUEST_ID }), {
+    db: fakeDb({
+      partnerRequest: acceptedRequest,
+      devices: TWO_DEVICES,
+      claimed,
+      listed,
+      partnerLookups: lookups,
+    }),
+    apns: null,
+  });
+  assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 });
+  assertEquals(claimed.map((c) => [c.kind, c.source_id, c.token]), [
+    ['partner_accept', PARTNER_REQUEST_ID, 'tok-a'],
+    ['partner_accept', PARTNER_REQUEST_ID, 'tok-b'],
+  ]);
+  assertEquals(claimed[0].payload, {
+    aps: { alert: { title: 'Casey', body: 'Accepted your partner request' }, 'thread-id': PARTNER_THREAD },
+  });
+  assertEquals(lookups, []);
+  assertEquals(listed, ['recipient']);
+});
+
+Deno.test('an acceptance from someone with no name is titled Your partner', async () => {
+  const claimed: PushRequestRow[] = [];
+  await handleSendPush(request({ kind: 'partner_accept', id: PARTNER_REQUEST_ID }), {
+    db: fakeDb({ partnerRequest: acceptedRequest, displayName: '  ', devices: [TWO_DEVICES[0]], claimed }),
+    apns: null,
+  });
+  assertEquals(claimed[0].payload.aps.alert.title, 'Your partner');
+});
+
+Deno.test('a forged or replayed acceptance for a request that is not accepted claims nothing', async () => {
+  for (const status of ['pending', 'declined']) {
+    const claimed: PushRequestRow[] = [];
+    const listed: string[] = [];
+    const response = await handleSendPush(request({ kind: 'partner_accept', id: PARTNER_REQUEST_ID }), {
+      db: fakeDb({ partnerRequest: { ...acceptedRequest, status }, devices: TWO_DEVICES, claimed, listed }),
+      apns: null,
+    });
+    assertEquals(response.status, 200, status);
+    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
+    assertEquals(claimed.length, 0);
+    assertEquals(listed, []);
+  }
+});
+
+Deno.test('a partner request or acceptance addressed to its own sender claims nothing', async () => {
+  for (const [kind, partnerRequest] of [
+    ['partner_request', { ...pendingRequest, to_user_id: 'sender' }],
+    ['partner_accept', { ...acceptedRequest, from_user_id: 'sender' }],
+  ] as const) {
+    const claimed: PushRequestRow[] = [];
+    const response = await handleSendPush(request({ kind, id: PARTNER_REQUEST_ID }), {
+      db: fakeDb({ partnerRequest, devices: TWO_DEVICES, claimed }),
+      apns: null,
+    });
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
+    assertEquals(claimed.length, 0);
+  }
+});
+
+Deno.test('a replayed partner request or acceptance is skipped for every device', async () => {
+  for (const [kind, partnerRequest] of [
+    ['partner_request', pendingRequest],
+    ['partner_accept', acceptedRequest],
+  ] as const) {
+    const claimed: PushRequestRow[] = [];
+    const deps = { db: fakeDb({ partnerRequest, devices: TWO_DEVICES, claimed }), apns: null };
+    await handleSendPush(request({ kind, id: PARTNER_REQUEST_ID }), deps);
+    const second = await handleSendPush(request({ kind, id: PARTNER_REQUEST_ID }), deps);
+    assertEquals(await second.json(), { sent: 0, recorded: 0, skipped: 2, failed: 0, gone: 0 });
+    assertEquals(claimed.length, 2);
+  }
+});
+
+Deno.test('a request and its acceptance are two claims on the same request id and token', async () => {
+  const claimed: PushRequestRow[] = [];
+  const db = (partnerRequest: PartnerRequestRow) =>
+    fakeDb({ partnerRequest, devices: [TWO_DEVICES[0]], claimed });
+  // `claimed` is shared, so a collision across kinds would show as a skip.
+  const first = await handleSendPush(request({ kind: 'partner_request', id: PARTNER_REQUEST_ID }), {
+    db: db(pendingRequest),
+    apns: null,
+  });
+  const second = await handleSendPush(request({ kind: 'partner_accept', id: PARTNER_REQUEST_ID }), {
+    db: db(acceptedRequest),
+    apns: null,
+  });
+  assertEquals(await first.json(), { sent: 0, recorded: 1, skipped: 0, failed: 0, gone: 0 });
+  assertEquals(await second.json(), { sent: 0, recorded: 1, skipped: 0, failed: 0, gone: 0 });
+  assertEquals(claimed.map((c) => c.kind), ['partner_request', 'partner_accept']);
+});
+
+Deno.test('a failed APNs send for a partner request releases its claim by kind', async () => {
+  for (const [kind, partnerRequest] of [
+    ['partner_request', pendingRequest],
+    ['partner_accept', acceptedRequest],
+  ] as const) {
+    const kinds: string[] = [];
+    const db = fakeDb({ partnerRequest, devices: [TWO_DEVICES[0]] });
+    const release = db.releaseRequest;
+    db.releaseRequest = (releasedKind, sourceId, token) => {
+      kinds.push(`${releasedKind}:${sourceId}`);
+      return release(releasedKind, sourceId, token);
+    };
+    const apns: ApnsClient = {
+      send: () => Promise.resolve({ ok: false, status: 500, reason: 'InternalServerError', timestamp: null }),
+    };
+    const response = await handleSendPush(request({ kind, id: PARTNER_REQUEST_ID }), { db, apns });
+    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 1, gone: 0 });
+    assertEquals(kinds, [`${kind}:${PARTNER_REQUEST_ID}`]);
+  }
+});
+
+Deno.test('a partner request kind with a non-uuid id is a 400', async () => {
+  for (const kind of ['partner_request', 'partner_accept']) {
+    const response = await handleSendPush(request({ kind, id: 'nope' }), {
+      db: fakeDb({ partnerRequest: pendingRequest }),
+      apns: null,
+    });
+    assertEquals(response.status, 400, kind);
+    await response.body?.cancel();
+  }
 });

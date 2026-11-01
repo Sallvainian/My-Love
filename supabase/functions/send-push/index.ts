@@ -1,12 +1,12 @@
 /**
  * Edge Function: send-push
  *
- * Sends the push a new love note, mood, photo, poke, kiss or date change
- * becomes, to every device registered to the recipient. Called by the triggers
- * on `love_notes`, `moods`, `photos`, `interactions`, `events`,
- * `couple_settings` and `users`; see `handler.ts` for the
- * contract. This file is only the serve binding and the real database and
- * APNs wiring.
+ * Sends the push a new love note, mood, photo, poke, kiss, date change,
+ * partner request or accepted partner request becomes, to every device
+ * registered to the recipient. Called by the triggers on `love_notes`,
+ * `moods`, `photos`, `interactions`, `events`, `couple_settings`, `users` and
+ * `partner_requests`; see `handler.ts` for the contract. This file is only
+ * the serve binding and the real database and APNs wiring.
  *
  * Secrets (never in source): APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, and
  * optionally APNS_TOPIC (default dev.sallvain.mylove). With any of the first
@@ -26,6 +26,8 @@ const SOURCE_COLUMN: Record<PushKind, string> = {
   photo: 'photo_id',
   interaction: 'interaction_id',
   date: 'date_change_id',
+  partner_request: 'partner_request_id',
+  partner_accept: 'partner_accept_id',
 };
 
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
@@ -91,6 +93,15 @@ const db: PushDb = {
       action: data.action as DateChangeRow['action'],
       event_label: eventLabel,
     };
+  },
+  async getPartnerRequest(requestId) {
+    const { data, error } = await admin
+      .from('partner_requests')
+      .select('id, from_user_id, to_user_id, status')
+      .eq('id', requestId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
   },
   async getPartnerId(userId) {
     const { data, error } = await admin.from('users').select('partner_id').eq('id', userId).maybeSingle();

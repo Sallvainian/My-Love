@@ -14,6 +14,11 @@
  * date, the date the couple got together, a birthday) on the same
  * `partner-activity` thread. The text never carries a date value, because the
  * recipient's timezone is unknown; an event's label is the only data in it.
+ *
+ * Story 3.6 adds a partner request and its acceptance, again on
+ * `partner-activity`. The title is the other person's display name. A request
+ * comes from someone who is not a partner yet, so with no name it falls back to
+ * `Someone`; an acceptance comes from a linked partner, so it keeps `Your partner`.
  */
 
 export const LOVE_NOTES_THREAD_ID = 'love-notes';
@@ -34,6 +39,10 @@ export const RELATIONSHIP_START_SET_BODY = 'Set the date you got together';
 export const RELATIONSHIP_START_CHANGED_BODY = 'Changed the date you got together';
 export const BIRTHDAY_ADDED_BODY = 'Added their birthday';
 export const BIRTHDAY_CHANGED_BODY = 'Changed their birthday';
+export const PARTNER_REQUEST_BODY = 'Sent you a partner request';
+export const PARTNER_ACCEPT_BODY = 'Accepted your partner request';
+/** Used when the asker has no display name: they are not a partner yet. */
+export const FALLBACK_REQUESTER_NAME = 'Someone';
 
 /**
  * Display labels for the 12 mood types, in `MOOD_TYPES` order. A copy: this
@@ -164,4 +173,19 @@ export function buildDatePayload(change: PushDateChange, senderName: string | nu
     case 'birthday':
       return partnerActivityPayload(added ? BIRTHDAY_ADDED_BODY : BIRTHDAY_CHANGED_BODY, senderName);
   }
+}
+
+/** `Sent you a partner request`, titled with the asker's name or `Someone`. */
+export function buildPartnerRequestPayload(askerName: string | null): ApnsPayload {
+  return {
+    aps: {
+      alert: { title: askerName?.trim() || FALLBACK_REQUESTER_NAME, body: PARTNER_REQUEST_BODY },
+      'thread-id': PARTNER_ACTIVITY_THREAD_ID,
+    },
+  };
+}
+
+/** `Accepted your partner request`, titled with the accepter's name or `Your partner`. */
+export function buildPartnerAcceptPayload(accepterName: string | null): ApnsPayload {
+  return partnerActivityPayload(PARTNER_ACCEPT_BODY, accepterName);
 }

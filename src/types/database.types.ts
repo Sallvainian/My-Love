@@ -538,6 +538,8 @@ export type Database = {
           interaction_id: string | null
           mood_id: string | null
           note_id: string | null
+          partner_accept_id: string | null
+          partner_request_id: string | null
           payload: NonNullable<Json>
           photo_id: string | null
           token: string
@@ -551,6 +553,8 @@ export type Database = {
           interaction_id?: string | null
           mood_id?: string | null
           note_id?: string | null
+          partner_accept_id?: string | null
+          partner_request_id?: string | null
           payload: NonNullable<Json>
           photo_id?: string | null
           token: string
@@ -564,6 +568,8 @@ export type Database = {
           interaction_id?: string | null
           mood_id?: string | null
           note_id?: string | null
+          partner_accept_id?: string | null
+          partner_request_id?: string | null
           payload?: NonNullable<Json>
           photo_id?: string | null
           token?: string
@@ -602,6 +608,20 @@ export type Database = {
             columns: ["note_id"]
             isOneToOne: false
             referencedRelation: "love_notes_visible"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_partner_accept_id_fkey"
+            columns: ["partner_accept_id"]
+            isOneToOne: false
+            referencedRelation: "partner_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_partner_request_id_fkey"
+            columns: ["partner_request_id"]
+            isOneToOne: false
+            referencedRelation: "partner_requests"
             referencedColumns: ["id"]
           },
           {

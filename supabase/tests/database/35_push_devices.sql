@@ -3,7 +3,8 @@
 -- and the love-note push trigger (20261031000000); unregister_push_device
 -- (20261031010000); the mood, photo and interaction triggers and the
 -- one-source check on push_requests (20261031020000); the date_changes log, its
--- five triggers and the fifth push_requests source (20261031030000)
+-- five triggers and the fifth push_requests source (20261031030000); the partner
+-- request and acceptance triggers and the sixth and seventh sources (20261031040000)
 --
 -- Pinned here: the exact policy sets (a policy added, renamed or dropped fails
 -- this file), who can touch each table, the register RPC (reassignment by
@@ -22,7 +23,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(94);
+select plan(114);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -866,6 +867,221 @@ select results_eq(
              where sender_id in (select a_id from t_ids union select b_id from t_ids union select c_id from t_c))$$,
   $$values (0, 0)$$,
   'PUSH-DB-094: and no change row survives for those writes'
+);
+
+
+-- ============================================
+-- Partner requests (20261031040000, story 3.6)
+-- ============================================
+-- notify_push() posts {kind: 'partner_request', id} for a pending INSERT and
+-- {kind: 'partner_accept', id} for a pending -> accepted UPDATE of status. Four
+-- fresh unlinked users; every count is scoped to this section's own request ids
+-- (the database is shared).
+create temporary table t_pr as
+select
+  tests.create_test_user('preq-a@example.com') as a_id,
+  tests.create_test_user('preq-b@example.com') as b_id,
+  tests.create_test_user('preq-c@example.com') as c_id,
+  tests.create_test_user('preq-d@example.com') as d_id;
+grant select on t_pr to authenticated, anon;
+
+-- The queued calls about this section's requests, as 'kind rN, ...'.
+create or replace function tests.preq_queue()
+returns text language sql as $$
+  select coalesce(string_agg(
+    (convert_from(q.body, 'UTF8')::jsonb->>'kind') || ' r' || right(convert_from(q.body, 'UTF8')::jsonb->>'id', 1),
+    ', ' order by (convert_from(q.body, 'UTF8')::jsonb->>'id'), (convert_from(q.body, 'UTF8')::jsonb->>'kind')), '')
+  from net.http_request_queue q
+  where convert_from(q.body, 'UTF8')::jsonb->>'id' like '99999999-0000-4000-8000-0000000000%'
+    and right(convert_from(q.body, 'UTF8')::jsonb->>'id', 2) between '31' and '37';
+$$;
+
+select is(
+  (select count(*)::int from information_schema.columns
+    where table_schema = 'public' and table_name = 'push_requests'
+      and column_name in ('partner_request_id', 'partner_accept_id') and data_type = 'uuid'),
+  2,
+  'PUSH-DB-095: push_requests has partner_request_id and partner_accept_id'
+);
+
+select is(
+  (select string_agg(format('%s %s %s', t.tgname, p.proname, t.tgenabled), ', ' order by t.tgname)
+     from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+    where t.tgrelid = 'public.partner_requests'::regclass and not t.tgisinternal),
+  'partner_requests_push_after_accept notify_push O, partner_requests_push_after_insert notify_push O',
+  'PUSH-DB-096: partner_requests carries exactly the two push triggers, both notify_push and enabled'
+);
+
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint
+    where conrelid = 'public.push_requests'::regclass and conname = 'push_requests_source_check')
+    ~ 'partner_request_id.*partner_accept_id'
+  and (select count(*)::int from pg_constraint
+        where conrelid = 'public.push_requests'::regclass
+          and conname in ('push_requests_partner_request_token_key', 'push_requests_partner_accept_token_key')) = 2,
+  'PUSH-DB-097: the source check spans the two new columns and each has its (id, token) unique key'
+);
+
+delete from public.push_sender_settings;
+insert into public.push_sender_settings (sender_url, sender_secret)
+values ('http://sender.test/send-push', 'trigger-test-secret-1234');
+delete from net.http_request_queue;
+
+-- Three pending requests: a -> b, c -> b (b's second) and c -> d.
+insert into public.partner_requests (id, from_user_id, to_user_id, status)
+select '99999999-0000-4000-8000-000000000031', a_id, b_id, 'pending' from t_pr;
+insert into public.partner_requests (id, from_user_id, to_user_id, status)
+select '99999999-0000-4000-8000-000000000032', c_id, b_id, 'pending' from t_pr;
+insert into public.partner_requests (id, from_user_id, to_user_id, status)
+select '99999999-0000-4000-8000-000000000033', c_id, d_id, 'pending' from t_pr;
+
+select results_eq(
+  $$select distinct headers->>'x-push-secret', url from net.http_request_queue
+     where convert_from(body, 'UTF8')::jsonb->>'id' like '99999999-0000-4000-8000-0000000000%'
+       and right(convert_from(body, 'UTF8')::jsonb->>'id', 2) between '31' and '37'$$,
+  $$values ('trigger-test-secret-1234'::text, 'http://sender.test/send-push'::text)$$,
+  'PUSH-DB-098: the queued calls go to the sender URL with the shared secret'
+);
+
+select is(tests.preq_queue(),
+  'partner_request r1, partner_request r2, partner_request r3',
+  'PUSH-DB-099: each pending INSERT queues one {kind: partner_request, id} call');
+
+-- An INSERT that arrives already accepted or declined posts nothing.
+insert into public.partner_requests (id, from_user_id, to_user_id, status)
+select '99999999-0000-4000-8000-000000000034', a_id, d_id, 'accepted' from t_pr;
+insert into public.partner_requests (id, from_user_id, to_user_id, status)
+select '99999999-0000-4000-8000-000000000035', d_id, a_id, 'declined' from t_pr;
+
+select is(tests.preq_queue(),
+  'partner_request r1, partner_request r2, partner_request r3',
+  'PUSH-DB-100: an INSERT with status accepted or declined queues nothing');
+
+-- b accepts a's request through the RPC; c's request to b is auto-declined.
+select tests.authenticate_as((select b_id from t_pr));
+select public.accept_partner_request('99999999-0000-4000-8000-000000000031');
+reset role;
+select tests.clear_jwt();
+
+select is(tests.preq_queue(),
+  'partner_accept r1, partner_request r1, partner_request r2, partner_request r3',
+  'PUSH-DB-101: accepting a request queues one {kind: partner_accept, id} call, for that request only');
+
+select results_eq(
+  $$select r.id::text, r.status,
+           (select ua.partner_id = t.b_id and ub.partner_id = t.a_id
+              from t_pr t, public.users ua, public.users ub
+             where ua.id = t.a_id and ub.id = t.b_id)
+      from public.partner_requests r
+     where r.id between '99999999-0000-4000-8000-000000000031' and '99999999-0000-4000-8000-000000000033'
+     order by r.id$$,
+  $$values ('99999999-0000-4000-8000-000000000031'::text, 'accepted'::text, true),
+           ('99999999-0000-4000-8000-000000000032', 'declined', true),
+           ('99999999-0000-4000-8000-000000000033', 'pending', true)$$,
+  'PUSH-DB-102: the accept linked a and b to each other, auto-declined c''s request to b (which queued nothing) and left c''s request to d pending'
+);
+
+-- d declines c's request: nothing is posted.
+select tests.authenticate_as((select d_id from t_pr));
+select public.decline_partner_request('99999999-0000-4000-8000-000000000033');
+reset role;
+select tests.clear_jwt();
+
+select is(tests.preq_queue(),
+  'partner_accept r1, partner_request r1, partner_request r2, partner_request r3',
+  'PUSH-DB-103: declining a request queues nothing');
+
+-- Only pending -> accepted counts: an update that leaves status alone, declined -> accepted
+-- and accepted -> declined all queue nothing.
+update public.partner_requests set updated_at = now() + interval '1 minute'
+ where id = '99999999-0000-4000-8000-000000000031';
+update public.partner_requests set status = 'accepted' where id = '99999999-0000-4000-8000-000000000035';
+update public.partner_requests set status = 'declined' where id = '99999999-0000-4000-8000-000000000034';
+
+select is(tests.preq_queue(),
+  'partner_accept r1, partner_request r1, partner_request r2, partner_request r3',
+  'PUSH-DB-104: updated_at alone, declined -> accepted and accepted -> declined queue nothing');
+
+-- push_requests takes a request and an acceptance as its sixth and seventh sources.
+select lives_ok(
+  $$insert into public.push_requests (partner_request_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000034', 'token-pr', 'sandbox', '{"aps":{}}', 'recorded');
+    insert into public.push_requests (partner_accept_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000034', 'token-pr', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  'PUSH-DB-105: one request and one acceptance can claim the same device token'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (partner_request_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000034', 'token-pr', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  '23505',
+  null,
+  'PUSH-DB-106: the same partner request and device token cannot be claimed twice'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (partner_accept_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000034', 'token-pr', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  '23505',
+  null,
+  'PUSH-DB-107: the same acceptance and device token cannot be claimed twice'
+);
+
+select throws_ok(
+  $$insert into public.push_requests (partner_request_id, partner_accept_id, token, environment, payload, delivery)
+      values ('99999999-0000-4000-8000-000000000034', '99999999-0000-4000-8000-000000000034',
+              'token-both-pr', 'sandbox', '{"aps":{}}', 'recorded')$$,
+  '23514',
+  null,
+  'PUSH-DB-108: a row naming both a request and an acceptance is refused'
+);
+
+-- Deleting the request deletes both kinds of recorded request.
+delete from public.partner_requests where id = '99999999-0000-4000-8000-000000000034';
+select is(
+  (select count(*)::int from public.push_requests where token = 'token-pr'),
+  0,
+  'PUSH-DB-109: deleting a partner request deletes its recorded requests and acceptances'
+);
+
+-- ---- no settings, and a failing call ----
+delete from public.push_sender_settings;
+delete from net.http_request_queue;
+
+insert into public.partner_requests (id, from_user_id, to_user_id, status)
+select '99999999-0000-4000-8000-000000000036', d_id, c_id, 'pending' from t_pr;
+
+select is(tests.preq_queue(), '',
+  'PUSH-DB-110: with no sender settings a pending INSERT queues nothing');
+
+update public.partner_requests set status = 'accepted' where id = '99999999-0000-4000-8000-000000000036';
+
+select is(tests.preq_queue(), '',
+  'PUSH-DB-111: and with no sender settings an acceptance queues nothing');
+
+insert into public.push_sender_settings (sender_url, sender_secret)
+values ('', 'trigger-test-secret-1234');
+
+select lives_ok(
+  $$insert into public.partner_requests (id, from_user_id, to_user_id, status)
+      select '99999999-0000-4000-8000-000000000037', c_id, d_id, 'pending' from t_pr$$,
+  'PUSH-DB-112: a request insert succeeds when the pg_net call itself raises'
+);
+
+select tests.authenticate_as((select d_id from t_pr));
+select lives_ok(
+  $$select public.accept_partner_request('99999999-0000-4000-8000-000000000037')$$,
+  'PUSH-DB-113: accept_partner_request succeeds when the pg_net call itself raises'
+);
+reset role;
+select tests.clear_jwt();
+
+select results_eq(
+  $$select (select status from public.partner_requests where id = '99999999-0000-4000-8000-000000000037'),
+           (select partner_id from public.users where id = (select c_id from t_pr)),
+           (select partner_id from public.users where id = (select d_id from t_pr))$$,
+  $$select 'accepted'::text, d_id, c_id from t_pr$$,
+  'PUSH-DB-114: and the request is accepted and the pair linked'
 );
 
 select * from finish();

@@ -7,6 +7,9 @@
  * Story 3.5 adds a third: an event added or changed, the wedding date, the date
  * the couple got together and a birthday each log a `date_changes` row and post
  * `{kind: 'date', id}`.
+ * Story 3.6 adds a fourth: a partner request records on the asked person's
+ * devices and its acceptance on the asker's (`{kind: 'partner_request' |
+ * 'partner_accept', id}` through `notify_push`); a decline records nothing.
  *
  * Path under test: register_push_device (RPC, real user JWTs) -> the
  * `love_notes` AFTER INSERT trigger -> pg_net -> Kong -> the `send-push` Edge
@@ -21,20 +24,30 @@
  * (`needs-edge-functions` in CI) and `supabase/seed.sql` applied, which holds
  * the local sender URL and secret in `push_sender_settings`.
  *
- * The sender is this worker's own account and the recipient its linked
- * partner; every note and device token this spec creates is removed at the
- * end, and nothing links, unlinks or resets an account.
+ * The first three describes use this worker's own pair (the sender is its
+ * own account, the recipient its linked partner); every note and device token
+ * they create is removed at the end, and nothing links, unlinks or resets that
+ * pair. The fourth uses throwaway accounts: it links two of them through
+ * `accept_partner_request` and deletes all four at the end.
  */
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database.types';
 import type { TypedSupabaseClient } from '../support/factories';
 import { resolveOwnPair } from '../support/helpers/events';
+import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 import { getUserAccessToken } from '../support/helpers/supabase';
 import { test, expect } from '../support/merged-fixtures';
 
 /** The `push_requests` column that holds each kind of source row's id. */
-type SourceColumn = 'note_id' | 'mood_id' | 'photo_id' | 'interaction_id' | 'date_change_id';
+type SourceColumn =
+  | 'note_id'
+  | 'mood_id'
+  | 'photo_id'
+  | 'interaction_id'
+  | 'date_change_id'
+  | 'partner_request_id'
+  | 'partner_accept_id';
 
 /** Rows the sender records for a note (or another source row), ordered by token. */
 async function requestsFor(
@@ -532,7 +545,7 @@ test.describe('Mood, photo, poke and kiss push', () => {
     expect(unknownKind.status).toBe(400);
     const badId = await postToSender(supabaseAdmin, { kind: 'mood', id: 'not-a-uuid' });
     expect(badId.status).toBe(400);
-    for (const kind of ['mood', 'photo', 'interaction', 'date']) {
+    for (const kind of ['mood', 'photo', 'interaction', 'date', 'partner_request', 'partner_accept']) {
       const missing = await postToSender(supabaseAdmin, { kind, id: randomUUID() });
       expect(missing.status, kind).toBe(404);
     }
@@ -917,5 +930,153 @@ test.describe('Date change push', () => {
     // Cleared to NULL: nothing.
     expect((await write(null)).error).toBeNull();
     await expectNoNewChange(supabaseAdmin, filter, known);
+  });
+});
+
+test.describe('Partner request push', () => {
+  /** A throwaway account with a display name; the cascade from `auth.users` removes everything it owns. */
+  async function createParty(
+    supabaseAdmin: TypedSupabaseClient,
+    cleanup: { defer: (name: string, fn: () => Promise<unknown>) => void },
+    role: string
+  ) {
+    const account = await createOutsiderClient(supabaseAdmin, `pushreq-${role}`);
+    cleanup.defer(`delete throwaway account ${role}`, () => deleteOutsider(account));
+    const name = `Push ${role.toUpperCase()} ${randomUUID().slice(0, 6)}`;
+    const { error } = await account.client
+      .from('users')
+      .update({ display_name: name, updated_at: new Date().toISOString() })
+      .eq('id', account.userId);
+    expect(error, `name ${role}`).toBeNull();
+    return { ...account, name };
+  }
+
+  type Party = Awaited<ReturnType<typeof createParty>>;
+
+  async function registerDevice(party: Party, environment: 'sandbox' | 'production') {
+    const token = newToken();
+    const { error } = await party.client.rpc('register_push_device', { p_token: token, p_environment: environment });
+    expect(error).toBeNull();
+    return token;
+  }
+
+  /** A pending request from `from` to `to`, sent as `from` itself; returns its id. */
+  async function sendRequest(from: Party, to: Party): Promise<string> {
+    const { data, error } = await from.client
+      .from('partner_requests')
+      .insert({ from_user_id: from.userId, to_user_id: to.userId, status: 'pending' })
+      .select('id')
+      .single();
+    expect(error).toBeNull();
+    return data!.id;
+  }
+
+  async function awaitRequests(
+    supabaseAdmin: TypedSupabaseClient,
+    requestId: string,
+    column: SourceColumn,
+    count: number
+  ) {
+    await expect
+      .poll(async () => (await requestsFor(supabaseAdmin, requestId, column)).length, {
+        message: `the sender records ${count} request(s) in ${column}`,
+        timeout: 20_000,
+      })
+      .toBe(count);
+    return requestsFor(supabaseAdmin, requestId, column);
+  }
+
+  const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
+
+  test('[P0] a request records on the asked person\'s devices only, and its acceptance on the asker\'s only; a decline and the auto-declined requests record none', async ({
+    supabaseAdmin,
+    cleanup,
+  }) => {
+    const asker = await createParty(supabaseAdmin, cleanup, 'a');
+    const asked = await createParty(supabaseAdmin, cleanup, 'b');
+    const rival = await createParty(supabaseAdmin, cleanup, 'c');
+    const decliner = await createParty(supabaseAdmin, cleanup, 'd');
+    const askerPhone = await registerDevice(asker, 'sandbox');
+    const [phone, tablet] = [await registerDevice(asked, 'sandbox'), await registerDevice(asked, 'production')];
+    const rivalPhone = await registerDevice(rival, 'sandbox');
+    const declinerPhone = await registerDevice(decliner, 'sandbox');
+
+    // ---- the request goes to the asked person's devices ----
+    const accepted = await sendRequest(asker, asked);
+    const requestRows = await awaitRequests(supabaseAdmin, accepted, 'partner_request_id', 2);
+    expect(requestRows.map((r) => [r.token, r.environment, r.delivery]).sort()).toEqual(
+      [
+        [phone, 'sandbox', 'recorded'],
+        [tablet, 'production', 'recorded'],
+      ].sort()
+    );
+    for (const row of requestRows) {
+      expect(row.payload).toEqual(partnerPayload(asker.name, 'Sent you a partner request'));
+    }
+    expect(await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).toEqual([]);
+
+    // A second asker, and a request to another person that will be declined.
+    const autoDeclined = await sendRequest(rival, asked);
+    expect(await awaitRequests(supabaseAdmin, autoDeclined, 'partner_request_id', 2)).toHaveLength(2);
+    const declined = await sendRequest(rival, decliner);
+    const declinedRows = await awaitRequests(supabaseAdmin, declined, 'partner_request_id', 1);
+    expect(declinedRows[0].token).toBe(declinerPhone);
+
+    // A replayed request post is skipped for every device.
+    const replay = await postToSender(supabaseAdmin, { kind: 'partner_request', id: accepted });
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 2 });
+
+    // A forged accept for a request that is still pending answers all zeros and claims nothing.
+    const forged = await postToSender(supabaseAdmin, { kind: 'partner_accept', id: accepted });
+    expect(forged.status).toBe(200);
+    expect(await forged.json()).toEqual(zeros);
+    expect(await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).toEqual([]);
+
+    // ---- the acceptance goes to the asker's devices ----
+    const accept = await asked.client.rpc('accept_partner_request', { p_request_id: accepted });
+    expect(accept.error).toBeNull();
+    const acceptRows = await awaitRequests(supabaseAdmin, accepted, 'partner_accept_id', 1);
+    expect(acceptRows.map((r) => [r.token, r.environment, r.delivery])).toEqual([[askerPhone, 'sandbox', 'recorded']]);
+    expect(acceptRows[0].payload).toEqual(partnerPayload(asked.name, 'Accepted your partner request'));
+
+    // A replayed acceptance is skipped.
+    const acceptReplay = await postToSender(supabaseAdmin, { kind: 'partner_accept', id: accepted });
+    expect(acceptReplay.status).toBe(200);
+    expect(await acceptReplay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 1 });
+
+    // ---- a decline, and the request the accept declined, push nothing ----
+    const decline = await decliner.client.rpc('decline_partner_request', { p_request_id: declined });
+    expect(decline.error).toBeNull();
+    const states = await supabaseAdmin
+      .from('partner_requests')
+      .select('id, status')
+      .in('id', [accepted, autoDeclined, declined]);
+    expect(states.error).toBeNull();
+    expect(Object.fromEntries(states.data!.map((r) => [r.id, r.status]))).toEqual({
+      [accepted]: 'accepted',
+      [autoDeclined]: 'declined',
+      [declined]: 'declined',
+    });
+
+    // The trigger's call is asynchronous, so give a (wrongly) fired one time to land.
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    expect(await requestsFor(supabaseAdmin, autoDeclined, 'partner_accept_id')).toEqual([]);
+    expect(await requestsFor(supabaseAdmin, declined, 'partner_accept_id')).toEqual([]);
+    expect((await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).map((r) => r.token)).toEqual([askerPhone]);
+
+    // A forged accept for a declined request is refused too, and the rival's device stays empty.
+    for (const id of [autoDeclined, declined]) {
+      const refused = await postToSender(supabaseAdmin, { kind: 'partner_accept', id });
+      expect(refused.status).toBe(200);
+      expect(await refused.json()).toEqual(zeros);
+    }
+    expect(await requestsFor(supabaseAdmin, autoDeclined, 'partner_accept_id')).toEqual([]);
+    expect(await requestsFor(supabaseAdmin, declined, 'partner_accept_id')).toEqual([]);
+    const { data: rivalRows } = await supabaseAdmin
+      .from('push_requests')
+      .select('id')
+      .eq('token', rivalPhone);
+    expect(rivalRows).toEqual([]);
   });
 });

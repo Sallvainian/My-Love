@@ -5,7 +5,10 @@ import {
   buildInteractionPayload,
   buildLoveNotePayload,
   buildMoodPayload,
+  buildPartnerAcceptPayload,
+  buildPartnerRequestPayload,
   buildPhotoPayload,
+  FALLBACK_REQUESTER_NAME,
   FALLBACK_SENDER_NAME,
   MOOD_LABELS,
   PICTURE_ONLY_BODY,
@@ -153,4 +156,29 @@ Deno.test('a date payload falls back to Your partner and carries no badge, sound
   assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
   assertEquals(payload.aps['thread-id'], thread);
   assertFalse(/\d/.test(payload.aps.alert.body));
+});
+
+// ---- Story 3.6 ----
+
+Deno.test('a partner request says it was sent, titled with the asker or Someone', () => {
+  assertEquals(buildPartnerRequestPayload('Riley'), {
+    aps: { alert: { title: 'Riley', body: 'Sent you a partner request' }, 'thread-id': thread },
+  });
+  assertEquals(buildPartnerRequestPayload(null).aps.alert.title, FALLBACK_REQUESTER_NAME);
+  assertEquals(buildPartnerRequestPayload('  ').aps.alert.title, 'Someone');
+});
+
+Deno.test('an acceptance says it was accepted, titled with the accepter or Your partner', () => {
+  assertEquals(buildPartnerAcceptPayload('Quinn'), {
+    aps: { alert: { title: 'Quinn', body: 'Accepted your partner request' }, 'thread-id': thread },
+  });
+  assertEquals(buildPartnerAcceptPayload(null).aps.alert.title, FALLBACK_SENDER_NAME);
+});
+
+Deno.test('the partner request payloads carry no badge, sound or image', () => {
+  for (const payload of [buildPartnerRequestPayload('Riley'), buildPartnerAcceptPayload('Quinn')]) {
+    assertEquals(Object.keys(payload), ['aps']);
+    assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
+    assertFalse('badge' in payload.aps || 'sound' in payload.aps);
+  }
 });

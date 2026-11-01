@@ -1,17 +1,21 @@
-// Provisions the sim driver's fixture pairs on the local Supabase stack:
+// Provisions the sim driver's fixture accounts on the local Supabase stack:
 // two confirmed accounts with fictional names, linked as partners, and enough
 // rows that every view scrolls (events, moods, love notes, photos with their
-// images); and a second linked pair, wiped of love notes and seeded with
+// images); a second linked pair, wiped of love notes and seeded with
 // nothing, for checks that sign the shell out and in as another couple (story
-// 3.2's push takeover). No E2E worker slot (tests/support/auth/worker-pool.ts)
-// uses them, so a driver run never writes another worker's rows.
+// 3.2's push takeover); and a third pair, Riley and Quinn, left unlinked with
+// every partner request involving either deleted, for checks of the partner
+// request and acceptance pushes (story 3.6). No E2E worker slot
+// (tests/support/auth/worker-pool.ts) uses them, so a driver run never writes
+// another worker's rows.
 //
 //   node scripts/sim-driver/provision.ts   (run by `sim provision`)
 //
 // Idempotent, as ensureUser/linkUserPair in tests/support/auth/global-setup.ts
 // are: an existing account gets its password and name reset, the first pair's
-// rows and photo objects are wiped and seeded afresh, and the second pair's
-// love notes are wiped. Needs
+// rows and photo objects are wiped and seeded afresh, the second pair's love
+// notes are wiped, and the third pair is unlinked and loses its partner
+// requests. Needs
 // SIM_SUPABASE_URL and SIM_SUPABASE_SECRET_KEY (`sim` reads both from
 // `supabase status`) and refuses any host but 127.0.0.1 or localhost.
 
@@ -29,6 +33,12 @@ const FIXTURE_PAIR = [
 const OTHER_PAIR = [
   { email: 'simdriver-other@test.example.com', displayName: 'Harper' },
   { email: 'simdriver-other-partner@test.example.com', displayName: 'Morgan' },
+] as const;
+
+/** `sim signin unlinked` / `unlinked-other`: no partner; their requests are deleted on every run. */
+const UNLINKED_PAIR = [
+  { email: 'simdriver-unlinked@test.example.com', displayName: 'Riley' },
+  { email: 'simdriver-unlinked-other@test.example.com', displayName: 'Quinn' },
 ] as const;
 
 function localConfig(): { url: string; key: string } {
@@ -290,6 +300,26 @@ async function main() {
   check('wiping the second pair\'s sent notes', (await admin.from('love_notes').delete().in('from_user_id', other)).error);
   check('wiping the second pair\'s received notes', (await admin.from('love_notes').delete().in('to_user_id', other)).error);
   console.log('second pair linked as partners, love notes wiped');
+
+  // The third pair stays unlinked, so a request between them is real.
+  for (const { email, displayName } of UNLINKED_PAIR) {
+    console.log(`${email} (${displayName}): ${await ensureUser(admin, email, displayName)}`);
+  }
+  const unlinked = await Promise.all(UNLINKED_PAIR.map((u) => profileId(admin, u.email)));
+  check(
+    'unlinking the third pair',
+    (await admin.from('users').update({ partner_id: null }).in('id', unlinked)).error
+  );
+  check(
+    'wiping the third pair\'s partner requests',
+    (
+      await admin
+        .from('partner_requests')
+        .delete()
+        .or(`from_user_id.in.(${unlinked.join(',')}),to_user_id.in.(${unlinked.join(',')})`)
+    ).error
+  );
+  console.log('third pair unlinked, partner requests deleted');
 }
 
 main().catch((error: unknown) => {
