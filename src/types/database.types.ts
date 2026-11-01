@@ -528,6 +528,39 @@ export type Database = {
         }
         Relationships: []
       }
+      push_preferences: {
+        Row: {
+          created_at: string
+          dates: boolean
+          love_notes: boolean
+          moods: boolean
+          partner_requests: boolean
+          photos: boolean
+          pokes_and_kisses: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dates?: boolean
+          love_notes?: boolean
+          moods?: boolean
+          partner_requests?: boolean
+          photos?: boolean
+          pokes_and_kisses?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dates?: boolean
+          love_notes?: boolean
+          moods?: boolean
+          partner_requests?: boolean
+          photos?: boolean
+          pokes_and_kisses?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       push_requests: {
         Row: {
           created_at: string

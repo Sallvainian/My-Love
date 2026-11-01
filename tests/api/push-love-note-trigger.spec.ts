@@ -10,6 +10,10 @@
  * Story 3.6 adds a fourth: a partner request records on the asked person's
  * devices and its acceptance on the asker's (`{kind: 'partner_request' |
  * 'partner_accept', id}` through `notify_push`); a decline records nothing.
+ * Story 3.7 adds a fifth: the receiver's `push_preferences` switch. With the
+ * partner's `love_notes` off a note records nothing on any of their devices,
+ * and with it back on the next note records on both; one account cannot read or
+ * write another's row.
  *
  * Path under test: register_push_device (RPC, real user JWTs) -> the
  * `love_notes` AFTER INSERT trigger -> pg_net -> Kong -> the `send-push` Edge
@@ -24,10 +28,10 @@
  * (`needs-edge-functions` in CI) and `supabase/seed.sql` applied, which holds
  * the local sender URL and secret in `push_sender_settings`.
  *
- * The first three describes use this worker's own pair (the sender is its
- * own account, the recipient its linked partner); every note and device token
- * they create is removed at the end, and nothing links, unlinks or resets that
- * pair. The fourth uses throwaway accounts: it links two of them through
+ * The first three describes and the fifth use this worker's own pair (the
+ * sender is its own account, the recipient its linked partner); every note,
+ * device token and switch row they create is removed at the end, and nothing
+ * links, unlinks or resets that pair. The fourth uses throwaway accounts: it links two of them through
  * `accept_partner_request` and deletes all four at the end.
  */
 import { randomUUID } from 'node:crypto';
@@ -1078,5 +1082,118 @@ test.describe('Partner request push', () => {
       .select('id')
       .eq('token', rivalPhone);
     expect(rivalRows).toEqual([]);
+  });
+});
+
+test.describe('Push switches', () => {
+  test('[P0] a switch off stops the push on every device, and on restores it; no one else can touch the row', async ({
+    supabaseAdmin,
+    supabaseAsUser,
+    cleanup,
+  }) => {
+    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+    const partner = await clientFor(supabaseAdmin, partnerId);
+    const [phone, tablet] = [newToken(), newToken()];
+    const noteKeys = [randomUUID(), randomUUID(), randomUUID()];
+    cleanup.defer('remove push devices, notes and the partner\'s switches', async () => {
+      await supabaseAdmin.from('push_preferences').delete().eq('user_id', partnerId);
+      await supabaseAdmin.from('push_devices').delete().in('token', [phone, tablet]);
+      await supabaseAdmin.from('love_notes').delete().in('idempotency_key', noteKeys);
+    });
+
+    expect((await partner.rpc('register_push_device', { p_token: phone, p_environment: 'sandbox' })).error).toBeNull();
+    expect((await partner.rpc('register_push_device', { p_token: tablet, p_environment: 'production' })).error).toBeNull();
+
+    const sendNote = async (idempotencyKey: string) => {
+      const { data, error } = await supabaseAsUser
+        .from('love_notes')
+        .insert({ from_user_id: userId, to_user_id: partnerId, content: 'Switch test', idempotency_key: idempotencyKey })
+        .select('id')
+        .single();
+      expect(error).toBeNull();
+      return data!.id;
+    };
+
+    // ---- the receiver switches love notes off, one column per write ----
+    const off = await partner
+      .from('push_preferences')
+      .upsert({ user_id: partnerId, love_notes: false }, { onConflict: 'user_id' })
+      .select('love_notes, moods')
+      .single();
+    expect(off.error).toBeNull();
+    expect(off.data).toEqual({ love_notes: false, moods: true });
+
+    // A second switch, written on its own, leaves the first as it was.
+    const second = await partner
+      .from('push_preferences')
+      .upsert({ user_id: partnerId, moods: false }, { onConflict: 'user_id' })
+      .select('love_notes, moods')
+      .single();
+    expect(second.error).toBeNull();
+    expect(second.data).toEqual({ love_notes: false, moods: false });
+
+    // ---- off: a note records nothing on any of their devices ----
+    const silenced = await sendNote(noteKeys[0]);
+    // The trigger's call is asynchronous, so give a (wrongly) recorded one time to land.
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    expect(await requestsFor(supabaseAdmin, silenced)).toEqual([]);
+
+    const direct = await postToSender(supabaseAdmin, { note_id: silenced });
+    expect(direct.status).toBe(200);
+    expect(await direct.json()).toEqual({ sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
+    expect(await requestsFor(supabaseAdmin, silenced)).toEqual([]);
+
+    // ---- on again: the next note records on both devices ----
+    const on = await partner
+      .from('push_preferences')
+      .upsert({ user_id: partnerId, love_notes: true }, { onConflict: 'user_id' })
+      .select('love_notes, moods')
+      .single();
+    expect(on.error).toBeNull();
+    expect(on.data).toEqual({ love_notes: true, moods: false });
+
+    const heard = await sendNote(noteKeys[1]);
+    await expect
+      .poll(async () => (await requestsFor(supabaseAdmin, heard)).length, {
+        message: 'the sender records a request for each of the recipient\'s devices',
+        timeout: 20_000,
+      })
+      .toBe(2);
+    expect((await requestsFor(supabaseAdmin, heard)).map((r) => r.token).sort()).toEqual([phone, tablet].sort());
+
+    // ---- the sender's own client cannot see or change the receiver's row ----
+    const peek = await supabaseAsUser.from('push_preferences').select('*').eq('user_id', partnerId);
+    expect(peek.error).toBeNull();
+    expect(peek.data).toEqual([]);
+
+    const tamper = await supabaseAsUser
+      .from('push_preferences')
+      .update({ love_notes: false })
+      .eq('user_id', partnerId)
+      .select('user_id');
+    expect(tamper.error).toBeNull();
+    expect(tamper.data).toEqual([]);
+
+    const forge = await supabaseAsUser
+      .from('push_preferences')
+      .upsert({ user_id: partnerId, love_notes: false }, { onConflict: 'user_id' });
+    expect(forge.error).not.toBeNull();
+
+    const { data: stored } = await supabaseAdmin
+      .from('push_preferences')
+      .select('love_notes, moods')
+      .eq('user_id', partnerId)
+      .single();
+    expect(stored).toEqual({ love_notes: true, moods: false });
+
+    // The receiver's own row cannot be deleted by the receiver either.
+    const del = await partner.from('push_preferences').delete().eq('user_id', partnerId);
+    expect(del.error).not.toBeNull();
+
+    // Another switch off never stops this kind: the note above went out with moods off.
+    const afterwards = await sendNote(noteKeys[2]);
+    await expect
+      .poll(async () => (await requestsFor(supabaseAdmin, afterwards)).length, { timeout: 20_000 })
+      .toBe(2);
   });
 });

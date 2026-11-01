@@ -46,6 +46,13 @@
  * `loadOwnProfile` is the kind's refresher; `setBirthday` needs a connection.
  * The display name is still written by `DisplayNameSetup`; Settings refreshes
  * this kind after a name save.
+ *
+ * Push switches (story 3.7): `pushPreferences` holds the account's
+ * `public.push_preferences` row (a missing row reads as all on). It is NOT
+ * persisted and has no local copy: Settings' push section calls
+ * `loadPushPreferences` when it opens, and `setPushPreference` writes one
+ * column server first, then updates state. `signedOutState()` clears both
+ * fields.
  */
 
 import { ZodError } from 'zod/v4';
@@ -62,6 +69,11 @@ import { coupleSettingsService } from '../../services/coupleSettingsService';
 import { readMessageData } from '../../services/customMessageService';
 import { toDateOnlyOrNull } from '../../services/eventsService';
 import { type OwnProfile, profileService } from '../../services/profileService';
+import {
+  type PushPreferenceKey,
+  type PushPreferences,
+  pushPreferencesService,
+} from '../../services/pushPreferencesService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { projectMessageFavorites } from '../../services/messageFavorites';
 import { storageService } from '../../services/storage';
@@ -86,6 +98,13 @@ export interface SettingsSlice {
    * local copy. `null` until the saved copy or the server has answered.
    */
   ownProfile: OwnProfile | null;
+  /**
+   * The account's push switches, from `public.push_preferences`. `null` until
+   * Settings' push section has loaded them (or after a failed load).
+   */
+  pushPreferences: PushPreferences | null;
+  /** The last `loadPushPreferences` failed; the section disables its rows. */
+  pushPreferencesLoadFailed: boolean;
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -132,6 +151,17 @@ export interface SettingsSlice {
    * and copy. Throws: `AccountDataError('offline')` without a connection.
    */
   setBirthday: (birthday: string) => Promise<void>;
+
+  /**
+   * Load the account's push switches from the server. Never throws; offline it
+   * does nothing. A failure sets `pushPreferencesLoadFailed`.
+   */
+  loadPushPreferences: () => Promise<void>;
+  /**
+   * Set one push switch. Server first, then state. Throws:
+   * `AccountDataError('offline')` without a connection, and the save's error.
+   */
+  setPushPreference: (key: PushPreferenceKey, enabled: boolean) => Promise<void>;
 }
 
 /**
@@ -353,6 +383,8 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     isOnboarded: true,
     coupleSettings: null,
     ownProfile: null,
+    pushPreferences: null,
+    pushPreferencesLoadFailed: false,
 
     // Initialize app
     initializeApp: async () => {
@@ -849,6 +881,46 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         if (!isCurrent()) return;
         set({ ownProfile: next });
         await saveOwnProfileCopy(requestedBy, requestedInSession, next);
+      });
+    },
+
+    loadPushPreferences: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Offline there is nothing to ask, and nothing worth reporting.
+      if (!isOnline()) return;
+
+      try {
+        await serializeAccountDataWrite(async () => {
+          const next = await pushPreferencesService.fetchPushPreferences(requestedBy);
+          if (!isCurrent()) return;
+          set({ pushPreferences: next, pushPreferencesLoadFailed: false });
+        });
+      } catch (error) {
+        console.error('[Settings] Failed to load the push settings:', error);
+        // Stale switches would show as usable beside the failure line, so a
+        // failed load clears them and the section disables its rows.
+        if (isCurrent()) set({ pushPreferences: null, pushPreferencesLoadFailed: true });
+      }
+    },
+
+    setPushPreference: async (key, enabled) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to change your push settings');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Refused before any request, so an offline edit changes nothing.
+      requireOnline('Push settings');
+
+      await serializeAccountDataWrite(async () => {
+        if (!isCurrent()) return;
+        const next = await pushPreferencesService.savePushPreference(requestedBy, key, enabled);
+        if (!isCurrent()) return;
+        set({ pushPreferences: next, pushPreferencesLoadFailed: false });
       });
     },
   };

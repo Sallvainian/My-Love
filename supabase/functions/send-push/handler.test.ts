@@ -9,9 +9,12 @@ import {
   type InteractionRow,
   type MoodRow,
   type NoteRow,
+  PREFERENCE_FOR_KIND,
   type PartnerRequestRow,
   type PhotoRow,
   type PushDb,
+  type PushKind,
+  type PushPreference,
   type PushRequestRow,
 } from './handler.ts';
 
@@ -80,7 +83,11 @@ function fakeDb(options: {
   claimed?: PushRequestRow[];
   released?: string[];
   deletedGone?: [string, number][];
-  failOn?: 'getNote';
+  failOn?: 'getNote' | 'isPushEnabled';
+  /** The receiver's switches; one not listed is on, as is every switch of an account with no row. */
+  preferences?: Partial<Record<PushPreference, boolean>>;
+  /** Every switch looked up, as `[userId, preference]`. */
+  preferenceLookups?: [string, PushPreference][];
 }): PushDb {
   const claimed = options.claimed ?? [];
   const note = options.note === undefined ? textNote : options.note;
@@ -97,6 +104,11 @@ function fakeDb(options: {
     getPartnerId: (userId) => {
       options.partnerLookups?.push(userId);
       return Promise.resolve(options.partnerId === undefined ? 'recipient' : options.partnerId);
+    },
+    isPushEnabled: (userId, preference) => {
+      options.preferenceLookups?.push([userId, preference]);
+      if (options.failOn === 'isPushEnabled') return Promise.reject(new Error('db down'));
+      return Promise.resolve(options.preferences?.[preference] ?? true);
     },
     getDisplayName: (userId) =>
       Promise.resolve(
@@ -878,4 +890,154 @@ Deno.test('a partner request kind with a non-uuid id is a 400', async () => {
     assertEquals(response.status, 400, kind);
     await response.body?.cancel();
   }
+});
+
+// ---- Story 3.7: the receiver's push switches ----
+
+/** One post per kind, with the rows that make `recipient` its receiver. */
+const KIND_CASES: { kind: PushKind; body: Record<string, string>; rows: Parameters<typeof fakeDb>[0] }[] = [
+  { kind: 'love_note', body: { note_id: NOTE_ID }, rows: { note: textNote } },
+  { kind: 'mood', body: { kind: 'mood', id: MOOD_ID }, rows: { mood: happyGrateful } },
+  { kind: 'photo', body: { kind: 'photo', id: PHOTO_ID }, rows: { photo } },
+  { kind: 'interaction', body: { kind: 'interaction', id: INTERACTION_ID }, rows: { interaction: poke } },
+  { kind: 'date', body: { kind: 'date', id: DATE_CHANGE_ID }, rows: { dateChange: eventAdded } },
+  {
+    kind: 'partner_request',
+    body: { kind: 'partner_request', id: PARTNER_REQUEST_ID },
+    rows: { partnerRequest: pendingRequest },
+  },
+  {
+    kind: 'partner_accept',
+    body: { kind: 'partner_accept', id: PARTNER_REQUEST_ID },
+    rows: { partnerRequest: acceptedRequest },
+  },
+];
+
+const ALL_PREFERENCES: PushPreference[] = [
+  'love_notes',
+  'moods',
+  'photos',
+  'pokes_and_kisses',
+  'dates',
+  'partner_requests',
+];
+
+Deno.test('every kind answers to one switch, and both partner kinds share one', () => {
+  assertEquals(
+    KIND_CASES.map((c) => [c.kind, PREFERENCE_FOR_KIND[c.kind]]),
+    [
+      ['love_note', 'love_notes'],
+      ['mood', 'moods'],
+      ['photo', 'photos'],
+      ['interaction', 'pokes_and_kisses'],
+      ['date', 'dates'],
+      ['partner_request', 'partner_requests'],
+      ['partner_accept', 'partner_requests'],
+    ]
+  );
+  assertEquals(
+    [...new Set(Object.values(PREFERENCE_FOR_KIND))].sort(),
+    [...ALL_PREFERENCES].sort()
+  );
+});
+
+Deno.test('a kind with its switch off answers zeros, claims nothing and lists no device', async () => {
+  for (const { kind, body, rows } of KIND_CASES) {
+    const claimed: PushRequestRow[] = [];
+    const listed: string[] = [];
+    const preference = PREFERENCE_FOR_KIND[kind];
+    const response = await handleSendPush(request(body), {
+      db: fakeDb({ ...rows, devices: TWO_DEVICES, claimed, listed, preferences: { [preference]: false } }),
+      apns: null,
+    });
+    assertEquals(response.status, 200, kind);
+    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 }, kind);
+    assertEquals(claimed.length, 0, kind);
+    assertEquals(listed, [], kind);
+  }
+});
+
+Deno.test('a switch that is off sends nothing to APNs either', async () => {
+  const sends: string[] = [];
+  const apns: ApnsClient = {
+    send: (token) => {
+      sends.push(token);
+      return Promise.resolve({ ok: true, status: 200, reason: null, timestamp: null });
+    },
+  };
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, preferences: { love_notes: false } }),
+    apns,
+  });
+  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
+  assertEquals(sends, []);
+});
+
+Deno.test('another switch being off does not stop the kind', async () => {
+  for (const { kind, body, rows } of KIND_CASES) {
+    const claimed: PushRequestRow[] = [];
+    const others = Object.fromEntries(
+      ALL_PREFERENCES.filter((p) => p !== PREFERENCE_FOR_KIND[kind]).map((p) => [p, false])
+    );
+    const response = await handleSendPush(request(body), {
+      db: fakeDb({ ...rows, devices: TWO_DEVICES, claimed, preferences: others }),
+      apns: null,
+    });
+    assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 }, kind);
+    assertEquals(claimed.length, 2, kind);
+  }
+});
+
+Deno.test('with no preferences row every kind is on', async () => {
+  for (const { kind, body, rows } of KIND_CASES) {
+    const response = await handleSendPush(request(body), {
+      db: fakeDb({ ...rows, devices: TWO_DEVICES }),
+      apns: null,
+    });
+    assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 }, kind);
+  }
+});
+
+Deno.test('a switch switched back on records again', async () => {
+  const claimed: PushRequestRow[] = [];
+  const preferences = { love_notes: false };
+  const deps = { db: fakeDb({ devices: TWO_DEVICES, claimed, preferences }), apns: null };
+  await handleSendPush(request({ note_id: NOTE_ID }), deps);
+  assertEquals(claimed.length, 0);
+  preferences.love_notes = true;
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), deps);
+  assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 });
+});
+
+Deno.test('the switch is looked up for the recipient and never the sender', async () => {
+  for (const { kind, body, rows } of KIND_CASES) {
+    const preferenceLookups: [string, PushPreference][] = [];
+    await handleSendPush(request(body), {
+      db: fakeDb({ ...rows, devices: TWO_DEVICES, preferenceLookups }),
+      apns: null,
+    });
+    assertEquals(preferenceLookups, [['recipient', PREFERENCE_FOR_KIND[kind]]], kind);
+  }
+});
+
+Deno.test('nobody to tell reads no switch', async () => {
+  const preferenceLookups: [string, PushPreference][] = [];
+  await handleSendPush(request({ kind: 'mood', id: MOOD_ID }), {
+    db: fakeDb({ mood: happyGrateful, partnerId: null, devices: TWO_DEVICES, preferenceLookups }),
+    apns: null,
+  });
+  assertEquals(preferenceLookups, []);
+});
+
+Deno.test('a failed switch read answers 500 and claims nothing', async () => {
+  const claimed: PushRequestRow[] = [];
+  const listed: string[] = [];
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, claimed, listed, failOn: 'isPushEnabled' }),
+    apns: null,
+  });
+  assertEquals(response.status, 500);
+  await response.body?.cancel();
+  assertEquals(claimed.length, 0);
+  assertEquals(listed, []);
 });

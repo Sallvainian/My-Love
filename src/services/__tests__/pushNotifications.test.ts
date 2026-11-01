@@ -337,3 +337,70 @@ describe('stopDevicePushes', () => {
     errorLog.mockRestore();
   });
 });
+
+describe('hasNativePush', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+  });
+
+  it('is true in the native shell with both push plugins', async () => {
+    const { hasNativePush } = await freshModule();
+
+    expect(hasNativePush()).toBe(true);
+  });
+
+  it('is false in a browser, even when the plugins report themselves available', async () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const { hasNativePush } = await freshModule();
+
+    expect(hasNativePush()).toBe(false);
+  });
+
+  it.each(['PushNotifications', 'PushEnvironment'])('is false when %s is missing', async (missing) => {
+    capacitor.isPluginAvailable.mockImplementation((name: string) => name !== missing);
+    const { hasNativePush } = await freshModule();
+
+    expect(hasNativePush()).toBe(false);
+  });
+});
+
+describe('getPushPermission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+  });
+
+  it.each([
+    ['granted', 'granted'],
+    ['denied', 'denied'],
+    ['prompt', 'prompt'],
+    ['prompt-with-rationale', 'prompt'],
+  ])('maps iOS %s to %s without asking for permission', async (receive, expected) => {
+    push.checkPermissions.mockResolvedValue({ receive });
+    const { getPushPermission } = await freshModule();
+
+    expect(await getPushPermission()).toBe(expected);
+    expect(push.requestPermissions).not.toHaveBeenCalled();
+  });
+
+  it('is unavailable without the native push plugins, and does not read the permission', async () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const { getPushPermission } = await freshModule();
+
+    expect(await getPushPermission()).toBe('unavailable');
+    expect(push.checkPermissions).not.toHaveBeenCalled();
+  });
+
+  it('never throws: a failing plugin answers unavailable', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    push.checkPermissions.mockRejectedValue(new Error('bridge gone'));
+    const { getPushPermission } = await freshModule();
+
+    await expect(getPushPermission()).resolves.toBe('unavailable');
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+});

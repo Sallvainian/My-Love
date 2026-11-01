@@ -43,6 +43,15 @@
  * the same, and so does a `partner_accept` whose request is not `accepted` now:
  * the post is a claim that it was, so a forged or replayed one announces nothing.
  *
+ * ## The receiver's switches
+ *
+ * `push_preferences` (20261031050000_push_preferences.sql) holds one boolean
+ * per kind of push, one row per account; no row means every kind is on. After
+ * the "nobody to tell" return and before it lists any device, the sender reads
+ * the recipient's switch for the kind (`PREFERENCE_FOR_KIND`; both partner
+ * kinds share `partner_requests`). A switch that is off answers 200 with every
+ * count 0, claims nothing and lists no devices. A failed read answers 500.
+ *
  * ## Dedupe and the recorded path
  *
  * `push_requests` is unique on (source row, device token), one column per
@@ -85,6 +94,26 @@ export type PushKind =
   | 'date'
   | 'partner_request'
   | 'partner_accept';
+
+/** The columns of `push_preferences`: one switch per kind of push the person can turn off. */
+export type PushPreference =
+  | 'love_notes'
+  | 'moods'
+  | 'photos'
+  | 'pokes_and_kisses'
+  | 'dates'
+  | 'partner_requests';
+
+/** The switch each kind answers to; both partner kinds share one. */
+export const PREFERENCE_FOR_KIND: Record<PushKind, PushPreference> = {
+  love_note: 'love_notes',
+  mood: 'moods',
+  photo: 'photos',
+  interaction: 'pokes_and_kisses',
+  date: 'dates',
+  partner_request: 'partner_requests',
+  partner_accept: 'partner_requests',
+};
 
 /** The kinds the triggers post as `{kind, id}`; a love note posts `{note_id}`. */
 const POSTED_KINDS = ['mood', 'photo', 'interaction', 'date', 'partner_request', 'partner_accept'] as const;
@@ -155,6 +184,8 @@ export interface PushDb {
   getPartnerRequest(requestId: string): Promise<PartnerRequestRow | null>;
   /** The account's linked partner, or null when it has none. */
   getPartnerId(userId: string): Promise<string | null>;
+  /** The receiver's switch: true when on or when the account has no `push_preferences` row. */
+  isPushEnabled(userId: string, preference: PushPreference): Promise<boolean>;
   getDisplayName(userId: string): Promise<string | null>;
   listDevices(userId: string): Promise<DeviceRow[]>;
   /** Inserts the row unless (source, token) exists; true when this call inserted it. */
@@ -359,6 +390,12 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
     // Nobody to tell: an unlinked owner, a self-addressed row or a type that
     // is not a push. Nothing is claimed.
     if (!source.recipientId || source.recipientId === source.senderId || !source.buildPayload) {
+      return json(200, { sent, recorded, skipped, failed, gone });
+    }
+
+    // The receiver's switch for this kind. Off builds nothing for any of their
+    // devices; a failed read throws and answers 500 like any other failed read.
+    if (!(await deps.db.isPushEnabled(source.recipientId, PREFERENCE_FOR_KIND[source.kind]))) {
       return json(200, { sent, recorded, skipped, failed, gone });
     }
 

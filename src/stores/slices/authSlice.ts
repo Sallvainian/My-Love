@@ -213,6 +213,9 @@ export function signedOutState() {
     coupleSettings: null,
     // The outgoing account's own name and birthday.
     ownProfile: null,
+    // The outgoing account's push switches.
+    pushPreferences: null,
+    pushPreferencesLoadFailed: false,
   } satisfies Partial<AppState>;
 }
 

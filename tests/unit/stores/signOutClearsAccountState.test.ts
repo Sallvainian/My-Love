@@ -97,6 +97,8 @@ const EXPECTED_RESET: Record<string, unknown> = {
   eventsHistoryError: null,
   coupleSettings: null,
   ownProfile: null,
+  pushPreferences: null,
+  pushPreferencesLoadFailed: false,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -519,6 +521,15 @@ describe('clearAuth on sign-out', () => {
         weddingDate: '2021-06-12',
       },
       ownProfile: { displayName: 'PREVIOUS-NAME', birthday: '1990-01-02' },
+      pushPreferences: {
+        loveNotes: false,
+        moods: true,
+        photos: true,
+        pokesAndKisses: true,
+        dates: true,
+        partnerRequests: true,
+      },
+      pushPreferencesLoadFailed: true,
     });
 
     useAppStore.getState().clearAuth();
@@ -532,6 +543,9 @@ describe('clearAuth on sign-out', () => {
     expect(state.coupleSettings).toBeNull();
     // The previous account's own name and birthday go too.
     expect(state.ownProfile).toBeNull();
+    // So do the previous account's push switches: the next account must not see them.
+    expect(state.pushPreferences).toBeNull();
+    expect(state.pushPreferencesLoadFailed).toBe(false);
   });
 
   it('keeps no copy of the anniversaries anywhere in localStorage', () => {

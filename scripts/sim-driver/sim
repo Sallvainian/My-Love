@@ -61,10 +61,13 @@ Accounts (local stack only):
                          linked and seeded so every view scrolls; Harper and
                          Morgan, linked, love notes wiped, nothing seeded; Riley
                          and Quinn, unlinked, partner requests deleted.
-  signin [partner|other|other-partner|unlinked|unlinked-other]
+  signin [partner|other|other-partner|unlinked|unlinked-other] [--decline-push]
                          Sign in through the login form (default: Casey;
                          partner: Jessie; other: Harper; other-partner: Morgan;
-                         unlinked: Riley; unlinked-other: Quinn).
+                         unlinked: Riley; unlinked-other: Quinn). The runner
+                         answers a notification permission alert Allow when it
+                         next touches the app; --decline-push answers it Don't
+                         Allow instead (after sim permission reset).
   signout                Sign out through Settings and wait for the login form.
 
 Device:
@@ -445,6 +448,11 @@ cmd_provision() {
 }
 
 cmd_signin() {
+  local decline=''
+  if [[ ${@[-1]:-} == --decline-push ]]; then
+    decline=decline-push
+    set -- ${@[1,-2]}
+  fi
   local which=${1:-}
   require_stack
   local email
@@ -461,7 +469,7 @@ cmd_signin() {
   password=$(node --input-type=module -e '
     const m = await import(process.argv[1]); console.log(m.TEST_USER_PASSWORD);
   ' $REPO/tests/support/test-credentials.ts)
-  drive signin $email $password
+  drive signin $email $password $decline
 }
 
 # ---- page --------------------------------------------------------------------

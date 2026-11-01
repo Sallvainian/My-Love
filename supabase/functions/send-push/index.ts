@@ -3,7 +3,8 @@
  *
  * Sends the push a new love note, mood, photo, poke, kiss, date change,
  * partner request or accepted partner request becomes, to every device
- * registered to the recipient. Called by the triggers on `love_notes`,
+ * registered to the recipient, unless the recipient switched that kind off in
+ * `push_preferences`. Called by the triggers on `love_notes`,
  * `moods`, `photos`, `interactions`, `events`, `couple_settings`, `users` and
  * `partner_requests`; see `handler.ts` for the contract. This file is only
  * the serve binding and the real database and APNs wiring.
@@ -107,6 +108,16 @@ const db: PushDb = {
     const { data, error } = await admin.from('users').select('partner_id').eq('id', userId).maybeSingle();
     if (error) throw new Error(error.message);
     return data?.partner_id ?? null;
+  },
+  async isPushEnabled(userId, preference) {
+    // No row means every switch is on; a failed read throws, so the sender answers 500.
+    const { data, error } = await admin
+      .from('push_preferences')
+      .select(preference)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? (data as Record<string, unknown>)[preference] !== false : true;
   },
   async getDisplayName(userId) {
     const { data, error } = await admin.from('users').select('display_name').eq('id', userId).maybeSingle();

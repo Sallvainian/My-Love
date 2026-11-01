@@ -24,8 +24,12 @@ import { supabase } from '../api/supabaseClient';
  * checked on its own: a shell from story 3.1 has `PushNotifications` but no
  * `AppBadge`.
  *
- * Not here yet: the Settings switches, badge counts, tap handling and
- * foreground suppression (later stories of the epic).
+ * The Settings switches (story 3.7) read the same gate through
+ * `hasNativePush()` and ask iOS for the permission state through
+ * `getPushPermission()`; their data is `pushPreferencesService`.
+ *
+ * Not here yet: badge counts, tap handling and foreground suppression (later
+ * stories of the epic).
  */
 
 type ApnsEnvironment = 'sandbox' | 'production';
@@ -84,8 +88,12 @@ export type PushRegistrationOutcome = 'unavailable' | 'denied' | 'registering';
 
 let listening: Promise<void> | null = null;
 
-/** Whether this shell carries both native pieces push needs. */
-function hasNativePush(): boolean {
+/**
+ * Whether this shell carries both native pieces push needs. False on the
+ * website, in the Home Screen web app and in a shell installed before the
+ * push plugins existed.
+ */
+export function hasNativePush(): boolean {
   return (
     Capacitor.isNativePlatform() &&
     Capacitor.isPluginAvailable('PushNotifications') &&
@@ -122,6 +130,26 @@ function listenOnce(): Promise<void> {
     throw error;
   });
   return listening;
+}
+
+/** What iOS says about notification permission; `unavailable` when this shell cannot say. */
+export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unavailable';
+
+/**
+ * iOS's notification permission for this app, without asking for it. Never
+ * throws: a shell with no push plugins, or a plugin that fails, answers
+ * `unavailable`.
+ */
+export async function getPushPermission(): Promise<PushPermission> {
+  if (!hasNativePush()) return 'unavailable';
+  try {
+    const { receive } = await PushNotifications.checkPermissions();
+    if (receive === 'granted' || receive === 'denied') return receive;
+    return 'prompt';
+  } catch (error) {
+    console.error('[Push] Could not read the notification permission:', error);
+    return 'unavailable';
+  }
 }
 
 /**

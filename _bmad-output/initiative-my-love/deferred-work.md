@@ -3087,3 +3087,11 @@ severity: low
 reason: Pre-existing drift already in the ledger as DW-357 (raw CLI 2.122 output differs from the committed file by 1268 diff lines). This story's change to the file is only the date_changes block and push_requests.date_change_id. The fix is an AGENTS.md decision or a one-time raw regeneration.
 status: done 2026-10-31
 resolution: duplicate of DW-357 (the same pre-existing database.types.ts drift, carried in from story 3.5's plan frontmatter); tracked there.
+
+### DW-360: src/types/database.types.ts is not the raw output of AGENTS.md's regeneration command; this story copied only the push_preferences block, in the file's format, from CLI output whose layout is
+origin: spec-deferred 42ce66f42fd1
+location: src/types/database.types.ts
+source_spec: `tickets/epic-push-notifications/tickets/story-each-push-type-has-a-settings-switch-plan.md`
+severity: low
+reason: supabase gen types typescript --local (CLI 2.122.0) emits the same push_preferences fields but with ComputedFields lines and inline quoted keys; pre-existing drift already in the ledger as DW-357.
+status: open
