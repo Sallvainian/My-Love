@@ -74,7 +74,6 @@ description = "Extends story 1's sender and trigger pattern to new moods, photos
 verify = "The sender's deno tests and an api-project spec cover each payload and show a mood re-sent with the same key builds no second push; through story 2.9's driver on the simulator, the payloads the sender built for a mood, a photo, a poke and a kiss from the partner, delivered with xcrun simctl push, each show a banner with the R7 text."
 covers = ["R1", "R7"]
 after = [13]
-unknown = "Does a database trigger reach the sender on the local stack and the hosted project? Story 1 answers it for the local stack and story 13 for the hosted project; if not, stories 4, 5 and 6 are re-sliced."
 hitl = false
 risk = "medium"
 
