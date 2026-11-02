@@ -4,7 +4,8 @@
 # Supabase stack, signs in a local fixture pair, folds and rotates with `ax`,
 # and taps, scrolls and reads the page through an XCUITest runner
 # (RunnerUITests/Drive.swift); it also answers the permission alert, pushes,
-# and reads banners, Notification Center and the badge (Notify.swift), for
+# and reads banners (pushed, or watched for with nothing pushed),
+# Notification Center and the badge (Notify.swift), for
 # the shell or, with --host, the runner's own host app. It also lists an app's
 # scheduled (pending) local notifications from the simulator's own
 # UserNotifications files (pending.py), and has the host schedule and remove
@@ -90,6 +91,11 @@ Device:
   rotate [N]                 Rotate a quarter turn N times: right (ax rotate),
                              or left where Device Hub has only Rotate Left.
   state                      Pose, active display and orientation (ax state).
+  reboot                     Shut the simulator down and boot it again,
+                             returning once it has booted. The simulator
+                             ignores a Mac clock change until it reboots, so
+                             run this after each sudo /bin/date. Apps do not
+                             come back running.
   screenshot PATH [--display inner|outer]
                              Save a PNG of a display (default: the active one).
 
@@ -118,6 +124,17 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          watches: the shell shows no banner for a foreground
                          push, so a pass ends in "no banner" (exit 1). It
                          cannot be combined with --tap (exit 2).
+  watch [--front] [--for SECONDS] [--host]
+                         Put Settings in front (--front: the app itself),
+                         push nothing, and wait up to SECONDS (default 120,
+                         at most 3600) for the app's banner, such as a local
+                         notification falling due. Prints "watching from"
+                         and "banner at" with the time, so a check shows the
+                         watch spanned the due time; no banner prints "no
+                         banner" (exit 1). Start it a minute or more before
+                         the due time: the runner takes 6-12 s to start and
+                         first waits up to 20 s for an earlier banner to
+                         clear, and a banner in that window is missed.
   center [--host]        The app's Notification Center groups as one JSON
                          line: each group's text (its newest notification's
                          title and body) and notification count.
@@ -717,6 +734,31 @@ cmd_banner() {
   finish_step Notify banner $code
 }
 
+# banner without the push, for a notification the app schedules itself. Runs
+# in the foreground: nothing has to happen once the watch starts.
+cmd_watch() {
+  target_args "$@"
+  local front= seconds=120 i=1
+  while (( i <= $#REST )); do
+    case $REST[i] in
+      --front) front=front; (( i++ )) ;;
+      --for) seconds=${REST[i+1]:-}; (( i += 2 )) ;;
+      *) die 2 "watch takes [--front] [--for SECONDS] (and --host)" ;;
+    esac
+  done
+  [[ $seconds == <1-3600> ]] || die 2 "watch: --for takes whole seconds from 1 to 3600"
+  notify watch $seconds ${front:+$front}
+}
+
+# shutdown, then bootstatus -b, which boots it and waits until it has.
+cmd_reboot() {
+  (( $# == 0 )) || die 2 "reboot takes nothing"
+  require_booted
+  stage simctl-shutdown xcrun simctl shutdown $UDID
+  stage simctl-boot xcrun simctl bootstatus $UDID -b
+  say "rebooted $UDID; the Mac clock reads $(print -P '%D{%Y-%m-%d %H:%M:%S}')"
+}
+
 # ax state's value for one key (pose, orientation).
 state_value() { ax state --device $UDID | sed -n "s/^$1: //p"; }
 
@@ -1050,6 +1092,7 @@ case $cmd in
     [[ -z ${1:-} || $1 == <1-9> ]] || die 2 "rotate takes a count from 1 to 9"
     require_booted; cmd_rotate ${1:-1} ;;
   state) require_booted; ax state --device $UDID ;;
+  reboot) cmd_reboot "$@" ;;
   tap)
     [[ $# == 2 && $1 == <->(|.<->) && $2 == <->(|.<->) ]] || die 2 "tap takes X Y in page points"
     drive tap $1 $2 ;;
@@ -1065,6 +1108,7 @@ case $cmd in
   permission) cmd_permission "$@" ;;
   push) cmd_push "$@" ;;
   banner) cmd_banner "$@" ;;
+  watch) cmd_watch "$@" ;;
   center) cmd_center "$@" ;;
   badge) cmd_badge "$@" ;;
   pending) cmd_pending "$@" ;;

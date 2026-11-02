@@ -3177,14 +3177,15 @@ location: scripts/sim-driver/sim
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
 reason: Observed in story 4.8's first pass: with the Mac clock set to 11-02 08:58:30 by `sudo /bin/date`, the 8 reminders due at 09:00 stayed pending; after a simulator reboot at 08:57 all 8 fired at 09:00. Every firing check in that story rebooted the simulator by hand after each clock jump. A `sim` command that reboots the simulator (or sets the clock and reboots) would make the step repeatable. The device check in story 5 is unaffected.
-status: open
+status: done 2026-11-02
+resolution: `sim reboot` shuts the simulator down and boots it again (`simctl shutdown`, then `simctl bootstatus -b`), returning once it has booted; run it after each `sudo /bin/date` (plan-dw-375-376-sim-reboot-and-watch.md).
 
 ### DW-376: A date reminder firing while the shell is in the foreground was never observed; the plugin's default `willPresent` should show a banner, but no check confirms it.
 origin: story 4.8 simulator checks, 2026-11-01
 location: src/services/dateReminders.ts, @capacitor/local-notifications (willPresent presentation options)
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
-reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes; `sim banner FILE --front` watches for a banner in that state.
+reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes: set the clock, `sim reboot`, `sim launch`, then `sim watch --front --for 180` started by 8:58, since the runner takes 6-12 s to start and first waits up to 20 s for any earlier banner to clear. `sim banner FILE --front` does not fit, because it pushes FILE and watches only 20 s.
 status: open
 
 ### DW-377: An offline sign-out leaves the account's refresh token valid on the server indefinitely, because nothing revokes it once the device is back online and no session timebox is set.
@@ -3250,4 +3251,12 @@ location: src/services/pushNotifications.ts (removePushRegistration); src/api/au
 source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
 severity: low
 reason: Only the app's own Sign out calls `removePushRegistration()` while the session still exists. On 2026-11-02 two Claude Bot rows were left on production by sessions that ended otherwise (the DW-383 sign-out, and a global sign-out from the simulator); story 4.5's cleanup deleted them. The rows keep pushing to a device that is signed out of the account until APNs answers 410. Related to DW-353 (a reinstall's old row). Settle it with DW-353's decision on who removes a device's stale rows.
+status: open
+
+### DW-385: AGENTS.md's sim-driver paragraph does not name `sim reboot` or `sim watch`.
+origin: plan-dw-375-376-sim-reboot-and-watch review, 2026-11-02
+location: AGENTS.md (Maintained by hand, the sim-driver paragraph)
+source_spec: `plan-dw-375-376-sim-reboot-and-watch.md`
+severity: low
+reason: The paragraph lists the driver's notification commands and names `banner FILE --front` for watching while the shell is in front, which covers a push only. It does not say that a Mac clock jump needs `sim reboot` before a scheduled notification fires, or that `sim watch [--front] [--for SECONDS]` watches for a banner with nothing pushed. `sim help` lists both. The edit touches an agent-context file, so it is deferred.
 status: open

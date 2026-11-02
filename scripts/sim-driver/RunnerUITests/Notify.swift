@@ -19,6 +19,9 @@ import XCTest
 //                           instead of Settings, which is how a push to the
 //                           app in front is checked (it ends in "no banner"
 //                           when the shell shows none)
+//   watch SECONDS [front]   banner with nothing pushed: wait SECONDS for a
+//                           banner (a local notification falling due), the
+//                           watch and the banner lines stamped with the time
 //   center                  open Notification Center (sim presses Home
 //                           first), print the app's groups as one JSON line
 //   badge                   print the app icon's value, or none
@@ -62,6 +65,11 @@ final class Notify: XCTestCase {
             try banner(app, icon, tap: nil, front: true)
         case ("banner", 1) where ["cold", "background"].contains(args[0]):
             try banner(app, icon, tap: args[0])
+        case ("watch", 1), ("watch", 2) where args[1] == "front":
+            guard let seconds = TimeInterval(args[0]), seconds > 0 else {
+                return XCTFail("watch needs a positive number of seconds: \(args[0])")
+            }
+            try banner(app, icon, tap: nil, front: args.count == 2, timeout: seconds, stamped: true)
         case ("center", 0):
             try center(icon)
         case ("badge", 0):
@@ -98,7 +106,11 @@ final class Notify: XCTestCase {
         say("status: \(status.label)")
     }
 
-    func banner(_ app: XCUIApplication, _ icon: String, tap: String?, front: Bool = false) throws {
+    // watch is banner with nothing pushed: it waits TIMEOUT seconds instead
+    // of 20 and stamps its lines with the time, so a check shows
+    // the watch spanned the time a local notification was due.
+    func banner(_ app: XCUIApplication, _ icon: String, tap: String?, front: Bool = false,
+                timeout: TimeInterval = 20, stamped: Bool = false) throws {
         if tap == "cold" { app.terminate() }
         // activate, not launch: launch would end a running instance, and
         // "background" means the app the caller left running.
@@ -124,11 +136,11 @@ final class Notify: XCTestCase {
         }
         let banners = any(springboard, "identifier == 'NotificationShortLookView'")
         if !until(20, { banners.count == 0 }) { return XCTFail("an earlier banner never went away") }
-        say("watching")
+        say(stamped ? "watching from \(clock())" : "watching")
         // SpringBoard's label starts with the app's name in capitals.
         let banner = any(springboard, "identifier == 'NotificationShortLookView' AND label BEGINSWITH[c] %@", icon + ",").firstMatch
-        guard banner.waitForExistence(timeout: 20) else { return XCTFail("no banner") }
-        say("banner: " + banner.label.replacingOccurrences(of: "\n", with: " | "))
+        guard banner.waitForExistence(timeout: timeout) else { return XCTFail("no banner") }
+        say((stamped ? "banner at \(clock()): " : "banner: ") + banner.label.replacingOccurrences(of: "\n", with: " | "))
         guard tap != nil else { return }
         let before = app.state
         say("before tap: \(name(before))")
@@ -406,6 +418,16 @@ final class Notify: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
         return true
+    }
+
+    // The Mac's time, which a simulator process reads too: after a clock
+    // jump it is the notification scheduler that lags until sim reboot, not
+    // this clock. POSIX, so a 12-hour setting cannot rewrite HH.
+    func clock() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f.string(from: Date())
     }
 
     func name(_ s: XCUIApplication.State) -> String {
