@@ -19,7 +19,7 @@
  * binding and the real client factory.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0';
 
 import { handleUpload } from './handler.ts';
 

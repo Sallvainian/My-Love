@@ -3080,7 +3080,9 @@ location: .github/workflows/deploy.yml (functions job); supabase/functions/send-
 source_spec: `tickets/epic-push-notifications/tickets/story-every-edge-function-deploys-from-deploy-yml-plan.md`
 severity: medium (unverified)
 reason: Both entrypoints import `https://esm.sh/@supabase/supabase-js@2`, and `supabase functions deploy --use-api` resolves that on Supabase's side at every deploy. Story 3.3's ticket asks for every function on every run, and for `build` to need the function deploy, so a newer 2.x on esm.sh reaches production on the next frontend-only push, and an esm.sh or bundler outage stops the site deploy. test.yml leaves `index.ts` out of `deno test` to avoid exactly this CDN dependency. That the resolved version drifts between deploys is unverified; compare the deployed bundle's supabase-js version across two runs to settle it. To fix, decide between pinning the import to an exact version in both functions and deploying functions only when `supabase/functions/**` or `supabase/config.toml` changed (which needs the owner to amend the "every run" decision).
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-pin-edge-supabase-js
+resolution-undo: c5ac684b11adaf4e0287144b8d69060bbd70dab23125f5b61f135345802238d2 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 pin-and-keep-every-run — owner, 2026-11-02: pin `https://esm.sh/@supabase/supabase-js@2` to one exact 2.x version in both entrypoints (the version package-lock.json resolves for the app is the natural choice); keep deploying every function on every run, so the deploy.yml job stays ungated.
 
 ### DW-356: A device that signs out offline leaves its old token's push_devices row, APNs keeps accepting pushes to that unregistered token with 200 instead of 410, so the sender never deletes it and sends to it on every note.
@@ -3499,4 +3501,12 @@ location: src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: First `npm run test:unit` of this run: 1 failed of 3759, `expect(element).toBeEnabled()` at src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166, with the button rendered `aria-busy="true" disabled`. `findByTestId` resolves on presence, not enablement, so an in-flight refresh still busy under load fails it. Unrelated to this change, which touches no PartnerMoodView code. Settle by asserting through `waitFor(() => expect(...).toBeEnabled())` after confirming what keeps it busy.
+status: open
+
+### DW-410: The pinned esm.sh supabase-js 2.118.0 bundle still floats one transitive dependency: storage-js 2.118.0 imports iceberg-js through the range ^0.8.1.
+origin: spec-deferred 3f3158bf60a9
+location: supabase/functions/send-push/index.ts:19; supabase/functions/upload-love-note-image/index.ts:22
+source_spec: `plan-dw-pin-edge-supabase-js.md`
+severity: medium
+reason: package-lock.json declares @supabase/storage-js 2.118.0 dependency "iceberg-js": "^0.8.1" (every other sub-package dependency is exact: tslib 2.8.1, @supabase/phoenix 0.4.5). esm.sh's built https://esm.sh/@supabase/storage-js@2.118.0/es2022/storage-js.mjs imports "/iceberg-js@^0.8.1?target=es2022", a range esm.sh resolves per request, so a new iceberg-js 0.8.x can reach both Edge Functions on the next deploy with no reviewed change. Pre-existing and outside the owner's 2026-11-02 decision, which pins supabase-js only. A fix would add ?deps=iceberg-js@0.8.1 to both import URLs (or vendor the import), which needs an owner call.
 status: open
