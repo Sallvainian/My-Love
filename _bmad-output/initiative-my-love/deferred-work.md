@@ -2892,7 +2892,8 @@ origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar 
 location: AGENTS.md (Policy, the public-repo line; inside the generated block)
 severity: low
 reason: AGENTS.md Policy says never to write an email address into `_bmad-output/`. The two addresses are fictional (`test.example.com`, local stack only) and also appear in scripts/sim-driver/sim, provision.ts and AGENTS.md itself, and other epics' plans and findings files in `_bmad-output/` already hold fictional test addresses, so whether the rule covers fictional fixture addresses is the owner's call. The line sits inside the plan's `<intent-contract>`, which only a person may change; if the rule covers them, replace the addresses there with "the sim driver's two fixture accounts", or reword the Policy line to exempt fictional `test.example.com` fixtures. 2026-11-02 triage: the cited line in story 9's plan was already reworded by 31eafa9b; 19 addresses remain in 10 tracked _bmad-output files (7 at test.example.com, 8 at example.com, 4 noreply@anthropic.com), and every commit carries the required noreply@anthropic.com trailer.
-status: open
+status: done 2026-11-02
+resolution: AGENTS.md's public-repo Policy line now forbids real addresses only: addresses at RFC 2606 reserved names (example.com, example.org, example.net and their subdomains, *.test, *.example, *.invalid) and the commit trailer's noreply@anthropic.com are allowed, any other address counts as real. Edited in place in the generated block, as the owner decided; the fixture addresses in _bmad-output need no change.
 decision: 2026-11-02 reword-rule — owner, 2026-11-02: the Policy line forbids real addresses only; addresses at reserved domains (example.com, example.org, *.test, *.invalid, RFC 2606) and the commit trailer noreply@anthropic.com are allowed, any other address counts as real. The line sits in AGENTS.md's generated block, so the edit goes through bmad-project-context, outside the loop; with it, the fixture addresses in story-partner-requests-push-plan.md:49 and elsewhere need no change.
 
 ### DW-336: The sim driver's old shared folders at the cache root are orphaned since the work dir became per checkout.
@@ -3127,7 +3128,8 @@ location: scripts/sim-driver/sim (help, center line; cmd_center; center_restore)
 source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: cmd_center asks for the front app whenever `$CENTER_POSE != unfolded && $CENTER_ORIENT != portrait`, which includes an empty pose (a phone with no pose, such as an iPhone 17). center_restore relaunches only when CENTER_FRONT is set and not `none`, so when `notify front` fails nothing is relaunched; center only says the folded landscape may not come back. Found by story 3.10's review. The fix edits AGENTS.md, so it is deferred: reword both to "a landscape start that is not unfolded gets back the shell, the host app, Settings or Safari when the front step found one".
-status: open
+status: done 2026-11-02
+resolution: `sim help` (center) and AGENTS.md's sim-driver paragraph now say a landscape start that is not unfolded (a folded Duo, or a phone with no pose) comes back only when the shell, the host app, Settings or Safari was in front, and that such a start gets that app back; behaviour unchanged.
 
 ### DW-365: `scripts/sim-driver/pending.py` checks no record-level schema marker, so an iOS release that keeps the pending archive's key names but changes their meaning would decode without error
 origin: story-4.7
@@ -3183,7 +3185,7 @@ source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-ev
 severity: low
 reason: Found during this pass's simulator verification, not by a review lens. After the first sign-in and a network-off relaunch, `sim pending` 15 s after launch said the plist did not exist; the next launch's console showed LocalNotifications.getPending returning 11 pending requests. Later launches rewrote the plist within 25 s. A check that reads the list right after the first schedule on a fresh install can see a false empty list. Story 7's reader (scripts/sim-driver) could wait for the plist's mtime to pass the launch, as the previous pass did by hand.
 status: done 2026-11-01
-resolution: story 4.4: documented, behaviour kept. `sim help`, pending.py's missing-file note and AGENTS.md say iOS writes PendingNotifications.plist up to about 25 s after a schedule, so an empty or stale list read right after one is not proof. A wait would need the schedule's time, which `sim pending` does not know.
+resolution: story 4.4: documented, behaviour kept. `sim help`, pending.py's missing-file note and AGENTS.md say iOS writes PendingNotifications.plist some time after a schedule, after a fresh install's first one sometimes not until the app's next launch, so an empty or stale list read right after one is not proof (the earlier "up to about 25 s" bound was dropped by DW-382). A wait would need the schedule's time, which `sim pending` does not know.
 
 ### DW-373: A re-plan cancels only the ids `getPending` reports, so if a follow-up re-plan's `getPending` misses requests the previous run just scheduled, ids above the new N stay pending.
 origin: spec-deferred 4cdc45753d6d
@@ -3276,7 +3278,8 @@ location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driv
 source_spec: `tickets/epic-date-reminders/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred. 2026-11-02 triage: rewording DW-372's resolution line is an orchestrator edit, so do it in the same interactive docs commit as the AGENTS.md change, not in a loop session.
-status: open
+status: done 2026-11-02
+resolution: `sim help` (pending), pending.py's missing-file note, AGENTS.md's sim-driver paragraph and DW-372's resolution drop the 25 s bound: iOS writes the file some time after a schedule, after a fresh install's first one sometimes not until the app's next launch.
 
 ### DW-383: A device clock far ahead of real time, online, makes supabase-js refresh the session in a loop until GoTrue answers 429, and the SDK then signs the device out.
 origin: spec-deferred story-4-5-ship
@@ -3304,7 +3307,8 @@ location: AGENTS.md (Maintained by hand, the sim-driver paragraph)
 source_spec: `plan-dw-375-376-sim-reboot-and-watch.md`
 severity: low
 reason: The paragraph lists the driver's notification commands and names `banner FILE --front` for watching while the shell is in front, which covers a push only. It does not say that a Mac clock jump needs `sim reboot` before a scheduled notification fires, or that `sim watch [--front] [--for SECONDS]` watches for a banner with nothing pushed. `sim help` lists both. The edit touches an agent-context file, so it is deferred. 2026-11-02: the same paragraph's `sim dates` sentence must also say that clear removes both people's countdown marks and resets the date-reminders switch once DW-397 lands.
-status: open
+status: done 2026-11-02
+resolution: AGENTS.md's sim-driver paragraph now names `sim watch [--front] [--for SECONDS]` (a banner with nothing pushed) and `sim reboot` (needed after each `sudo /bin/date` before a scheduled notification fires), and its `sim dates` sentence says clear also deletes both people's countdown marks and turns both people's date reminders back on.
 
 ### DW-386: "Sign out of all devices" reports success when only this device was signed out.
 
@@ -3437,7 +3441,8 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/services/dateReminders.ts (reminderIdsToCancel); AGENTS.md (Known pitfalls)
 severity: low
 reason: reminderIdsToCancel adds every pending id, which is correct today because the shell schedules no other local notification (story 4.1's review), but a future local-notification feature would have its notifications cancelled on every re-plan. Accepted as design; the remedy is a pitfall line telling such a feature to reserve an id range or tag and narrow the cancel. Outside the loop: it edits AGENTS.md.
-status: open
+status: done 2026-11-02
+resolution: AGENTS.md (Maintained by hand) now warns that every re-plan cancels ids 1 to MAX_SCHEDULED_REMINDERS and every pending local notification, and that a new local-notification feature must reserve an id range or tag and narrow that cancel in the same change. Placed outside the generated block so a context refresh keeps it.
 
 ### DW-399: settingsSlice.ts has grown to 1116 lines with six registerLocalCopy kinds.
 
