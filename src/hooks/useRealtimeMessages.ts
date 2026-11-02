@@ -456,8 +456,9 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
             retryTimeoutRef.current = null;
           }
 
-          // And say so. This is the only terminal state the hook has; until it
-          // was reported, the feed just stopped and no consumer could tell.
+          // And say so. This is the only state in which the hook stops trying;
+          // until it was reported, the feed just stopped and no consumer could
+          // tell.
           setReport({ key: currentUserId, status: 'disconnected' });
           return;
         }
@@ -756,8 +757,8 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       ? report.status
       : 'connecting';
 
-  // Previously `{}`. The one terminal state this hook has -- the retry ceiling
-  // giving up -- was invisible to every caller, so the notes feed could stop
-  // for good with nothing anywhere to say so.
+  // Previously `{}`. The one state in which this hook stops trying -- the retry
+  // ceiling giving up -- was invisible to every caller, so the notes feed could
+  // stop with nothing anywhere to say so.
   return { status };
 }

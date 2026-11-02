@@ -305,8 +305,8 @@ describe('useRealtimeMessages', () => {
 
       // Now let the parked open resume. Without the give-up flag it walks on and
       // builds a sixth channel, leaving the banner reading "not receiving new
-      // notes" while a channel is live — the type calls `disconnected` terminal,
-      // so it has to be.
+      // notes" while a channel is live — `disconnected` holds until a re-arm,
+      // so it has to hold.
       await act(async () => {
         releaseAuth();
         await vi.advanceTimersByTimeAsync(BACKOFF_CAP_MS);
@@ -337,8 +337,8 @@ describe('useRealtimeMessages', () => {
       });
       expect(result!.current.status).toBe('reconnecting');
 
-      // Exhaust the ceiling. The terminal state is the whole point: the hook
-      // stops trying here and nothing else in the app re-arms it, so a consumer
+      // Exhaust the ceiling. The give-up is the whole point: the hook stops
+      // trying here until the network or the sign-in returns, so a consumer
       // that cannot read this has no way to tell a working feed from a dead one.
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         await act(async () => {
