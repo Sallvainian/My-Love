@@ -114,6 +114,19 @@ runs:
       shell: bash
       run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+    # Pull Supabase's images from GitHub's container registry instead of the
+    # CLI's default, public.ecr.aws. ECR rate-limits anonymous pulls: 49 of 50
+    # jobs on 2026-11-01/02 logged `toomanyrequests`, and run 32268765187 lost
+    # a whole job to it. The CLI reads SUPABASE_INTERNAL_IMAGE_REGISTRY
+    # (apps/cli-go/internal/utils/docker.go GetRegistry, v2.122.0) and then
+    # pulls only from that registry, with no ECR or Docker Hub fallback. All 15
+    # image tags CI pulled in those runs answered 200 on ghcr.io/supabase.
+    # Set through GITHUB_ENV so later steps that start containers (`supabase
+    # test db`'s pg_prove, the type generation) use it too.
+    - name: Use GitHub's container registry for Supabase images
+      shell: bash
+      run: echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io" >> "$GITHUB_ENV"
+
     # `-x` excludes up to five services. Three no CI job here touches; the other
     # two, mailpit and edge-runtime, are opt-in per job through needs-mail and
     # needs-edge-functions, so only the api leg starts them. Verified against the pinned
