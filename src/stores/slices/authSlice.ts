@@ -11,6 +11,7 @@
  * - NOT persisted (derived from Supabase session on each app load)
  */
 
+import { cancelDateReminders } from '../../services/dateReminders';
 import { deleteAccountImages } from '../../services/imageCache';
 import { deleteAccountCopies } from '../../services/localCopy';
 import { moodService } from '../../services/moodService';
@@ -49,7 +50,9 @@ function getAccountOwner(): string | null {
 /**
  * Delete one account's saved data from this device: its local copies
  * (anniversaries, partner, couple settings, custom messages and favorites, …),
- * its cached images and its synced `moods` rows.
+ * its cached images and its synced `moods` rows, and the native shell's pending
+ * date reminders (`cancelDateReminders`: they are planned from those copies, and
+ * the next account on the device must not get them; a no-op on the web).
  * Nothing else — unsynced `moods` rows and any other queued write stay for
  * their owner to send on the next sign-in. The server keeps everything, so the
  * next signed-in refresh brings it back.
@@ -72,6 +75,9 @@ function deleteAccountData(userId: string): void {
   });
   moodService.deleteSyncedForUser(userId).catch((error: unknown) => {
     console.error('[AuthSlice] Failed to delete the outgoing account\'s synced moods:', error);
+  });
+  cancelDateReminders().catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to cancel the outgoing account\'s date reminders:', error);
   });
 }
 
@@ -216,6 +222,8 @@ export function signedOutState() {
     // The outgoing account's push switches.
     pushPreferences: null,
     pushPreferencesLoadFailed: false,
+    // The outgoing account's marked dates ("not loaded" for the next account).
+    countdownMarks: null,
   } satisfies Partial<AppState>;
 }
 

@@ -49,10 +49,27 @@
  *
  * Push switches (story 3.7): `pushPreferences` holds the account's
  * `public.push_preferences` row (a missing row reads as all on). It is NOT
- * persisted and has no local copy: Settings' push section calls
- * `loadPushPreferences` when it opens, and `setPushPreference` writes one
- * column server first, then updates state. `signedOutState()` clears both
- * fields.
+ * persisted: Settings' push section calls `loadPushPreferences` when it opens,
+ * and `setPushPreference` writes one column server first, then updates state.
+ * `signedOutState()` clears both fields. Story 4.3 added the date reminders'
+ * switch to the row (`dateReminders`) and keeps the whole row as the local copy
+ * of kind `push-preferences`, filled only from a successful read or a
+ * confirmed write (a failed read never writes or clears it), so the shell can
+ * plan the reminders offline. The kind's refresher runs
+ * `loadPushPreferences` only in a shell with the local-notifications plugin,
+ * so the web and an older shell never read the table on their own.
+ *
+ * Countdown marks (story 4.2): `countdownMarks` is the list of date keys the
+ * account marked for the "In a month" and "In a week" reminders
+ * (`public.countdown_marks`; key forms in `dateReminders.ts`). `null` means not
+ * loaded, `[]` means loaded with no marks. It is NOT persisted: its saved copy
+ * is the local copy of kind `countdown-marks`, filled only from a successful
+ * read or a confirmed write, which is what lets the date reminders' re-plan
+ * (`dateRemindersAtLaunch.ts`) tell "not loaded" from "no marks".
+ * `loadCountdownMarks` is the kind's refresher and does nothing unless the shell
+ * carries the local-notifications plugin, so the web never reads the table.
+ * `setCountdownMark` writes the server first, then state and copy; a failed read
+ * keeps both. `signedOutState()` resets the state.
  */
 
 import { ZodError } from 'zod/v4';
@@ -66,6 +83,8 @@ import {
   type ServerAnniversary,
 } from '../../services/anniversariesService';
 import { coupleSettingsService } from '../../services/coupleSettingsService';
+import { countdownMarksService } from '../../services/countdownMarksService';
+import { hasNativeReminders } from '../../services/dateReminders';
 import { readMessageData } from '../../services/customMessageService';
 import { toDateOnlyOrNull } from '../../services/eventsService';
 import { type OwnProfile, profileService } from '../../services/profileService';
@@ -105,6 +124,12 @@ export interface SettingsSlice {
   pushPreferences: PushPreferences | null;
   /** The last `loadPushPreferences` failed; the section disables its rows. */
   pushPreferencesLoadFailed: boolean;
+  /**
+   * The date keys the account marked for the month and week reminders, from
+   * `public.countdown_marks` via its local copy. `null` until the saved copy or
+   * the server has answered; `[]` is a loaded "no marks".
+   */
+  countdownMarks: string[] | null;
 
   // Actions
   initializeApp: () => Promise<void>;
@@ -162,6 +187,19 @@ export interface SettingsSlice {
    * `AccountDataError('offline')` without a connection, and the save's error.
    */
   setPushPreference: (key: PushPreferenceKey, enabled: boolean) => Promise<void>;
+
+  /**
+   * The countdown-marks local-copy refresher: show the saved copy while the
+   * state is `null`, then — when online — replace state and copy with the
+   * server's rows. Does nothing off the native shell. Never throws.
+   */
+  loadCountdownMarks: () => Promise<void>;
+  /**
+   * Mark (`true`) or unmark (`false`) one date key. Server first, then state
+   * and copy. Throws: `AccountDataError('offline')` without a connection, an
+   * error while the marks are not loaded, and the save's error.
+   */
+  setCountdownMark: (key: string, marked: boolean) => Promise<void>;
 }
 
 /**
@@ -271,6 +309,66 @@ function parseSavedAnniversaries(value: unknown): Anniversary[] | null {
   return valid;
 }
 
+/**
+ * The saved anniversaries copy for `userId`, or `null` when there is none, the
+ * read failed or the copy is malformed. Reads only; the store is untouched.
+ */
+export async function readSavedAnniversaries(userId: string): Promise<Anniversary[] | null> {
+  return parseSavedAnniversaries(await readLocalCopy<unknown>(userId, ANNIVERSARIES_COPY_KIND));
+}
+
+/** The saved couple-settings copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedCoupleSettings(userId: string): Promise<CoupleSettings | null> {
+  return parseSavedCoupleSettings(await readLocalCopy<unknown>(userId, COUPLE_SETTINGS_COPY_KIND));
+}
+
+/** The saved own-profile copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedOwnProfile(userId: string): Promise<OwnProfile | null> {
+  return parseSavedOwnProfile(await readLocalCopy<unknown>(userId, PROFILE_COPY_KIND));
+}
+
+/** Local-copy kind for the account's countdown marks (`string[]` of date keys). */
+export const COUNTDOWN_MARKS_COPY_KIND = 'countdown-marks';
+
+/** A saved marks copy: a list of strings, otherwise `null`. */
+function parseSavedCountdownMarks(value: unknown): string[] | null {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) return null;
+  return value as string[];
+}
+
+/** The saved countdown-marks copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedCountdownMarks(userId: string): Promise<string[] | null> {
+  return parseSavedCountdownMarks(await readLocalCopy<unknown>(userId, COUNTDOWN_MARKS_COPY_KIND));
+}
+
+/** Local-copy kind for the account's push switches (the whole `PushPreferences` row). */
+export const PUSH_PREFERENCES_COPY_KIND = 'push-preferences';
+
+const PUSH_PREFERENCE_KEYS: readonly (keyof PushPreferences)[] = [
+  'loveNotes',
+  'moods',
+  'photos',
+  'pokesAndKisses',
+  'dates',
+  'partnerRequests',
+  'dateReminders',
+];
+
+/** A saved push-preferences copy: an object whose seven switches are all booleans, otherwise `null`. */
+function parseSavedPushPreferences(value: unknown): PushPreferences | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (!PUSH_PREFERENCE_KEYS.every((key) => typeof record[key] === 'boolean')) return null;
+  return Object.fromEntries(
+    PUSH_PREFERENCE_KEYS.map((key) => [key, record[key]])
+  ) as unknown as PushPreferences;
+}
+
+/** The saved push-preferences copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedPushPreferences(userId: string): Promise<PushPreferences | null> {
+  return parseSavedPushPreferences(await readLocalCopy<unknown>(userId, PUSH_PREFERENCES_COPY_KIND));
+}
+
 const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
 
 /** Validate a form's anniversary before it is sent, with the form's error shape. */
@@ -327,6 +425,30 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
   registerLocalCopy(ANNIVERSARIES_COPY_KIND, () => get().loadAnniversariesFromServer());
   registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => get().loadCoupleSettings());
   registerLocalCopy(PROFILE_COPY_KIND, () => get().loadOwnProfile());
+  registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, () => get().loadCountdownMarks());
+  // Only a shell with the local-notifications plugin needs the date reminders'
+  // switch; the web and an older shell make no push_preferences read here.
+  registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, () =>
+    hasNativeReminders() ? get().loadPushPreferences() : Promise.resolve()
+  );
+
+  /** After a confirmed server answer for `userId`: save the marks as the copy. A failed save is logged. */
+  const saveCountdownMarksCopy = async (userId: string, value: string[]) => {
+    try {
+      await writeLocalCopy(userId, COUNTDOWN_MARKS_COPY_KIND, value);
+    } catch (error) {
+      console.error('[Settings] Failed to save the countdown marks copy:', error);
+    }
+  };
+
+  /** After a confirmed server answer for `userId`: save the row as the copy. A failed save is logged. */
+  const savePushPreferencesCopy = async (userId: string, value: PushPreferences) => {
+    try {
+      await writeLocalCopy(userId, PUSH_PREFERENCES_COPY_KIND, value);
+    } catch (error) {
+      console.error('[Settings] Failed to save the push settings copy:', error);
+    }
+  };
 
   /** Same as `saveCoupleSettingsCopy`, for the profile kind. */
   const saveOwnProfileCopy = async (userId: string, authSessionVersion: number, value: OwnProfile) => {
@@ -385,6 +507,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
     ownProfile: null,
     pushPreferences: null,
     pushPreferencesLoadFailed: false,
+    countdownMarks: null,
 
     // Initialize app
     initializeApp: async () => {
@@ -898,6 +1021,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
           const next = await pushPreferencesService.fetchPushPreferences(requestedBy);
           if (!isCurrent()) return;
           set({ pushPreferences: next, pushPreferencesLoadFailed: false });
+          await savePushPreferencesCopy(requestedBy, next);
         });
       } catch (error) {
         console.error('[Settings] Failed to load the push settings:', error);
@@ -921,6 +1045,68 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         const next = await pushPreferencesService.savePushPreference(requestedBy, key, enabled);
         if (!isCurrent()) return;
         set({ pushPreferences: next, pushPreferencesLoadFailed: false });
+        await savePushPreferencesCopy(requestedBy, next);
+      });
+    },
+
+    loadCountdownMarks: async () => {
+      // The web and a shell without the plugin never read the table.
+      if (!hasNativeReminders()) return;
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // 1. The saved copy, at once — online or offline. Only while the state is
+      // not loaded: a server answer or a confirmed write is newer.
+      if (get().countdownMarks === null) {
+        const saved = await readSavedCountdownMarks(requestedBy);
+        if (!isCurrent()) return;
+        if (saved && get().countdownMarks === null) set({ countdownMarks: saved });
+      }
+
+      // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
+      if (!isOnline()) return;
+
+      // 3. The server's rows replace state and copy — only on success. In the
+      // account-data queue, so it cannot read before a mark write and land
+      // after it.
+      try {
+        await serializeAccountDataWrite(async () => {
+          const next = await countdownMarksService.fetchCountdownMarks(requestedBy);
+          if (!isCurrent()) return;
+          set({ countdownMarks: next });
+          await saveCountdownMarksCopy(requestedBy, next);
+        });
+      } catch (error) {
+        // State and copy stay as they were, so the reminders keep their marks.
+        console.error('[Settings] Failed to load the countdown marks from the server:', error);
+      }
+    },
+
+    setCountdownMark: async (key, marked) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to change your reminders');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Refused before any request, so an offline edit changes nothing.
+      requireOnline('Reminders');
+      // A copy written from a list that was never loaded would claim "no other marks".
+      if (get().countdownMarks === null) throw new Error('Your reminders have not loaded yet');
+
+      await serializeAccountDataWrite(async () => {
+        if (!isCurrent()) return;
+        await countdownMarksService.setCountdownMark(requestedBy, key, marked);
+        if (!isCurrent()) return;
+        const current = get().countdownMarks ?? [];
+        const next = marked
+          ? current.includes(key)
+            ? current
+            : [...current, key]
+          : current.filter((existing) => existing !== key);
+        set({ countdownMarks: next });
+        await saveCountdownMarksCopy(requestedBy, next);
       });
     },
   };

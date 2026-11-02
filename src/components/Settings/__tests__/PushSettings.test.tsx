@@ -26,11 +26,24 @@ vi.mock('@capacitor/core', () => ({
   registerPlugin: () => ({}),
 }));
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: push }));
+// Sign-out (beforeEach's clearAuth) cancels the date reminders through this plugin.
+vi.mock('@capacitor/local-notifications', () => ({
+  LocalNotifications: {
+    getPending: vi.fn(() => Promise.resolve({ notifications: [] })),
+    cancel: vi.fn(() => Promise.resolve()),
+  },
+}));
 vi.mock('../../../api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn(), rpc: vi.fn() },
   getPartnerId: vi.fn(),
   lookupPartnerId: vi.fn(),
   isSeedFallbackName: () => false,
+}));
+vi.mock('../../../services/countdownMarksService', () => ({
+  countdownMarksService: {
+    fetchCountdownMarks: vi.fn(() => Promise.resolve([])),
+    setCountdownMark: vi.fn(() => Promise.resolve()),
+  },
 }));
 vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/pushPreferencesService')>()),
@@ -38,6 +51,7 @@ vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({
 }));
 
 import { AccountDataError } from '../../../services/accountDataError';
+import { serializeAccountDataWrite } from '../../../services/accountDataQueue';
 import {
   ALL_PUSH_PREFERENCES_ON,
   type PushPreferences,
@@ -74,11 +88,16 @@ function setVisibility(state: 'visible' | 'hidden'): void {
   Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
 }
 
-/** Renders the section and waits for the loaded switches to enable the rows. */
+/**
+ * Renders the section and waits for the loaded switches to enable the rows,
+ * and for the load's copy write (story 4.3) to leave the account-data queue,
+ * which a click would otherwise wait behind.
+ */
 async function renderLoaded(preferences: PushPreferences = ALL_PUSH_PREFERENCES_ON) {
   service.fetchPushPreferences.mockResolvedValue(preferences);
   render(<PushSettings />);
   await waitFor(() => expect(screen.getByTestId('settings-push-love-notes')).toBeEnabled());
+  await serializeAccountDataWrite(async () => {});
 }
 
 beforeEach(() => {
@@ -137,8 +156,12 @@ describe('PushSettings: the rows', () => {
   it('lists the six switches in order with their labels and helpers', async () => {
     await renderLoaded();
 
+    // The Reminders group's "Date reminders" switch (story 4.3) follows them; it has its own tests.
     const switches = within(screen.getByTestId('settings-push')).getAllByRole('switch');
-    expect(switches.map((row) => row.getAttribute('data-testid'))).toEqual(ROWS.map(([id]) => id));
+    expect(switches.map((row) => row.getAttribute('data-testid'))).toEqual([
+      ...ROWS.map(([id]) => id),
+      'settings-reminders-switch',
+    ]);
     for (const [id, label, helper] of ROWS) {
       const row = screen.getByTestId(id);
       expect(row).toHaveAccessibleName(label);

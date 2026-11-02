@@ -1,7 +1,8 @@
-import type { Session } from '@supabase/supabase-js';
+import { AuthApiError, AuthRetryableFetchError, type Session } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuthBootstrapSession } from '../../../../tests/support/factories/auth-bootstrap-notification-order';
 import { PUSH_TOKEN_STORAGE_KEY } from '../../../services/pushNotifications';
+import { AUTH_STORAGE_KEY } from '../../authStorage';
 import { signIn, signOut } from '../actionService';
 import { onAuthStateChange } from '../sessionService';
 
@@ -176,6 +177,77 @@ describe('auth session/action services', () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
+  });
+
+  describe('sign-out while the server is unreachable, on a stored session', () => {
+    const unreachable = () => new AuthRetryableFetchError('Failed to fetch', 0);
+
+    beforeEach(() => {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(listenerSession));
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      vi.restoreAllMocks();
+    });
+
+    it('removes the stored session, then signs out on this device without throwing', async () => {
+      let storedAtLocalSignOut: string | null = 'not called';
+      mockSignOut.mockResolvedValueOnce({ error: unreachable() }).mockImplementationOnce(() => {
+        storedAtLocalSignOut = localStorage.getItem(AUTH_STORAGE_KEY);
+        return Promise.resolve({ error: null });
+      });
+
+      await expect(signOut()).resolves.toBeUndefined();
+
+      expect(mockSignOut.mock.calls).toEqual([[], [{ scope: 'local' }]]);
+      expect(storedAtLocalSignOut).toBeNull();
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+      expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
+      expect(console.warn).toHaveBeenCalledWith(
+        '[AuthService] Server unreachable; signing out on this device:',
+        'Failed to fetch'
+      );
+    });
+
+    it('with a valid access token the SDK already signed out: done, with no second call', async () => {
+      // `_signOut` removes the session (emitting SIGNED_OUT) before it returns
+      // the retryable error, so nothing is stored by the time it answers.
+      mockSignOut.mockImplementationOnce(() => {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        return Promise.resolve({ error: unreachable() });
+      });
+
+      await expect(signOut()).resolves.toBeUndefined();
+
+      expect(mockSignOut).toHaveBeenCalledExactlyOnceWith();
+      expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
+      expect(console.warn).not.toHaveBeenCalled();
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('throws when the local sign-out fails too', async () => {
+      const localFailure = new AuthApiError('local sign-out failed', 500, 'unexpected_failure');
+      mockSignOut
+        .mockResolvedValueOnce({ error: unreachable() })
+        .mockResolvedValueOnce({ error: localFailure });
+
+      await expect(signOut()).rejects.toBe(localFailure);
+      expect(mockSignOut).toHaveBeenCalledTimes(2);
+      expect(mockClearAuthToken).not.toHaveBeenCalled();
+    });
+
+    it('a non-retryable error still throws, keeps the stored session and makes no local call', async () => {
+      const rejected = new AuthApiError('Internal error', 500, 'unexpected_failure');
+      mockSignOut.mockResolvedValueOnce({ error: rejected });
+
+      await expect(signOut()).rejects.toBe(rejected);
+      expect(mockSignOut).toHaveBeenCalledExactlyOnceWith();
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).not.toBeNull();
+      expect(mockClearAuthToken).not.toHaveBeenCalled();
+    });
   });
 
   describe('push registration on sign-out', () => {

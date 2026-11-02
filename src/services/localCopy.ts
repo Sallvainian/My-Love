@@ -12,7 +12,12 @@
  * Storage (IndexedDB convention: reads return `null` on failure, writes throw):
  * - `readLocalCopy<T>(userId, kind)` — the saved value, or `null` when there is
  *   none or the read failed.
- * - `writeLocalCopy<T>(userId, kind, value)` — replace the saved value. Throws.
+ * - `writeLocalCopy<T>(userId, kind, value)` — replace the saved value, then tell
+ *   the write listeners. Throws.
+ * - `onLocalCopyWritten(listener)` — call `listener(userId, kind)` after every
+ *   successful write, whoever made it (a refresh, a confirmed edit, a Realtime
+ *   event). Returns the function that stops it. A throwing listener is logged
+ *   and never fails the write. Date reminders re-plan from it (story 4.6).
  * - `deleteAccountCopies(userId)` — delete every kind saved for one account.
  *   Called on sign-out with the OUTGOING account; touches no other store
  *   (queued `moods` rows stay for their owner). Throws.
@@ -50,6 +55,10 @@ import { STORE_NAMES, openMyLoveDB } from './dbSchema';
 export type LocalCopyRefresher = () => Promise<void>;
 
 const refreshers = new Map<string, LocalCopyRefresher>();
+
+export type LocalCopyWriteListener = (userId: string, kind: string) => void;
+
+const writeListeners = new Set<LocalCopyWriteListener>();
 
 let dbPromise: Promise<IDBPDatabase<MyLoveDBSchema>> | null = null;
 
@@ -92,6 +101,25 @@ export async function readLocalCopy<T>(userId: string, kind: string): Promise<T 
 export async function writeLocalCopy<T>(userId: string, kind: string, value: T): Promise<void> {
   const db = await getDb();
   await db.put(STORE_NAMES.LOCAL_COPIES, { userId, kind, value, savedAt: Date.now() });
+  // After the put, so a listener that reads the copy sees this value.
+  for (const listener of [...writeListeners]) {
+    try {
+      listener(userId, kind);
+    } catch (error) {
+      console.error(`[localCopy] A write listener failed for ${kind}:`, error);
+    }
+  }
+}
+
+/**
+ * Call `listener(userId, kind)` after every successful `writeLocalCopy`.
+ * Returns a function that stops it.
+ */
+export function onLocalCopyWritten(listener: LocalCopyWriteListener): () => void {
+  writeListeners.add(listener);
+  return () => {
+    writeListeners.delete(listener);
+  };
 }
 
 /**

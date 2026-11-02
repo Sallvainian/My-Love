@@ -200,8 +200,8 @@ describe('LoveNotes realtime notice', () => {
     await renderWith('disconnected');
 
     const notice = screen.getByTestId(NOTICE);
-    // States what is true of the feed rather than promising a recovery that is
-    // not coming: `disconnected` is terminal for the mount.
+    // States what is true of the feed rather than promising a recovery on a
+    // schedule: `disconnected` holds until the network or the sign-in returns.
     expect(notice).toHaveTextContent('Not receiving new notes');
     expect(notice.textContent).not.toMatch(/reconnect/i);
     expect(notice).toHaveClass('text-danger');

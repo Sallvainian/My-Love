@@ -31,11 +31,27 @@ const mocks = vi.hoisted(() => ({
   isDisconnecting: vi.fn(),
   /** Ordered record of the calls whose ORDER is load-bearing */
   order: [] as string[],
+  /** The hook's auth-state listener, so a test can emit TOKEN_REFRESHED. */
+  authListener: null as null | ((event: string, session: unknown) => void),
+  /** The catch-up read a re-armed feed runs on its SUBSCRIBED. */
+  refreshLocalCopy: vi.fn(),
+  /** The auth listener's removal, which the effect cleanup must call. */
+  authUnsubscribe: vi.fn(),
+}));
+
+vi.mock('../../services/localCopy', () => ({
+  refreshLocalCopy: (...args: unknown[]) => mocks.refreshLocalCopy(...args),
 }));
 
 // Mock Supabase
 vi.mock('../../api/supabaseClient', () => ({
   supabase: {
+    auth: {
+      onAuthStateChange: (listener: (event: string, session: unknown) => void) => {
+        mocks.authListener = listener;
+        return { data: { subscription: { unsubscribe: () => mocks.authUnsubscribe() } } };
+      },
+    },
     channel: vi.fn(() => ({
       on: vi.fn().mockReturnThis(),
       subscribe: vi.fn((callback) => {
@@ -248,6 +264,311 @@ describe('useRealtimeMessages', () => {
       expect(mockSubscribe).toHaveBeenCalledTimes(6);
       expect(supabase.channel).toHaveBeenCalledTimes(6);
       expect(supabase.removeChannel).toHaveBeenCalledTimes(6);
+    });
+
+    /**
+     * Mount the hook and fail every join until it gives up, as the test above
+     * does: 6 channels, the last one released, status `disconnected`.
+     */
+    async function driveToGiveUp() {
+      const { supabase } = await import('../../api/supabaseClient');
+      const callbacks: Array<(status: string, err?: Error) => void> = [];
+      vi.mocked(supabase.channel).mockImplementation(() => {
+        const channel = {
+          on: vi.fn().mockReturnThis(),
+          subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+            if (callback) callbacks.push(callback);
+            return channel;
+          }),
+        };
+        return channel as unknown as RealtimeChannel;
+      });
+
+      let hook!: ReturnType<typeof renderHook<ReturnType<typeof useRealtimeMessages>, unknown>>;
+      await act(async () => {
+        hook = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      for (let i = 0; i < 6; i++) {
+        await act(async () => {
+          emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(Math.min(1000 * 2 ** i, 30000) + 100);
+        });
+      }
+
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+      expect(hook.result.current.status).toBe('disconnected');
+      return { supabase, hook, callbacks };
+    }
+
+    it('re-arms a feed that gave up when the network comes back, and catches up on join', async () => {
+      const { supabase, hook, callbacks } = await driveToGiveUp();
+
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+      expect(hook.result.current.status).toBe('reconnecting');
+      expect(mocks.refreshLocalCopy).not.toHaveBeenCalled();
+
+      await act(async () => {
+        emitStatus(callbacks.at(-1) ?? null, 'SUBSCRIBED');
+      });
+
+      expect(hook.result.current.status).toBe('connected');
+      expect(mocks.refreshLocalCopy).toHaveBeenCalledTimes(1);
+      expect(mocks.refreshLocalCopy).toHaveBeenCalledWith('love-notes');
+
+      hook.unmount();
+    });
+
+    it("re-arms a feed that gave up when this account's sign-in renews, not another's", async () => {
+      const { supabase, hook } = await driveToGiveUp();
+
+      await act(async () => {
+        mocks.authListener?.('TOKEN_REFRESHED', { user: { id: 'someone-else' } });
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+
+      await act(async () => {
+        mocks.authListener?.('TOKEN_REFRESHED', { user: { id: USER_ID } });
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+      expect(hook.result.current.status).toBe('reconnecting');
+
+      hook.unmount();
+    });
+
+    it('opens no second channel when re-arm signals repeat, or when the feed never gave up', async () => {
+      const { supabase, hook, callbacks } = await driveToGiveUp();
+
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        mocks.authListener?.('TOKEN_REFRESHED', { user: { id: USER_ID } });
+        window.dispatchEvent(new Event('online'));
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+
+      // Live again: a further signal is not a re-arm.
+      await act(async () => {
+        emitStatus(callbacks.at(-1) ?? null, 'SUBSCRIBED');
+      });
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        mocks.authListener?.('SIGNED_IN', { user: { id: USER_ID } });
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+      expect(supabase.removeChannel).toHaveBeenCalledTimes(6);
+
+      hook.unmount();
+    });
+
+    it('drops a retry still pending at the give-up, so a re-arm opens exactly one channel', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const callbacks: Array<(status: string, err?: Error) => void> = [];
+      vi.mocked(supabase.channel).mockImplementation(() => {
+        const channel = {
+          on: vi.fn().mockReturnThis(),
+          subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+            if (callback) callbacks.push(callback);
+            return channel;
+          }),
+        };
+        return channel as unknown as RealtimeChannel;
+      });
+
+      let hook!: ReturnType<typeof renderHook<ReturnType<typeof useRealtimeMessages>, unknown>>;
+      await act(async () => {
+        hook = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // Four failures, each retried: 5 channels, retry count 4.
+      for (let i = 0; i < 4; i++) {
+        await act(async () => {
+          emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000 * 2 ** i + 100);
+        });
+      }
+      expect(supabase.channel).toHaveBeenCalledTimes(5);
+
+      // The fifth failure schedules the last retry 16 s out; before it fires,
+      // the same channel's own rejoin fails again and the hook gives up.
+      await act(async () => {
+        emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+      });
+      await act(async () => {
+        emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+      });
+      expect(hook.result.current.status).toBe('disconnected');
+
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+
+      // Past the old retry's 16 s: it must not replace the re-armed channel.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(17000);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+
+      hook.unmount();
+    });
+
+    it('an open parked across the give-up and a re-arm does not add a second channel', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const callbacks: Array<(status: string, err?: Error) => void> = [];
+      vi.mocked(supabase.channel).mockImplementation(() => {
+        const channel = {
+          on: vi.fn().mockReturnThis(),
+          subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+            if (callback) callbacks.push(callback);
+            return channel;
+          }),
+        };
+        return channel as unknown as RealtimeChannel;
+      });
+
+      let hook!: ReturnType<typeof renderHook<ReturnType<typeof useRealtimeMessages>, unknown>>;
+      await act(async () => {
+        hook = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      // Four failures, each retried: 5 channels, retry count 4.
+      for (let i = 0; i < 4; i++) {
+        await act(async () => {
+          emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1000 * 2 ** i + 100);
+        });
+      }
+      expect(supabase.channel).toHaveBeenCalledTimes(5);
+
+      // The fifth failure's retry fires and parks on its token install.
+      let releaseAuth!: () => void;
+      mocks.setAuth.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseAuth = resolve;
+          })
+      );
+      await act(async () => {
+        emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16000 + 100);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(5);
+
+      // Meanwhile the old channel fails once more: the hook gives up, then the
+      // network comes back and the feed re-arms with channel 6.
+      await act(async () => {
+        emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+      });
+      expect(hook.result.current.status).toBe('disconnected');
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+      const leavesBefore = vi.mocked(supabase.removeChannel).mock.calls.length;
+
+      // The parked open resumes: it belongs to before the give-up, so it must
+      // neither release the re-armed channel nor build another.
+      await act(async () => {
+        releaseAuth();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+      expect(supabase.removeChannel).toHaveBeenCalledTimes(leavesBefore);
+
+      hook.unmount();
+    });
+
+    it('re-arms at the give-up when a signal arrived while it was still retrying', async () => {
+      const { supabase } = await import('../../api/supabaseClient');
+      const callbacks: Array<(status: string, err?: Error) => void> = [];
+      vi.mocked(supabase.channel).mockImplementation(() => {
+        const channel = {
+          on: vi.fn().mockReturnThis(),
+          subscribe: vi.fn((callback?: (status: string, err?: Error) => void) => {
+            if (callback) callbacks.push(callback);
+            return channel;
+          }),
+        };
+        return channel as unknown as RealtimeChannel;
+      });
+
+      let hook!: ReturnType<typeof renderHook<ReturnType<typeof useRealtimeMessages>, unknown>>;
+      await act(async () => {
+        hook = renderHook(() => useRealtimeMessages());
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      for (let i = 0; i < 6; i++) {
+        await act(async () => {
+          emitStatus(callbacks.at(-1) ?? null, 'CHANNEL_ERROR', new Error('Connection failed'));
+        });
+        // The sign-in renews during the retries, and the retries still run out.
+        if (i === 2) {
+          await act(async () => {
+            mocks.authListener?.('TOKEN_REFRESHED', { user: { id: USER_ID } });
+            await vi.advanceTimersByTimeAsync(0);
+          });
+          expect(supabase.channel).toHaveBeenCalledTimes(3);
+        }
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(Math.min(1000 * 2 ** i, 30000) + 100);
+        });
+      }
+
+      // 6 channels from the retries, then one from the re-arm at the give-up.
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+      expect(hook.result.current.status).toBe('reconnecting');
+
+      hook.unmount();
+    });
+
+    it('removes both re-arm listeners when the feed unmounts', async () => {
+      const added = vi.spyOn(window, 'addEventListener');
+      const removed = vi.spyOn(window, 'removeEventListener');
+      const { supabase, hook } = await driveToGiveUp();
+
+      const onlineListener = added.mock.calls.find(([type]) => type === 'online')?.[1];
+      expect(onlineListener).toBeDefined();
+      expect(mocks.authUnsubscribe).not.toHaveBeenCalled();
+
+      hook.unmount();
+
+      expect(removed).toHaveBeenCalledWith('online', onlineListener);
+      expect(mocks.authUnsubscribe).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+
+      added.mockRestore();
+      removed.mockRestore();
     });
 
     it('restarts the backoff at 1s after a successful rejoin', async () => {

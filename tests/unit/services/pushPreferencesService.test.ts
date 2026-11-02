@@ -49,6 +49,7 @@ const ROW = {
   pokes_and_kisses: true,
   dates: true,
   partner_requests: true,
+  date_reminders: true,
 };
 
 function setOnline(online: boolean) {
@@ -77,6 +78,7 @@ describe('fetchPushPreferences', () => {
       pokesAndKisses: true,
       dates: true,
       partnerRequests: true,
+      dateReminders: true,
     });
     expect(calls[0].table).toBe('push_preferences');
     expect(argsOf('eq')).toEqual([['user_id', 'USER-A']]);
@@ -116,6 +118,7 @@ describe('savePushPreference', () => {
     ['pokesAndKisses', 'pokes_and_kisses'],
     ['dates', 'dates'],
     ['partnerRequests', 'partner_requests'],
+    ['dateReminders', 'date_reminders'],
   ];
 
   it.each(COLUMNS)('%s upserts user_id and %s alone, on user_id', async (key, column) => {

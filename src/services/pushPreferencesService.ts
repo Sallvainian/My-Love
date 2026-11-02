@@ -1,10 +1,13 @@
 /**
  * Push Preferences Service — the signed-in account's switch for each kind of
- * push (`public.push_preferences`, one row per account).
+ * push, and the date reminders' switch (`public.push_preferences`, one row per
+ * account).
  *
- * Supabase is the source of truth, and nothing here is cached on the device:
- * Settings loads the switches when its push section opens
- * (`settingsSlice.pushPreferences`). A missing row means every switch is on,
+ * Supabase is the source of truth. This service caches nothing: Settings loads
+ * the switches when its push section opens (`settingsSlice.pushPreferences`),
+ * and the slice keeps the answer as the `push-preferences` local copy, which is
+ * how the shell's date reminders know the date reminders' switch offline
+ * (story 4.3). A missing row means every switch is on,
  * as it does for the `send-push` sender that reads the receiver's row.
  * Reads and writes are online-only and THROW — see `accountDataError.ts` for
  * the error convention (offline is `AccountDataError('offline')`).
@@ -28,6 +31,8 @@ export interface PushPreferences {
   pokesAndKisses: boolean;
   dates: boolean;
   partnerRequests: boolean;
+  /** The iOS shell's date reminders (local notifications, story 4.3); no push is behind it. */
+  dateReminders: boolean;
 }
 
 export type PushPreferenceKey = keyof PushPreferences;
@@ -40,6 +45,7 @@ export const ALL_PUSH_PREFERENCES_ON: PushPreferences = {
   pokesAndKisses: true,
   dates: true,
   partnerRequests: true,
+  dateReminders: true,
 };
 
 /** The `push_preferences` column behind each switch. */
@@ -50,6 +56,7 @@ interface PreferencesRow {
   pokes_and_kisses: boolean;
   dates: boolean;
   partner_requests: boolean;
+  date_reminders: boolean;
 }
 
 type PreferenceColumn = Exclude<keyof PreferencesRow, never>;
@@ -61,6 +68,7 @@ const COLUMN: Record<PushPreferenceKey, PreferenceColumn> = {
   pokesAndKisses: 'pokes_and_kisses',
   dates: 'dates',
   partnerRequests: 'partner_requests',
+  dateReminders: 'date_reminders',
 };
 
 const COLUMNS = Object.values(COLUMN).join(', ');
@@ -75,6 +83,7 @@ function toPushPreferences(row: PreferencesRow): PushPreferences {
     pokesAndKisses: row.pokes_and_kisses,
     dates: row.dates,
     partnerRequests: row.partner_requests,
+    dateReminders: row.date_reminders,
   };
 }
 

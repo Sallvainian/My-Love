@@ -22,7 +22,12 @@
 
 import { Cake } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { parseEventDate } from '../../services/eventsService';
+import {
+  type BirthdayInfo,
+  getNextBirthday,
+  getUpcomingAge,
+  toBirthdayInfo,
+} from '../../utils/countdownService';
 import { CountdownCard, type CountdownTone } from './CountdownCard';
 import {
   formatCountdownClock,
@@ -31,13 +36,6 @@ import {
   getCountdownToDay,
   type CountdownParts,
 } from './eventCountdownHelpers';
-
-/** A birthday's parts, read from its `YYYY-MM-DD` string. */
-interface BirthdayInfo {
-  month: number; // 1-12
-  day: number;
-  birthYear: number;
-}
 
 interface BirthdayCountdownProps {
   /** The person's display name; `null` reads as "You" (your own card, no name chosen). */
@@ -48,39 +46,6 @@ interface BirthdayCountdownProps {
   /** Shown under "Not set yet" when the birthday is not set. */
   unsetDescription?: string;
   testId: string;
-}
-
-/** The parts of a `YYYY-MM-DD` birthday, or `null` for an unreadable one. */
-function toBirthdayInfo(birthday: string | null): BirthdayInfo | null {
-  if (!birthday) return null;
-  const date = parseEventDate(birthday);
-  if (!date) return null;
-  return { month: date.getMonth() + 1, day: date.getDate(), birthYear: date.getFullYear() };
-}
-
-/**
- * Calculate the next occurrence of a birthday
- */
-function getNextBirthday(birthday: BirthdayInfo, now: Date = new Date()): Date {
-  const thisYear = now.getFullYear();
-  const startOfToday = new Date(thisYear, now.getMonth(), now.getDate());
-
-  // Create date for this year's birthday
-  const birthdayThisYear = new Date(thisYear, birthday.month - 1, birthday.day);
-
-  // If birthday has already passed this year, use next year
-  if (birthdayThisYear < startOfToday) {
-    return new Date(thisYear + 1, birthday.month - 1, birthday.day);
-  }
-
-  return birthdayThisYear;
-}
-
-/**
- * Calculate the age someone will turn on their next birthday
- */
-function getUpcomingAge(birthday: BirthdayInfo, now: Date = new Date()): number {
-  return getNextBirthday(birthday, now).getFullYear() - birthday.birthYear;
 }
 
 function computeBirthdayCountdownState(birthday: BirthdayInfo): {

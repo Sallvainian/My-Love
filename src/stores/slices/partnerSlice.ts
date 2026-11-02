@@ -57,6 +57,20 @@ function normalizePartnerCopy(copy: PartnerCopy | null): PartnerCopy | null {
 }
 
 /**
+ * The saved partner copy for `userId`, or `null` when there is none, the read
+ * failed or the copy is malformed. `{ status: 'unlinked' }` is a loaded answer.
+ * Reads only; the store is untouched.
+ */
+export async function readSavedPartner(userId: string): Promise<PartnerCopy | null> {
+  const saved = await readLocalCopy<unknown>(userId, PARTNER_COPY_KIND);
+  if (!saved || typeof saved !== 'object') return null;
+  const { status, partner } = saved as { status?: unknown; partner?: unknown };
+  if (status === 'unlinked') return { status: 'unlinked' };
+  if (status !== 'linked' || !partner || typeof partner !== 'object') return null;
+  return normalizePartnerCopy(saved as PartnerCopy);
+}
+
+/**
  * Orders overlapping `loadPartner` calls (view mount, start/reconnect refresh,
  * accept). Only the most recent call may write state or the copy, so an older
  * answer that lands last — a pre-accept "unlinked" after the post-accept

@@ -1,6 +1,7 @@
 /**
  * PushSettings — "Push and reminders": a switch for each kind of push, in the
- * native iOS shell only.
+ * native iOS shell only, and below them the "Reminders" group (`CountdownMarks`)
+ * that marks dates for the earlier month and week reminders.
  *
  * The website, the Home Screen web app and a shell installed before the push
  * plugins existed render nothing and fetch nothing (`hasNativePush()`). The
@@ -41,6 +42,7 @@ import {
   NOTICE,
   SECTION_LABEL,
 } from '../shared/kitClasses';
+import { CountdownMarks } from './CountdownMarks';
 import { SwitchRow } from './SwitchRow';
 
 interface PushRow {
@@ -212,6 +214,7 @@ function PushSettingsSection() {
           {saveError}
         </p>
       )}
+      <CountdownMarks />
     </section>
   );
 }

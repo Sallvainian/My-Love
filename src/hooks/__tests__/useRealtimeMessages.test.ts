@@ -36,6 +36,8 @@ const mocks = vi.hoisted(() => ({
 // Mock Supabase
 vi.mock('../../api/supabaseClient', () => ({
   supabase: {
+    // The hook re-arms a feed that gave up on TOKEN_REFRESHED / SIGNED_IN.
+    auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }) },
     channel: vi.fn(() => ({
       on: vi.fn().mockReturnThis(),
       subscribe: vi.fn((callback) => {

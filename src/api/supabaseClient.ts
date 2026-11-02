@@ -14,6 +14,7 @@ import {
 } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
 import { logger } from '../utils/logger';
+import { AUTH_STORAGE_KEY, createSessionGuardedFetch } from './authStorage';
 
 // Re-export Database type for convenience
 export type { Database } from '../types/database.types';
@@ -63,6 +64,9 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      // Equal to the SDK's own default key, so stored sessions keep working;
+      // named here so `readStoredSession` reads the same key the SDK writes.
+      storageKey: AUTH_STORAGE_KEY,
       // Accept a callback only for a flow this browser started. With PKCE the
       // SDK takes a `?code=` back only when a code verifier this browser wrote
       // is in its storage, and refuses a `#access_token=...` fragment outright
@@ -84,6 +88,19 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       params: {
         eventsPerSecond: 10,
       },
+    },
+    global: {
+      // supabase-js hands this fetch to the auth client as it is and wraps it
+      // in `fetchWithAuth` for data, storage, functions and Realtime HTTP
+      // calls, so the guard sees every HTTP request the client makes; the
+      // Realtime WebSocket does not use fetch and is outside it (DW-378). It
+      // refuses a data request that carries no user token while a session is
+      // stored -- see `createSessionGuardedFetch` -- and never an auth request.
+      fetch: createSessionGuardedFetch({
+        supabaseUrl,
+        supabaseKey: supabaseAnonKey,
+        fetchImpl: (...args) => fetch(...args),
+      }),
     },
   }
 );

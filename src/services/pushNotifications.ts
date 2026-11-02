@@ -41,7 +41,9 @@ import type { ViewType } from '../stores/slices/navigationSlice';
  * exists, so a cold-start tap arrives once `listenOnce` runs on the signed-in
  * start. This module must not import the store: `authSlice` imports it.
  *
- * Not here yet: date reminders (story 4.6 reuses `viewForPush` and `onPushTap`).
+ * Story 4.6 reuses the same fan-out for a tapped date reminder:
+ * `routeNotificationTap(view)` delivers a view to `onPushTap`'s handlers, or
+ * holds it until one subscribes. `dateReminders.ts` calls it with `'home'`.
  */
 
 type ApnsEnvironment = 'sandbox' | 'production';
@@ -176,6 +178,19 @@ export function onPushTap(handler: (view: ViewType) => void): () => void {
 }
 
 /**
+ * Opens `view` for a tapped notification: every `onPushTap` handler hears it,
+ * or, with none subscribed, the latest one is held for the first to subscribe.
+ * Shared by the push listener and the date-reminder tap listener.
+ */
+export function routeNotificationTap(view: ViewType): void {
+  if (pushTapHandlers.size === 0) {
+    pendingTapView = view;
+    return;
+  }
+  for (const handler of [...pushTapHandlers]) deliverTap(handler, view);
+}
+
+/**
  * Whether this shell carries both native pieces push needs. False on the
  * website, in the Home Screen web app and in a shell installed before the
  * push plugins existed.
@@ -225,11 +240,7 @@ function listenOnce(): Promise<void> {
         if (action.actionId !== 'tap') return;
         const view = viewForPush(action.notification?.data);
         if (view === null) return;
-        if (pushTapHandlers.size === 0) {
-          pendingTapView = view;
-          return;
-        }
-        for (const handler of [...pushTapHandlers]) deliverTap(handler, view);
+        routeNotificationTap(view);
       } catch (error) {
         console.error('[Push] Could not route a push tap:', error);
       }

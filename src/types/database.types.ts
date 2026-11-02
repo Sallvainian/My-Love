@@ -87,6 +87,25 @@ export type Database = {
         }
         Relationships: []
       }
+      countdown_marks: {
+        Row: {
+          created_at: string
+          date_key: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          date_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       couple_settings: {
         Row: {
           relationship_start: string | null
@@ -562,6 +581,7 @@ export type Database = {
       push_preferences: {
         Row: {
           created_at: string
+          date_reminders: boolean
           dates: boolean
           love_notes: boolean
           moods: boolean
@@ -573,6 +593,7 @@ export type Database = {
         ComputedFields: never
         Insert: {
           created_at?: string
+          date_reminders?: boolean
           dates?: boolean
           love_notes?: boolean
           moods?: boolean
@@ -583,6 +604,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          date_reminders?: boolean
           dates?: boolean
           love_notes?: boolean
           moods?: boolean

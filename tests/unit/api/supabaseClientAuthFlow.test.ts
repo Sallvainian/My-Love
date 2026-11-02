@@ -23,6 +23,17 @@ import { loadConfigFromFile } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createAuthBootstrapSession } from '../../support/factories/auth-bootstrap-notification-order';
+import { AUTH_STORAGE_KEY } from '../../../src/api/authStorage';
+
+// Only the offline sign-out cases import `actionService`; these keep its push
+// and service-worker side effects out of the real client's request log.
+vi.mock('../../../src/services/pushNotifications', () => ({
+  removePushRegistration: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('../../../src/sw-db', () => ({
+  storeAuthToken: vi.fn(() => Promise.resolve()),
+  clearAuthToken: vi.fn(() => Promise.resolve()),
+}));
 
 // `vitest.config.ts` defines VITE_SUPABASE_URL as `https://unit-tests.invalid`,
 // so the SDK derives this storage key (`sb-${hostname.split('.')[0]}-auth-token`).
@@ -75,6 +86,26 @@ function seedVictimSession(): void {
         accessToken: 'victim.access.token',
         refreshToken: 'victim-refresh-token',
         expiresAt: NOW_SEC + 3600,
+      })
+    )
+  );
+}
+
+/**
+ * A stored session whose access token expired an hour ago, so every read of it
+ * starts a refresh: the state a phone cold-started offline is in.
+ */
+function seedExpiredSession(): void {
+  localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify(
+      createAuthBootstrapSession({
+        userId: VICTIM_USER_ID,
+        email: 'victim@test.example.com',
+        displayName: null,
+        accessToken: 'expired.access.token',
+        refreshToken: 'stored-refresh-token',
+        expiresAt: NOW_SEC - 3600,
       })
     )
   );
@@ -615,6 +646,53 @@ describe('supabaseClient auth callback flow (CAP-13)', () => {
     expect(isAuthImplicitGrantRedirectError(error)).toBe(false);
 
     await expect(returning.getAuthCallbackOutcome()).resolves.toBe('code-expired');
+  });
+
+  describe('server unreachable, on a stored session whose access token expired', () => {
+    beforeEach(() => {
+      setUrl(`${APP_ORIGIN}/`);
+      seedExpiredSession();
+      // Every request fails as a network failure does. Each failure also moves
+      // the faked clock past the SDK's 30 s refresh window
+      // (`AUTO_REFRESH_TICK_DURATION_MS`), so a refresh gives up after one
+      // attempt instead of sleeping through its real-timer backoff.
+      fetchSpy.mockImplementation(() => {
+        vi.setSystemTime(Date.now() + 31_000);
+        return Promise.reject(new TypeError('Failed to fetch'));
+      });
+    });
+
+    it('lets the token refresh through and sends no data request as anon', async () => {
+      const { supabase } = await importAppClient();
+      clients.push(supabase);
+
+      // Without postgrest-js's own network-error retries (1 s, 2 s, 4 s), which
+      // would only repeat the same refused request.
+      const { error } = await supabase.from('events').select().retry(false);
+
+      expect(error).not.toBeNull();
+      const urls = fetchUrls(fetchSpy);
+      expect(urls.some((url) => url.includes('/auth/v1/token?grant_type=refresh_token'))).toBe(
+        true
+      );
+      expect(urls.filter((url) => url.includes('/rest/v1/'))).toEqual([]);
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).not.toBeNull();
+    });
+
+    it('signs out on this device: SIGNED_OUT with no session, and the store is empty', async () => {
+      const { signOut } = await import('../../../src/api/auth/actionService');
+      const { supabase } = await importAppClient();
+      clients.push(supabase);
+      const events: Array<[string, unknown]> = [];
+      supabase.auth.onAuthStateChange((event, session) => {
+        events.push([event, session]);
+      });
+
+      await signOut();
+
+      await vi.waitFor(() => expect(events).toContainEqual(['SIGNED_OUT', null]));
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+    });
   });
 
   it('leaves password sign-in on the password grant with no PKCE parameters', async () => {

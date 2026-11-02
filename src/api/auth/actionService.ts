@@ -1,8 +1,9 @@
 import { Capacitor } from '@capacitor/core';
-import type { AuthError } from '@supabase/supabase-js';
+import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js';
 import { removePushRegistration } from '../../services/pushNotifications';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import { logger } from '../../utils/logger';
+import { AUTH_STORAGE_KEY, readStoredSession } from '../authStorage';
 import { supabase } from '../supabaseClient';
 import { signInWithGoogleNative } from './nativeGoogleSignIn';
 import type { AuthCredentials, AuthResult } from './types';
@@ -79,7 +80,26 @@ export const signOut = async (): Promise<void> => {
     // SIGNED_OUT event below arrives, offline too.
     await removePushRegistration();
 
-    const { error } = await supabase.auth.signOut();
+    let { error } = await supabase.auth.signOut();
+
+    // The server is unreachable. With a valid access token the SDK has already
+    // removed the session and emitted SIGNED_OUT, so the sign-out is done. On a
+    // stored session it could not refresh, it returns before removing it: sign
+    // out on this device instead -- with the key gone, a local sign-out skips
+    // the server and emits SIGNED_OUT, so the usual cleanup runs. Either way the
+    // server-side session is not revoked (DW-377).
+    if (error && isAuthRetryableFetchError(error)) {
+      if (readStoredSession()) {
+        console.warn(
+          '[AuthService] Server unreachable; signing out on this device:',
+          error.message
+        );
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        ({ error } = await supabase.auth.signOut({ scope: 'local' }));
+      } else {
+        error = null;
+      }
+    }
 
     if (error) {
       console.error('[AuthService] Sign-out failed:', error.message);

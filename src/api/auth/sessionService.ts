@@ -1,14 +1,36 @@
-import type { Session, User } from '@supabase/supabase-js';
+import { isAuthRetryableFetchError, type Session, type User } from '@supabase/supabase-js';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import { logger } from '../../utils/logger';
+import { readStoredSession } from '../authStorage';
 import { supabase } from '../supabaseClient';
 import type { AuthStatus } from './types';
 
+/**
+ * The current session, or `null` when signed out or the read failed.
+ *
+ * While the server is unreachable this may return the session the SDK still
+ * holds in storage, whose access token may have expired; the SDK renews it
+ * once the server answers.
+ */
 export const getSession = async (): Promise<Session | null> => {
   try {
     const { data, error } = await supabase.auth.getSession();
 
     if (error) {
+      // An unreachable server is not a sign-out: while the SDK still holds
+      // the session in storage, answer with it (see `readStoredSession`).
+      if (isAuthRetryableFetchError(error)) {
+        const stored = readStoredSession();
+        if (stored) {
+          console.warn(
+            '[AuthService] Server unreachable; using the stored session:',
+            error.message
+          );
+        } else {
+          console.error('[AuthService] Failed to get session:', error.message);
+        }
+        return stored;
+      }
       console.error('[AuthService] Failed to get session:', error.message);
       return null;
     }
@@ -71,7 +93,18 @@ export const onAuthStateChange = (callback: (session: Session | null) => void): 
     // deadlock a nested refresh triggered from TOKEN_REFRESHED. Invalidate the
     // app's previous session before any token persistence is queued.
     try {
-      callback(session);
+      // A null INITIAL_SESSION also arrives when the SDK could not reach the
+      // server to refresh an expired token, with the session still stored.
+      // Hand the app that stored session; an empty store stays `null`.
+      if (event === 'INITIAL_SESSION' && !session) {
+        const stored = readStoredSession();
+        if (stored) {
+          console.warn('[AuthService] INITIAL_SESSION carried no session; using the stored one');
+        }
+        callback(stored);
+      } else {
+        callback(session);
+      }
     } finally {
       // Queue token persistence even if app delivery throws, while letting
       // that original error propagate synchronously.

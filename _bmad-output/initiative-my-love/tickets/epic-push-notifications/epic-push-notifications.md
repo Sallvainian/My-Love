@@ -7,6 +7,7 @@ sources: [AGENTS.md, supabase/migrations/20260922000000_local_data_tables.sql, s
 companions: []
 after: []
 risk: high
+status: done
 ---
 
 # Push Notifications
@@ -133,3 +134,6 @@ R11 (AGENTS.md native iOS shell; owner decision 2026-10-30): The website, the Ho
 - Unknown: whether XCUITest can open Notification Center and tap SpringBoard on the Duo's inner display (story 12's drag did not open it there; story 2.7 found AXe taps do not reach that display; story 2.9 proved XCUITest taps there only inside the web view). Story 14 answers it while it builds; if XCUITest cannot, it stops and is re-sliced.
 - Decision: 2026-10-31 the Unknown above is not story 14's `unknown` field, which would hold it out of an unattended run until a person settled it; building the story is the check.
 - Decision: 2026-10-31 build order is 12, 14, 1, 2, 3, 13, 4–9, 10, 11 (owner asked for story 14 after story 12): story 1 waits on 14 instead of 12, because both may change `scripts/sim-driver/sim` and only one Duo story runs at a time; story 10 also waits on 14. The first loop run builds 12, 14, 1 and 2. The set check suggested 12, 1, 14, 2 instead, so that story 1, the tracer, is not held behind a tooling story that may stop for a re-slice, and because story 1's check does not use `center`; kept the owner's order, open to the owner. Supersedes the 2026-10-30 lines that list the build order (12, 1, 2, 3, 13, 4–9, 10, 11), the stories a loop run builds (12, 1, 2 and 4–10), and the run shape (a loop run builds 12, 1 and 2), where they list them.
+- Decision: 2026-11-01 the epic is closed (owner confirmed after the closure check). Simulator, API and unit-test evidence stands in for device runs where story 3.11 did not run them on the iPhone: partner request and acceptance (R2), the wedding date, relationship start and birthday pushes (R1), the moods and pokes switches on their own (R3), and an older shell updated by live update (R11, Done when 4).
+- Decision: 2026-11-01 the Home Screen web app was never checked for R11 and Done when 4; accepted, because it runs the same bundle the website ran on the device with no push section and no error.
+- Decision: 2026-11-01 R7's picture-only push is deferred: `love_notes_content_check` refuses a note with no text, on production too, so the sender's "Sent you a picture" is never reached from the app. Ledger DW-363 stays open; the fix is the high-priority bug _bmad-output/backlog/bug-a-picture-only-love-note-never-sends.md.
