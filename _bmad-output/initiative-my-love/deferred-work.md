@@ -3264,7 +3264,9 @@ location: src/components/Settings/CountdownMarks.tsx (the switch's `?? true` def
 source_spec: `tickets/epic-date-reminders/tickets/story-a-settings-switch-turns-date-reminders-off-plan.md`
 severity: low
 reason: `loadPushPreferences` returns early offline and the row renders `?? true`, the same as story 3.7's six push rows. Planning is unaffected, because the re-plan reads the copy, so no reminder is scheduled; only the switch's shown state is wrong. A fix seeds the store from the copy before the online read, for all seven rows, which is a load-behaviour change and not cleanup.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-push-preferences-saved-copy
+resolution-undo: 56a0a8b609c0d775e125b17c47bb18a344e21e1a0204ed542d96495a1d8e50d6 2026-11-02 7374617475733a206f70656e
 
 ### DW-382: The docs this sweep added for DW-372 say iOS writes PendingNotifications.plist "up to about 25 s after a schedule", but no measurement bounds the lag on a fresh install's first schedule.
 origin: spec-deferred 8a19bda4005c
@@ -3372,7 +3374,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/stores/slices/settingsSlice.ts:1024-1031 (loadPushPreferences catch)
 severity: low
 reason: Story 4.3 made loadPushPreferences the push-preferences refresher, so it runs on every signed-in start and reconnect; a failed read sets pushPreferences: null and pushPreferencesLoadFailed: true, and an open Settings section then shows its load failure and disables all seven rows although the saved copy is fine. Same function as DW-381: fix together, so a failed read falls back to the saved copy and only a missing copy shows the failure.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-push-preferences-saved-copy
+resolution-undo: 56a0a8b609c0d775e125b17c47bb18a344e21e1a0204ed542d96495a1d8e50d6 2026-11-02 7374617475733a206f70656e
 
 ### DW-394: PushSettings.test.tsx asserts only that console.error was called.
 
@@ -3380,7 +3384,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/components/Settings/__tests__/PushSettings.test.tsx:357
 severity: low
 reason: The bare expect(console.error).toHaveBeenCalled() has passed vacuously twice when a newly mounted native module logged an unrelated error (4.6's local-notifications mock, 4.2's countdown-marks mock). Assert the expected message instead. Fits the DW-381 bundle.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-push-preferences-saved-copy
+resolution-undo: 56a0a8b609c0d775e125b17c47bb18a344e21e1a0204ed542d96495a1d8e50d6 2026-11-02 7374617475733a206f70656e
 
 ### DW-395: The countdown marks list offers dates that can never schedule a reminder.
 

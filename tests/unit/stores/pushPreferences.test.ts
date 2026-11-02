@@ -25,6 +25,7 @@ vi.mock('../../../src/services/pushPreferencesService', async (importOriginal) =
 }));
 
 import { AccountDataError } from '../../../src/services/accountDataError';
+import { deleteAccountCopies } from '../../../src/services/localCopy';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesService';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
@@ -52,12 +53,16 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   state().clearAuth();
   state().setAuthUser(A);
+  // After the identity setup: clearAuth's copy deletion is fire-and-forget, and
+  // a successful load writes the account's copy into the shared fake database.
+  await deleteAccountCopies(A);
+  await deleteAccountCopies(B);
 });
 
 afterEach(() => {
@@ -116,7 +121,7 @@ describe('loadPushPreferences', () => {
     expect(state().pushPreferences).toEqual(ALL_PUSH_PREFERENCES_ON);
   });
 
-  it('a failed reload after a successful load clears the switches, so none shows stale', async () => {
+  it('a failed reload after a successful load keeps the switches and does not flag the failure', async () => {
     fetchPushPreferences.mockResolvedValueOnce(NOTES_OFF);
     await state().loadPushPreferences();
     expect(state().pushPreferences).toEqual(NOTES_OFF);
@@ -124,8 +129,8 @@ describe('loadPushPreferences', () => {
     fetchPushPreferences.mockRejectedValueOnce(new Error('boom'));
     await state().loadPushPreferences();
 
-    expect(state().pushPreferences).toBeNull();
-    expect(state().pushPreferencesLoadFailed).toBe(true);
+    expect(state().pushPreferences).toEqual(NOTES_OFF);
+    expect(state().pushPreferencesLoadFailed).toBe(false);
   });
 
   it('a failed reload that lands after sign-out leaves the next account untouched', async () => {
@@ -150,6 +155,7 @@ describe('loadPushPreferences', () => {
     fetchPushPreferences.mockReturnValue(read.promise);
 
     const pending = state().loadPushPreferences();
+    await vi.waitFor(() => expect(fetchPushPreferences).toHaveBeenCalled());
     state().clearAuth();
     read.resolve(NOTES_OFF);
     await pending;
@@ -162,6 +168,7 @@ describe('loadPushPreferences', () => {
     fetchPushPreferences.mockReturnValue(read.promise);
 
     const pending = state().loadPushPreferences();
+    await vi.waitFor(() => expect(fetchPushPreferences).toHaveBeenCalled());
     state().clearAuth();
     state().setAuthUser(A);
     read.resolve(NOTES_OFF);
@@ -175,6 +182,7 @@ describe('loadPushPreferences', () => {
     fetchPushPreferences.mockReturnValue(read.promise);
 
     const pending = state().loadPushPreferences();
+    await vi.waitFor(() => expect(fetchPushPreferences).toHaveBeenCalled());
     state().clearAuth();
     state().setAuthUser(B);
     read.reject(new Error('boom'));

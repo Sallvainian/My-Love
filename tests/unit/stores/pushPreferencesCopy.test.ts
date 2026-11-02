@@ -100,7 +100,8 @@ describe('loadPushPreferences writes the copy', () => {
 
     await state().loadPushPreferences();
 
-    expect(state().pushPreferencesLoadFailed).toBe(true);
+    expect(state().pushPreferences).toEqual(REMINDERS_OFF);
+    expect(state().pushPreferencesLoadFailed).toBe(false);
     expect(await savedCopy()).toEqual(REMINDERS_OFF);
   });
 
@@ -127,6 +128,7 @@ describe('loadPushPreferences writes the copy', () => {
     fetchPushPreferences.mockReturnValue(read.promise);
 
     const pending = state().loadPushPreferences();
+    await vi.waitFor(() => expect(fetchPushPreferences).toHaveBeenCalled());
     state().clearAuth();
     state().setAuthUser(B);
     read.settle(REMINDERS_OFF);
@@ -141,12 +143,93 @@ describe('loadPushPreferences writes the copy', () => {
     fetchPushPreferences.mockReturnValue(read.promise);
 
     const pending = state().loadPushPreferences();
+    await vi.waitFor(() => expect(fetchPushPreferences).toHaveBeenCalled());
     state().clearAuth();
     state().setAuthUser(A);
     read.settle(REMINDERS_OFF);
     await pending;
 
     expect(await savedCopy(A)).toBeNull();
+  });
+});
+
+describe('loadPushPreferences shows the saved copy', () => {
+  it('seeds the state from the copy offline, with no read', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, REMINDERS_OFF);
+    setOnline(false);
+
+    await state().loadPushPreferences();
+
+    expect(fetchPushPreferences).not.toHaveBeenCalled();
+    expect(state().pushPreferences).toEqual(REMINDERS_OFF);
+    expect(state().pushPreferencesLoadFailed).toBe(false);
+  });
+
+  it('leaves the state null and not failed offline with no copy', async () => {
+    setOnline(false);
+
+    await state().loadPushPreferences();
+
+    expect(fetchPushPreferences).not.toHaveBeenCalled();
+    expect(state().pushPreferences).toBeNull();
+    expect(state().pushPreferencesLoadFailed).toBe(false);
+  });
+
+  it('shows the copy when the read fails, without flagging the failure', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, REMINDERS_OFF);
+    const failure = new Error('boom');
+    fetchPushPreferences.mockRejectedValue(failure);
+
+    await state().loadPushPreferences();
+
+    expect(state().pushPreferences).toEqual(REMINDERS_OFF);
+    expect(state().pushPreferencesLoadFailed).toBe(false);
+    expect(console.error).toHaveBeenCalledWith(
+      '[Settings] Failed to load the push settings:',
+      failure
+    );
+  });
+
+  it('flags the failure when the read fails and there is no copy', async () => {
+    fetchPushPreferences.mockRejectedValue(new Error('boom'));
+
+    await state().loadPushPreferences();
+
+    expect(state().pushPreferences).toBeNull();
+    expect(state().pushPreferencesLoadFailed).toBe(true);
+  });
+
+  it('does not overwrite a state that is already loaded with the copy', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, REMINDERS_OFF);
+    useAppStore.setState({ pushPreferences: ALL_PUSH_PREFERENCES_ON });
+    setOnline(false);
+
+    await state().loadPushPreferences();
+
+    expect(state().pushPreferences).toEqual(ALL_PUSH_PREFERENCES_ON);
+  });
+
+  it('does not let a copy read that lands after a server answer overwrite it', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, REMINDERS_OFF);
+    setOnline(false);
+
+    const pending = state().loadPushPreferences();
+    useAppStore.setState({ pushPreferences: ALL_PUSH_PREFERENCES_ON });
+    await pending;
+
+    expect(state().pushPreferences).toEqual(ALL_PUSH_PREFERENCES_ON);
+  });
+
+  it('sets nothing when the account changes during the copy read', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, REMINDERS_OFF);
+
+    const pending = state().loadPushPreferences();
+    state().clearAuth();
+    state().setAuthUser(B);
+    await pending;
+
+    expect(state().pushPreferences).toBeNull();
+    expect(fetchPushPreferences).not.toHaveBeenCalled();
   });
 });
 

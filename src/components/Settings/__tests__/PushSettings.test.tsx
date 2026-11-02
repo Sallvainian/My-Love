@@ -52,10 +52,12 @@ vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({
 
 import { AccountDataError } from '../../../services/accountDataError';
 import { serializeAccountDataWrite } from '../../../services/accountDataQueue';
+import { deleteAccountCopies, writeLocalCopy } from '../../../services/localCopy';
 import {
   ALL_PUSH_PREFERENCES_ON,
   type PushPreferences,
 } from '../../../services/pushPreferencesService';
+import { PUSH_PREFERENCES_COPY_KIND } from '../../../stores/slices/settingsSlice';
 import { useAppStore } from '../../../stores/useAppStore';
 import { PushSettings } from '../PushSettings';
 
@@ -100,7 +102,7 @@ async function renderLoaded(preferences: PushPreferences = ALL_PUSH_PREFERENCES_
   await serializeAccountDataWrite(async () => {});
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   capacitor.isNativePlatform.mockReturnValue(true);
@@ -110,6 +112,9 @@ beforeEach(() => {
   setVisibility('visible');
   useAppStore.getState().clearAuth();
   useAppStore.getState().setAuthUser('user-a');
+  // After the identity setup: clearAuth's copy deletion is fire-and-forget, and
+  // a successful load writes the account's copy into the shared fake database.
+  await deleteAccountCopies('user-a');
 });
 
 afterEach(() => {
@@ -327,6 +332,25 @@ describe('PushSettings: opened offline', () => {
     for (const [id] of ROWS) expect(screen.getByTestId(id)).toBeDisabled();
   });
 
+  it('shows the saved copy with the rows enabled and no offline line', async () => {
+    await writeLocalCopy('user-a', PUSH_PREFERENCES_COPY_KIND, {
+      ...ALL_PUSH_PREFERENCES_ON,
+      loveNotes: false,
+      dateReminders: false,
+    });
+    setOnline(false);
+    render(<PushSettings />);
+
+    await waitFor(() => expect(screen.getByTestId('settings-push-love-notes')).toBeEnabled());
+    expect(screen.getByTestId('settings-push-love-notes')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByTestId('settings-push-moods')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('settings-reminders-switch')).toBeEnabled();
+    expect(screen.getByTestId('settings-reminders-switch')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId('settings-push-offline')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-push-load-error')).not.toBeInTheDocument();
+    expect(service.fetchPushPreferences).not.toHaveBeenCalled();
+  });
+
   it('shows no offline line when online and loaded', async () => {
     await renderLoaded();
 
@@ -335,26 +359,54 @@ describe('PushSettings: opened offline', () => {
 });
 
 describe('PushSettings: a failed load', () => {
-  it('disables the rows that had loaded when a reload fails', async () => {
+  it('keeps the rows that had loaded enabled when a reload fails', async () => {
     await renderLoaded();
-    service.fetchPushPreferences.mockRejectedValue(new Error('boom'));
+    const failure = new Error('boom');
+    service.fetchPushPreferences.mockRejectedValue(failure);
     act(() => {
       window.dispatchEvent(new Event('online'));
     });
 
-    expect(await screen.findByTestId('settings-push-load-error')).toBeInTheDocument();
-    for (const [id] of ROWS) expect(screen.getByTestId(id)).toBeDisabled();
+    await waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith('[Settings] Failed to load the push settings:', failure)
+    );
+    await serializeAccountDataWrite(async () => {});
+    expect(screen.queryByTestId('settings-push-load-error')).not.toBeInTheDocument();
+    for (const [id] of ROWS) expect(screen.getByTestId(id)).toBeEnabled();
+  });
+
+  it('shows the saved copy, with no load-error line, when the read fails', async () => {
+    await writeLocalCopy('user-a', PUSH_PREFERENCES_COPY_KIND, {
+      ...ALL_PUSH_PREFERENCES_ON,
+      loveNotes: false,
+    });
+    const failure = new Error('boom');
+    service.fetchPushPreferences.mockRejectedValue(failure);
+    render(<PushSettings />);
+
+    await waitFor(() => expect(screen.getByTestId('settings-push-love-notes')).toBeEnabled());
+    await waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith('[Settings] Failed to load the push settings:', failure)
+    );
+    await serializeAccountDataWrite(async () => {});
+    expect(screen.getByTestId('settings-push-love-notes')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId('settings-push-load-error')).not.toBeInTheDocument();
+    for (const [id] of ROWS) expect(screen.getByTestId(id)).toBeEnabled();
   });
 
   it('disables the rows and says the settings could not be loaded', async () => {
-    service.fetchPushPreferences.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    const failure = new AccountDataError('transport', 'boom');
+    service.fetchPushPreferences.mockRejectedValue(failure);
     render(<PushSettings />);
 
     expect(await screen.findByTestId('settings-push-load-error')).toHaveTextContent(
       "Couldn't load your push settings."
     );
     for (const [id] of ROWS) expect(screen.getByTestId(id)).toBeDisabled();
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[Settings] Failed to load the push settings:',
+      failure
+    );
   });
 
   it('reloads when the connection returns', async () => {

@@ -55,7 +55,9 @@
  * switch to the row (`dateReminders`) and keeps the whole row as the local copy
  * of kind `push-preferences`, filled only from a successful read or a
  * confirmed write (a failed read never writes or clears it), so the shell can
- * plan the reminders offline. The kind's refresher runs
+ * plan the reminders offline. `loadPushPreferences` shows that copy at once,
+ * online or offline, while nothing is loaded, so the switches stay usable
+ * offline and after a failed read. The kind's refresher runs
  * `loadPushPreferences` only in a shell with the local-notifications plugin,
  * so the web and an older shell never read the table on their own.
  *
@@ -118,11 +120,15 @@ export interface SettingsSlice {
    */
   ownProfile: OwnProfile | null;
   /**
-   * The account's push switches, from `public.push_preferences`. `null` until
-   * Settings' push section has loaded them (or after a failed load).
+   * The account's push switches, from `public.push_preferences` via its local
+   * copy. `null` until the saved copy or the server has answered; a failed read
+   * leaves what is shown as it was.
    */
   pushPreferences: PushPreferences | null;
-  /** The last `loadPushPreferences` failed; the section disables its rows. */
+  /**
+   * The last `loadPushPreferences` failed and nothing is shown (no saved copy,
+   * no earlier answer); the section disables its rows.
+   */
   pushPreferencesLoadFailed: boolean;
   /**
    * The date keys the account marked for the month and week reminders, from
@@ -178,8 +184,10 @@ export interface SettingsSlice {
   setBirthday: (birthday: string) => Promise<void>;
 
   /**
-   * Load the account's push switches from the server. Never throws; offline it
-   * does nothing. A failure sets `pushPreferencesLoadFailed`.
+   * Load the account's push switches: the saved copy first (online or offline,
+   * only while nothing is loaded), then the server's row when online. Never
+   * throws. A failed read keeps what is shown and sets
+   * `pushPreferencesLoadFailed` only when nothing is.
    */
   loadPushPreferences: () => Promise<void>;
   /**
@@ -1013,9 +1021,21 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
       const isCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
-      // Offline there is nothing to ask, and nothing worth reporting.
+      // 1. The saved copy, at once — online or offline. Only while the state is
+      // not loaded: a server answer or a confirmed write is newer.
+      if (get().pushPreferences === null) {
+        const saved = await readSavedPushPreferences(requestedBy);
+        if (!isCurrent()) return;
+        if (saved && get().pushPreferences === null) {
+          set({ pushPreferences: saved, pushPreferencesLoadFailed: false });
+        }
+      }
+
+      // 2. Offline there is nothing to ask, and nothing worth reporting; the
+      // copy (or nothing) stays shown.
       if (!isOnline()) return;
 
+      // 3. The server's row replaces state and copy — only on success.
       try {
         await serializeAccountDataWrite(async () => {
           const next = await pushPreferencesService.fetchPushPreferences(requestedBy);
@@ -1025,9 +1045,11 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         });
       } catch (error) {
         console.error('[Settings] Failed to load the push settings:', error);
-        // Stale switches would show as usable beside the failure line, so a
-        // failed load clears them and the section disables its rows.
-        if (isCurrent()) set({ pushPreferences: null, pushPreferencesLoadFailed: true });
+        // Whatever is shown (the saved copy or an earlier answer) stays; only
+        // an empty section is flagged, and it disables its rows.
+        if (isCurrent() && get().pushPreferences === null) {
+          set({ pushPreferencesLoadFailed: true });
+        }
       }
     },
 

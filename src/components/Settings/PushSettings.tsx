@@ -165,7 +165,8 @@ function PushSettingsSection() {
     [setPushPreference]
   );
 
-  // Rows wait for the account's row: until it is loaded they show the default and cannot be toggled.
+  // Rows wait for the account's row: until the saved copy or the server has answered they show
+  // the default and cannot be toggled.
   const disabled = pushPreferences === null;
 
   return (
