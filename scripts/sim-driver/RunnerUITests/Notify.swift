@@ -209,7 +209,13 @@ final class Notify: XCTestCase {
         if try cellFrames() != before { return XCTFail(tooMany + ": a drag down the list moved it") }
         list.swipeUp()
         sleep(1)
-        if try cellFrames() != before { return XCTFail(tooMany + ": a swipe down the list moved it") }
+        // The list always keeps its empty first cell, so no cells (or no list,
+        // which makes the snapshot throw) means the swipe closed it.
+        let after = list.exists ? ((try? cellFrames()) ?? []) : []
+        if after.isEmpty {
+            return XCTFail("Notification Center closed on the end-of-list swipe, so center could not confirm the list fits one screen; run it again")
+        }
+        if after != before { return XCTFail(tooMany + ": a swipe down the list moved it") }
         let doc: [String: Any] = ["groups": read.groups.map { ["text": $0[0], "count": $0.count] }]
         let data = try JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys])
         say(String(decoding: data, as: UTF8.self))
