@@ -3553,7 +3553,9 @@ location: supabase/functions/send-push/index.ts:19; supabase/functions/upload-lo
 source_spec: `plan-dw-pin-edge-supabase-js.md`
 severity: medium
 reason: package-lock.json declares @supabase/storage-js 2.118.0 dependency "iceberg-js": "^0.8.1" (every other sub-package dependency is exact: tslib 2.8.1, @supabase/phoenix 0.4.5). esm.sh's built https://esm.sh/@supabase/storage-js@2.118.0/es2022/storage-js.mjs imports "/iceberg-js@^0.8.1?target=es2022", a range esm.sh resolves per request, so a new iceberg-js 0.8.x can reach both Edge Functions on the next deploy with no reviewed change. Pre-existing and outside the owner's 2026-11-02 decision, which pins supabase-js only. A fix would add ?deps=iceberg-js@0.8.1 to both import URLs (or vendor the import), which needs an owner call.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-edge-pin-iceberg-js
+resolution-undo: 3e3cad4e23563016d63b082448d5ee7a9cc230415fc6fd9d1dcd33e84bbd304e 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 pin-iceberg — owner, 2026-11-02: pin iceberg-js to 0.8.1 exactly by adding `deps=iceberg-js@0.8.1` to both Edge Function supabase-js import URLs (send-push, upload-love-note-image), finishing the DW-355 pin.
 
 ### DW-411: After a stale-session boot the Mood screen never mounts the partner card, so a later renewal cannot bring it back until the screen is re-entered; the usePartnerMood realtime-lost error is therefore
