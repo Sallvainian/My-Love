@@ -9,7 +9,7 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 2 * * 0' # Weekly full suite on Sundays at 2 AM UTC; burn-in runs only on PRs
+    - cron: '0 2 * * 0' # Weekly full suite on Sundays at 2 AM UTC, plus a burn-in of every E2E spec
   workflow_dispatch:
 
 concurrency:
@@ -412,7 +412,11 @@ jobs:
 
   # ============================================
   # Stage 7: Burn-In (Flaky Detection)
-  # Only on PRs to main — runs changed E2E specs 5x
+  # On PRs to main it runs the changed E2E specs 5x. On the weekly cron it runs
+  # EVERY E2E spec 5x: a PR only ever burns in the files it touched, so a test
+  # that turned flaky without its own file changing (an app change, a shared
+  # helper, a slower dependency) is never repeated anywhere else. TEA's CI
+  # template burns in on both triggers.
   #
   # Runs alongside e2e-tests rather than after it. Burn-in re-runs the changed
   # specs from scratch 5x, so it never consumed anything the shards produced —
@@ -449,7 +453,10 @@ jobs:
   burn-in:
     name: Burn-In (Shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The weekly run repeats the whole suite: about 511s of tests over 2 E2E
+    # shards (2026-11), so roughly 3 minutes per pass per burn-in shard, more on
+    # the shard that draws the heavy files, times 5 passes plus setup.
+    timeout-minutes: ${{ github.event_name == 'schedule' && 60 || 30 }}
     permissions:
       contents: read
     needs: [changes]
@@ -460,8 +467,8 @@ jobs:
     # spins three runners through a fetch-depth:0 checkout just to skip.
     if: >-
       needs.changes.outputs.e2e == 'true' &&
-      github.event_name == 'pull_request' &&
-      github.base_ref == 'main'
+      ((github.event_name == 'pull_request' && github.base_ref == 'main') ||
+       github.event_name == 'schedule')
     strategy:
       # One shard finding a flake must not cancel the others: the point of this
       # job is the report, and a second shard's result is evidence too.
@@ -490,22 +497,29 @@ jobs:
           # One job silently skipping was already wrong; three of them are also
           # indistinguishable from legitimately-empty slices.
           set -euo pipefail
-          git fetch origin ${{ github.base_ref }}
 
-          # --diff-filter=d excludes DELETED paths. Without it, a shard whose
-          # whole slice is a deleted spec runs `playwright test <gone>` on its
-          # own, and Playwright exits 1 with "No tests found" — a red required
-          # check for a PR that merely removed a spec. The single-invocation
-          # version tolerated this because the surviving filters still matched
-          # something; three narrow invocations do not. PR #125 is
-          # exactly this shape: 4 changed specs, one of them a deletion.
-          CHANGED=$(git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+          # The weekly cron has no base branch to diff against and burns in
+          # every tracked E2E spec; a PR burns in the specs it changed.
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            CHANGED=$(git ls-files -- tests/e2e | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+          else
+            git fetch origin ${{ github.base_ref }}
+
+            # --diff-filter=d excludes DELETED paths. Without it, a shard whose
+            # whole slice is a deleted spec runs `playwright test <gone>` on its
+            # own, and Playwright exits 1 with "No tests found" — a red required
+            # check for a PR that merely removed a spec. The single-invocation
+            # version tolerated this because the surviving filters still matched
+            # something; three narrow invocations do not. PR #125 is
+            # exactly this shape: 4 changed specs, one of them a deletion.
+            CHANGED=$(git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+          fi
 
           # NF drops the blank line `echo` emits for an empty CHANGED, which
           # would otherwise hand shard 1 a one-element list of "".
           MINE=$(echo "$CHANGED" | awk -v s="${{ matrix.shard }}" -v t=3 'NF && (NR % t) == (s % t)')
 
-          echo "All changed E2E specs:"
+          echo "All E2E specs to burn in (${{ github.event_name }}):"
           echo "${CHANGED:-  (none)}"
           echo "This shard (${{ matrix.shard }}/3) will burn in:"
           echo "${MINE:-  (none)}"
@@ -533,7 +547,7 @@ jobs:
         env:
           SPECS: ${{ steps.changed-tests.outputs.specs }}
         run: |
-          echo "Running 5 iterations on shard ${{ matrix.shard }}/3's changed E2E test files"
+          echo "Running 5 iterations on shard ${{ matrix.shard }}/3's E2E test files"
           # --retries=0 is load-bearing. The job sets CI=true, and
           # playwright.config.ts reads `retries: process.env.CI ? 2 : 0`, so
           # without this flag each iteration retries a failure twice and burn-in
