@@ -109,6 +109,8 @@ vi.mock('../../api/supabaseClient', () => {
 
   return {
     supabase: {
+      // The hook re-arms a feed that gave up on TOKEN_REFRESHED / SIGNED_IN.
+      auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }) },
       channel: (topic: string, params?: Record<string, unknown>) => {
         const channel = client.channel(topic, params as never);
         harness.opened.push(channel);

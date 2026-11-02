@@ -99,6 +99,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   ownProfile: null,
   pushPreferences: null,
   pushPreferencesLoadFailed: false,
+  countdownMarks: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -528,8 +529,10 @@ describe('clearAuth on sign-out', () => {
         pokesAndKisses: true,
         dates: true,
         partnerRequests: true,
+        dateReminders: true,
       },
       pushPreferencesLoadFailed: true,
+      countdownMarks: ['wedding', 'own-birthday'],
     });
 
     useAppStore.getState().clearAuth();
@@ -546,6 +549,8 @@ describe('clearAuth on sign-out', () => {
     // So do the previous account's push switches: the next account must not see them.
     expect(state.pushPreferences).toBeNull();
     expect(state.pushPreferencesLoadFailed).toBe(false);
+    // And the dates the previous account marked for a month-and-a-week reminder.
+    expect(state.countdownMarks).toBeNull();
   });
 
   it('keeps no copy of the anniversaries anywhere in localStorage', () => {

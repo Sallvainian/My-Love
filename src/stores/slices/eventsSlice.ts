@@ -132,6 +132,15 @@ function parseSavedEvents(value: unknown): CoupleEvent[] | null {
 }
 
 /**
+ * The events the app last loaded for `userId` (the saved copy), or `null` when
+ * there is none, it cannot be read or it is not in a shape the screens can use.
+ * For readers that must not start a load of their own, such as the date reminders.
+ */
+export async function readSavedEvents(userId: string): Promise<CoupleEvent[] | null> {
+  return parseSavedEvents(await readLocalCopy<unknown>(userId, EVENTS_COPY_KIND));
+}
+
+/**
  * Outcome of a write attempt. The failure message is returned directly rather
  * than read back off the store, so callers get the message for *their* write
  * and not whatever unrelated error `eventsError` happens to hold.

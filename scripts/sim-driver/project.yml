@@ -2,8 +2,11 @@
 # ios/App so the shipped app never changes. `sim` copies this folder into its
 # work dir and runs xcodegen there. Runner is the host the UI tests need, and
 # asks for notification permission so Notify.swift's steps can be proven on it
-# (`sim ... --host`); RunnerUITests/Drive.swift drives the installed shell by
-# bundle id, and RunnerUITests/Notify.swift drives SpringBoard's notifications.
+# (`sim ... --host`), and schedules or removes local notification requests when
+# launched with SCHEDULE / REMOVE (`sim schedule`, `sim unschedule`: its own
+# requests are the ones whose contents are known, which proves `sim pending`);
+# RunnerUITests/Drive.swift drives the installed shell by bundle id, and
+# RunnerUITests/Notify.swift drives SpringBoard's notifications.
 name: SimDriver
 options:
   bundleIdPrefix: dev.sallvain.simdriver

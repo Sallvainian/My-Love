@@ -32,6 +32,8 @@ import {
   supabase,
 } from '../api/supabaseClient';
 import { parseLoveNoteBroadcast } from '../api/validation/broadcastSchemas';
+import { refreshLocalCopy } from '../services/localCopy';
+import { LOVE_NOTES_COPY_KIND } from '../stores/slices/notesSlice';
 import { useAppStore } from '../stores/useAppStore';
 import type { LoveNote } from '../types/models';
 import { playHaptic } from '../utils/haptics';
@@ -40,8 +42,8 @@ import { logger } from '../utils/logger';
 /**
  * How the love-notes feed is doing, for a consumer that wants to say so.
  *
- * `disconnected` is terminal within a mount: it means the retry ceiling was
- * reached and this hook will not try again on its own.
+ * `disconnected` means the retry ceiling was reached: the hook tries again
+ * only when the network comes back or the sign-in renews.
  */
 export type NoteFeedStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
@@ -267,10 +269,28 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
      * interleaving the retry path documents below. The give-up branch then runs,
      * releases the channel and reports `disconnected`, and the parked open would
      * resume and build a fresh channel on top of it, leaving the banner saying
-     * the feed is dead while a channel is live. `disconnected` is documented as
-     * terminal, so it has to actually be.
+     * the feed is dead while a channel is live. `disconnected` holds until a
+     * re-arm (`rearm` below) clears this, so it has to actually hold.
      */
     let gaveUp = false;
+
+    /**
+     * Bumped on every give-up. An `openChannel` started before the give-up
+     * checks it after each await, so a re-arm that clears `gaveUp` cannot let
+     * that older open resume and build a second channel next to the re-armed
+     * one.
+     */
+    let epoch = 0;
+
+    /** Set by a re-arm, so its SUBSCRIBED reads the notes missed meanwhile. */
+    let catchUpOnJoin = false;
+
+    /**
+     * A re-arm signal that arrived while the feed was still retrying. If those
+     * retries still run out, the give-up re-arms once at once rather than
+     * waiting for a signal that has already come and gone.
+     */
+    let signalWhileRetrying = false;
 
     // Whether the partner snapshot can be trusted for the NEXT `SUBSCRIBED`.
     //
@@ -353,7 +373,14 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Reset retry count on successful subscription
       if (status === 'SUBSCRIBED') {
         retryCountRef.current = 0;
+        signalWhileRetrying = false;
         setReport({ key: currentUserId, status: 'connected' });
+        // After a re-arm the feed was down for a while, and a broadcast missed
+        // then is never re-sent: read the thread again, as a reconnect does.
+        if (catchUpOnJoin) {
+          catchUpOnJoin = false;
+          void refreshLocalCopy(LOVE_NOTES_COPY_KIND);
+        }
         // And cancel the retry that failure scheduled. The SDK runs its own
         // rejoin loop on an errored channel (@supabase/phoenix
         // assets/js/phoenix/channel.js:76 `rejoinTimer.scheduleTimeout()`),
@@ -426,12 +453,25 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           }
 
           // Checked by `openChannel` after each of its awaits, so an open
-          // already in flight abandons rather than resurrecting the topic.
+          // already in flight abandons rather than resurrecting the topic. The
+          // epoch keeps it abandoned after a re-arm clears `gaveUp`, and a retry
+          // still pending (the old channel's own rejoin can report the last
+          // failure before that timer fires) is dropped for the same reason.
           gaveUp = true;
+          epoch++;
+          if (retryTimeoutRef.current) {
+            clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
+          }
 
-          // And say so. This is the only terminal state the hook has; until it
-          // was reported, the feed just stopped and no consumer could tell.
+          // And say so. This is the only state in which the hook stops trying;
+          // until it was reported, the feed just stopped and no consumer could
+          // tell.
           setReport({ key: currentUserId, status: 'disconnected' });
+          if (signalWhileRetrying) {
+            signalWhileRetrying = false;
+            setTimeout(rearm, 0);
+          }
           return;
         }
 
@@ -531,11 +571,13 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       takeSnapshot: boolean;
       releaseCurrent: boolean;
     }): Promise<void> => {
+      const myEpoch = epoch;
+      const abandoned = () => cancelled || gaveUp || myEpoch !== epoch;
       if (takeSnapshot) {
         // Snapshot the partner BEFORE the join, so the very first broadcast is
         // already checked against a known sender.
         const partnerId = await resolvePartnerIdForDelivery();
-        if (cancelled || gaveUp) return;
+        if (abandoned()) return;
         partnerIdRef.current = partnerId;
         // Only skip the first SUBSCRIBED's refresh when this produced a
         // snapshot. A genuinely unlinked user pays one extra round-trip that
@@ -547,7 +589,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Required for a private channel: Realtime authorizes the join against
       // the socket's access token, which is the anon key until this runs.
       await supabase.realtime.setAuth();
-      if (cancelled || gaveUp) return;
+      if (abandoned()) return;
 
       // Only now is the failed channel let go. Everything above can reject,
       // and a retry that had already released it would leave the hook with no
@@ -586,14 +628,14 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // above, or a previous mount's cleanup. Opening now would just retrieve
       // the dying channel and join nothing.
       await waitForNoteChannelLeaves(topic);
-      if (cancelled || gaveUp) return;
+      if (abandoned()) return;
 
       // Closing that channel may have been what removed the LAST channel in
       // the app, which tears the shared socket down; opening inside that window
       // silently never joins. Read last, and acted on with no await in
       // between.
       await waitForSocketReady();
-      if (cancelled || gaveUp) return;
+      if (abandoned()) return;
 
       // Created here rather than at the top of the effect: `supabase.channel()`
       // registers synchronously, and anything registered before these awaits
@@ -632,9 +674,52 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       console.error('[useRealtimeMessages] Subscription setup failed:', error);
     });
 
+    /**
+     * Start again after giving up. The retry budget (about 31 s) is shorter
+     * than a stretch offline, and than the SDK's 60 s cooldown after a failed
+     * token refresh, during which a private join is refused: after an offline
+     * start the feed gives up before the sign-in can renew. Only a feed that
+     * gave up and holds no channel re-arms, and `gaveUp` is cleared at once,
+     * so a second signal while this open is in flight opens nothing.
+     */
+    const rearm = () => {
+      if (cancelled) return;
+      if (!gaveUp) {
+        // Still retrying, or connected: remember it only while retrying.
+        if (retryCountRef.current > 0) signalWhileRetrying = true;
+        return;
+      }
+      if (channelRef.current) return;
+      gaveUp = false;
+      retryCountRef.current = 0;
+      snapshotFresh = false;
+      catchUpOnJoin = true;
+      setReport({ key: currentUserId, status: 'reconnecting' });
+      void openChannel({ takeSnapshot: false, releaseCurrent: false }).catch((error) => {
+        console.error('[useRealtimeMessages] Re-arm failed:', error);
+      });
+    };
+
+    window.addEventListener('online', rearm);
+    // Kept synchronous: auth-js awaits its listeners, and a nested auth call
+    // from inside one can deadlock (see sessionService.onAuthStateChange), so
+    // the re-arm, which calls setAuth, runs on the next task.
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') &&
+        session?.user?.id === currentUserId
+      ) {
+        setTimeout(rearm, 0);
+      }
+    });
+
     return () => {
       cancelled = true;
       subscriptionActive = false;
+      window.removeEventListener('online', rearm);
+      authSubscription.unsubscribe();
       partnerIdRef.current = null;
       if (refreshSnapshotRef.current === refreshPartnerSnapshot) {
         refreshSnapshotRef.current = null;
@@ -690,8 +775,8 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       ? report.status
       : 'connecting';
 
-  // Previously `{}`. The one terminal state this hook has -- the retry ceiling
-  // giving up -- was invisible to every caller, so the notes feed could stop
-  // for good with nothing anywhere to say so.
+  // Previously `{}`. The one state in which this hook stops trying -- the retry
+  // ceiling giving up -- was invisible to every caller, so the notes feed could
+  // stop with nothing anywhere to say so.
   return { status };
 }

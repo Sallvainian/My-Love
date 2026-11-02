@@ -24,7 +24,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { TEST_USER_PASSWORD } from '../../tests/support/test-credentials.ts';
 
-const FIXTURE_PAIR = [
+export const FIXTURE_PAIR = [
   { email: 'simdriver@test.example.com', displayName: 'Casey' },
   { email: 'simdriver-partner@test.example.com', displayName: 'Jessie' },
 ] as const;
@@ -41,7 +41,7 @@ const UNLINKED_PAIR = [
   { email: 'simdriver-unlinked-other@test.example.com', displayName: 'Quinn' },
 ] as const;
 
-function localConfig(): { url: string; key: string } {
+export function localConfig(): { url: string; key: string } {
   const url = process.env.SIM_SUPABASE_URL ?? '';
   const key = process.env.SIM_SUPABASE_SECRET_KEY ?? '';
   if (!url || !key) throw new Error('SIM_SUPABASE_URL and SIM_SUPABASE_SECRET_KEY must be set');
@@ -92,7 +92,7 @@ async function ensureUser(admin: SupabaseClient, email: string, displayName: str
 }
 
 // The profile row comes from a trigger on the auth user and can trail it.
-async function profileId(admin: SupabaseClient, email: string): Promise<string> {
+export async function profileId(admin: SupabaseClient, email: string): Promise<string> {
   for (let attempt = 1; attempt <= 10; attempt++) {
     const { data, error } = await admin.from('users').select('id').eq('email', email).single();
     if (!error && data?.id) return data.id as string;
@@ -180,7 +180,7 @@ function solidPng(size: number, [r, g, b]: readonly [number, number, number]): B
   ]);
 }
 
-function check(what: string, error: { message: string } | null) {
+export function check(what: string, error: { message: string } | null) {
   if (error) throw new Error(`${what}: ${error.message}`);
 }
 
@@ -322,7 +322,10 @@ async function main() {
   console.log('third pair unlinked, partner requests deleted');
 }
 
-main().catch((error: unknown) => {
-  console.error(`provision: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+// dates.ts imports the helpers above, so main runs only when this file is the entry point.
+if (import.meta.main) {
+  main().catch((error: unknown) => {
+    console.error(`provision: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
+}

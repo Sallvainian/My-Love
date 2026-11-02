@@ -58,10 +58,10 @@ export function LoveNotes(): ReactElement {
    * should not narrate itself, and an announcement that always fires is the
    * one nobody listens to on the day it matters.
    *
-   * `disconnected` is terminal -- the subscription gave up after five failed
-   * re-joins and nothing re-arms it -- so the wording says what is true of the
-   * feed rather than promising a recovery that is not coming. Reopening the
-   * screen is what starts a new subscription.
+   * `disconnected` means the subscription gave up after five failed re-joins
+   * and waits for the network to come back or the sign-in to renew, so the
+   * wording says what is true of the feed rather than promising a recovery on
+   * a schedule. Reopening the screen also starts a new subscription.
    */
   const realtimeNotice =
     realtimeStatus === 'reconnecting'

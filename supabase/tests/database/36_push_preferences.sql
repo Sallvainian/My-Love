@@ -13,7 +13,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(26);
+select plan(27);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -106,8 +106,8 @@ select is(
      left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
     where a.attrelid = 'public.push_preferences'::regclass and a.attnum > 0 and not a.attisdropped
       and a.atttypid = 'boolean'::regtype),
-  'love_notes:true:true,moods:true:true,photos:true:true,pokes_and_kisses:true:true,dates:true:true,partner_requests:true:true',
-  'PUSH-PREF-009: the six switches are boolean not null default true'
+  'love_notes:true:true,moods:true:true,photos:true:true,pokes_and_kisses:true:true,dates:true:true,partner_requests:true:true,date_reminders:true:true',
+  'PUSH-PREF-009: the seven switches are boolean not null default true'
 );
 
 select fk_ok('public', 'push_preferences', 'user_id', 'auth', 'users', 'id',
@@ -126,9 +126,21 @@ select lives_ok(
 );
 
 select results_eq(
-  $$select love_notes, moods, photos, pokes_and_kisses, dates, partner_requests from public.push_preferences$$,
-  $$values (true, true, true, true, true, true)$$,
+  $$select love_notes, moods, photos, pokes_and_kisses, dates, partner_requests, date_reminders from public.push_preferences$$,
+  $$values (true, true, true, true, true, true, true)$$,
   'PUSH-PREF-013: the owner reads it back with every switch on'
+);
+
+select results_eq(
+  $$with saved as (
+      insert into public.push_preferences (user_id, date_reminders)
+        select a_id, false from t_ids
+        on conflict (user_id) do update set date_reminders = excluded.date_reminders
+        returning love_notes, moods, photos, pokes_and_kisses, dates, partner_requests, date_reminders
+    )
+    select * from saved$$,
+  $$values (true, true, true, true, true, true, false)$$,
+  'PUSH-PREF-027: the owner upserts date_reminders off and the other switches stay on'
 );
 
 select lives_ok(

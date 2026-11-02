@@ -5,8 +5,11 @@
 # and taps, scrolls and reads the page through an XCUITest runner
 # (RunnerUITests/Drive.swift); it also answers the permission alert, pushes,
 # and reads banners, Notification Center and the badge (Notify.swift), for
-# the shell or, with --host, the runner's own host app. `sim help` lists the
-# commands.
+# the shell or, with --host, the runner's own host app. It also lists an app's
+# scheduled (pending) local notifications from the simulator's own
+# UserNotifications files (pending.py), and has the host schedule and remove
+# requests on command so that reader is proven against known ones. `sim help`
+# lists the commands.
 #
 # Every build happens in a staged copy outside the repo, in $SIM_DRIVER_WORK
 # (default ~/Library/Caches/my-love-sim-driver/<checkout>-<hash>, one per
@@ -61,6 +64,18 @@ Accounts (local stack only):
                          linked and seeded so every view scrolls; Harper and
                          Morgan, linked, love notes wiped, nothing seeded; Riley
                          and Quinn, unlinked, partner requests deleted.
+  dates kinds|many|clear
+                         Set the dates the date reminders are planned from, for
+                         Casey and Jessie only. kinds: one date of each kind,
+                         3 to 8 days ahead. many: 50 events and 10 anniversaries
+                         (70 reminders). clear: remove every date (both people's
+                         events and anniversaries, the pair's couple settings and
+                         both birthdays). kinds and many clear first, so only the
+                         listed dates remain. The event and birthday writes send
+                         the other person date-change pushes. sim provision
+                         restores only the seeded events, not anniversaries,
+                         couple settings or birthdays: run sim dates clear, then
+                         sim provision, to get back the provisioned state.
   signin [partner|other|other-partner|unlinked|unlinked-other] [--decline-push]
                          Sign in through the login form (default: Casey;
                          partner: Jessie; other: Harper; other-partner: Morgan;
@@ -114,6 +129,29 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          that a folded-landscape start gets its front app
                          back.
   badge [--host]         The app icon's badge ("3 new items"), or none.
+  pending [BUNDLE|--host]
+                         The app's scheduled (pending) local notifications as
+                         one JSON line, sorted by identifier: an array of
+                         {identifier, title, body, threadId, trigger}, where
+                         trigger is {type:"calendar", dateComponents:{only
+                         those set}, repeats} or {type:"interval", seconds,
+                         repeats}. Default: the shell; BUNDLE names another.
+                         Decoded from the simulator's own files, so it needs
+                         no runner step; [] when the app has none. iOS writes
+                         the file some seconds (up to about 25) after a
+                         schedule, so an empty or stale list read right after
+                         one is not proof: read again. It exits 1,
+                         naming the record and key, on a record it does not
+                         recognise, and prints nothing then.
+  schedule FILE          Have the host schedule the requests in FILE (JSON
+                         array; scripts/sim-driver/fixtures/host-requests.json
+                         is a known-good one) and return once pending --host
+                         lists them. Same identifier replaces. Launches the
+                         host, so it comes to the front. The host needs
+                         permission (permission allow --host); exit 1 says so.
+  unschedule ID...       Have the host remove those pending requests and
+                         return once pending --host no longer lists them.
+                         Launches the host, so it comes to the front.
 
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
 SIM_SUPABASE_URL overrides the local stack's URL (default: .env.test's).
@@ -451,6 +489,15 @@ cmd_provision() {
   [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
   (cd $REPO && SIM_SUPABASE_URL=$(supabase_url) SIM_SUPABASE_SECRET_KEY=$key \
     node scripts/sim-driver/provision.ts) || die 1 "provision failed"
+}
+
+cmd_dates() {
+  [[ ${1:-} == (kinds|many|clear) && $# -eq 1 ]] || die 2 "dates takes kinds, many or clear"
+  require_stack
+  local key=$(stack_secret)
+  [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
+  (cd $REPO && SIM_SUPABASE_URL=$(supabase_url) SIM_SUPABASE_SECRET_KEY=$key \
+    node scripts/sim-driver/dates.ts $1) || die 1 "dates failed"
 }
 
 cmd_signin() {
@@ -796,6 +843,185 @@ cmd_badge() {
   notify badge
 }
 
+# ---- scheduled notifications ---------------------------------------------------
+
+# The device's data folder as simctl reports it, not a hand-built
+# ~/Library path (SIM_DRIVER_WORK-style overrides and device sets move it).
+data_path() {
+  local out
+  out=$(xcrun simctl list devices -j | node -e '
+    const udid = process.argv[1];
+    const d = Object.values(JSON.parse(require("fs").readFileSync(0, "utf8")).devices)
+      .flat().find((x) => x.udid === udid);
+    if (!d || !d.dataPath) process.exit(1);
+    console.log(d.dataPath);
+  ' $UDID) || die 6 "simctl list devices -j has no dataPath for $UDID"
+  print -r -- $out
+}
+
+# pending.py's JSON for one bundle; its notes and errors go to stderr, its
+# exit code is the result (1: a record it does not recognise).
+read_pending() {
+  python3 -I $TOOL/pending.py $1 $2
+}
+
+cmd_pending() {
+  target_args "$@"
+  local bundle=$TARGET
+  if (( $#REST )); then
+    (( $#REST == 1 && !IS_HOST )) && [[ -n $REST[1] && $REST[1] != *[^A-Za-z0-9.-]* ]] ||
+      die 2 "pending takes [BUNDLE | --host]"
+    bundle=$REST[1]
+  fi
+  resolve_device
+  # Resolved here, not inside read_pending's arguments: a die in $(...) ends
+  # only that subshell and would hand pending.py an empty path.
+  local dir
+  dir=$(data_path) || exit $?
+  read_pending $dir/Library/UserNotifications $bundle
+}
+
+# Prints FILE as one compact JSON line if it is a schedule the host can read:
+# a non-empty array of {identifier, title, body, threadId, trigger}, trigger
+# being {type:"interval", seconds, repeats} or {type:"calendar",
+# dateComponents:{year, month, day, hour, minute, second, weekday}, repeats}.
+# Otherwise prints why and exits 1. The host checks the same on its side.
+check_schedule() {
+  node -e '
+    const fail = (why) => { console.log(why); process.exit(1); };
+    let doc;
+    try { doc = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); }
+    catch (e) { fail("not JSON: " + e.message.replace(/\s+/g, " ")); }
+    if (!Array.isArray(doc) || doc.length === 0) fail("not a non-empty array of requests");
+    const plain = (x) => x && typeof x === "object" && !Array.isArray(x);
+    const only = (x, keys, at) => {
+      const extra = Object.keys(x).filter((k) => !keys.includes(k));
+      if (extra.length) fail(`${at} has unknown ${extra.join(", ")}`);
+    };
+    const seen = new Set();
+    doc.forEach((r, i) => {
+      const at = `request ${i}`;
+      if (!plain(r)) fail(`${at} is not an object`);
+      for (const k of ["identifier", "title", "body", "threadId"])
+        if (typeof r[k] !== "string") fail(`${at} lacks a string ${k}`);
+      if (!r.identifier) fail(`${at} has an empty identifier`);
+      if (!r.title && !r.body) fail(`${at} has an empty title and body, which iOS drops without an error`);
+      if (seen.has(r.identifier)) fail(`${at} repeats identifier ${r.identifier}`);
+      seen.add(r.identifier);
+      only(r, ["identifier", "title", "body", "threadId", "trigger"], at);
+      const t = r.trigger;
+      if (!plain(t)) fail(`${at} lacks a trigger object`);
+      if (typeof t.repeats !== "boolean") fail(`${at} trigger lacks a boolean repeats`);
+      if (t.type === "interval") {
+        only(t, ["type", "seconds", "repeats"], `${at} trigger`);
+        if (typeof t.seconds !== "number" || !(t.seconds > 0)) fail(`${at} trigger lacks positive seconds`);
+        if (t.repeats && t.seconds < 60) fail(`${at} trigger repeats under 60 seconds`);
+      } else if (t.type === "calendar") {
+        only(t, ["type", "dateComponents", "repeats"], `${at} trigger`);
+        const c = t.dateComponents;
+        if (!plain(c) || Object.keys(c).length === 0) fail(`${at} trigger lacks dateComponents`);
+        only(c, ["year", "month", "day", "hour", "minute", "second", "weekday"], `${at} dateComponents`);
+        for (const [k, v] of Object.entries(c))
+          if (!Number.isInteger(v)) fail(`${at} dateComponents.${k} is not an integer`);
+      } else {
+        fail(`${at} trigger type is not interval or calendar`);
+      }
+    });
+    console.log(JSON.stringify(doc));
+  ' $1
+}
+
+# True when the pending list on stdin satisfies the wait: MODE present, with
+# ARG a schedule file, needs every scheduled request listed with its title,
+# body, threadId and trigger as scheduled (a same-identifier replacement is
+# not done until its new content shows); MODE absent, with ARG a JSON array of
+# identifiers, needs none of them listed.
+pending_satisfies() {
+  node -e '
+    const fs = require("fs");
+    const [mode, arg] = process.argv.slice(1);
+    const listed = JSON.parse(fs.readFileSync(0, "utf8"));
+    if (mode === "absent") {
+      const gone = JSON.parse(arg);
+      process.exit(listed.some((p) => gone.includes(p.identifier)) ? 1 : 0);
+    }
+    const want = JSON.parse(fs.readFileSync(arg, "utf8"));
+    const same = require("util").isDeepStrictEqual;
+    process.exit(want.every((w) => listed.some((p) => same(p, w))) ? 0 : 1);
+  ' $1 $2
+}
+
+# Launches the host with REMOVE / SCHEDULE (JSON, either may be empty), reads
+# the result it leaves in its Documents folder, then polls pending --host
+# until MODE and ARG (see pending_satisfies) hold, so the next `sim pending`
+# is consistent. The iOS daemon writes PendingNotifications.plist
+# asynchronously, hence the poll.
+host_apply() {
+  local schedule=$1 remove=$2 mode=$3 arg=$4
+  require_booted
+  ensure_runner
+  # Always installed: ensure_runner may have rebuilt the host since the last
+  # install, and an install keeps its data and notification permission.
+  local app=$RUNNER/dd/Build/Products/Debug-iphonesimulator/Runner.app
+  [[ -d $app ]] || die 1 "no build of the host at $app"
+  stage simctl-install xcrun simctl install $UDID $app
+  local data result
+  if data=$(xcrun simctl get_app_container $UDID $HOST_BUNDLE data 2>/dev/null); then
+    rm -f $data/Documents/schedule-result.txt
+  fi
+  (
+    unset SIMCTL_CHILD_SCHEDULE SIMCTL_CHILD_REMOVE
+    [[ -n $schedule ]] && export SIMCTL_CHILD_SCHEDULE=$schedule
+    [[ -n $remove ]] && export SIMCTL_CHILD_REMOVE=$remove
+    xcrun simctl launch --terminate-running-process $UDID $HOST_BUNDLE >/dev/null
+  ) || die 6 "could not launch the host ($HOST_BUNDLE)"
+  data=$(xcrun simctl get_app_container $UDID $HOST_BUNDLE data) ||
+    die 6 "no data container for $HOST_BUNDLE"
+  result=$data/Documents/schedule-result.txt
+  local deadline=$(( SECONDS + 30 ))
+  until [[ -f $result ]]; do
+    (( SECONDS < deadline )) || die 1 "the host wrote no result in 30 s (is it running? launch it by hand and look)"
+    sleep 0.25
+  done
+  local line=$(<$result)
+  case $line in
+    ok) ;;
+    "not authorized") die 1 "the host has no notification permission: run sim permission allow --host" ;;
+    *) die 1 "the host refused: $line" ;;
+  esac
+  # The file is replaced while the daemon writes it, so a read that fails or
+  # does not yet match is tried again until the deadline; the last read (or
+  # its failure) is reported.
+  local dir out errlog=$WORK/logs/pending.err
+  dir=$(data_path) || exit $?
+  mkdir -p $WORK/logs
+  deadline=$(( SECONDS + 20 ))
+  until out=$(read_pending $dir/Library/UserNotifications $HOST_BUNDLE 2>$errlog) && print -r -- $out | pending_satisfies $mode $arg; do
+    if (( SECONDS >= deadline )); then
+      local why=$(<$errlog)
+      die 1 "pending --host did not show the change in 20 s; last read: ${out:-nothing}${why:+ ($why)}"
+    fi
+    sleep 0.5
+  done
+}
+
+cmd_schedule() {
+  (( $# == 1 )) || die 2 "schedule takes FILE"
+  [[ -f $1 ]] || die 2 "no schedule file $1"
+  local json
+  json=$(check_schedule $1) || die 2 "schedule $1: $json"
+  host_apply "$json" "" present "$1"
+  say "scheduled $(print -r -- $json | node -e 'console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).length)') request(s) on the host"
+}
+
+cmd_unschedule() {
+  (( $# )) || die 2 "unschedule takes one or more identifiers"
+  local ids
+  ids=$(node -e 'console.log(JSON.stringify(process.argv.slice(1)))' -- "$@")
+  host_apply "" "$ids" absent "$ids"
+  say "asked the host to remove $# identifier(s); none is pending on it now"
+}
+
 # ---- main --------------------------------------------------------------------
 
 args=()
@@ -812,6 +1038,7 @@ cmd=$1; shift
 case $cmd in
   help|-h|--help) usage ;;
   provision) cmd_provision ;;
+  dates) cmd_dates "$@" ;;
   build) cmd_build "$@" ;;
   serve-update) cmd_serve_update "$@" ;;
   signin) cmd_signin "$@" ;;
@@ -840,5 +1067,8 @@ case $cmd in
   banner) cmd_banner "$@" ;;
   center) cmd_center "$@" ;;
   badge) cmd_badge "$@" ;;
+  pending) cmd_pending "$@" ;;
+  schedule) cmd_schedule "$@" ;;
+  unschedule) cmd_unschedule "$@" ;;
   *) usage >&2; die 2 "unknown command $cmd" ;;
 esac

@@ -1,0 +1,31 @@
+[
+  {
+    "identifier": "probe-interval",
+    "title": "Probe interval title",
+    "body": "Probe interval body, an hour from launch",
+    "threadId": "probe-thread-interval",
+    "trigger": { "type": "interval", "seconds": 3600, "repeats": false }
+  },
+  {
+    "identifier": "probe-once",
+    "title": "Probe once title",
+    "body": "Probe once body, one dated 9:00",
+    "threadId": "probe-thread-once",
+    "trigger": {
+      "type": "calendar",
+      "dateComponents": { "year": 2031, "month": 6, "day": 15, "hour": 9, "minute": 0 },
+      "repeats": false
+    }
+  },
+  {
+    "identifier": "probe-yearly",
+    "title": "Probe yearly title",
+    "body": "Probe yearly body, every June 15 at 9:00",
+    "threadId": "probe-thread-yearly",
+    "trigger": {
+      "type": "calendar",
+      "dateComponents": { "month": 6, "day": 15, "hour": 9, "minute": 0 },
+      "repeats": true
+    }
+  }
+]

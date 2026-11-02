@@ -3082,7 +3082,8 @@ location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
 source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
 severity: medium (unverified)
 reason: The push plugin's willPresent tells the web view about the push and then returns the badge option, and iOS applies the payload's badge after the first clear. On the iPhone Duo simulator a second `AppBadge.clear()` 1 s later left the badge clear on every run. No device has been checked, and a slower one could apply the badge after the second clear; the badge would then show until Love Notes is next opened or brought to the front. Settle it on the owner's iPhone in story 3.11: with Love Notes in front, a note from the partner must leave the badge clear. If it does not, clear the badge natively (for example in a willPresent wrapper told by the web view that Love Notes is on screen) rather than lengthening the wait.
-status: open
+status: done 2026-11-01
+resolution: settled on the owner's iPhone in story 3.11: with Love Notes in front, a partner note showed no banner and left no badge, so the 1 s second clear held (story-push-ships-to-the-owner-s-iphone-plan.md, Result).
 
 ### DW-363: A picture-only love note sent from the app is refused by love_notes_content_check: the composer clears as if it sent, the note shows as failed, and Retry fails the same way
 origin: story-3.10
@@ -3098,4 +3099,139 @@ location: scripts/sim-driver/sim (help, center line; cmd_center; center_restore)
 source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: cmd_center asks for the front app whenever `$CENTER_POSE != unfolded && $CENTER_ORIENT != portrait`, which includes an empty pose (a phone with no pose, such as an iPhone 17). center_restore relaunches only when CENTER_FRONT is set and not `none`, so when `notify front` fails nothing is relaunched; center only says the folded landscape may not come back. Found by story 3.10's review. The fix edits AGENTS.md, so it is deferred: reword both to "a landscape start that is not unfolded gets back the shell, the host app, Settings or Safari when the front step found one".
+status: open
+
+### DW-365: `scripts/sim-driver/pending.py` checks no record-level schema marker, so an iOS release that keeps the pending archive's key names but changes their meaning would decode without error
+origin: story-4.7
+location: scripts/sim-driver/pending.py (pending, trigger_of)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: medium (unverified)
+reason: Found by story 4.7's review. Each record in the fixture `PendingNotifications.plist` carries about 60 keys, `SchemaVersion` 11 and `TriggerRepeatInterval` 0 among them, but the mapper reads only the identifier, text, thread and trigger keys and fails loudly only when one of those is missing or holds an unknown shape. Whether an iOS release changes a key's meaning while keeping its name is UNVERIFIED. To settle it, decode a pending archive from a later simulator runtime (`python3 -I scripts/sim-driver/pending.py --raw FILE`) and compare it with the fixture. If it is real, the fix is to require the measured `SchemaVersion` and `TriggerRepeatInterval` 0.
+status: open
+
+### DW-366: AGENTS.md's sentence on `sim schedule`/`sim unschedule` omits two side effects: both launch the host app and bring it to the front, and `sim permission reset --host` uninstalls the host and so wipes its pending requests
+origin: story-4.7
+location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (host_apply, cmd_permission)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: low
+reason: Found by story 4.7's review. `host_apply` runs `xcrun simctl launch --terminate-running-process` on the host, which leaves the host in front where a check may expect the shell, and `permission reset` runs `simctl uninstall`. Both appear in `sim help`, not in AGENTS.md. The fix edits AGENTS.md, so it is deferred: add both to the sim-driver paragraph.
+status: done 2026-11-01
+resolution: story 4.4: AGENTS.md's sim-driver paragraph now says `schedule` and `unschedule` launch the host, leaving it in front of the shell, and that `sim permission reset --host` uninstalls the host and wipes its pending requests.
+
+### DW-369: The AGENTS.md sentence on `sim schedule` does not say the host needs `sim permission allow --host` first, so a later story's first schedule exits 1 and has to be rerun.
+origin: spec-deferred e0029a1bba77
+location: AGENTS.md (Maintained by hand, sim-driver paragraph)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: low
+reason: host_apply dies with "the host has no notification permission: run sim permission allow --host" when the host's result file reads "not authorized", and `sim help` says so, but AGENTS.md's sim-driver paragraph does not. The fix edits AGENTS.md, so it is deferred.
+status: done 2026-11-01
+resolution: story 4.4: AGENTS.md's sim-driver paragraph now says `schedule` needs `sim permission allow --host` first.
+
+### DW-370: On a first sign-in the launch plan can find notification permission not yet granted, and nothing re-plans once the person taps Allow until the next launch.
+origin: spec-deferred ec751e5258fa
+location: src/App.tsx:418-424, src/services/dateReminders.ts scheduleDateReminders
+source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
+severity: low
+reason: dateReminders.ts schedules only when checkPermissions().display is 'granted' and never prompts; story 3.1's alert is often still up when refreshLocalCopies() resolves on the first signed-in start. Story 4.6 owns the re-plan triggers (foreground, sign-in, date change). Whether its foreground trigger fires when the system permission alert closes is unverified; story 4.6 should check a re-plan after the first-sign-in permission answer.
+status: done 2026-11-01
+resolution: story 4.6: App's push effect re-plans the date reminders, with the start's captured identity, when `startPushRegistration()` resolves 'registering' (the permission is granted), covered by `tests/unit/App.localCopyRefresh.test.tsx`.
+
+### DW-371: The `sim help` text and the AGENTS.md sim-driver sentence say `sim dates kinds|many` replace only the seeded events, but they first clear both people's anniversaries, the pair's couple_settings row
+origin: spec-deferred 356b1422e4d3
+location: scripts/sim-driver/sim:67-75, AGENTS.md (sim-driver paragraph)
+source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
+severity: low
+reason: scripts/sim-driver/sim:71-72 reads "kinds and many first remove the seeded events"; AGENTS.md's sim-driver paragraph reads "replacing the seeded events"; scripts/sim-driver/dates.ts runs clearDates before kinds and many, as its own header states. The fix edits AGENTS.md, an agent-context file.
+status: done 2026-11-01
+resolution: story 4.4: `sim help` and AGENTS.md now say `kinds` and `many` first do what `clear` does (both people's events and anniversaries, the pair's couple settings, both birthdays), and that their event and birthday writes send the other person date-change pushes (story 4.1's residual risk).
+
+### DW-372: `sim pending` can report "nothing has been scheduled since ... installed" (and []) while requests are pending, because the simulator writes PendingNotifications.plist some time after `schedule`
+origin: spec-deferred 533ac45bf375
+location: scripts/sim-driver/sim cmd_pending
+source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
+severity: low
+reason: Found during this pass's simulator verification, not by a review lens. After the first sign-in and a network-off relaunch, `sim pending` 15 s after launch said the plist did not exist; the next launch's console showed LocalNotifications.getPending returning 11 pending requests. Later launches rewrote the plist within 25 s. A check that reads the list right after the first schedule on a fresh install can see a false empty list. Story 7's reader (scripts/sim-driver) could wait for the plist's mtime to pass the launch, as the previous pass did by hand.
+status: done 2026-11-01
+resolution: story 4.4: documented, behaviour kept. `sim help`, pending.py's missing-file note and AGENTS.md say iOS writes PendingNotifications.plist up to about 25 s after a schedule, so an empty or stale list read right after one is not proof. A wait would need the schedule's time, which `sim pending` does not know.
+
+### DW-373: A re-plan cancels only the ids `getPending` reports, so if a follow-up re-plan's `getPending` misses requests the previous run just scheduled, ids above the new N stay pending.
+origin: spec-deferred 4cdc45753d6d
+location: src/services/dateReminders.ts scheduleDateReminders
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-re-plan-on-every-change-stop-at-sign-out-stack-wit-plan.md`
+severity: medium
+reason: Quick review finding, verdict maybe-false. The plugin's `schedule` calls `center.add` and resolves without waiting for its completion (LocalNotificationsPlugin.swift:211-227), and this story makes back-to-back re-plans routine (single-flight follow-up, copy-write bursts). Whether a `getPendingNotificationRequests` issued right after can miss an `add` still in flight is undocumented. On the simulator in this pass, a delete took the list from 12 to 10 and both stale ids were cancelled, but a single run does not settle the race. To settle it, schedule N and then immediately run getPending in a loop on a device or simulator and check whether it ever lists fewer than N. The fix, if needed, is the sign-out cancel's id union (1..64 plus pending) in scheduleDateReminders' cancel step. (declared severity: medium (unverified))
+status: done 2026-11-01
+resolution: `scheduleDateReminders` now cancels the same id union as `cancelDateReminders` (ids 1..64 plus every pending id, through `reminderIdsToCancel`), so a re-plan, and the story 4.3 Settings switch turned off, also cancels a fresh schedule the pending list has not caught up with. Whether iOS's `getPending` can lag an `add` stays unmeasured; the re-plan no longer depends on the pending list, though like the sign-out cancel it still assumes iOS applies a removal after an `add` already in flight (unverified).
+
+### DW-374: `src/types/database.types.ts` gets each new table's block inserted in the committed file's style, because `supabase gen types typescript --local` on CLI 2.122.0 no longer reproduces the committed
+origin: spec-deferred 8482db9d6aac
+location: src/types/database.types.ts, AGENTS.md (Policy, database.types.ts)
+source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
+severity: low
+reason: Quick review finding. On CLI 2.122.0 the command prints unformatted output, 621 lines against the committed 977, with `ComputedFields: never` in all 22 tables. A whole-file regeneration would rewrite every table's lines. Story 3.8 (b430cde6) and this story both inserted only their own table's block, which matches the generator's Row/Insert/Update shape. Settling it is a decision for the owner: either commit one full regeneration on the current CLI and run Prettier on that generated file, or amend the AGENTS.md rule. The rule edit touches an agent-context file.
+status: open
+
+### DW-375: The iOS simulator ignores a host clock jump until it is rebooted, and the sim driver has no step for it, so a check that moves the Mac clock to make a reminder fire sees nothing fire.
+origin: story 4.8 simulator checks, 2026-11-01
+location: scripts/sim-driver/sim
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: Observed in story 4.8's first pass: with the Mac clock set to 11-02 08:58:30 by `sudo /bin/date`, the 8 reminders due at 09:00 stayed pending; after a simulator reboot at 08:57 all 8 fired at 09:00. Every firing check in that story rebooted the simulator by hand after each clock jump. A `sim` command that reboots the simulator (or sets the clock and reboots) would make the step repeatable. The device check in story 5 is unaffected.
+status: open
+
+### DW-376: A date reminder firing while the shell is in the foreground was never observed; the plugin's default `willPresent` should show a banner, but no check confirms it.
+origin: story 4.8 simulator checks, 2026-11-01
+location: src/services/dateReminders.ts, @capacitor/local-notifications (willPresent presentation options)
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes; `sim banner FILE --front` watches for a banner in that state.
+status: open
+
+### DW-377: An offline sign-out leaves the account's refresh token valid on the server indefinitely, because nothing revokes it once the device is back online and no session timebox is set.
+origin: story 4.8 thorough review, 2026-11-01
+location: src/api/auth/actionService.ts (signOut, retryable fallback); supabase/config.toml ([auth.sessions] commented out)
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: The owner chose a device-only sign-out when the server is unreachable (story 4.8 decisions). The device deletes its stored session, so the token is gone from that phone; the server session stays usable by anyone who already holds the refresh token. Settling it means either a revoke of the previous refresh token at the next online start (the token would have to be kept somewhere after sign-out) or an `[auth.sessions]` timebox/inactivity timeout in the hosted project; the hosted setting is unverified.
+status: open
+
+### DW-378: While the app runs on a stored session the SDK cannot use, Realtime channels may join with the publishable key and stay muted after the token renews.
+origin: story 4.8 thorough review, 2026-11-01
+location: src/api/supabaseClient.ts (guard covers HTTP fetch only); src/services/moodSyncService.ts, src/services/interactionService.ts, src/hooks/useRealtimeMessages.ts
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: medium (unverified)
+reason: The session guard wraps `global.fetch`, which the Realtime WebSocket never uses; supabase-js 2.118 gives Realtime `_getAccessToken`, which falls back to the publishable key when `getSession` has no session (index.mjs:836-840). A null `INITIAL_SESSION` therefore leaves channels joining as anon until `TOKEN_REFRESHED` calls `realtime.setAuth`. Whether private Broadcast channels rejoin and `postgres_changes` subscriptions pick up the new token afterwards is unverified; AGENTS.md notes nothing re-arms a muted channel. Settle it on the simulator: offline cold start with an expired token, gateway back, then a partner mood, note and interaction must arrive live.
+status: open
+
+### DW-379: AGENTS.md does not yet state the session rules story 4.8 introduced.
+origin: story 4.8 thorough review, 2026-11-01
+location: AGENTS.md (Known pitfalls)
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: Three rules a later agent needs are only in code comments: only an empty SDK session store means signed out (`readStoredSession`, `src/api/authStorage.ts`); `getSession` can return a stored session whose access token has expired while the server is unreachable, so code that sends `session.access_token` itself must expect a 401; and the session guard fails a data request with a synthetic `TypeError('Failed to fetch')` even when the network is up (the SDK's 60 s refresh cooldown, or GoTrue down). The edit touches an agent-context file, so it is deferred.
+status: done 2026-11-01
+resolution: story 4.4: the three session rules are a Maintained-by-hand bullet in AGENTS.md (outside the generated block, so a context refresh keeps them).
+
+### DW-380: A countdown mark on the partner's birthday is keyed `partner-birthday`, not by the partner, so after an unlink and a link to someone else it marks the new partner's birthday.
+origin: story 4.2 residual risk, carried in by story 4.4, 2026-11-01
+location: src/services/dateReminders.ts (MARK_KEYS); the countdown marks table and its local copy (story 4.2)
+source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
+severity: low
+reason: Story 4.2 keys the fixed dates `relationship-start`, `wedding`, `own-birthday` and `partner-birthday`, so a mark outlives the link it was made under; the same holds for `relationship-start` and `wedding`, which are the couple settings of whichever pair the person is in. Whether a mark should carry over to a new partner is an owner decision; a fix would key the partner-scoped marks by the partner's id (or clear them in `accept_partner_request`) and needs a migration. Recorded only in the plan's residual risks until now.
+status: open
+
+### DW-381: Offline, or after a failed read, Settings shows the "Date reminders" switch on (disabled) while the saved copy says off, because nothing seeds the store's push preferences from the `push-preferences` local copy.
+origin: story 4.3 review (rejected there under its unchanged-load-behaviour rule), carried in by story 4.4, 2026-11-01
+location: src/components/Settings/CountdownMarks.tsx (the switch's `?? true` default; PushSettings.tsx's six rows the same); src/stores/slices/settingsSlice.ts `loadPushPreferences`
+source_spec: `tickets/epic-date-reminders/tickets/story-a-settings-switch-turns-date-reminders-off-plan.md`
+severity: low
+reason: `loadPushPreferences` returns early offline and the row renders `?? true`, the same as story 3.7's six push rows. Planning is unaffected, because the re-plan reads the copy, so no reminder is scheduled; only the switch's shown state is wrong. A fix seeds the store from the copy before the online read, for all seven rows, which is a load-behaviour change and not cleanup.
+status: open
+
+### DW-382: The docs this sweep added for DW-372 say iOS writes PendingNotifications.plist "up to about 25 s after a schedule", but no measurement bounds the lag on a fresh install's first schedule.
+origin: spec-deferred 8a19bda4005c
+location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (help, pending); scripts/sim-driver/pending.py (missing-file comment); _bmad-output/initiative-my-love/deferred-work.md
+source_spec: `tickets/epic-date-reminders/tickets/story-refactor-sweep-plan.md`
+severity: low
+reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred.
 status: open
