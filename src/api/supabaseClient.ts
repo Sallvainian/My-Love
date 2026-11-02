@@ -96,6 +96,8 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       // Realtime WebSocket does not use fetch and is outside it (DW-378). It
       // refuses a data request that carries no user token while a session is
       // stored -- see `createSessionGuardedFetch` -- and never an auth request.
+      // The same fetch also removes `expires_at` from the auth server's session
+      // responses, so expiry is measured on the device clock, not the server's.
       fetch: createSessionGuardedFetch({
         supabaseUrl,
         supabaseKey: supabaseAnonKey,

@@ -3282,7 +3282,9 @@ location: src/api/auth/sessionService.ts; node_modules/@supabase/auth-js (GoTrue
 source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
 severity: low
 reason: Seen on the owner's iPhone on 2026-11-02 against production: with the clock five days ahead and Wi-Fi still on, every token the server issued already looked expired to the device, so it refreshed about 30 times in 3 s (06:11:49-52 UTC, all 200), then GoTrue answered 429 `over_request_rate_limit`. A 429 is not an `AuthRetryableFetchError`, and with the access token expired by the device's clock `_callRefreshToken` calls `_removeSession()`, which emits SIGNED_OUT. Only a wrong device clock reaches it, and iOS sets the clock itself unless the person turns that off. Settle it with a decision: accept it, or treat a 429 refresh like an unreachable server (keep the stored session) in the app's auth layer.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-session-device-relative-expiry
+resolution-undo: ce31c7258ea1b5ae305ceb0e442d53638df4b42816fb54983de29c8dfd29184f 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 fix-device-relative-expiry — owner, 2026-11-02 (well-built clients tolerate a wrong device clock): in the app's session-guarded fetch wrapper (supabaseClient.ts createSessionGuardedFetch), strip expires_at from GoTrue token responses so auth-js computes expiry from expires_in on the device's own clock (@supabase/auth-js 2.118.0 lib/fetch.js:140); the server still checks expiry with its own clock. Unit-test a token response with expires_at days in the past and a clock days ahead; no refresh loop and no SIGNED_OUT.
 
 ### DW-384: A session that ends without the app's Sign out (a refresh the SDK gives up on, or a sign-out of all devices from elsewhere) leaves the device's push_devices row on the account.
