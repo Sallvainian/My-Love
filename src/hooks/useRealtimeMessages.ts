@@ -285,6 +285,13 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
     /** Set by a re-arm, so its SUBSCRIBED reads the notes missed meanwhile. */
     let catchUpOnJoin = false;
 
+    /**
+     * A re-arm signal that arrived while the feed was still retrying. If those
+     * retries still run out, the give-up re-arms once at once rather than
+     * waiting for a signal that has already come and gone.
+     */
+    let signalWhileRetrying = false;
+
     // Whether the partner snapshot can be trusted for the NEXT `SUBSCRIBED`.
     //
     // The first open below resolves it immediately before the first `subscribe`,
@@ -366,6 +373,7 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       // Reset retry count on successful subscription
       if (status === 'SUBSCRIBED') {
         retryCountRef.current = 0;
+        signalWhileRetrying = false;
         setReport({ key: currentUserId, status: 'connected' });
         // After a re-arm the feed was down for a while, and a broadcast missed
         // then is never re-sent: read the thread again, as a reconnect does.
@@ -460,6 +468,10 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
           // until it was reported, the feed just stopped and no consumer could
           // tell.
           setReport({ key: currentUserId, status: 'disconnected' });
+          if (signalWhileRetrying) {
+            signalWhileRetrying = false;
+            setTimeout(rearm, 0);
+          }
           return;
         }
 
@@ -671,7 +683,13 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
      * so a second signal while this open is in flight opens nothing.
      */
     const rearm = () => {
-      if (cancelled || !gaveUp || channelRef.current) return;
+      if (cancelled) return;
+      if (!gaveUp) {
+        // Still retrying, or connected: remember it only while retrying.
+        if (retryCountRef.current > 0) signalWhileRetrying = true;
+        return;
+      }
+      if (channelRef.current) return;
       gaveUp = false;
       retryCountRef.current = 0;
       snapshotFresh = false;
