@@ -3513,7 +3513,9 @@ location: supabase/migrations/20261031000000_push_devices.sql (register_push_dev
 source_spec: `plan-dw-sign-out-everywhere.md`
 severity: medium
 reason: Global sign-out revokes refresh tokens, but access tokens stay valid until they expire (supabase/config.toml jwt_expiry = 3600). register_push_device checks only auth.uid() (20261031000000_push_devices.sql), and App.tsx re-registers on every signed-in start with permission. The same happens if a registration lands in the up-to-3 s gap between unregister_all_push_devices() and the global sign-out. Pre-existing: register_push_device never checked whether the caller's session was revoked. Settling it needs a server-side check that the JWT's session_id still exists in auth.sessions, or an owner decision to accept the window.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-push-register-session-check
+resolution-undo: 0a5864b1b6284bf808388361b35ec0695f3ddb78b43e86ad46388a30fc0f93fb 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 server-session-check — owner, 2026-11-02: register_push_device refuses a caller whose JWT session_id no longer exists in auth.sessions, so a device signed out by "Sign out of all devices" cannot re-register while its access token is still valid; this also covers a registration landing between unregister_all_push_devices() and the global sign-out. Keep jwt_expiry as is. Scope is push registration only: a still-valid access token reading app data until it expires is accepted.
 
 ### DW-407: DW-352's native removal is unverified on a shell: no simulator check yet shows sign-out emptying Notification Center of delivered pushes and date reminders.
@@ -3556,4 +3558,12 @@ location: src/components/MoodTracker/MoodTracker.tsx (loadPartnerId effect)
 source_spec: `plan-dw-realtime-recovery-after-renewal.md`
 severity: low
 reason: MoodTracker looks its partner up through lookupPartnerId on mount and again only when store.partner.id changes; on a boot whose stored session the SDK cannot use that lookup fails and nothing re-runs it on TOKEN_REFRESHED. Observed in tests/e2e/partner/realtime-recovery-after-renewal.spec.ts on the local stack: no card and no error card after TOKEN_REFRESHED; Home then Mood mounts it.
+status: open
+
+### DW-412: A register_push_device call that lands between unregister_all_push_devices() and the global sign-out still has a live session, so the session check accepts it and its push_devices row outlives "Sign
+origin: spec-deferred 716063194f07
+location: supabase/migrations/20261102010000_register_push_device_session_check.sql (register_push_device); src/api/auth/actionService.ts (signOut, everywhere)
+source_spec: `plan-dw-push-register-session-check.md`
+severity: medium
+reason: src/api/auth/actionService.ts signOut({ everywhere }) awaits removeAllPushRegistrations() before supabase.auth.signOut({ scope: 'global' }). In that window the other device's auth.sessions row still exists, so the new check in 20261102010000 passes and the insert commits; the later session delete does not touch push_devices, and send-push reads only push_devices. The 2026-11-02 owner decision expected the session check to cover this window, but it closes only registrations after the sign-out. Closing the window needs new state, for example an account-level fence written by unregister_all_push_devices() that refuses sessions created before it, or the registering session id stored on each push_devices row and checked or pruned by send-push. Either needs an owner decision, because the intent limited this change to replacing the function.
 status: open
