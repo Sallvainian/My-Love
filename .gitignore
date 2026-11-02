@@ -172,3 +172,6 @@ _bmad/custom/*.user.toml
 # read first and so shadow the installed skills.
 .grok/
 _bmad/render/
+
+# Python bytecode cache (scripts/sim-driver/pending.py is imported at run time)
+__pycache__/
