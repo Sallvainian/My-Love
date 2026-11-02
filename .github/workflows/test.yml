@@ -342,7 +342,7 @@ jobs:
   # off when a P0 test failed. Removed; coverage is unchanged.
   # ============================================
   e2e-tests:
-    name: E2E (Shard ${{ matrix.shard }}/2)
+    name: E2E (Shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -352,19 +352,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2 shards, not 4. Measured on run 35056348791 (head 0a83dec8): E2E
-        # jobs 197/224/251/259s total, setup 129/129/138/129s, test-step
-        # 49/70/86/101s (306s combined). Historical 381s is run 32279178457,
-        # not this run. The setup floor (129-138s) is paid per shard and this
-        # work cannot move it. Two jobs share those 306s of tests plus one
-        # setup floor each. Residual job time besides setup and tests
-        # (checkout, node, stop, upload) measured 19/25/27/29s. Conservative
-        # worst wall from max setup, 86+101 test-step, and max residual:
-        # 138+187+29 = 354s versus 259s at 4. Runner time 931s at 4 versus
-        # 2×(setup+residual)+306; typical 129+25 gives 614s. N=1 serialises
-        # all 306s of tests (138+306+29 = 473s wall) and is the first N that
-        # stops making sense against wall-clock.
-        shard: [1, 2]
+        # 4 shards. Measured on run 41398404930 (head 0dce8011), against
+        # run 41394367324 (head c185620a) at 2 shards: E2E jobs 185/199/253/252s
+        # with test steps 78/79/129/121s, against 291/402s at 2. The suite had
+        # grown to ~511s of test time over 2 shards (2026-11-01/02), and a
+        # simulation from 8 runs' per-test times put the wait at ~6.8 min for
+        # 2, ~5.6 for 3, ~4.9 for 4 and under 25s saved per shard beyond 4,
+        # because each shard pays ~2 min of setup whatever its share. More
+        # shards also cost queue time when several PRs run at once: in run
+        # 41398404930, with #435's run beside it, the last E2E shard started
+        # 227s after the run was created against 60s in 41394367324.
+        # Historical: 2 shards were chosen at 306s of tests (run 35056348791),
+        # and 381s is run 32279178457.
+        shard: [1, 2, 3, 4]
     env:
       CI: 'true'
     steps:
@@ -378,15 +378,15 @@ jobs:
       - name: Setup Playwright E2E
         uses: ./.github/actions/setup-playwright-e2e
 
-      - name: Run E2E tests (shard ${{ matrix.shard }}/2)
+      - name: Run E2E tests (shard ${{ matrix.shard }}/4)
         env:
           E2E_BLOB_REPORT: '1'
-        run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/2
+        run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/4
 
       # A green shard that quietly ran fewer tests than Playwright lists for it
       # fails here; scripts/check-test-counts.sh says what it compares.
       - name: Check every test in this shard ran
-        run: scripts/check-test-counts.sh chromium tests/e2e --shard=${{ matrix.shard }}/2
+        run: scripts/check-test-counts.sh chromium tests/e2e --shard=${{ matrix.shard }}/4
 
       # Only on failure: the merged report (merge-reports) already carries
       # every shard's traces, videos and screenshots through the blob reports,
@@ -612,8 +612,8 @@ jobs:
           # Every shard must contribute; never publish a silently partial report.
           shopt -s nullglob
           reports=(all-blob-reports/*.zip)
-          if (( ${#reports[@]} != 2 )); then
-            echo "::error::Expected 2 shard blob reports, found ${#reports[@]}."
+          if (( ${#reports[@]} != 4 )); then
+            echo "::error::Expected 4 shard blob reports, found ${#reports[@]}."
             printf 'Available blob reports: %s\n' "${reports[@]}"
             exit 1
           fi
