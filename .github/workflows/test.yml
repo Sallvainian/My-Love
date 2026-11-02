@@ -495,6 +495,8 @@ jobs:
       # keys on it and an empty slice costs a checkout rather than a provision.
       - name: Detect changed E2E test files
         id: changed-tests
+        env:
+          TRIAL_HEAD_REF: ${{ github.head_ref }} # TEMPORARY (trial measurement on #436)
         run: |
           # set -e, not the bare shell the single-job version used: a transient
           # `git fetch` failure leaves CHANGED empty, which the `|| true` below
@@ -524,7 +526,7 @@ jobs:
           # branch changes no spec, so burn-in would skip. Burn in the 8 most
           # recently changed E2E specs (25 tests) to measure 10 passes on 4
           # shards against the E2E shards in the same run.
-          if [[ "${{ github.head_ref }}" == "ci/trial-shards-ghcr-burn-in" ]]; then
+          if [[ "${TRIAL_HEAD_REF:-}" == "ci/trial-shards-ghcr-burn-in" ]]; then
             CHANGED=$(printf '%s\n' \
               tests/e2e/auth/login.spec.ts \
               tests/e2e/settings/push-switches-web.spec.ts \
