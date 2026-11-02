@@ -2918,7 +2918,9 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGr
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
 severity: medium
 reason: Story 12's review found, by reading the code, that the multi-screen path has four faults. The read-and-scroll loop stops after 30 screens and still exits 0 with partial groups. Groups on different screens count as one when they share any notification text, so two threads with identical wording merge, and duplicates collapse. A stacked cell that is never reachable is reported as one notification. `merge`'s return value is unused, although the plan said to scroll "until none is new". center is unchanged since 4c089033 and story 3.14's 8-group runs used that code, but the multi-screen path has never run. The owner moved the multi-group case to story 3.14 on 2026-10-31; 3.14 reads up to 8 groups unfolded in portrait, on one screen, so these faults stay open past 8 groups. Settle it with a run of more groups than fit on the unfolded inner display, plus one thread whose expanded group is taller than a drag step.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-center-one-screen
+resolution-undo: 2ecb451ec71336ba2dd3eb5040fb949b8b3ed6d86f65b7e6cff0c86cc597792d 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 one-screen-limit — owner, 2026-11-02: `center` reads one screen only and exits non-zero with a clear message when Notification Center holds more than fits (no ticket needs more than 8 groups); remove the multi-screen scroll-and-merge path, update `sim help` and test-center-exit.zsh, then close this and DW-345.
 
 ### DW-339: sim center's multi-screen read (scroll and merge) is unproven and can cut groups short, merge two threads with identical text, collapse duplicates, or count an unreachable stack as one notification.
@@ -2981,7 +2983,9 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium (unverified)
 reason: Story 3.14 found that on the first opening after a delivery Notification Center keeps a summary cell (body `phraseThatEnumeratesAllRemainingNotificationsInSection`, "+6 from Runner") beside the 8 expanded groups, and `center` printed it as a 9th group; `screenGroups` now ignores such cells unless they are stacked "Grouped" cells. With 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (the DW-338 multi-screen case) a summary might stand for notifications never listed, and dropping it would undercount with no warning. Settle it with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the notifications pushed.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-center-one-screen
+resolution-undo: 2ecb451ec71336ba2dd3eb5040fb949b8b3ed6d86f65b7e6cff0c86cc597792d 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 one-screen-limit — owner, 2026-11-02: settled with DW-338's one-screen limit; when a summary cell ("+N from <app>") is present, `center` reports it rather than dropping it silently, so an undercount is never quiet.
 
 ### DW-346: sim banner --tap cold on the unfolded Duo can miss once because the banner is gone before the tap reaches it.
@@ -3008,7 +3012,9 @@ location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium (unverified)
 reason: No run so far has used either path. The 8-group runs passed, but nobody observed whether any tap went through displayInUse()'s coordinate fallback. The restore's rotate_to path through cmd_rotate on a phone with only Rotate Left (iPhone 17) was not run. If either is wrong, a read past a shrunk cell misses, or a phone is left turned. Settle it with one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (log whether the fallback ran), and one center --host started in landscape on an iPhone 17 simulator, comparing ax state before and after. 2026-11-02 triage: the coordinate fallback (Notify.swift tap) logs nothing, so no run can show whether it was used, and test-center-exit.zsh never stubs a phone with only Rotate Left and no fold. This entry is the code half: log a line when the fallback taps, and add the Rotate-Left-only stub to test-center-exit.zsh. The two simulator runs move to DW-403.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-center-one-screen
+resolution-undo: 2ecb451ec71336ba2dd3eb5040fb949b8b3ed6d86f65b7e6cff0c86cc597792d 2026-11-02 7374617475733a206f70656e
 
 ### DW-349: AGENTS.md's sim-driver clause says center puts the pose and orientation back, without sim help's exception for a folded landscape.
 origin: spec-deferred 5cff3711aeb0
@@ -3435,4 +3441,20 @@ origin: split from DW-348 by the 2026-11-02 ledger triage
 location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
 severity: medium (unverified)
 reason: Needs two runs after DW-348 lands its fallback log line: one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (read whether the fallback ran), and one `center --host` started in landscape on an iPhone 17 simulator, comparing `ax state` before and after (the iPhone 17 needs selecting in Device Hub, DW-334). Outside the loop.
+status: open
+
+### DW-404: A failed center's restore skips its "could not restore" report: when die's exit (nested below cmd_center) runs center's EXIT trap, zsh 5.9 ends the trap as soon as a function it calls directly
+origin: spec-deferred 9f0d4541ec07
+location: scripts/sim-driver/sim (center_restore, die); scripts/sim-driver/test-center-exit.zsh
+source_spec: `plan-dw-sim-center-one-screen.md`
+severity: low
+reason: Reproduced in plain zsh 5.9: with `f() { trap restore EXIT; die; }` and `die() { exit 1; }`, `restore() { inner || print report; print after; exit 7; }` runs inner's whole body, then stops (exit 1, no "report", no "after"); with `exit 1` called in f directly it prints both and exits 7. In sim, center_restore's only direct function call is `rotate_to` (sim:824), so a failed read still turns the device back, but a restore failure on that path is never reported and CENTER_DONE is never set. In test-center-exit.zsh ax, xcrun and sleep are stub functions, so a failed read's restore stops at its first stubbed call; a phone read-fails case starting in landscape ended in portrait for that reason and was left out. Fix: call rotate_to in a subshell, `( rotate_to $CENTER_ORIENT )`, and make the stubbed restore checkable.
+status: open
+
+### DW-405: center's one-screen check (no stacked cell left, and neither a drag nor a swipe down the list moves a cell) has not been run on a simulator.
+origin: spec-deferred f1809e113bbf
+location: scripts/sim-driver/RunnerUITests/Notify.swift (center)
+source_spec: `plan-dw-sim-center-one-screen.md`
+severity: low
+reason: The drag-then-swipe sequence is the one every passing 8-group run ended on, and those runs printed no extra stacked-cell group, so neither check should fire at 8 groups; a run with 8 groups (exit 0) and one with more than fit (exit 1 with the message) would prove it. Needs the Duo simulator, like DW-403.
 status: open

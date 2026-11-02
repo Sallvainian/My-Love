@@ -138,6 +138,13 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
   center [--host]        The app's Notification Center groups as one JSON
                          line: each group's text (its newest notification's
                          title and body) and notification count.
+                         Reads one screen only: when Notification Center
+                         holds more than fits, it prints no groups and
+                         exits 1 saying so. A "+N from <app>" summary cell
+                         is not a group; each is reported on stderr, since
+                         notifications it stands for may be uncounted. A
+                         tap made through screen coordinates (a cell
+                         XCUITest calls not hittable) is noted on stderr.
                          Unfolds the Duo and turns it to portrait to read
                          (proven with 8 groups), then puts the pose and
                          orientation back; a folded landscape comes back
@@ -826,7 +833,8 @@ center_restore() {
 # Hub's Home goes before each drag, and again after, to close it. A drag can
 # miss while the Home Screen settles, so it is tried three times. The Duo is
 # unfolded and turned to portrait first, where 8 groups were proven to fit
-# the inner display, and put back (pose, then orientation) afterwards.
+# the inner display, and put back (pose, then orientation) afterwards. The
+# runner reads that one screen only and fails when more is there.
 cmd_center() {
   target_args "$@"
   (( $#REST == 0 )) || die 2 "center takes only --host"
@@ -869,13 +877,19 @@ cmd_center() {
     say "Notification Center did not open (try $try of 3)"
   done
   ax control Home --device $UDID >/dev/null
+  # A failed read's lines (its warnings and notes too) go to stderr, so
+  # stdout never carries anything but the JSON line.
   if (( code )); then
-    finish_step Notify center $code
+    finish_step Notify center $code >&2
   fi
-  # The runner's warnings go to stderr, its one JSON line to stdout.
+  # The runner's warnings and notes go to stderr, its one JSON line to stdout.
   local line
   for line in ${(f)out}; do
-    if [[ $line == warning:* ]]; then say ${line#warning: }; else print -r -- $line; fi
+    case $line in
+      warning:*) say ${line#warning: } ;;
+      note:*) say ${line#note: } ;;
+      *) print -r -- $line ;;
+    esac
   done
 }
 

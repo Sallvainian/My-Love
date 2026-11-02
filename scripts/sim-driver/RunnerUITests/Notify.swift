@@ -23,7 +23,8 @@ import XCTest
 //                           banner (a local notification falling due), the
 //                           watch and the banner lines stamped with the time
 //   center                  open Notification Center (sim presses Home
-//                           first), print the app's groups as one JSON line
+//                           first), print the app's groups as one JSON line;
+//                           one screen only, failing when more is there
 //   badge                   print the app icon's value, or none
 //   front                   print the bundle of the known app in front, or
 //                           none
@@ -159,15 +160,17 @@ final class Notify: XCTestCase {
     // ("Grouped") cell expands it, the whole stack first, then each thread's
     // group, which then shows a header ("Show less", Clear) above its cells,
     // one per notification. It keeps its scroll position and expansions
-    // between openings, a pull past the top of the list folds it into an
-    // "N Notifications" pill or opens Spotlight, and a fast swipe at its end
-    // can close Notification Center. So the list is dragged back to its top
-    // by exactly the distance left (its first cell, an empty one, sits at
-    // y 0 there), then down a screen at a time with slow drags that end held
-    // (no coasting), until a drag moves nothing, each visible stacked cell
-    // expanded and each screen read on the way. Notifications are told apart
-    // by title and body, so one group's cells seen on two screens count once,
-    // and two identical notifications in one group count as one.
+    // between openings, and a pull past the top of the list folds it into an
+    // "N Notifications" pill or opens Spotlight. So the list is dragged back
+    // to its top by exactly the distance left (its first cell, an empty one,
+    // sits at y 0 there) with slow drags that end held (no coasting), each
+    // stacked cell is expanded, and that one screen is read. center reads one
+    // screen only (8 groups fit the unfolded inner display in portrait): a
+    // stacked cell it cannot expand, or a list that a drag down it (or the
+    // fast swipe that opens the pile of shrunk cells a long list ends in)
+    // moves, fails the step rather than print a partial count. That swipe
+    // at the list's end can close Notification Center, and the read then
+    // fails too (the list it snapshots is gone).
     func center(_ icon: String) throws {
         skipIdleWaits()
         let stacked = any(springboard, "identifier == 'NotificationShortLookView' AND label BEGINSWITH[c] %@", icon + ", Grouped,")
@@ -186,28 +189,28 @@ final class Notify: XCTestCase {
             drag(list, by: min(left, step))
         }
         if !top { return XCTFail("Notification Center's list never reached its top") }
-        var groups: [[String]] = []
-        for _ in 0..<30 {
-            var taps = 0
-            while let cell = try stacked.allElementsBoundByIndex.first(where: { try reachable($0, in: list.frame) }) {
-                taps += 1
-                if taps > 30 { return XCTFail("stacked notifications never expanded") }
-                tap(cell)
-            }
-            merge(&groups, try screenGroups(icon),
-                  same: { !Set($0).isDisjoint(with: $1) },
-                  combine: { merge(&$0, $1, same: ==, combine: { _, _ in }) })
-            // The list ends in a pile of shrunk cells (the oldest groups) that
-            // slow drags leave folded and a fast swipe opens.
-            let before = try cellFrames()
-            drag(list, by: -step)
-            if try cellFrames() == before {
-                list.swipeUp()
-                sleep(1)
-                if try cellFrames() == before { break }
-            }
+        var taps = 0
+        while let cell = try stacked.allElementsBoundByIndex.first(where: { try reachable($0, in: list.frame) }) {
+            taps += 1
+            if taps > 30 { return XCTFail("stacked notifications never expanded") }
+            tap(cell)
         }
-        let doc: [String: Any] = ["groups": groups.map { ["text": $0[0], "count": $0.count] }]
+        let tooMany = "Notification Center holds more \(icon) notifications than fit on one screen,"
+            + " and center reads one screen only (8 groups fit unfolded in portrait)"
+        if stacked.count > 0 { return XCTFail(tooMany + ": a stacked group could not be expanded") }
+        let read = try screenGroups(icon)
+        // A summary cell stands for notifications that may have no cell of
+        // their own, so it is reported, never dropped quietly.
+        for summary in read.summaries {
+            say("warning: a summary cell (\(summary)) is not counted; notifications it stands for that have no cell of their own are missing from the counts")
+        }
+        let before = try cellFrames()
+        drag(list, by: -step)
+        if try cellFrames() != before { return XCTFail(tooMany + ": a drag down the list moved it") }
+        list.swipeUp()
+        sleep(1)
+        if try cellFrames() != before { return XCTFail(tooMany + ": a swipe down the list moved it") }
+        let doc: [String: Any] = ["groups": read.groups.map { ["text": $0[0], "count": $0.count] }]
         let data = try JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys])
         say(String(decoding: data, as: UTF8.self))
     }
@@ -228,7 +231,7 @@ final class Notify: XCTestCase {
     }
 
     // The frames of the list's cells: a drag that leaves them all in place
-    // met the list's end.
+    // found nothing more to show.
     func cellFrames() throws -> [CGRect] {
         var cells: [CGRect] = []
         func walk(_ n: XCUIElementSnapshot) {
@@ -262,13 +265,15 @@ final class Notify: XCTestCase {
     // Cells near the list's bottom edge are drawn shrunk, and XCUITest calls
     // them not hittable; those are tapped at their centre through the
     // display's coordinates (a coordinate on the cell itself makes XCUITest
-    // wait out the "banner" as an interruption).
+    // wait out the "banner" as an interruption). A "note:" line says each
+    // time that happened, so a run shows whether the fallback was used.
     func tap(_ cell: XCUIElement) {
         if cell.isHittable {
             cell.tap()
         } else {
             let display = displayInUse()
             let at = cell.frame, screen = display.frame.origin
+            say("note: tapping \"\(cell.label.replacingOccurrences(of: "\n", with: " | "))\" at its centre (\(Int(at.midX)), \(Int(at.midY))) through the display's coordinates; XCUITest calls it not hittable")
             display.coordinate(withNormalizedOffset: .zero)
                 .withOffset(CGVector(dx: at.midX - screen.x, dy: at.midY - screen.y)).tap()
         }
@@ -305,34 +310,6 @@ final class Notify: XCTestCase {
         if missing { say("warning: idle waits cannot be skipped on this Xcode; runs will be slow") }
     }
 
-    // Merges one screen's items, top to bottom, into those seen so far in
-    // screen order: a new item goes after the seen item above it on the same
-    // screen, or before the first seen item below it, or (a screen sharing
-    // nothing) after everything. Returns whether any item was new.
-    @discardableResult
-    func merge<T>(_ all: inout [T], _ screen: [T],
-                  same: (T, T) -> Bool, combine: (inout T, T) -> Void) -> Bool {
-        var fresh = false
-        var last: Int?
-        var above: [T] = []
-        for item in screen {
-            if var i = all.firstIndex(where: { same($0, item) }) {
-                if last == nil && !above.isEmpty {
-                    all.insert(contentsOf: above, at: i)
-                    i += above.count
-                    above = []
-                }
-                combine(&all[i], item)
-                last = i
-            } else {
-                fresh = true
-                if let l = last { all.insert(item, at: l + 1); last = l + 1 } else { above.append(item) }
-            }
-        }
-        all.append(contentsOf: above)
-        return fresh
-    }
-
     // Drags the list's content BY points (down when positive) through its
     // middle, holding at the end so it does not coast on.
     func drag(_ list: XCUIElement, by points: CGFloat) {
@@ -344,10 +321,11 @@ final class Notify: XCTestCase {
         sleep(1)
     }
 
-    // The app's groups on screen, top to bottom, each as its members' texts.
-    // An expanded group's cells (and its header) share one parent; a group
-    // still stacked is a single "Grouped" cell, its own group.
-    func screenGroups(_ icon: String) throws -> [[String]] {
+    // The app's groups on screen, top to bottom, each as its members' texts,
+    // and the text of each summary cell on screen. An expanded group's cells
+    // (and its header) share one parent; a group still stacked is a single
+    // "Grouped" cell, its own group.
+    func screenGroups(_ icon: String) throws -> (groups: [[String]], summaries: [String]) {
         let root = try springboard.snapshot()
         func find(_ n: XCUIElementSnapshot, _ match: (XCUIElementSnapshot) -> Bool) -> XCUIElementSnapshot? {
             if match(n) { return n }
@@ -357,10 +335,12 @@ final class Notify: XCTestCase {
         // On the first opening after a delivery the list can keep a summary
         // cell ("+6 from Runner", labelled like the newest notification it
         // sits on) beside the expanded groups; it stands for notifications
-        // read as their own cells, so it is not one.
-        func isSummary(_ n: XCUIElementSnapshot) -> Bool {
-            find(n) { $0.identifier.contains("phraseThatEnumeratesAllRemainingNotificationsInSection") } != nil
+        // that, on one screen, were read as their own cells, so it is not a
+        // group, but its text is returned for the caller to report.
+        func summaryPhrase(_ n: XCUIElementSnapshot) -> XCUIElementSnapshot? {
+            find(n) { $0.identifier.contains("phraseThatEnumeratesAllRemainingNotificationsInSection") }
         }
+        func isSummary(_ n: XCUIElementSnapshot) -> Bool { summaryPhrase(n) != nil }
         func isStacked(_ n: XCUIElementSnapshot) -> Bool {
             n.label.uppercased().hasPrefix(icon.uppercased() + ", GROUPED,")
         }
@@ -378,14 +358,21 @@ final class Notify: XCTestCase {
             return joined.isEmpty ? cell.label : joined
         }
         var out: [(y: CGFloat, texts: [String])] = []
+        var summaries: [String] = []
         func walk(_ n: XCUIElementSnapshot) {
             if isCell(n) { out.append((n.frame.minY, [text(n)])); return }
+            if n.identifier == "ListCell", n.label.uppercased().hasPrefix(icon.uppercased() + ","),
+               let phrase = summaryPhrase(n) {
+                summaries.append((phrase.label.isEmpty ? n.label : phrase.label)
+                    .replacingOccurrences(of: "\n", with: " | "))
+                return
+            }
             let cells = n.children.filter { isCell($0) && !isStacked($0) }
             if let top = cells.map(\.frame.minY).min() { out.append((top, cells.map(text))) }
             n.children.filter { !isCell($0) || isStacked($0) }.forEach(walk)
         }
         walk(root)
-        return out.sorted { $0.y < $1.y }.map(\.texts)
+        return (out.sorted { $0.y < $1.y }.map(\.texts), summaries)
     }
 
     // Two icons can share the name (the Duo simulator's Home Screen has two
