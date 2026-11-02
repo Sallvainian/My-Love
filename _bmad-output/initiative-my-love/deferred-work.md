@@ -3049,7 +3049,9 @@ location: src/services/pushNotifications.ts (stopDevicePushes)
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
 reason: Sign-out now removes the device's registration, unregisters from APNs and clears the badge, but the ticket does not ask for delivered notifications to go, and stopDevicePushes deliberately avoids the push plugin's removeAllDeliveredNotifications(), which rejects unless register() ran this launch. Each banner already delivered keeps its sender's name and note text in Notification Center after sign-out. Settle it in a later story with a native removal (UNUserNotificationCenter removeAllDeliveredNotifications) gated on its own plugin check, and a decision on whether a sign-out should empty the app's whole Notification Center group.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sign-out-clears-notifications
+resolution-undo: b04da7f46545fbcaa346ae11efa04b980a6f5b208f9ab1392bb4755eae75bae2 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 clear-whole-group — owner, 2026-11-02: sign-out removes every delivered notification of the app, pushes and date reminders alike (retro L7), using @capacitor/local-notifications' removeAllDeliveredNotifications(), which needs no register() this launch, behind its own Capacitor.isPluginAvailable check; web-only, no new Swift. A simulator check of the shell is a follow-up outside the loop.
 
 ### DW-353: A push_devices row outlives the install or session that registered it (reinstall, offline sign-out, or a session ended elsewhere), and only an APNs 410 removes it, which may never come.
@@ -3473,4 +3475,28 @@ location: supabase/migrations/20261031000000_push_devices.sql (register_push_dev
 source_spec: `plan-dw-sign-out-everywhere.md`
 severity: medium
 reason: Global sign-out revokes refresh tokens, but access tokens stay valid until they expire (supabase/config.toml jwt_expiry = 3600). register_push_device checks only auth.uid() (20261031000000_push_devices.sql), and App.tsx re-registers on every signed-in start with permission. The same happens if a registration lands in the up-to-3 s gap between unregister_all_push_devices() and the global sign-out. Pre-existing: register_push_device never checked whether the caller's session was revoked. Settling it needs a server-side check that the JWT's session_id still exists in auth.sessions, or an owner decision to accept the window.
+status: open
+
+### DW-407: DW-352's native removal is unverified on a shell: no simulator check yet shows sign-out emptying Notification Center of delivered pushes and date reminders.
+origin: spec-deferred e63b7bcda168
+location: src/services/pushNotifications.ts (stopDevicePushes)
+source_spec: `plan-dw-sign-out-clears-notifications.md`
+severity: low
+reason: The intent names a simulator check of the shell as a follow-up outside the loop. Unit tests mock the plugin, so they cannot show that `Capacitor.isPluginAvailable('LocalNotifications')` is true in the installed shell or that the plugin's iOS method (`UNUserNotificationCenter.removeAllDeliveredNotifications()`, LocalNotificationsPlugin.swift:879-888) removes delivered APNs pushes there. Settle it with `scripts/sim-driver/sim`: push a love note and let a date reminder fire, sign out, then `sim center` shows no group for the app.
+status: open
+
+### DW-408: An account switch without a sign-out (in place, or a fresh sign-in whose owner marker names another account) leaves the outgoing account's delivered notifications in Notification Center.
+origin: spec-deferred ff783ef05e40
+location: src/stores/slices/authSlice.ts:331-336, 456-459
+source_spec: `plan-dw-sign-out-clears-notifications.md`
+severity: low
+reason: `discardAccountState` calls `stopPushesForSignOut()` only when `identity.userId === null` (src/stores/slices/authSlice.ts:336), and the fresh-sign-in leftover path calls `deleteAccountData(leftover)` alone (authSlice.ts:457-459). `deleteAccountData` cancels pending date reminders but does not remove delivered ones, so delivered pushes and reminders stay for the incoming account on those paths. This predates DW-352, and the owner's decision covers sign-out only. Reachability is unverified: a device normally goes through signed out, which now runs the removal. The fix would be a removal call on those paths (not the APNs unregister, which would race `startPushRegistration`), plus a decision that a switch should empty Notification Center too.
+status: open
+
+### DW-409: PartnerMoodView.kit.test.tsx "enables refresh when online" failed once under the full unit suite with the refresh button still `aria-busy` and disabled, and passed on 3 isolated reruns and 2 later
+origin: spec-deferred 5bd4d01176e8
+location: src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166
+source_spec: `plan-dw-sign-out-clears-notifications.md`
+severity: low
+reason: First `npm run test:unit` of this run: 1 failed of 3759, `expect(element).toBeEnabled()` at src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166, with the button rendered `aria-busy="true" disabled`. `findByTestId` resolves on presence, not enablement, so an in-flight refresh still busy under load fails it. Unrelated to this change, which touches no PartnerMoodView code. Settle by asserting through `waitFor(() => expect(...).toBeEnabled())` after confirming what keeps it busy.
 status: open

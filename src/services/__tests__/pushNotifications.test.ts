@@ -23,6 +23,10 @@ const push = vi.hoisted(() => ({
   ),
 }));
 
+const local = vi.hoisted(() => ({
+  removeAllDeliveredNotifications: vi.fn(() => Promise.resolve()),
+}));
+
 const rpc = vi.hoisted(() =>
   vi.fn((_name: string, _args?: unknown) => Promise.resolve({ error: null as { message: string } | null }))
 );
@@ -34,6 +38,7 @@ vi.mock('@capacitor/core', () => ({
   registerPlugin: (name: string) => (name === 'AppBadge' ? badge : environment),
 }));
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: push }));
+vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: local }));
 vi.mock('../../api/supabaseClient', () => ({ supabase: { rpc } }));
 
 type Handler = (payload: unknown) => void;
@@ -355,12 +360,14 @@ describe('stopDevicePushes', () => {
     localStorage.removeItem(TOKEN_KEY);
   });
 
-  it('unregisters from APNs, clears the badge and forgets the token', async () => {
+  it('unregisters from APNs, empties Notification Center, clears the badge and forgets the token', async () => {
     const { stopDevicePushes } = await freshModule();
 
     await stopDevicePushes();
 
     expect(push.unregister).toHaveBeenCalledTimes(1);
+    // Pushes and date reminders alike, so the next person cannot read them (DW-352).
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
     expect(badge.clear).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
     // The server row is actionService.signOut's job; this half makes no request.
@@ -377,13 +384,26 @@ describe('stopDevicePushes', () => {
     expect(badge.clear).not.toHaveBeenCalled();
   });
 
-  it('an older shell, with neither plugin, makes no native call', async () => {
+  it('a shell with no local-notifications plugin skips the removal and still clears the badge', async () => {
+    capacitor.isPluginAvailable.mockImplementation((name: string) => name !== 'LocalNotifications');
+    const { stopDevicePushes } = await freshModule();
+
+    await stopDevicePushes();
+
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
+    expect(push.unregister).toHaveBeenCalledTimes(1);
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  it('an older shell, with none of the plugins, makes no native call', async () => {
     capacitor.isPluginAvailable.mockReturnValue(false);
     const { stopDevicePushes } = await freshModule();
 
     await stopDevicePushes();
 
     expect(push.unregister).not.toHaveBeenCalled();
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
     expect(badge.clear).not.toHaveBeenCalled();
   });
 
@@ -395,8 +415,26 @@ describe('stopDevicePushes', () => {
     await stopDevicePushes();
 
     expect(push.unregister).not.toHaveBeenCalled();
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
     expect(badge.clear).not.toHaveBeenCalled();
     expect(errorLog).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it('a failing removal is logged once, and the badge and token still go', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    local.removeAllDeliveredNotifications.mockRejectedValueOnce(new Error('bridge gone'));
+    const { stopDevicePushes } = await freshModule();
+
+    await expect(stopDevicePushes()).resolves.toBeUndefined();
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining('delivered notifications'),
+      expect.any(Error)
+    );
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
     errorLog.mockRestore();
   });
 

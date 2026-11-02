@@ -5,9 +5,10 @@ import UserNotifications
 /// The app icon's badge.
 ///
 /// Sign-out clears it (src/services/pushNotifications.ts, stopDevicePushes), so
-/// the outgoing account's count does not stay on the icon. Notification
-/// Center is left as it is: the push plugin's removeAllDeliveredNotifications
-/// would empty it too, and it rejects unless register() ran this launch.
+/// the outgoing account's count does not stay on the icon. Sign-out also
+/// empties the app's Notification Center group there, through the
+/// local-notifications plugin's removeAllDeliveredNotifications: the push
+/// plugin's rejects unless register() ran this launch.
 /// Love Notes clears it too when it marks notes read
 /// (src/hooks/useLoveNotesReadMarker.ts); the count itself arrives in each
 /// push's `aps.badge`.

@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { isOnline } from '../api/errorHandlers';
 import { supabase } from '../api/supabaseClient';
@@ -20,10 +21,11 @@ import type { ViewType } from '../stores/slices/navigationSlice';
  *
  * Sign-out stops the device's pushes in two steps (story 3.2):
  * `removePushRegistration` deletes this device's row while the session still
- * exists (online only), then `stopDevicePushes` unregisters from APNs and
- * clears the badge on every transition to signed out. Each native plugin is
- * checked on its own: a shell from story 3.1 has `PushNotifications` but no
- * `AppBadge`.
+ * exists (online only), then `stopDevicePushes` unregisters from APNs,
+ * empties the app's delivered notifications (DW-352) and clears the badge on
+ * every transition to signed out. Each native plugin is checked on its own: a
+ * shell from story 3.1 has `PushNotifications` but no `AppBadge`, and one from
+ * before story 4.1 has no `LocalNotifications`.
  *
  * The Settings switches (story 3.7) read the same gate through
  * `hasNativePush()` and ask iOS for the permission state through
@@ -378,14 +380,15 @@ export async function removeAllPushRegistrations(): Promise<boolean> {
 }
 
 /**
- * Stops this device's pushes natively: unregisters from APNs, clears the app
- * icon's badge and forgets the stored token. Called on every transition to
- * signed out (sign-out online or offline, and a boot that finds the session
- * gone), never on sign-in or an account switch, so it cannot race
+ * Stops this device's pushes natively: unregisters from APNs, removes every
+ * notification of the app still in Notification Center (love-note pushes and
+ * date reminders alike, so the next person on the device cannot read them),
+ * clears the app icon's badge and forgets the stored token. Called on every
+ * transition to signed out (sign-out online or offline, and a boot that finds
+ * the session gone), never on sign-in or an account switch, so it cannot race
  * `startPushRegistration`.
  *
- * Delivered notifications stay in Notification Center. Never throws; logs
- * only failures.
+ * Never throws; logs only failures.
  */
 export async function stopDevicePushes(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
@@ -397,8 +400,16 @@ export async function stopDevicePushes(): Promise<void> {
       console.error('[Push] Could not unregister from APNs:', error);
     }
   }
-  // Not removeAllDeliveredNotifications(): it rejects unless register() ran
-  // this launch, and it would also empty Notification Center.
+  // The local-notifications plugin's removal, not the push plugin's: that one
+  // rejects unless register() ran this launch. Both empty the app's whole
+  // Notification Center group, pushes included (DW-352).
+  if (Capacitor.isPluginAvailable('LocalNotifications')) {
+    try {
+      await LocalNotifications.removeAllDeliveredNotifications();
+    } catch (error) {
+      console.error('[Push] Could not remove the delivered notifications:', error);
+    }
+  }
   await clearAppBadge();
   forgetToken();
 }

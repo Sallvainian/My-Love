@@ -83,8 +83,8 @@ function deleteAccountData(userId: string): void {
 
 /**
  * Stop this device's pushes for the account that just signed out: unregister
- * from APNs, clear the app icon's badge, forget the stored token
- * (`stopDevicePushes`). The server row is removed earlier, by
+ * from APNs, remove the app's delivered notifications from Notification Center,
+ * clear the app icon's badge, forget the stored token (`stopDevicePushes`). The server row is removed earlier, by
  * `actionService.signOut` while the session still exists; offline, or on a
  * boot that finds the session gone, this native half is all that runs.
  *
