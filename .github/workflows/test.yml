@@ -317,6 +317,11 @@ jobs:
       - name: Run ${{ matrix.project }} tests
         run: npx playwright test --project=${{ matrix.project }}
 
+      # A green run that quietly ran fewer tests than the suite holds fails
+      # here; scripts/check-test-counts.sh says what it compares.
+      - name: Check every ${{ matrix.project }} test ran
+        run: scripts/check-test-counts.sh ${{ matrix.project }} tests/${{ matrix.project }}
+
       - name: Upload ${{ matrix.project }} test results
         uses: actions/upload-artifact@v7
         if: failure()
@@ -377,6 +382,11 @@ jobs:
         env:
           E2E_BLOB_REPORT: '1'
         run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/2
+
+      # A green shard that quietly ran fewer tests than Playwright lists for it
+      # fails here; scripts/check-test-counts.sh says what it compares.
+      - name: Check every test in this shard ran
+        run: scripts/check-test-counts.sh chromium tests/e2e --shard=${{ matrix.shard }}/2
 
       # Only on failure: the merged report (merge-reports) already carries
       # every shard's traces, videos and screenshots through the blob reports,
