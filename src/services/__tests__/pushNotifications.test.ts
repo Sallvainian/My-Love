@@ -186,6 +186,121 @@ describe('startPushRegistration', () => {
   });
 });
 
+describe('startPushRenewalOnForeground', () => {
+  const HOUR = 60 * 60 * 1000;
+  let visibility: DocumentVisibilityState = 'visible';
+  let online = true;
+
+  function returnToForeground() {
+    visibility = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'));
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    push.checkPermissions.mockResolvedValue({ receive: 'granted' });
+    rpc.mockResolvedValue({ error: null });
+    visibility = 'visible';
+    online = true;
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
+    localStorage.setItem(TOKEN_KEY, 'stored-token');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    localStorage.removeItem(TOKEN_KEY);
+  });
+
+  it('re-records the stored token on a foreground return 12 hours after the start', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+
+    vi.setSystemTime(Date.now() + 12 * HOUR);
+    returnToForeground();
+
+    await vi.waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith('register_push_device', {
+        p_token: 'stored-token',
+        p_environment: 'sandbox',
+      })
+    );
+    stop();
+  });
+
+  it('renews at most once every 12 hours', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+
+    returnToForeground();
+    vi.setSystemTime(Date.now() + 11 * HOUR);
+    returnToForeground();
+    await Promise.resolve();
+    expect(rpc).not.toHaveBeenCalled();
+
+    vi.setSystemTime(Date.now() + 1 * HOUR);
+    returnToForeground();
+    await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+    vi.setSystemTime(Date.now() + 1 * HOUR);
+    returnToForeground();
+    await Promise.resolve();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('does nothing offline, when hidden, without a token or without permission', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+    vi.setSystemTime(Date.now() + 13 * HOUR);
+
+    online = false;
+    returnToForeground();
+    online = true;
+    visibility = 'hidden';
+    document.dispatchEvent(new Event('visibilitychange'));
+    localStorage.removeItem(TOKEN_KEY);
+    returnToForeground();
+    await Promise.resolve();
+    expect(rpc).not.toHaveBeenCalled();
+
+    localStorage.setItem(TOKEN_KEY, 'stored-token');
+    push.checkPermissions.mockResolvedValue({ receive: 'denied' });
+    returnToForeground();
+    await vi.waitFor(() => expect(push.checkPermissions).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(rpc).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('stops listening once stopped', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    startPushRenewalOnForeground()();
+    vi.setSystemTime(Date.now() + 13 * HOUR);
+
+    returnToForeground();
+    await Promise.resolve();
+    expect(push.checkPermissions).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op in a browser', async () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+    vi.setSystemTime(Date.now() + 13 * HOUR);
+
+    returnToForeground();
+    await Promise.resolve();
+    expect(push.checkPermissions).not.toHaveBeenCalled();
+    stop();
+  });
+});
+
 describe('removePushRegistration', () => {
   beforeEach(() => {
     vi.clearAllMocks();

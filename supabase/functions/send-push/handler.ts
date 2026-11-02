@@ -100,8 +100,9 @@
  * neither claimed nor sent to: it is deleted through `deleteGoneDevice` with
  * the cutoff, so a row registered again meanwhile survives, and counted `gone`
  * (a failed delete counts `failed`). A device registers on every signed-in
- * start with permission, so one not started for 30 days stops getting pushes
- * until it next starts.
+ * start with permission and renews on a foreground return (at most every 12
+ * hours), so only one not opened for 30 days stops getting pushes until it
+ * next opens.
  */
 
 import type { ApnsClient, ApnsResult } from './apns.ts';

@@ -304,6 +304,38 @@ export async function startPushRegistration(): Promise<PushRegistrationOutcome> 
   }
 }
 
+/** How often a return to the foreground may renew the registration. */
+export const PUSH_RENEWAL_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Keeps this device's registration fresh while the app is in use. The sender
+ * drops a device whose registration has not been renewed for 30 days, and a
+ * signed-in start is the only other renewal, so a shell that is only ever
+ * brought back from the background would otherwise age out. On a return to
+ * the foreground while online, with permission granted and a token stored,
+ * this re-records the stored token, at most once every 12 hours (the start
+ * that set this up has just registered). Call while signed in; returns the
+ * function that stops it. A no-op on the web and in a shell without push.
+ */
+export function startPushRenewalOnForeground(): () => void {
+  if (!hasNativePush()) return () => {};
+  let lastRenewal = Date.now();
+  const onVisibility = () => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+    if (Date.now() - lastRenewal < PUSH_RENEWAL_INTERVAL_MS) return;
+    const token = storedToken();
+    if (!token) return;
+    lastRenewal = Date.now();
+    void (async () => {
+      const { receive } = await PushNotifications.checkPermissions();
+      if (receive !== 'granted') return;
+      await recordDevice(token);
+    })().catch((error: unknown) => console.error('[Push] Could not renew the device:', error));
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  return () => document.removeEventListener('visibilitychange', onVisibility);
+}
+
 /**
  * Deletes this device's registration under the signed-in account, so its
  * pushes stop reaching the device. Call before `supabase.auth.signOut()`: the

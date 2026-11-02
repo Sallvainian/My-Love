@@ -32,7 +32,11 @@ import {
   startDateReminderTriggers,
 } from './services/dateRemindersAtLaunch';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
-import { onPushTap, startPushRegistration } from './services/pushNotifications';
+import {
+  onPushTap,
+  startPushRegistration,
+  startPushRenewalOnForeground,
+} from './services/pushNotifications';
 import { clearSignOutNotice } from './services/signOutNotice';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
@@ -462,6 +466,14 @@ function App() {
     void startPushRegistration().then((outcome) => {
       if (outcome === 'registering') void replanDateReminders(owner);
     });
+  }, [authUserId, authSessionVersion]);
+
+  // While signed in, a return to the foreground renews this device's push
+  // registration (at most every 12 hours), so the sender's 30-day prune never
+  // drops a phone that is in use but never cold-started. A no-op on the web.
+  useEffect(() => {
+    if (!authUserId) return;
+    return startPushRenewalOnForeground();
   }, [authUserId, authSessionVersion]);
 
   // Date reminders re-plan from the saved copies on every return to the
