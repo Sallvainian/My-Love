@@ -520,6 +520,22 @@ jobs:
             CHANGED=$(git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
           fi
 
+          # TEMPORARY (trial measurement on #436; removed before merge): this
+          # branch changes no spec, so burn-in would skip. Burn in the 8 most
+          # recently changed E2E specs (25 tests) to measure 10 passes on 4
+          # shards against the E2E shards in the same run.
+          if [[ "${{ github.head_ref }}" == "ci/trial-shards-ghcr-burn-in" ]]; then
+            CHANGED=$(printf '%s\n' \
+              tests/e2e/auth/login.spec.ts \
+              tests/e2e/settings/push-switches-web.spec.ts \
+              tests/e2e/notes/love-notes-read-marker.spec.ts \
+              tests/e2e/offline/birthdays-wedding-offline.spec.ts \
+              tests/e2e/navigation/dock.spec.ts \
+              tests/e2e/account-data/account-data.spec.ts \
+              tests/e2e/auth/implicit-fragment-rejection.spec.ts \
+              tests/e2e/auth/logout.spec.ts)
+          fi
+
           # NF drops the blank line `echo` emits for an empty CHANGED, which
           # would otherwise hand shard 1 a one-element list of "".
           MINE=$(echo "$CHANGED" | awk -v s="${{ matrix.shard }}" -v t=4 'NF && (NR % t) == (s % t)')
