@@ -22,6 +22,7 @@ vi.mock('../../../src/services/dateReminders', async (importOriginal) => {
 });
 vi.mock('../../../src/services/pushNotifications', () => ({
   stopDevicePushes: vi.fn(() => Promise.resolve()),
+  clearDeliveredNotifications: vi.fn(() => Promise.resolve()),
   startPushRegistration: vi.fn(() => Promise.resolve('unavailable')),
 }));
 vi.mock('../../../src/services/localCopy', async (importOriginal) => {

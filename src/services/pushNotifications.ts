@@ -25,7 +25,9 @@ import type { ViewType } from '../stores/slices/navigationSlice';
  * empties the app's delivered notifications (DW-352) and clears the badge on
  * every transition to signed out. Each native plugin is checked on its own: a
  * shell from story 3.1 has `PushNotifications` but no `AppBadge`, and one from
- * before story 4.1 has no `LocalNotifications`.
+ * before story 4.1 has no `LocalNotifications`. An account switch without a
+ * sign-out empties Notification Center and the badge alone, through
+ * `clearDeliveredNotifications` (DW-408).
  *
  * The Settings switches (story 3.7) read the same gate through
  * `hasNativePush()` and ask iOS for the permission state through
@@ -418,7 +420,7 @@ export async function removeAllPushRegistrations(): Promise<boolean> {
  * clears the app icon's badge and forgets the stored token. Called on every
  * transition to signed out (sign-out online or offline, and a boot that finds
  * the session gone), never on sign-in or an account switch, so it cannot race
- * `startPushRegistration`.
+ * `startPushRegistration`; a switch runs `clearDeliveredNotifications` alone.
  *
  * Never throws; logs only failures.
  */
@@ -432,6 +434,24 @@ export async function stopDevicePushes(): Promise<void> {
       console.error('[Push] Could not unregister from APNs:', error);
     }
   }
+  await clearDeliveredNotifications();
+  forgetToken();
+}
+
+/**
+ * Removes every notification of the app still in Notification Center (pushes
+ * and date reminders alike) and clears the app icon's badge, without touching
+ * the APNs registration or the stored token. `stopDevicePushes` runs it on
+ * sign-out (DW-352); an account switch runs it alone (DW-408), because an
+ * unregister there would race `startPushRegistration` for the incoming account.
+ * Does nothing outside the native shell, and skips the removal in a shell with
+ * no `LocalNotifications` plugin (one installed before story 4.1).
+ *
+ * Never throws; logs only failures.
+ */
+export async function clearDeliveredNotifications(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+
   // The local-notifications plugin's removal, not the push plugin's: that one
   // rejects unless register() ran this launch. Both empty the app's whole
   // Notification Center group, pushes included (DW-352).
@@ -443,7 +463,6 @@ export async function stopDevicePushes(): Promise<void> {
     }
   }
   await clearAppBadge();
-  forgetToken();
 }
 
 /**

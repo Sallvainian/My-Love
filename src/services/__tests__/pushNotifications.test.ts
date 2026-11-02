@@ -568,6 +568,71 @@ describe('stopDevicePushes', () => {
   });
 });
 
+describe('clearDeliveredNotifications', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    localStorage.setItem(TOKEN_KEY, 'device-token-1');
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(TOKEN_KEY);
+  });
+
+  it('empties Notification Center and clears the badge, keeping the APNs registration and token', async () => {
+    const { clearDeliveredNotifications } = await freshModule();
+
+    await clearDeliveredNotifications();
+
+    // An account switch (DW-408): an unregister would race startPushRegistration.
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+    expect(push.unregister).not.toHaveBeenCalled();
+    expect(localStorage.getItem(TOKEN_KEY)).toBe('device-token-1');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('a shell with no local-notifications plugin skips the removal and still clears the badge', async () => {
+    capacitor.isPluginAvailable.mockImplementation((name: string) => name !== 'LocalNotifications');
+    const { clearDeliveredNotifications } = await freshModule();
+
+    await clearDeliveredNotifications();
+
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing in a browser and logs nothing', async () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const errorLog = vi.spyOn(console, 'error');
+    const { clearDeliveredNotifications } = await freshModule();
+
+    await clearDeliveredNotifications();
+
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
+    expect(badge.clear).not.toHaveBeenCalled();
+    expect(errorLog).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it('a failing removal is logged once, the badge still clears, and nothing throws', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    local.removeAllDeliveredNotifications.mockRejectedValueOnce(new Error('bridge gone'));
+    const { clearDeliveredNotifications } = await freshModule();
+
+    await expect(clearDeliveredNotifications()).resolves.toBeUndefined();
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining('delivered notifications'),
+      expect.any(Error)
+    );
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+});
+
 describe('hasNativePush', () => {
   beforeEach(() => {
     vi.clearAllMocks();

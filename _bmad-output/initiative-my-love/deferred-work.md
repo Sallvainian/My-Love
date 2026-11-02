@@ -3532,7 +3532,9 @@ location: src/stores/slices/authSlice.ts:331-336, 456-459
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: `discardAccountState` calls `stopPushesForSignOut()` only when `identity.userId === null` (src/stores/slices/authSlice.ts:336), and the fresh-sign-in leftover path calls `deleteAccountData(leftover)` alone (authSlice.ts:457-459). `deleteAccountData` cancels pending date reminders but does not remove delivered ones, so delivered pushes and reminders stay for the incoming account on those paths. This predates DW-352, and the owner's decision covers sign-out only. Reachability is unverified: a device normally goes through signed out, which now runs the removal. The fix would be a removal call on those paths (not the APNs unregister, which would race `startPushRegistration`), plus a decision that a switch should empty Notification Center too.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-account-switch-clears-delivered
+resolution-undo: 92e0c22e3cba748ed6298bc6f8c758ca82890213e08ffd6f0f26614b21af443f 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 switch-clears-too — owner, 2026-11-02: any account switch empties the app's delivered notifications from Notification Center, as sign-out does (DW-352): add the delivered-notification removal on the in-place switch and the fresh-sign-in leftover paths, without the APNs unregister, which would race startPushRegistration.
 
 ### DW-409: PartnerMoodView.kit.test.tsx "enables refresh when online" failed once under the full unit suite with the refresh button still `aria-busy` and disabled, and passed on 3 isolated reruns and 2 later
@@ -3566,4 +3568,12 @@ location: supabase/migrations/20261102010000_register_push_device_session_check.
 source_spec: `plan-dw-push-register-session-check.md`
 severity: medium
 reason: src/api/auth/actionService.ts signOut({ everywhere }) awaits removeAllPushRegistrations() before supabase.auth.signOut({ scope: 'global' }). In that window the other device's auth.sessions row still exists, so the new check in 20261102010000 passes and the insert commits; the later session delete does not touch push_devices, and send-push reads only push_devices. The 2026-11-02 owner decision expected the session check to cover this window, but it closes only registrations after the sign-out. Closing the window needs new state, for example an account-level fence written by unregister_all_push_devices() that refuses sessions created before it, or the registering session id stored on each push_devices row and checked or pruned by send-push. Either needs an owner decision, because the intent limited this change to replacing the function.
+status: open
+
+### DW-413: On an account switch without a sign-out, a love-note push sent to the outgoing account between the Notification Center clear and the incoming account's `register_push_device` still lands, so it stays
+origin: spec-deferred 3168721c2825
+location: src/stores/slices/authSlice.ts (clearDeliveredForSwitch callers); src/services/pushNotifications.ts (recordDevice)
+source_spec: `plan-dw-account-switch-clears-delivered.md`
+severity: low
+reason: On the in-place switch and the fresh-sign-in leftover paths nothing deletes this device's `push_devices` row first (only `actionService.signOut` calls `removePushRegistration`, src/api/auth/actionService.ts:100). The token moves to the incoming account only when `register_push_device` upserts it (supabase/migrations/20261102010000_register_push_device_session_check.sql:64-69), after App.tsx's effect re-runs `startPushRegistration()`, APNs answers and `recordDevice` sends the RPC. That is normally seconds. If the RPC fails, `recordDevice` only logs it (src/services/pushNotifications.ts:216-218), and the token stays with the outgoing account until the next signed-in start or the 12-hour foreground renewal. The gap predates DW-408, and the intent rules out the APNs unregister on these paths. Options: a second `clearDeliveredNotifications()` once `recordDevice` succeeds after a switch, or have the switch delete the outgoing row server-side while the outgoing session still exists, which the
 status: open

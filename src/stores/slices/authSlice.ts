@@ -15,7 +15,7 @@ import { cancelDateReminders } from '../../services/dateReminders';
 import { deleteAccountImages } from '../../services/imageCache';
 import { deleteAccountCopies } from '../../services/localCopy';
 import { moodService } from '../../services/moodService';
-import { stopDevicePushes } from '../../services/pushNotifications';
+import { clearDeliveredNotifications, stopDevicePushes } from '../../services/pushNotifications';
 import type { AppState, AppStateCreator } from '../types';
 import { revokePreviewUrlsFromNotes } from './notesSlice';
 
@@ -97,6 +97,21 @@ function deleteAccountData(userId: string): void {
 function stopPushesForSignOut(): void {
   stopDevicePushes().catch((error: unknown) => {
     console.error('[AuthSlice] Failed to stop this device\'s pushes:', error);
+  });
+}
+
+/**
+ * An account switch without a sign-out — in place, or a fresh sign-in whose
+ * owner marker names another account — empties the app's delivered
+ * notifications and its badge, so the incoming account cannot read the
+ * outgoing one's pushes and date reminders (DW-408). Only that half of
+ * `stopPushesForSignOut`: the APNs unregister and token forget would race
+ * `startPushRegistration` for the incoming account. Fire-and-forget; it never
+ * throws, and the catch only guards the contract.
+ */
+function clearDeliveredForSwitch(): void {
+  clearDeliveredNotifications().catch((error: unknown) => {
+    console.error('[AuthSlice] Failed to clear the delivered notifications:', error);
   });
 }
 
@@ -331,9 +346,11 @@ function discardAccountState(
   // stay for their owner (deleteAccountData).
   if (outgoingUserId && outgoingUserId !== identity.userId) {
     deleteAccountData(outgoingUserId);
-    // Signed out (sign-out, or a boot whose marker names an account), not a
-    // switch to another account: this device's pushes stop too.
+    // Signed out (sign-out, or a boot whose marker names an account): this
+    // device's pushes stop too. A switch to another account keeps them and
+    // empties Notification Center alone.
     if (identity.userId === null) stopPushesForSignOut();
+    else clearDeliveredForSwitch();
   }
 
   // `messages` is the daily-rotation pool: the shared bundled messages PLUS
@@ -455,7 +472,10 @@ export const createAuthSlice: AppStateCreator<AuthSlice> = (set, get, _api) => (
     if (previous === null) {
       const leftover = getAccountOwner();
       setAccountOwner(userId);
-      if (leftover && leftover !== userId) deleteAccountData(leftover);
+      if (leftover && leftover !== userId) {
+        deleteAccountData(leftover);
+        clearDeliveredForSwitch();
+      }
     }
 
     set(identity);
