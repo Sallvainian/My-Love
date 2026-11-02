@@ -387,11 +387,20 @@ describe('removePushRegistration', () => {
 });
 
 describe('removeAllPushRegistrations', () => {
+  /** The RPC's builder: `setHeader` records the header and returns the call. */
+  const setHeader = vi.fn();
+  function answer(result: Promise<{ error: { message: string } | null }>) {
+    rpc.mockImplementationOnce(() => {
+      const call = Object.assign(result, { setHeader });
+      setHeader.mockReturnValue(call);
+      return call;
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     capacitor.isNativePlatform.mockReturnValue(true);
     capacitor.isPluginAvailable.mockReturnValue(true);
-    rpc.mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
@@ -399,13 +408,16 @@ describe('removeAllPushRegistrations', () => {
     localStorage.removeItem(TOKEN_KEY);
   });
 
-  it('deletes every row the account owns and resolves true', async () => {
+  it('deletes every row the account owns with the token it is given, and resolves true', async () => {
     localStorage.setItem(TOKEN_KEY, 'device-token-1');
+    answer(Promise.resolve({ error: null }));
     const { removeAllPushRegistrations } = await freshModule();
 
-    await expect(removeAllPushRegistrations()).resolves.toBe(true);
+    await expect(removeAllPushRegistrations('access-1')).resolves.toBe(true);
 
     expect(rpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
+    // The global sign-out has removed the session from the client (DW-412).
+    expect(setHeader).toHaveBeenCalledExactlyOnceWith('Authorization', 'Bearer access-1');
   });
 
   it.each([
@@ -413,19 +425,31 @@ describe('removeAllPushRegistrations', () => {
     ['with no token stored', () => localStorage.removeItem(TOKEN_KEY)],
   ])('still calls the RPC %s', async (_case, arrange) => {
     arrange();
+    answer(Promise.resolve({ error: null }));
     const { removeAllPushRegistrations } = await freshModule();
 
-    await expect(removeAllPushRegistrations()).resolves.toBe(true);
+    await expect(removeAllPushRegistrations('access-1')).resolves.toBe(true);
 
     expect(rpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
   });
 
-  it('logs a refusal and resolves false', async () => {
+  it('makes no call and resolves false with no access token', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-    rpc.mockResolvedValueOnce({ error: { message: 'nope' } });
     const { removeAllPushRegistrations } = await freshModule();
 
-    await expect(removeAllPushRegistrations()).resolves.toBe(false);
+    await expect(removeAllPushRegistrations(undefined)).resolves.toBe(false);
+
+    expect(rpc).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('[Push]'));
+    errorLog.mockRestore();
+  });
+
+  it('logs a refusal and resolves false', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    answer(Promise.resolve({ error: { message: 'nope' } }));
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations('access-1')).resolves.toBe(false);
 
     expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('[Push]'), 'nope');
     errorLog.mockRestore();
@@ -433,10 +457,10 @@ describe('removeAllPushRegistrations', () => {
 
   it('logs a thrown call and resolves false', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-    rpc.mockRejectedValueOnce(new Error('network'));
+    answer(Promise.reject(new Error('network')));
     const { removeAllPushRegistrations } = await freshModule();
 
-    await expect(removeAllPushRegistrations()).resolves.toBe(false);
+    await expect(removeAllPushRegistrations('access-1')).resolves.toBe(false);
 
     expect(errorLog).toHaveBeenCalledTimes(1);
     errorLog.mockRestore();
@@ -445,11 +469,11 @@ describe('removeAllPushRegistrations', () => {
   it('gives up after about 3 s and resolves false so sign-out never hangs', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-    rpc.mockReturnValueOnce(new Promise(() => {}));
+    answer(new Promise(() => {}));
     const { removeAllPushRegistrations } = await freshModule();
 
     let result: boolean | undefined;
-    const done = removeAllPushRegistrations().then((value) => {
+    const done = removeAllPushRegistrations('access-1').then((value) => {
       result = value;
     });
     await vi.advanceTimersByTimeAsync(2_900);

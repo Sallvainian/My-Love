@@ -2,23 +2,23 @@
 -- DW-406: register_push_device refuses a caller whose session has ended
 --
 -- "Sign out of all devices" (src/api/auth/actionService.ts, signOut with
--- everywhere) calls unregister_all_push_devices() (20261102000000) and then
--- signs out with scope=global, which deletes every auth.sessions row of the
--- account. Another device's access token stays valid until it expires
--- (supabase/config.toml jwt_expiry), and App.tsx registers again on every
--- signed-in start, so a lost phone opened within that window re-created its
--- push_devices row; a registration landing between the unregister and the
--- global sign-out did the same. register_push_device checked only auth.uid().
+-- everywhere) signs out with scope=global, which deletes every auth.sessions
+-- row of the account, and removes every push_devices row through
+-- unregister_all_push_devices() (20261102000000). Another device's access
+-- token stays valid until it expires (supabase/config.toml jwt_expiry), and
+-- App.tsx registers again on every signed-in start, so a lost phone opened
+-- within that window re-created its push_devices row. register_push_device
+-- checked only auth.uid().
 --
 -- It now also requires the JWT's session_id claim to name a live
 -- auth.sessions row of the same user. A token with no session_id, a
 -- malformed one, or another user's session is refused the same way. A
 -- refused call writes nothing, so it neither creates nor reassigns a row.
--- A registration that lands between the unregister and the global sign-out
--- still has a live session, so it is accepted and its row outlives the
--- sign-out; only registrations after the sign-out are refused. Closing that
--- window needs state this check does not have and is recorded as deferred
--- work (plan-dw-push-register-session-check.md).
+-- This check alone cannot refuse a registration landing before the global
+-- sign-out, while the session is still live, so "Sign out of all devices" now
+-- signs out globally first and calls unregister_all_push_devices() after it,
+-- with the access token read before it (DW-412): every row registered before
+-- the sign-out is removed, and every registration after it is refused here.
 -- Owner decision 2026-11-02: jwt_expiry stays as is, and the check covers push
 -- registration only -- a still-valid token reading app data until it expires
 -- is accepted.

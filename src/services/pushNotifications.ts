@@ -376,9 +376,12 @@ export async function removePushRegistration(): Promise<void> {
 }
 
 /**
- * Deletes every push registration the signed-in account owns, on every
- * device, for "Sign out of all devices" (DW-353). Call before the global
- * `supabase.auth.signOut()`: the RPC needs the session.
+ * Deletes every push registration the account owns, on every device, for
+ * "Sign out of all devices" (DW-353). Called after the global
+ * `supabase.auth.signOut()` with the access token read before it (DW-412):
+ * the sign-out removes the session from the client, but the token stays valid
+ * until it expires, and the RPC reads only `auth.uid()`. With no token there
+ * is nothing to send it with, so it resolves false.
  *
  * No native or token gate, unlike `removePushRegistration`: the other devices'
  * rows are removed from wherever the person signs out, the web included.
@@ -386,14 +389,24 @@ export async function removePushRegistration(): Promise<void> {
  * answered without an error; false on an error, a throw or the timeout, so the
  * caller can tell the person the other devices may still get pushes.
  */
-export async function removeAllPushRegistrations(): Promise<boolean> {
+export async function removeAllPushRegistrations(
+  accessToken: string | undefined
+): Promise<boolean> {
+  if (!accessToken) {
+    console.error('[Push] No access token to remove every device registration with');
+    return false;
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const timedOut = new Promise<'timeout'>((resolve) => {
       timer = setTimeout(() => resolve('timeout'), UNREGISTER_TIMEOUT_MS);
     });
     const outcome = await Promise.race([
-      Promise.resolve(supabase.rpc('unregister_all_push_devices')),
+      Promise.resolve(
+        supabase
+          .rpc('unregister_all_push_devices')
+          .setHeader('Authorization', `Bearer ${accessToken}`)
+      ),
       timedOut,
     ]);
     if (outcome === 'timeout') {

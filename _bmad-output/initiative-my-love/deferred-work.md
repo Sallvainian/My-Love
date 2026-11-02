@@ -3572,7 +3572,8 @@ location: supabase/migrations/20261102010000_register_push_device_session_check.
 source_spec: `plan-dw-push-register-session-check.md`
 severity: medium
 reason: src/api/auth/actionService.ts signOut({ everywhere }) awaits removeAllPushRegistrations() before supabase.auth.signOut({ scope: 'global' }). In that window the other device's auth.sessions row still exists, so the new check in 20261102010000 passes and the insert commits; the later session delete does not touch push_devices, and send-push reads only push_devices. The 2026-11-02 owner decision expected the session check to cover this window, but it closes only registrations after the sign-out. Closing the window needs new state, for example an account-level fence written by unregister_all_push_devices() that refuses sessions created before it, or the registering session id stored on each push_devices row and checked or pruned by send-push. Either needs an owner decision, because the intent limited this change to replacing the function.
-status: open
+status: done 2026-11-02
+resolution: owner, 2026-11-02: fix it. "Sign out of all devices" now signs out with scope=global first and calls unregister_all_push_devices() after it, sending the access token read before the sign-out (src/api/auth/actionService.ts signOut, src/services/pushNotifications.ts removeAllPushRegistrations). A registration before the sign-out is removed by that call, and one after it is refused by DW-406's session check, so no row outlives the sign-out. No new state.
 
 ### DW-413: On an account switch without a sign-out, a love-note push sent to the outgoing account between the Notification Center clear and the incoming account's `register_push_device` still lands, so it stays
 origin: spec-deferred 3168721c2825
