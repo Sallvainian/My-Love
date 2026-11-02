@@ -21,9 +21,20 @@ folder="$2"
 shard="${3:-}"
 junit="${JUNIT_FILE:-test-results/junit.xml}"
 
+# Read the run's own count FIRST. A plain `playwright test --list` still runs
+# every reporter in the config, so the junit reporter would overwrite this file
+# with the listed tests (and html would rebuild playwright-report/), making the
+# two counts equal by construction. The list runs below also pass
+# --reporter=list, which writes no report files.
+if [[ ! -f "$junit" ]]; then
+  echo "::error::$junit is missing, so the tests this run executed cannot be counted."
+  exit 1
+fi
+ran=$(grep -o -m1 '<testsuites[^>]*' "$junit" | sed -nE 's/.* tests="([0-9]+)".*/\1/p')
+
 on_disk=$(git ls-files -- "$folder" | grep -cE '\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
 
-total_line() { npx playwright test --list --project="$project" "$@" | tail -1; }
+total_line() { npx playwright test --list --reporter=list --project="$project" "$@" | tail -1; }
 whole=$(total_line)
 listed_files=$(sed -nE 's/^Total: [0-9]+ tests? in ([0-9]+) files?$/\1/p' <<<"$whole")
 if [[ -n "$shard" ]]; then
@@ -32,12 +43,6 @@ else
   part=$whole
 fi
 listed_tests=$(sed -nE 's/^Total: ([0-9]+) tests? in [0-9]+ files?$/\1/p' <<<"$part")
-
-if [[ ! -f "$junit" ]]; then
-  echo "::error::$junit is missing, so the tests this run executed cannot be counted."
-  exit 1
-fi
-ran=$(grep -o -m1 '<testsuites[^>]*' "$junit" | sed -nE 's/.* tests="([0-9]+)".*/\1/p')
 
 if [[ -z "$listed_files" || -z "$listed_tests" || -z "$ran" ]]; then
   echo "::error::Could not read a count (listed files '${listed_files}', listed tests '${listed_tests}', ran '${ran}'). Playwright printed: '${whole}' / '${part}'."
