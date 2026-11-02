@@ -26,12 +26,21 @@ import {
   RotateCcw,
   Signal,
 } from 'lucide-react';
-import { useEffect, useState, useSyncExternalStore, type SubmitEvent } from 'react';
+import { AnimatePresence, m as motion } from 'motion/react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type SubmitEvent,
+} from 'react';
 import { authService } from '../../api/authService';
 import { isOnline } from '../../api/errorHandlers';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
 import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
+import { showSignOutNotice } from '../../services/signOutNotice';
 import {
   canTellMobileData,
   getPhotosOverMobileData,
@@ -41,15 +50,21 @@ import {
 import { refreshLocalCopy } from '../../services/localCopy';
 import { PROFILE_COPY_KIND } from '../../stores/slices/settingsSlice';
 import { useAppStore } from '../../stores/useAppStore';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { logger } from '../../utils/logger';
 import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
 import {
   CARD,
+  DESTRUCTIVE_BUTTON,
+  DIALOG_BACKDROP,
+  DIALOG_PANEL,
+  DIALOG_TITLE,
   DIVIDER,
   FIELD_ERROR,
   GROUP_ROW as ROW,
   GROUP_TILE as TILE,
   SECTION_LABEL,
+  SECONDARY_BUTTON,
   SMALL_SECONDARY,
   fieldClass,
 } from '../shared/kitClasses';
@@ -459,6 +474,86 @@ function MobileDataPhotosRow() {
   );
 }
 
+/**
+ * Shown on the login screen when "Sign out of all devices" signed this device
+ * out but could not reach every other one (the server was unreachable, or the
+ * push registrations could not be removed). Settings owns the wording; the
+ * login screen only displays it (`services/signOutNotice.ts`).
+ */
+const PARTIAL_SIGN_OUT_NOTICE =
+  "You're signed out on this device, but your other devices could not be signed out. Sign in again when you're online and try Sign out of all devices once more.";
+
+interface SignOutEverywhereConfirmationProps {
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+/**
+ * Asks before ending every session. Cancel takes initial focus, as in
+ * `EventDeleteConfirmation`: the action signs the person out of every device.
+ */
+function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywhereConfirmationProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const titleId = 'settings-sign-out-everywhere-title';
+
+  useFocusTrap(panelRef, true, {
+    onEscape: onCancel,
+    initialFocusRef: cancelButtonRef,
+  });
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onCancel();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={DIALOG_BACKDROP}
+      onClick={handleBackdropClick}
+      data-testid="settings-sign-out-everywhere-confirmation"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <motion.div
+        ref={panelRef}
+        tabIndex={-1}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className={`${DIALOG_PANEL} max-w-sm`}
+      >
+        <h3 id={titleId} className={`${DIALOG_TITLE} mb-5`}>
+          Sign out on every device? You'll need to sign in again on each one.
+        </h3>
+        <div className="flex gap-3">
+          <button
+            ref={cancelButtonRef}
+            type="button"
+            onClick={onCancel}
+            data-testid="settings-sign-out-everywhere-cancel"
+            className={SECONDARY_BUTTON}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            data-testid="settings-sign-out-everywhere-confirm"
+            className={DESTRUCTIVE_BUTTON}
+          >
+            Sign out everywhere
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 interface SettingsProps {
   /** Replays the welcome splash; the About row is not rendered without it. */
   onShowWelcome?: () => void;
@@ -468,6 +563,10 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   // Which sign-out is running; both buttons wait while either does.
   const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
+  /** The "Sign out on every device?" dialog is open; nothing is signed out until it confirms. */
+  const [confirmingEverywhere, setConfirmingEverywhere] = useState(false);
+  /** A sign-out is running; the guard `handleLogout` reads before `isLoggingOut` can. */
+  const signOutRunningRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   /** `null` while the read is in flight; the lookup's own three answers after. */
@@ -542,6 +641,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const avatarInitial = firstGrapheme?.segment.toUpperCase() ?? '';
 
   const handleLogout = async (everywhere = false) => {
+    // A ref, not `isLoggingOut`: a second press in the same tick, or on the
+    // confirm button while the dialog plays its exit, sees the old state.
+    if (signOutRunningRef.current) return;
     setError(null);
     // Ending the other devices' sessions is a server call; refuse it up front
     // rather than sign out only this device.
@@ -549,11 +651,16 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
       setError(offlineMessage('Signing out of all devices', 'go through', 'needs'));
       return;
     }
+    signOutRunningRef.current = true;
     setIsLoggingOut(true);
     setSigningOutEverywhere(everywhere);
 
     try {
-      await authService.signOut({ everywhere });
+      const { otherDevicesSignedOut } = await authService.signOut({ everywhere });
+
+      // This device is signed out either way. Settings unmounts when SIGNED_OUT
+      // lands, so the person is told on the login screen they land on.
+      if (!otherDevicesSignedOut) showSignOutNotice(PARTIAL_SIGN_OUT_NOTICE);
 
       logger.debug('[Settings] User signed out successfully');
 
@@ -562,9 +669,30 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     } catch (err) {
       console.error('[Settings] Logout failed:', err);
       setError('Failed to sign out. Please try again.');
+      signOutRunningRef.current = false;
       setIsLoggingOut(false);
       setSigningOutEverywhere(false);
     }
+  };
+
+  // Offline is refused before the dialog, so the person is never asked to
+  // confirm what cannot go through.
+  const handleSignOutEverywhereRow = () => {
+    setError(null);
+    if (!isOnline()) {
+      setError(offlineMessage('Signing out of all devices', 'go through', 'needs'));
+      return;
+    }
+    setConfirmingEverywhere(true);
+  };
+
+  // Stable: the dialog's focus trap re-runs on a new onEscape and puts focus
+  // back on Cancel, so an inline arrow would move it on every Settings render.
+  const handleCancelEverywhere = useCallback(() => setConfirmingEverywhere(false), []);
+
+  const handleConfirmEverywhere = () => {
+    setConfirmingEverywhere(false);
+    void handleLogout(true);
   };
 
   return (
@@ -740,7 +868,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             session only. */}
         <button
           type="button"
-          onClick={() => void handleLogout(true)}
+          onClick={handleSignOutEverywhereRow}
           disabled={isLoggingOut}
           className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
           data-testid="settings-sign-out-everywhere"
@@ -758,6 +886,16 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           {signingOutEverywhere ? 'Signing out of all devices…' : 'Sign out of all devices'}
         </button>
       </div>
+
+      {/* Outside every card, like the other dialogs, so no card can clip it. */}
+      <AnimatePresence>
+        {confirmingEverywhere && (
+          <SignOutEverywhereConfirmation
+            onCancel={handleCancelEverywhere}
+            onConfirm={handleConfirmEverywhere}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Mounted only while open, so `useState(initialName)` inside the form
           actually picks the current name up — kept mounted behind

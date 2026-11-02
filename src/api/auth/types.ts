@@ -11,6 +11,17 @@ export interface AuthResult {
   error: AuthError | null;
 }
 
+/** What `signOut` resolves with: whether the account's other devices were signed out too. */
+export interface SignOutResult {
+  /**
+   * False when "Sign out of all devices" could not reach every device: the
+   * auth server was unreachable, or the push registrations could not be
+   * removed. This device is signed out either way. True for a plain sign-out,
+   * which never claims the other devices.
+   */
+  otherDevicesSignedOut: boolean;
+}
+
 export interface AuthStatus {
   isAuthenticated: boolean;
   user: User | null;

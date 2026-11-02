@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { isOnline } from '../api/errorHandlers';
 import { supabase } from '../api/supabaseClient';
@@ -20,10 +21,11 @@ import type { ViewType } from '../stores/slices/navigationSlice';
  *
  * Sign-out stops the device's pushes in two steps (story 3.2):
  * `removePushRegistration` deletes this device's row while the session still
- * exists (online only), then `stopDevicePushes` unregisters from APNs and
- * clears the badge on every transition to signed out. Each native plugin is
- * checked on its own: a shell from story 3.1 has `PushNotifications` but no
- * `AppBadge`.
+ * exists (online only), then `stopDevicePushes` unregisters from APNs,
+ * empties the app's delivered notifications (DW-352) and clears the badge on
+ * every transition to signed out. Each native plugin is checked on its own: a
+ * shell from story 3.1 has `PushNotifications` but no `AppBadge`, and one from
+ * before story 4.1 has no `LocalNotifications`.
  *
  * The Settings switches (story 3.7) read the same gate through
  * `hasNativePush()` and ask iOS for the permission state through
@@ -302,6 +304,38 @@ export async function startPushRegistration(): Promise<PushRegistrationOutcome> 
   }
 }
 
+/** How often a return to the foreground may renew the registration. */
+export const PUSH_RENEWAL_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Keeps this device's registration fresh while the app is in use. The sender
+ * drops a device whose registration has not been renewed for 30 days, and a
+ * signed-in start is the only other renewal, so a shell that is only ever
+ * brought back from the background would otherwise age out. On a return to
+ * the foreground while online, with permission granted and a token stored,
+ * this re-records the stored token, at most once every 12 hours (the start
+ * that set this up has just registered). Call while signed in; returns the
+ * function that stops it. A no-op on the web and in a shell without push.
+ */
+export function startPushRenewalOnForeground(): () => void {
+  if (!hasNativePush()) return () => {};
+  let lastRenewal = Date.now();
+  const onVisibility = () => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+    if (Date.now() - lastRenewal < PUSH_RENEWAL_INTERVAL_MS) return;
+    const token = storedToken();
+    if (!token) return;
+    lastRenewal = Date.now();
+    void (async () => {
+      const { receive } = await PushNotifications.checkPermissions();
+      if (receive !== 'granted') return;
+      await recordDevice(token);
+    })().catch((error: unknown) => console.error('[Push] Could not renew the device:', error));
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  return () => document.removeEventListener('visibilitychange', onVisibility);
+}
+
 /**
  * Deletes this device's registration under the signed-in account, so its
  * pushes stop reaching the device. Call before `supabase.auth.signOut()`: the
@@ -340,14 +374,53 @@ export async function removePushRegistration(): Promise<void> {
 }
 
 /**
- * Stops this device's pushes natively: unregisters from APNs, clears the app
- * icon's badge and forgets the stored token. Called on every transition to
- * signed out (sign-out online or offline, and a boot that finds the session
- * gone), never on sign-in or an account switch, so it cannot race
+ * Deletes every push registration the signed-in account owns, on every
+ * device, for "Sign out of all devices" (DW-353). Call before the global
+ * `supabase.auth.signOut()`: the RPC needs the session.
+ *
+ * No native or token gate, unlike `removePushRegistration`: the other devices'
+ * rows are removed from wherever the person signs out, the web included.
+ * Waits at most ~3 s and never throws. Resolves true only when the server
+ * answered without an error; false on an error, a throw or the timeout, so the
+ * caller can tell the person the other devices may still get pushes.
+ */
+export async function removeAllPushRegistrations(): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timedOut = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), UNREGISTER_TIMEOUT_MS);
+    });
+    const outcome = await Promise.race([
+      Promise.resolve(supabase.rpc('unregister_all_push_devices')),
+      timedOut,
+    ]);
+    if (outcome === 'timeout') {
+      console.error('[Push] Removing every device registration timed out; signing out anyway');
+      return false;
+    }
+    if (outcome.error) {
+      console.error('[Push] Could not remove every device registration:', outcome.error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[Push] Could not remove every device registration:', error);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Stops this device's pushes natively: unregisters from APNs, removes every
+ * notification of the app still in Notification Center (love-note pushes and
+ * date reminders alike, so the next person on the device cannot read them),
+ * clears the app icon's badge and forgets the stored token. Called on every
+ * transition to signed out (sign-out online or offline, and a boot that finds
+ * the session gone), never on sign-in or an account switch, so it cannot race
  * `startPushRegistration`.
  *
- * Delivered notifications stay in Notification Center. Never throws; logs
- * only failures.
+ * Never throws; logs only failures.
  */
 export async function stopDevicePushes(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
@@ -359,8 +432,16 @@ export async function stopDevicePushes(): Promise<void> {
       console.error('[Push] Could not unregister from APNs:', error);
     }
   }
-  // Not removeAllDeliveredNotifications(): it rejects unless register() ran
-  // this launch, and it would also empty Notification Center.
+  // The local-notifications plugin's removal, not the push plugin's: that one
+  // rejects unless register() ran this launch. Both empty the app's whole
+  // Notification Center group, pushes included (DW-352).
+  if (Capacitor.isPluginAvailable('LocalNotifications')) {
+    try {
+      await LocalNotifications.removeAllDeliveredNotifications();
+    } catch (error) {
+      console.error('[Push] Could not remove the delivered notifications:', error);
+    }
+  }
   await clearAppBadge();
   forgetToken();
 }

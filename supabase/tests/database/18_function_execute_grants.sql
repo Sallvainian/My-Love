@@ -26,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(24);
+select plan(25);
 
 create or replace function tests.create_test_user(test_email text default 'test@example.com')
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -111,7 +111,7 @@ select is(
       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       and has_function_privilege('authenticated', p.oid, 'EXECUTE')
   ),
-  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests, mark_love_notes_read, register_push_device, unregister_push_device',
+  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_my_partner_id, get_my_pending_partner_requests, mark_love_notes_read, register_push_device, unregister_all_push_devices, unregister_push_device',
   'FN-GRANT-008: authenticated holds EXECUTE on exactly the app RPCs'
 );
 
@@ -172,6 +172,14 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.mark_love_notes_read()', 'EXECUTE'),
   'FN-GRANT-015: mark_love_notes_read is executable by authenticated'
+);
+
+-- 20261102000000, same shape: Sign out of all devices removes every push
+-- registration through it, so without the grant the other devices keep their
+-- pushes.
+select ok(
+  has_function_privilege('authenticated', 'public.unregister_all_push_devices()', 'EXECUTE'),
+  'FN-GRANT-016: unregister_all_push_devices is executable by authenticated'
 );
 
 -- ============================================

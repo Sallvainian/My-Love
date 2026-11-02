@@ -16,10 +16,14 @@ import { useAppStore } from '../stores/useAppStore';
 import {
   hasNativeReminders,
   planDateReminders,
+  reminderDatesFrom,
   scheduleDateReminders,
   type ReminderDates,
 } from './dateReminders';
-import { onLocalCopyWritten } from './localCopy';
+import { readStoredSession } from '../api/authStorage';
+import { isOnline } from '../api/errorHandlers';
+import { supabase } from '../api/supabaseClient';
+import { onLocalCopyWritten, refreshLocalCopy } from './localCopy';
 
 /** The signed-in start a launch step belongs to, captured when that start began. */
 export interface LaunchOwner {
@@ -43,7 +47,10 @@ export interface LaunchOwner {
  * marks list is a loaded "no marks"). If any of the seven reads `null` (absent,
  * failed or malformed) the whole re-plan is skipped and the pending list
  * stays: planning the other kinds would cancel that kind's reminders, which is
- * the wipe this rule forbids. It never loads anything from the server.
+ * the wipe this rule forbids. The one exception is a push switches copy with
+ * `dateReminders` off (DW-392): off plans nothing whatever the dates are, so
+ * the pending reminders are cancelled without the other six copies. It never
+ * loads anything from the server itself: it reads only saved copies.
  *
  * Single-flight: while a re-plan runs, any number of further requests collapse
  * into one more run after it. The native calls themselves run in
@@ -51,14 +58,48 @@ export interface LaunchOwner {
  *
  * Triggers: the signed-in start (`scheduleDateRemindersAtLaunch`), the push
  * permission answer (App), `startDateReminderTriggers()`'s foreground return
- * (`visibilitychange` to visible) and every successful write of a date kind's
- * copy, the marks and push switches copies included, for the signed-in user.
- * The write hook fires after the copy lands, so the re-plan reads the new value; a store
- * subscription would fire before it.
+ * (`visibilitychange` to visible), a token renewal (`TOKEN_REFRESHED`) and
+ * every successful write of a date kind's copy, the marks and push switches
+ * copies included, for the signed-in user. The write hook fires after the copy
+ * lands, so the re-plan reads the new value; a store subscription would fire
+ * before it.
+ *
+ * Refreshing the copies (DW-389, DW-400): a foreground return re-plans from
+ * the saved copies at once, then, while online, refreshes the seven date
+ * copies through `refreshLocalCopy` and re-plans again. A `TOKEN_REFRESHED` for
+ * the signed-in user does the same refresh and re-plan. Both are throttled to
+ * one refresh per `DATE_COPY_REFRESH_INTERVAL_MS` for one identity, so a date
+ * changed on another device reaches a resumed phone without a restart. A
+ * foreground return whose stored token is expired or within auth-js's 90 s
+ * renewal margin re-plans only: the reads would fail and burn the throttle, so
+ * the `TOKEN_REFRESHED` that the renewal emits does the refresh. The
+ * launch plan runs at once from the saved copies and again once the launch
+ * refresh settles, so one stalled refresher never holds it.
  *
  * Like `pushNotifications.ts`, it is a no-op on the web and in a shell without
  * the plugin: no plugin call, no IndexedDB read, no listener. It never throws.
  */
+
+/** The shortest gap between two date-copy refreshes raised by a foreground return or a token renewal. */
+export const DATE_COPY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+/**
+ * How close to expiry auth-js renews an access token (`EXPIRY_MARGIN_MS` in
+ * `@supabase/auth-js/lib/constants`: 3 auto-refresh ticks of 30 s). Inside it,
+ * every `getSession()` first tries a renewal and reports no session if that
+ * fails, so the date-copy reads would fail too.
+ */
+const TOKEN_RENEWAL_MARGIN_MS = 90_000;
+
+/**
+ * Whether the stored access token is expired or inside auth-js's renewal
+ * margin. `expires_at` is in seconds and relative to the device clock. No
+ * stored session, or one without `expires_at`, does not need renewal.
+ */
+function storedTokenNeedsRenewal(): boolean {
+  const expiresAt = readStoredSession()?.expires_at;
+  return typeof expiresAt === 'number' && expiresAt * 1000 - Date.now() < TOKEN_RENEWAL_MARGIN_MS;
+}
 
 const DATE_COPY_KINDS: ReadonlySet<string> = new Set([
   EVENTS_COPY_KIND,
@@ -92,20 +133,23 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
       readSavedPushPreferences(userId),
     ]);
     if (!isCurrent(owner)) return;
+    // The switch off is a complete answer: cancel everything pending without
+    // waiting for the date copies, which an off switch would not plan anyway.
+    if (prefs && !prefs.dateReminders) {
+      await scheduleDateReminders([], () => isCurrent(owner));
+      return;
+    }
     // A copy that is missing is not yet loaded: keep whatever is pending.
     if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner || !marks || !prefs) return;
 
-    const linked = coupleSettings.status === 'linked' ? coupleSettings : null;
     const dates: ReminderDates = {
-      events,
-      anniversaries,
-      relationshipStart: linked?.relationshipStart ?? null,
-      weddingDate: linked?.weddingDate ?? null,
-      ownBirthday: { name: ownProfile.displayName, birthday: ownProfile.birthday },
-      partnerBirthday:
-        partner.status === 'linked'
-          ? { name: partner.partner.displayName, birthday: partner.partner.birthday }
-          : null,
+      ...reminderDatesFrom({
+        events,
+        anniversaries,
+        coupleSettings,
+        ownProfile,
+        partner: partner.status === 'linked' ? partner.partner : null,
+      }),
       marks: new Set(marks),
       remindersOn: prefs.dateReminders,
     };
@@ -158,26 +202,72 @@ export function replanDateReminders(owner?: LaunchOwner): Promise<void> {
 }
 
 /**
- * The signed-in start's trigger: re-plans once the date copies have loaded.
- * `owner` is the start's identity; the step does nothing once the store's
+ * The signed-in start's trigger: re-plans at once from the saved copies, then,
+ * when `refreshed` (the launch refresh) is given, once more after it settles.
+ * `owner` is the start's identity; a step does nothing once the store's
  * identity differs.
  */
-export async function scheduleDateRemindersAtLaunch(owner: LaunchOwner): Promise<void> {
+export async function scheduleDateRemindersAtLaunch(
+  owner: LaunchOwner,
+  refreshed?: Promise<unknown>
+): Promise<void> {
   if (!hasNativeReminders()) return;
   if (!isCurrent(owner)) return;
+  await replanDateReminders(owner);
+  if (!refreshed) return;
+  try {
+    await refreshed;
+  } catch {
+    // The refresh failed; the saved copies are what there is to plan from.
+  }
   await replanDateReminders(owner);
 }
 
 /**
- * Wires the foreground and date-copy-write triggers and returns the function
- * that stops them. Does nothing, and returns a no-op, on the web or in a shell
- * without the plugin.
+ * Wires the foreground, token-renewal and date-copy-write triggers and returns
+ * the function that stops them. Does nothing, and returns a no-op, on the web
+ * or in a shell without the plugin.
  */
 export function startDateReminderTriggers(): () => void {
   if (!hasNativeReminders()) return () => {};
 
+  // The identity and time of the last refresh this closure started. Each start
+  // begins unthrottled.
+  let lastRefresh: (LaunchOwner & { at: number }) | null = null;
+
+  /**
+   * Refreshes the seven date copies and re-plans for the identity that began
+   * the refresh. Does nothing when signed out, offline, or within the interval
+   * of the last refresh for the same identity.
+   */
+  const refreshDateCopies = async (): Promise<void> => {
+    const { userId, authSessionVersion } = useAppStore.getState();
+    if (userId === null || !isOnline()) return;
+    const owner: LaunchOwner = { userId, authSessionVersion };
+    const now = Date.now();
+    if (
+      lastRefresh &&
+      lastRefresh.userId === userId &&
+      lastRefresh.authSessionVersion === authSessionVersion &&
+      // A negative gap (the device clock moved back) counts as elapsed.
+      now - lastRefresh.at >= 0 &&
+      now - lastRefresh.at < DATE_COPY_REFRESH_INTERVAL_MS
+    ) {
+      return;
+    }
+    lastRefresh = { ...owner, at: now };
+    await Promise.all(Array.from(DATE_COPY_KINDS, (kind) => refreshLocalCopy(kind)));
+    // Covers a refresh that wrote nothing; a write already raised its own re-plan.
+    await replanDateReminders(owner);
+  };
+
   const onVisibilityChange = () => {
-    if (document.visibilityState === 'visible') void replanDateReminders();
+    if (document.visibilityState !== 'visible') return;
+    void replanDateReminders();
+    // A token that needs renewal makes every read fail and would burn the
+    // throttle window; auth-js renews on its own foreground handler, and the
+    // TOKEN_REFRESHED that follows does the refresh.
+    if (!storedTokenNeedsRenewal()) void refreshDateCopies();
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -187,8 +277,26 @@ export function startDateReminderTriggers(): () => void {
     void replanDateReminders();
   });
 
+  // Kept synchronous: auth-js awaits its listeners, and a nested auth call from
+  // inside one can deadlock (see useRealtimeMessages), and the refreshers make
+  // authenticated requests, so the work runs on the next task.
+  let renewalTimer: ReturnType<typeof setTimeout> | null = null;
+  const {
+    data: { subscription: authSubscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== 'TOKEN_REFRESHED' || session?.user?.id !== useAppStore.getState().userId) return;
+    if (renewalTimer !== null) clearTimeout(renewalTimer);
+    renewalTimer = setTimeout(() => {
+      renewalTimer = null;
+      void refreshDateCopies();
+    }, 0);
+  });
+
   return () => {
     document.removeEventListener('visibilitychange', onVisibilityChange);
     stopCopyTrigger();
+    authSubscription.unsubscribe();
+    if (renewalTimer !== null) clearTimeout(renewalTimer);
+    renewalTimer = null;
   };
 }

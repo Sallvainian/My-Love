@@ -18,6 +18,8 @@ import { createAuthBootstrapSession } from '../support/factories/auth-bootstrap-
 
 const push = vi.hoisted(() => ({
   startPushRegistration: vi.fn(async () => 'registering' as const),
+  stopRenewal: vi.fn(),
+  startPushRenewalOnForeground: vi.fn((): (() => void) => push.stopRenewal),
   tapHandler: null as ((view: ViewType) => void) | null,
   onPushTap: vi.fn((handler: (view: ViewType) => void) => {
     push.tapHandler = handler;
@@ -28,6 +30,7 @@ const push = vi.hoisted(() => ({
 }));
 vi.mock('../../src/services/pushNotifications', () => ({
   startPushRegistration: push.startPushRegistration,
+  startPushRenewalOnForeground: push.startPushRenewalOnForeground,
   onPushTap: push.onPushTap,
 }));
 
@@ -216,6 +219,25 @@ describe('App registers for push', () => {
 
     expect(screen.getByTestId('login-screen')).toBeInTheDocument();
     expect(push.startPushRegistration).not.toHaveBeenCalled();
+  });
+});
+
+describe('App renews the push registration on foreground returns', () => {
+  it('while signed in, restarting on an account switch', async () => {
+    await renderApp();
+    expect(push.startPushRenewalOnForeground).toHaveBeenCalledTimes(1);
+
+    await act(async () => auth.listener!(session(OTHER_USER_ID)));
+
+    expect(push.stopRenewal).toHaveBeenCalledTimes(1);
+    expect(push.startPushRenewalOnForeground).toHaveBeenCalledTimes(2);
+  });
+
+  it('not while signed out', async () => {
+    auth.getSession.mockResolvedValue(null);
+    await renderApp();
+
+    expect(push.startPushRenewalOnForeground).not.toHaveBeenCalled();
   });
 });
 

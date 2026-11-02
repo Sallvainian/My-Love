@@ -296,6 +296,13 @@ export class InteractionService {
    *   the join reply and can come before this confirmation; a row inserted
    *   before it can miss live delivery, so the caller re-reads what it may have
    *   missed.
+   * @param onTokenRenewed - Function called when the SDK renews this user's
+   *   access token (`TOKEN_REFRESHED`). A session the SDK could not use at boot
+   *   joins this public channel with the publishable key, and the channel never
+   *   re-fires SUBSCRIBED after `setAuth` swaps in the renewed token, so the
+   *   caller re-resolves whatever it read while signed out. Called on a later
+   *   task, never from inside the auth listener. The listener is registered
+   *   only when this is passed.
    * @returns Promise resolving to unsubscribe function to stop listening
    *
    * @example
@@ -320,7 +327,8 @@ export class InteractionService {
     userId: string,
     callback: (interaction: SupabaseInteractionRecord) => void,
     onStatusChange: (status: InteractionSubscriptionStatus) => void,
-    onDeliveryArmed?: () => void
+    onDeliveryArmed?: () => void,
+    onTokenRenewed?: () => void
   ): Promise<() => void> {
     // NOTE: this does NOT give each subscription its own channel, despite the
     // per-call shape. `supabase.channel(topic)` returns whatever is already
@@ -368,9 +376,24 @@ export class InteractionService {
       });
 
     let removed = false;
+
+    // Kept synchronous: auth-js awaits its listeners, and a nested auth call
+    // from inside one can deadlock (see useRealtimeMessages), so the callback,
+    // which reads through the client, runs on the next task.
+    const authSubscription = onTokenRenewed
+      ? supabase.auth.onAuthStateChange((event, session) => {
+          if (event !== 'TOKEN_REFRESHED' || session?.user?.id !== userId) return;
+          setTimeout(() => {
+            if (removed) return;
+            onTokenRenewed();
+          }, 0);
+        }).data.subscription
+      : null;
+
     return () => {
       if (removed) return;
       removed = true;
+      authSubscription?.unsubscribe();
       supabase.removeChannel(channel);
       logger.info('[InteractionService] Unsubscribed from interactions');
     };

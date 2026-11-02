@@ -466,6 +466,36 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
 
         // Subscribe to incoming interactions
         let active = true;
+
+        // Re-read the partner under a live subscription: on a reconnect
+        // (SUBSCRIBED) and when this account's token renews. The second matters
+        // because a session the SDK could not use at boot joins this public
+        // channel with the publishable key and never fires SUBSCRIBED again
+        // after the renewed token is installed, so the snapshot taken at
+        // subscribe, which may have failed signed-out, would stay null.
+        const reResolvePartner = () => {
+          void interactionService.resolvePartnerLookup().then((lookup) => {
+            if (!active || !ownsSession(currentUserId, subscribedInSession)) return;
+            // An INCONCLUSIVE read leaves the existing snapshot alone. This is
+            // the one write that can clobber a working value: `SUBSCRIBED`
+            // fires once more on a healthy socket, so a failure-null here
+            // silently drops every poke and kiss for the rest of the page
+            // view while `isSubscribed` stays true and the UI looks fine.
+            //
+            // A genuine unlink is conclusive and still nulls it, which is the
+            // whole point of re-resolving on a re-join.
+            if (lookup.status === 'error') {
+              logger.debug(
+                '[InteractionsSlice] Partner re-resolve was inconclusive; keeping the previous snapshot'
+              );
+              return;
+            }
+            set({
+              interactionPartnerId: lookup.status === 'linked' ? lookup.partnerId : null,
+            });
+          });
+        };
+
         const unsubscribe = await interactionService.subscribeInteractions(
           currentUserId,
           (record) => {
@@ -485,30 +515,7 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
             if (status === 'SUBSCRIBED') {
               // A reconnect re-fires SUBSCRIBED, which is the one moment the
               // relationship can have changed under a live subscription.
-              void interactionService.resolvePartnerLookup().then((lookup) => {
-                if (
-                  !active ||
-                  get().userId !== currentUserId ||
-                  get().authSessionVersion !== subscribedInSession
-                ) return;
-                // An INCONCLUSIVE read leaves the existing snapshot alone. This is
-                // the one write that can clobber a working value: `SUBSCRIBED`
-                // fires once more on a healthy socket, so a failure-null here
-                // silently drops every poke and kiss for the rest of the page
-                // view while `isSubscribed` stays true and the UI looks fine.
-                //
-                // A genuine unlink is conclusive and still nulls it, which is the
-                // whole point of re-resolving on a re-join.
-                if (lookup.status === 'error') {
-                  logger.debug(
-                    '[InteractionsSlice] Partner re-resolve was inconclusive; keeping the previous snapshot'
-                  );
-                  return;
-                }
-                set({
-                  interactionPartnerId: lookup.status === 'linked' ? lookup.partnerId : null,
-                });
-              });
+              reResolvePartner();
             }
             onStatusChange(status);
           },
@@ -518,6 +525,10 @@ export const createInteractionsSlice: AppStateCreator<InteractionsSlice> = (set,
             // (seen in an E2E trace), and a row inserted while no screen was
             // subscribed never had it. Both reach the list through this read.
             void get().loadInteractionHistory(HISTORY_LIMIT);
+          },
+          () => {
+            if (!active || !ownsSession(currentUserId, subscribedInSession)) return;
+            reResolvePartner();
           }
         );
 

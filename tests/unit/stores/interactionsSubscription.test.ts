@@ -16,8 +16,9 @@ const partnerLookups = vi.hoisted((): Array<Promise<unknown>> => []);
 /**
  * The promise each `lookup.then(handler)` call returned: it settles only once
  * the slice's handler has returned (and, were the handler async, once its own
- * awaits have finished). The re-join is the slice's only `.then` on a lookup;
- * the pre-subscribe read is an `await`, which never calls an own `then`.
+ * awaits have finished). The re-join and the token renewal are the slice's
+ * only `.then`s on a lookup; the pre-subscribe read is an `await`, which never
+ * calls an own `then`.
  */
 const lookupHandled = vi.hoisted((): Array<Promise<unknown>> => []);
 
@@ -78,6 +79,8 @@ interface CapturedSubscription {
   userId: string;
   reportInteraction: (record: SupabaseInteractionRecord) => void;
   reportStatus: (status: InteractionSubscriptionStatus) => void;
+  /** The service's TOKEN_REFRESHED callback (5th argument). */
+  reportTokenRenewed: () => void;
   unsubscribe: Mock<() => void>;
 }
 
@@ -121,12 +124,15 @@ describe('interactionsSlice subscription bridge', () => {
       (
         userId: string,
         reportInteraction: (record: SupabaseInteractionRecord) => void,
-        reportStatus: (status: InteractionSubscriptionStatus) => void
+        reportStatus: (status: InteractionSubscriptionStatus) => void,
+        _reportDeliveryArmed: () => void,
+        reportTokenRenewed: () => void
       ) => {
         const subscription = {
           userId,
           reportInteraction,
           reportStatus,
+          reportTokenRenewed,
           unsubscribe: vi.fn<() => void>(),
         };
         subscriptions.push(subscription);
@@ -396,6 +402,7 @@ describe('interactionsSlice subscription bridge', () => {
           userId,
           reportInteraction,
           reportStatus,
+          reportTokenRenewed: () => {},
           unsubscribe: vi.fn<() => void>(),
         };
         subscriptions.push(subscription);
@@ -592,6 +599,85 @@ describe('interactionsSlice subscription bridge', () => {
     // Restoring it here would re-arm addIncomingInteraction for the couple that
     // just signed out.
     expect(store.getState().interactionPartnerId).toBeNull();
+  });
+
+  describe('when the token renews', () => {
+    it('recovers a snapshot that the signed-out lookups left null, so the next poke is added', async () => {
+      // Boot on a session the SDK cannot use: `lookupPartnerId` answers
+      // `error` (the guarded fetch fails), so the pre-subscribe lookup is
+      // inconclusive and the snapshot stays at its initial null. The public
+      // channel never re-fires SUBSCRIBED after the renewed token is installed.
+      const store = createTestStore();
+      resolvePartnerId.mockRejectedValue(new Error('Failed to fetch'));
+      await store.getState().subscribeToInteractions(vi.fn());
+      const subscription = subscriptions[0];
+      expect(store.getState().interactionPartnerId).toBeNull();
+      subscription.reportInteraction(interaction('before-renewal'));
+      expect(store.getState().interactions).toEqual([]);
+
+      resolvePartnerId.mockResolvedValue(OTHER_USER_ID);
+      subscription.reportTokenRenewed();
+      expect(partnerLookups).toHaveLength(2);
+      await lookupHandled[0];
+
+      expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
+      subscription.reportInteraction(interaction('after-renewal'));
+      expect(store.getState().interactions.map(({ id }) => id)).toEqual(['after-renewal']);
+    });
+
+    it('keeps the snapshot when the lookup after renewal is inconclusive', async () => {
+      const store = createTestStore();
+      await store.getState().subscribeToInteractions(vi.fn());
+      const subscription = subscriptions[0];
+
+      resolvePartnerId.mockRejectedValue(new Error('network down'));
+      subscription.reportTokenRenewed();
+      expect(partnerLookups).toHaveLength(2);
+      await lookupHandled[0];
+
+      expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
+    });
+
+    it('nulls the snapshot when the lookup after renewal says unlinked', async () => {
+      const store = createTestStore();
+      await store.getState().subscribeToInteractions(vi.fn());
+      const subscription = subscriptions[0];
+
+      resolvePartnerId.mockResolvedValue(null);
+      subscription.reportTokenRenewed();
+      await lookupHandled[0];
+
+      expect(store.getState().interactionPartnerId).toBeNull();
+    });
+
+    it('starts no lookup after teardown', async () => {
+      const { store, unsubscribe, subscription } = await subscribedWithOneRecord();
+      unsubscribe();
+
+      subscription.reportTokenRenewed();
+
+      expect(partnerLookups).toHaveLength(1);
+      expect(store.getState().interactionPartnerId).toBe(OTHER_USER_ID);
+    });
+
+    it('does not write the snapshot after sign-out mid-lookup', async () => {
+      const store = createTestStore();
+      await store.getState().subscribeToInteractions(vi.fn());
+      const subscription = subscriptions[0];
+
+      let releaseLookup: ((partnerId: string | null) => void) | undefined;
+      resolvePartnerId.mockImplementation(
+        () => new Promise<string | null>((resolve) => { releaseLookup = resolve; })
+      );
+      subscription.reportTokenRenewed();
+      await vi.waitFor(() => expect(releaseLookup).toBeDefined());
+
+      store.getState().clearAuth();
+      releaseLookup!(OTHER_USER_ID);
+      await lookupHandled[0];
+
+      expect(store.getState().interactionPartnerId).toBeNull();
+    });
   });
 
   it('sends as the signed-in user and passes no recipient', async () => {

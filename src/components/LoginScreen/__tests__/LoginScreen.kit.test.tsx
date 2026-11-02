@@ -9,6 +9,7 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { clearSignOutNotice, showSignOutNotice } from '../../../services/signOutNotice';
 import { LoginScreen } from '../LoginScreen';
 
 const actions = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ vi.mock('../../../api/auth/actionService', () => ({
 
 afterEach(() => {
   cleanup();
+  clearSignOutNotice();
   vi.clearAllMocks();
 });
 
@@ -282,5 +284,63 @@ describe('LoginScreen on the kit', () => {
     expect(screen.getByTestId('login-error')).toHaveTextContent('Please enter a valid email address');
     expect(screen.queryByTestId('login-notice')).not.toBeInTheDocument();
     expect(actions.signIn).not.toHaveBeenCalled();
+  });
+
+  describe('the partial sign-out notice', () => {
+    const NOTICE_TEXT = 'You are signed out here, but other devices were not.';
+
+    it('shows a notice already set when the screen mounts', () => {
+      showSignOutNotice(NOTICE_TEXT);
+      const { container } = render(<LoginScreen />);
+
+      const notice = screen.getByTestId('login-sign-out-notice');
+      expect(notice).toHaveTextContent(NOTICE_TEXT);
+      expect(notice).toHaveAttribute('role', 'status');
+      expect(notice).toHaveClass('bg-card2', 'text-ink');
+      expect(screen.getByTestId('login-card')).toContainElement(notice);
+      expectOnKit(container.innerHTML);
+    });
+
+    it('shows a notice set after the screen mounted', () => {
+      render(<LoginScreen />);
+      expect(screen.queryByTestId('login-sign-out-notice')).not.toBeInTheDocument();
+
+      act(() => showSignOutNotice(NOTICE_TEXT));
+
+      expect(screen.getByTestId('login-sign-out-notice')).toHaveTextContent(NOTICE_TEXT);
+    });
+
+    it('is cleared by a sign-in attempt, even one that fails validation', async () => {
+      const user = userEvent.setup();
+      showSignOutNotice(NOTICE_TEXT);
+      render(<LoginScreen />);
+
+      await user.type(screen.getByRole('textbox', { name: 'Email' }), 'person@localhost');
+      await user.type(screen.getByLabelText('Password'), 'secret-pass');
+      await user.click(screen.getByTestId('submit-button'));
+
+      expect(screen.queryByTestId('login-sign-out-notice')).not.toBeInTheDocument();
+      expect(actions.signIn).not.toHaveBeenCalled();
+    });
+
+    it('is cleared by a Google sign-in attempt', async () => {
+      const user = userEvent.setup();
+      actions.signInWithGoogle.mockResolvedValue('cancelled');
+      showSignOutNotice(NOTICE_TEXT);
+      render(<LoginScreen />);
+
+      await user.click(screen.getByTestId('google-signin-button'));
+
+      expect(screen.queryByTestId('login-sign-out-notice')).not.toBeInTheDocument();
+    });
+
+    it('is cleared when something else clears it, as App does when a session arrives', () => {
+      showSignOutNotice(NOTICE_TEXT);
+      render(<LoginScreen />);
+
+      act(() => clearSignOutNotice());
+
+      expect(screen.queryByTestId('login-sign-out-notice')).not.toBeInTheDocument();
+    });
   });
 });

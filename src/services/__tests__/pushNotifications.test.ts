@@ -23,6 +23,10 @@ const push = vi.hoisted(() => ({
   ),
 }));
 
+const local = vi.hoisted(() => ({
+  removeAllDeliveredNotifications: vi.fn(() => Promise.resolve()),
+}));
+
 const rpc = vi.hoisted(() =>
   vi.fn((_name: string, _args?: unknown) => Promise.resolve({ error: null as { message: string } | null }))
 );
@@ -34,6 +38,7 @@ vi.mock('@capacitor/core', () => ({
   registerPlugin: (name: string) => (name === 'AppBadge' ? badge : environment),
 }));
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: push }));
+vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: local }));
 vi.mock('../../api/supabaseClient', () => ({ supabase: { rpc } }));
 
 type Handler = (payload: unknown) => void;
@@ -181,6 +186,121 @@ describe('startPushRegistration', () => {
   });
 });
 
+describe('startPushRenewalOnForeground', () => {
+  const HOUR = 60 * 60 * 1000;
+  let visibility: DocumentVisibilityState = 'visible';
+  let online = true;
+
+  function returnToForeground() {
+    visibility = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'));
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    push.checkPermissions.mockResolvedValue({ receive: 'granted' });
+    rpc.mockResolvedValue({ error: null });
+    visibility = 'visible';
+    online = true;
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
+    localStorage.setItem(TOKEN_KEY, 'stored-token');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    localStorage.removeItem(TOKEN_KEY);
+  });
+
+  it('re-records the stored token on a foreground return 12 hours after the start', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+
+    vi.setSystemTime(Date.now() + 12 * HOUR);
+    returnToForeground();
+
+    await vi.waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith('register_push_device', {
+        p_token: 'stored-token',
+        p_environment: 'sandbox',
+      })
+    );
+    stop();
+  });
+
+  it('renews at most once every 12 hours', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+
+    returnToForeground();
+    vi.setSystemTime(Date.now() + 11 * HOUR);
+    returnToForeground();
+    await Promise.resolve();
+    expect(rpc).not.toHaveBeenCalled();
+
+    vi.setSystemTime(Date.now() + 1 * HOUR);
+    returnToForeground();
+    await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+    vi.setSystemTime(Date.now() + 1 * HOUR);
+    returnToForeground();
+    await Promise.resolve();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('does nothing offline, when hidden, without a token or without permission', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+    vi.setSystemTime(Date.now() + 13 * HOUR);
+
+    online = false;
+    returnToForeground();
+    online = true;
+    visibility = 'hidden';
+    document.dispatchEvent(new Event('visibilitychange'));
+    localStorage.removeItem(TOKEN_KEY);
+    returnToForeground();
+    await Promise.resolve();
+    expect(rpc).not.toHaveBeenCalled();
+
+    localStorage.setItem(TOKEN_KEY, 'stored-token');
+    push.checkPermissions.mockResolvedValue({ receive: 'denied' });
+    returnToForeground();
+    await vi.waitFor(() => expect(push.checkPermissions).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(rpc).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('stops listening once stopped', async () => {
+    const { startPushRenewalOnForeground } = await freshModule();
+    startPushRenewalOnForeground()();
+    vi.setSystemTime(Date.now() + 13 * HOUR);
+
+    returnToForeground();
+    await Promise.resolve();
+    expect(push.checkPermissions).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op in a browser', async () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const { startPushRenewalOnForeground } = await freshModule();
+    const stop = startPushRenewalOnForeground();
+    vi.setSystemTime(Date.now() + 13 * HOUR);
+
+    returnToForeground();
+    await Promise.resolve();
+    expect(push.checkPermissions).not.toHaveBeenCalled();
+    stop();
+  });
+});
+
 describe('removePushRegistration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -266,6 +386,83 @@ describe('removePushRegistration', () => {
   });
 });
 
+describe('removeAllPushRegistrations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    rpc.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.removeItem(TOKEN_KEY);
+  });
+
+  it('deletes every row the account owns and resolves true', async () => {
+    localStorage.setItem(TOKEN_KEY, 'device-token-1');
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
+  });
+
+  it.each([
+    ['in a browser', () => capacitor.isNativePlatform.mockReturnValue(false)],
+    ['with no token stored', () => localStorage.removeItem(TOKEN_KEY)],
+  ])('still calls the RPC %s', async (_case, arrange) => {
+    arrange();
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
+  });
+
+  it('logs a refusal and resolves false', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockResolvedValueOnce({ error: { message: 'nope' } });
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(false);
+
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('[Push]'), 'nope');
+    errorLog.mockRestore();
+  });
+
+  it('logs a thrown call and resolves false', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockRejectedValueOnce(new Error('network'));
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(false);
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+
+  it('gives up after about 3 s and resolves false so sign-out never hangs', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockReturnValueOnce(new Promise(() => {}));
+    const { removeAllPushRegistrations } = await freshModule();
+
+    let result: boolean | undefined;
+    const done = removeAllPushRegistrations().then((value) => {
+      result = value;
+    });
+    await vi.advanceTimersByTimeAsync(2_900);
+    expect(result).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(200);
+    await done;
+
+    expect(result).toBe(false);
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('timed out'));
+    errorLog.mockRestore();
+  });
+});
+
 describe('stopDevicePushes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -278,12 +475,14 @@ describe('stopDevicePushes', () => {
     localStorage.removeItem(TOKEN_KEY);
   });
 
-  it('unregisters from APNs, clears the badge and forgets the token', async () => {
+  it('unregisters from APNs, empties Notification Center, clears the badge and forgets the token', async () => {
     const { stopDevicePushes } = await freshModule();
 
     await stopDevicePushes();
 
     expect(push.unregister).toHaveBeenCalledTimes(1);
+    // Pushes and date reminders alike, so the next person cannot read them (DW-352).
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
     expect(badge.clear).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
     // The server row is actionService.signOut's job; this half makes no request.
@@ -300,13 +499,26 @@ describe('stopDevicePushes', () => {
     expect(badge.clear).not.toHaveBeenCalled();
   });
 
-  it('an older shell, with neither plugin, makes no native call', async () => {
+  it('a shell with no local-notifications plugin skips the removal and still clears the badge', async () => {
+    capacitor.isPluginAvailable.mockImplementation((name: string) => name !== 'LocalNotifications');
+    const { stopDevicePushes } = await freshModule();
+
+    await stopDevicePushes();
+
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
+    expect(push.unregister).toHaveBeenCalledTimes(1);
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  it('an older shell, with none of the plugins, makes no native call', async () => {
     capacitor.isPluginAvailable.mockReturnValue(false);
     const { stopDevicePushes } = await freshModule();
 
     await stopDevicePushes();
 
     expect(push.unregister).not.toHaveBeenCalled();
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
     expect(badge.clear).not.toHaveBeenCalled();
   });
 
@@ -318,8 +530,26 @@ describe('stopDevicePushes', () => {
     await stopDevicePushes();
 
     expect(push.unregister).not.toHaveBeenCalled();
+    expect(local.removeAllDeliveredNotifications).not.toHaveBeenCalled();
     expect(badge.clear).not.toHaveBeenCalled();
     expect(errorLog).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it('a failing removal is logged once, and the badge and token still go', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    local.removeAllDeliveredNotifications.mockRejectedValueOnce(new Error('bridge gone'));
+    const { stopDevicePushes } = await freshModule();
+
+    await expect(stopDevicePushes()).resolves.toBeUndefined();
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.stringContaining('delivered notifications'),
+      expect.any(Error)
+    );
+    expect(badge.clear).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
     errorLog.mockRestore();
   });
 

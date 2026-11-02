@@ -1,12 +1,12 @@
 import { Capacitor } from '@capacitor/core';
 import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js';
-import { removePushRegistration } from '../../services/pushNotifications';
+import { removeAllPushRegistrations, removePushRegistration } from '../../services/pushNotifications';
 import { clearAuthToken, storeAuthToken } from '../../sw-db';
 import { logger } from '../../utils/logger';
 import { AUTH_STORAGE_KEY, readStoredSession } from '../authStorage';
 import { supabase } from '../supabaseClient';
 import { signInWithGoogleNative } from './nativeGoogleSignIn';
-import type { AuthCredentials, AuthResult } from './types';
+import type { AuthCredentials, AuthResult, SignOutResult } from './types';
 
 export const signIn = async (credentials: AuthCredentials): Promise<AuthResult> => {
   try {
@@ -77,14 +77,28 @@ export const signUp = async (credentials: AuthCredentials): Promise<AuthResult> 
  * 2026-11-02); `everywhere` ends the account's sessions on every device, for a
  * lost or given-away phone. Callers check the connection before `everywhere`:
  * a server it cannot reach still signs this device out, below, but no other.
+ *
+ * Resolves `{ otherDevicesSignedOut: false }` when `everywhere` could not
+ * reach every device -- the global sign-out met a retryable error, or the push
+ * registrations could not be removed (a lost phone would keep its pushes) --
+ * so the caller can say so. A plain sign-out always resolves true.
  */
-export const signOut = async ({ everywhere = false }: { everywhere?: boolean } = {}): Promise<void> => {
+export const signOut = async ({
+  everywhere = false,
+}: { everywhere?: boolean } = {}): Promise<SignOutResult> => {
   try {
-    // While the session still exists: the RPC that drops this device's push
-    // registration needs it. Online only, at most ~3 s, never throws. The
-    // native half (APNs unregister, badge) runs from clearAuth once the
+    let otherDevicesSignedOut = true;
+
+    // While the session still exists: the RPC that drops push registrations
+    // needs it. At most ~3 s, never throws. Everywhere drops every device's
+    // row, the web included; otherwise only this device's, online in the shell.
+    // The native half (APNs unregister, badge) runs from clearAuth once the
     // SIGNED_OUT event below arrives, offline too.
-    await removePushRegistration();
+    if (everywhere) {
+      if (!(await removeAllPushRegistrations())) otherDevicesSignedOut = false;
+    } else {
+      await removePushRegistration();
+    }
 
     // 'local' ends this device's session only; the SDK's default, 'global',
     // ends the account's sessions on every device.
@@ -97,6 +111,8 @@ export const signOut = async ({ everywhere = false }: { everywhere?: boolean } =
     // the server and emits SIGNED_OUT, so the usual cleanup runs. Either way the
     // server-side session is not revoked (DW-377).
     if (error && isAuthRetryableFetchError(error)) {
+      // The other devices' sessions were not revoked either way.
+      if (everywhere) otherDevicesSignedOut = false;
       if (readStoredSession()) {
         console.warn(
           '[AuthService] Server unreachable; signing out on this device:',
@@ -107,6 +123,19 @@ export const signOut = async ({ everywhere = false }: { everywhere?: boolean } =
       } else {
         error = null;
       }
+    }
+
+    // Any other error on the global sign-out (a 500, a 429): the SDK removes
+    // this device's session before it returns one, so this device is signed
+    // out but the others may not be. Report that rather than throw -- Settings
+    // has already unmounted and could not show a thrown error.
+    if (error && everywhere && !readStoredSession()) {
+      console.warn(
+        '[AuthService] Global sign-out failed; signed out on this device only:',
+        error.message
+      );
+      otherDevicesSignedOut = false;
+      error = null;
     }
 
     if (error) {
@@ -122,6 +151,7 @@ export const signOut = async ({ everywhere = false }: { everywhere?: boolean } =
     }
 
     logger.debug('[AuthService] Sign-out successful');
+    return { otherDevicesSignedOut };
   } catch (err) {
     console.error('[AuthService] Unexpected error during sign-out:', err);
     throw err;

@@ -9,11 +9,12 @@
  * store (signed out, so neither loads anything) because the headings under
  * test are theirs.
  */
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import pkg from '../../../../package.json';
+import { clearSignOutNotice, getSignOutNotice } from '../../../services/signOutNotice';
 
 const backend = vi.hoisted(() => ({
   lookupOwnDisplayName: vi.fn(),
@@ -65,6 +66,7 @@ describe('Settings on the kit', () => {
 
   afterEach(() => {
     cleanup();
+    clearSignOutNotice();
   });
 
   it('renders the four section labels and one heading per countdown group', async () => {
@@ -108,9 +110,9 @@ describe('Settings on the kit', () => {
 
   it('disables the Sign out row and says so while the sign-out is in flight', async () => {
     const user = userEvent.setup();
-    let release: (() => void) | undefined;
+    let release: ((value: { otherDevicesSignedOut: boolean }) => void) | undefined;
     backend.signOut.mockImplementation(
-      () => new Promise<void>((resolve) => (release = resolve))
+      () => new Promise<{ otherDevicesSignedOut: boolean }>((resolve) => (release = resolve))
     );
     await renderSettings();
 
@@ -125,7 +127,7 @@ describe('Settings on the kit', () => {
     expect(screen.getByTestId('settings-sign-out-everywhere')).toBeDisabled();
 
     await act(async () => {
-      release?.();
+      release?.({ otherDevicesSignedOut: true });
     });
   });
 
@@ -144,19 +146,90 @@ describe('Settings on the kit', () => {
     expect(signOut).toHaveTextContent('Sign out');
   });
 
-  it('signs out of all devices from its own row, and says so while in flight', async () => {
+  const CONFIRM_TEXT = "Sign out on every device? You'll need to sign in again on each one.";
+  const PARTIAL_NOTICE =
+    "You're signed out on this device, but your other devices could not be signed out. Sign in again when you're online and try Sign out of all devices once more.";
+
+  async function openEverywhereDialog(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByTestId('settings-sign-out-everywhere'));
+    return screen.findByRole('dialog');
+  }
+
+  it('asks before signing out of all devices, and signs out nothing until confirmed', async () => {
     const user = userEvent.setup();
-    let release: (() => void) | undefined;
+    await renderSettings();
+    expect(screen.getByTestId('settings-sign-out-everywhere')).toHaveTextContent(
+      'Sign out of all devices'
+    );
+
+    const dialog = await openEverywhereDialog(user);
+
+    expect(dialog).toHaveTextContent(CONFIRM_TEXT);
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Sign out everywhere' })).toBeInTheDocument();
+    expect(backend.signOut).not.toHaveBeenCalled();
+  });
+
+  it('puts initial focus on Cancel', async () => {
+    const user = userEvent.setup();
+    await renderSettings();
+
+    const dialog = await openEverywhereDialog(user);
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    );
+  });
+
+  it('keeps focus where the person moved it when Settings re-renders', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Settings />);
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
+    );
+
+    const dialog = await openEverywhereDialog(user);
+    const confirm = within(dialog).getByRole('button', { name: 'Sign out everywhere' });
+    confirm.focus();
+    rerender(<Settings />);
+
+    expect(confirm).toHaveFocus();
+  });
+
+  it('closes on Cancel, Escape and the backdrop without signing out', async () => {
+    const user = userEvent.setup();
+    await renderSettings();
+
+    let dialog = await openEverywhereDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await openEverywhereDialog(user);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    dialog = await openEverywhereDialog(user);
+    await user.click(dialog);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    expect(backend.signOut).not.toHaveBeenCalled();
+    expect(screen.getByTestId('settings-sign-out-everywhere')).toBeEnabled();
+  });
+
+  it('signs out of all devices on confirm, and says so while in flight', async () => {
+    const user = userEvent.setup();
+    let release: ((value: { otherDevicesSignedOut: boolean }) => void) | undefined;
     backend.signOut.mockImplementation(
-      () => new Promise<void>((resolve) => (release = resolve))
+      () => new Promise<{ otherDevicesSignedOut: boolean }>((resolve) => (release = resolve))
     );
     await renderSettings();
 
-    const everywhere = screen.getByTestId('settings-sign-out-everywhere');
-    expect(everywhere).toHaveTextContent('Sign out of all devices');
-    await user.click(everywhere);
+    const dialog = await openEverywhereDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Sign out everywhere' }));
 
+    const everywhere = screen.getByTestId('settings-sign-out-everywhere');
     await waitFor(() => expect(everywhere).toBeDisabled());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(everywhere).toHaveTextContent('Signing out of all devices…');
     expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: true });
     const signOut = screen.getByTestId('settings-sign-out');
@@ -164,11 +237,52 @@ describe('Settings on the kit', () => {
     expect(signOut).toHaveTextContent('Sign out');
 
     await act(async () => {
-      release?.();
+      release?.({ otherDevicesSignedOut: true });
     });
+    expect(getSignOutNotice()).toBeNull();
   });
 
-  it('refuses to sign out of all devices offline, before any request', async () => {
+  it('signs out once when "Sign out everywhere" is pressed twice', async () => {
+    const user = userEvent.setup();
+    backend.signOut.mockReturnValue(new Promise(() => {}));
+    await renderSettings();
+
+    const dialog = await openEverywhereDialog(user);
+    const confirm = within(dialog).getByRole('button', { name: 'Sign out everywhere' });
+    // Both presses land before React re-renders, as a double tap on the
+    // exiting dialog does: the second still holds the old handler.
+    act(() => {
+      confirm.click();
+      confirm.click();
+    });
+
+    expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: true });
+  });
+
+  it('hands a partial sign-out to the login screen as a notice', async () => {
+    const user = userEvent.setup();
+    backend.signOut.mockResolvedValue({ otherDevicesSignedOut: false });
+    await renderSettings();
+
+    const dialog = await openEverywhereDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Sign out everywhere' }));
+
+    await waitFor(() => expect(getSignOutNotice()).toBe(PARTIAL_NOTICE));
+  });
+
+  it('leaves the plain Sign out row asking nothing and showing no notice', async () => {
+    const user = userEvent.setup();
+    backend.signOut.mockResolvedValue({ otherDevicesSignedOut: true });
+    await renderSettings();
+
+    await user.click(screen.getByTestId('settings-sign-out'));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: false });
+    expect(getSignOutNotice()).toBeNull();
+  });
+
+  it('refuses to sign out of all devices offline, before any dialog or request', async () => {
     const user = userEvent.setup();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     await renderSettings();
@@ -179,6 +293,7 @@ describe('Settings on the kit', () => {
     expect(alert).toHaveTextContent(
       'You are offline. Signing out of all devices needs a connection to go through.'
     );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(backend.signOut).not.toHaveBeenCalled();
     expect(screen.getByTestId('settings-sign-out-everywhere')).toBeEnabled();
   });

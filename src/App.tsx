@@ -32,7 +32,12 @@ import {
   startDateReminderTriggers,
 } from './services/dateRemindersAtLaunch';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
-import { onPushTap, startPushRegistration } from './services/pushNotifications';
+import {
+  onPushTap,
+  startPushRegistration,
+  startPushRenewalOnForeground,
+} from './services/pushNotifications';
+import { clearSignOutNotice } from './services/signOutNotice';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
@@ -261,8 +266,18 @@ function App() {
 
           // Signed in: open the app now. The outcome below starts with
           // `supabase.auth.initialize()`, which with an expired token and no
-          // server retries the refresh for up to 30 s, and a session present
-          // means its outcome is `null` and no notice is shown anyway.
+          // server retries the refresh for up to 30 s, and with a session no
+          // notice is shown anyway. The outcome itself is not always `null`
+          // then: an implicit-grant error redirect (`error=` in the query or
+          // the fragment) reads `cancelled` or `provider-error` before any
+          // session is looked at, and the SDK keeps the stored session through
+          // it. The notice lives only on the login screen, which is not
+          // rendered while signed in, and once a session notification arrives
+          // it clears the outcome (or the guard keeps it from being stored),
+          // so a later sign-out shows a clean login screen. Only a load whose
+          // session dies before any such notification -- the SDK rejecting
+          // an expired token's refresh -- keeps it, and that person really is
+          // signed out on the load that carried the error.
           if (currentSession) setAuthLoading(false);
         }
 
@@ -353,6 +368,8 @@ function App() {
           // The flag keeps a still-in-flight `checkAuth` from putting it back.
           hasSessionNotification = true;
           setCallbackOutcome(null);
+          // Same reasoning for the partial sign-out notice (Settings sets it).
+          clearSignOutNotice();
           // The name lives in the profile row, not in auth metadata, so this is
           // a read and the gate settles a tick later.
           //
@@ -422,16 +439,18 @@ function App() {
   // registered kind on each signed-in start, including an in-place account
   // switch. Each kind shows its saved copy first and keeps it if the read fails.
   //
-  // The native shell's date reminders re-plan once the refreshers have saved
-  // their copies. The re-plan reads the five saved copies, not the store, and
-  // this launch run also covers an offline start, when no copy is written (each
+  // The native shell's date reminders plan at once from the saved copies, and
+  // again once the refresh settles, so one refresher that never answers cannot
+  // hold the launch plan. The re-plan reads the saved copies, not the store, and
+  // the first run also covers an offline start, when no copy is written (each
   // copy written triggers its own re-plan). A no-op on the web.
   useEffect(() => {
     if (!authUserId) return;
     // The identity this start belongs to: a refresh that settles after an
     // account switch must not plan for the next identity, which has its own run.
     const owner = { userId: authUserId, authSessionVersion };
-    void refreshLocalCopies().then(() => scheduleDateRemindersAtLaunch(owner));
+    const refreshed = refreshLocalCopies();
+    void scheduleDateRemindersAtLaunch(owner, refreshed);
   }, [authUserId, authSessionVersion]);
 
   // The native shell asks for notification permission once and registers this
@@ -449,9 +468,19 @@ function App() {
     });
   }, [authUserId, authSessionVersion]);
 
+  // While signed in, a return to the foreground renews this device's push
+  // registration (at most every 12 hours), so the sender's 30-day prune never
+  // drops a phone that is in use but never cold-started. A no-op on the web.
+  useEffect(() => {
+    if (!authUserId) return;
+    return startPushRenewalOnForeground();
+  }, [authUserId, authSessionVersion]);
+
   // Date reminders re-plan from the saved copies on every return to the
-  // foreground and every date copy written for the signed-in account. A no-op
-  // on the web and in a shell without the local-notifications plugin.
+  // foreground and every date copy written for the signed-in account; a
+  // foreground return and a token renewal also refresh the date copies (at most
+  // once every 5 minutes) and re-plan. A no-op on the web and in a shell
+  // without the local-notifications plugin.
   useEffect(() => startDateReminderTriggers(), []);
 
   // A tapped date reminder opens Home through the push taps below. Added once;

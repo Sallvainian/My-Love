@@ -697,6 +697,16 @@ export function useRealtimeMessages(options: UseRealtimeMessagesOptions = {}) {
       setReport({ key: currentUserId, status: 'reconnecting' });
       void openChannel({ takeSnapshot: false, releaseCurrent: false }).catch((error) => {
         console.error('[useRealtimeMessages] Re-arm failed:', error);
+        // The open rejected (a failed `setAuth`, say) before it built a channel,
+        // so nothing is left to report a failure or schedule a retry: without
+        // this the feed stays `reconnecting` with no channel, and every later
+        // signal is swallowed by the `!gaveUp` branch above. Hand the give-up
+        // state back so the next `online` or token renewal re-arms. Skipped when
+        // the hook is gone, a give-up already restored it, or a channel exists
+        // (its own status reports drive the retries from there).
+        if (cancelled || gaveUp || channelRef.current) return;
+        gaveUp = true;
+        setReport({ key: currentUserId, status: 'disconnected' });
       });
     };
 

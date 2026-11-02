@@ -16,7 +16,7 @@
  * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the runtime.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0';
 
 import { apnsConfigFromEnv, createApnsClient } from './apns.ts';
 import { handleSendPush, type DateChangeRow, type PushDb, type PushKind } from './handler.ts';
@@ -126,7 +126,10 @@ const db: PushDb = {
     return data?.display_name ?? null;
   },
   async listDevices(userId) {
-    const { data, error } = await admin.from('push_devices').select('token, environment').eq('user_id', userId);
+    const { data, error } = await admin
+      .from('push_devices')
+      .select('token, environment, updated_at')
+      .eq('user_id', userId);
     if (error) throw new Error(error.message);
     return data ?? [];
   },

@@ -30,7 +30,9 @@ vi.mock('../../src/services/localCopy', () => ({
 }));
 
 const dateReminders = vi.hoisted(() => ({
-  scheduleDateRemindersAtLaunch: vi.fn(async (_owner: { userId: string; authSessionVersion: number }) => {}),
+  scheduleDateRemindersAtLaunch: vi.fn(
+    async (_owner: { userId: string; authSessionVersion: number }, _refreshed?: Promise<unknown>) => {}
+  ),
   replanDateReminders: vi.fn(async (_owner?: { userId: string; authSessionVersion: number }) => {}),
   stopTriggers: vi.fn(),
   startDateReminderTriggers: vi.fn(),
@@ -241,30 +243,32 @@ describe('App refreshes the local copies', () => {
   });
 });
 
-describe('App plans the date reminders once the local copies have loaded', () => {
-  /** Makes the next `refreshLocalCopies()` wait until the returned function is called. */
+describe('App plans the date reminders at launch without waiting for the local copies', () => {
+  /** Makes the next `refreshLocalCopies()` wait until `settle` is called; `promise` is what it returned. */
   function holdNextRefresh() {
     let settle: () => void = () => {};
-    localCopy.refreshLocalCopies.mockImplementationOnce(
-      () => new Promise<void>((resolve) => { settle = resolve; })
-    );
-    return () => settle();
+    const promise = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    localCopy.refreshLocalCopies.mockImplementationOnce(() => promise);
+    return { settle: () => settle(), promise };
   }
 
-  it("after the refresh resolves, with the start's identity", async () => {
-    const settle = holdNextRefresh();
+  it("at once, with the start's identity and the pending refresh", async () => {
+    const held = holdNextRefresh();
 
     await renderApp();
+
     expect(localCopy.refreshLocalCopies).toHaveBeenCalledTimes(1);
-    expect(dateReminders.scheduleDateRemindersAtLaunch).not.toHaveBeenCalled();
-
-    await act(async () => settle());
-
     expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
-    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledWith({
-      userId: USER_ID,
-      authSessionVersion: useAppStore.getState().authSessionVersion,
-    });
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledWith(
+      { userId: USER_ID, authSessionVersion: useAppStore.getState().authSessionVersion },
+      held.promise
+    );
+
+    // Settling the refresh does not start another launch step: the one call waits on it.
+    await act(async () => held.settle());
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
   });
 
   it('again, with the new identity, on an in-place account switch', async () => {
@@ -274,29 +278,27 @@ describe('App plans the date reminders once the local copies have loaded', () =>
     await act(async () => auth.listener!(session(OTHER_USER_ID)));
 
     expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(2);
-    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenLastCalledWith({
-      userId: OTHER_USER_ID,
-      authSessionVersion: useAppStore.getState().authSessionVersion,
-    });
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenLastCalledWith(
+      { userId: OTHER_USER_ID, authSessionVersion: useAppStore.getState().authSessionVersion },
+      expect.any(Promise)
+    );
   });
 
-  it("with the first start's identity when that refresh settles after an in-place account switch", async () => {
-    const settle = holdNextRefresh();
+  it("gives each start its own identity and its own refresh when the first refresh is still pending", async () => {
+    const held = holdNextRefresh();
     await renderApp();
     const first = { userId: USER_ID, authSessionVersion: useAppStore.getState().authSessionVersion };
 
     await act(async () => auth.listener!(session(OTHER_USER_ID)));
-    // The switch's own refresh resolves at once, so its run comes first.
-    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(1);
-    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenLastCalledWith({
-      userId: OTHER_USER_ID,
-      authSessionVersion: useAppStore.getState().authSessionVersion,
-    });
-
-    await act(async () => settle());
 
     expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenCalledTimes(2);
-    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenNthCalledWith(2, first);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenNthCalledWith(1, first, held.promise);
+    expect(dateReminders.scheduleDateRemindersAtLaunch).toHaveBeenNthCalledWith(
+      2,
+      { userId: OTHER_USER_ID, authSessionVersion: useAppStore.getState().authSessionVersion },
+      expect.any(Promise)
+    );
+    expect(dateReminders.scheduleDateRemindersAtLaunch.mock.calls[1][1]).not.toBe(held.promise);
   });
 
   it('not on the window online event: only a signed-in start plans', async () => {

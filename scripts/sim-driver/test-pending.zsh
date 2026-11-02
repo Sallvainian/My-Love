@@ -21,7 +21,9 @@
 #      (check first that Library.plist holds only bundle ids and folder UUIDs)
 #   5. sim unschedule probe-interval probe-once probe-yearly, then copy that
 #      same PendingNotifications.plist to fixtures/pending-empty.plist
-# FOLDER below is read from the folder's name, so nothing else changes.
+# FOLDER below is read from the folder's name. If the new records carry another
+# SchemaVersion or TriggerRepeatInterval, pending.py refuses them until MARKERS
+# there and the marker cases below ("not the measured …") are updated to match.
 # Run: zsh scripts/sim-driver/test-pending.zsh
 emulate zsh
 TOOL=${0:A:h}
@@ -190,6 +192,27 @@ for bad in 9.5 true; do
   d=$(fresh date-component-$bad)
   edit $d/$FOLDER/PendingNotifications.plist set-date probe-once NS.hour $bad
   check date-component-hour-$bad 1 - $d $HOST "record 1 (probe-once)" "date component hour" "not an integer"
+done
+
+# The record's schema markers must hold the values measured in the fixture
+# (SchemaVersion 11, TriggerRepeatInterval 0); another value, a missing marker
+# or a marker of the wrong type is refused, naming the record and what it found.
+d=$(fresh changed-schema-version)
+edit $d/$FOLDER/PendingNotifications.plist set-key probe-yearly SchemaVersion 12
+check record-changed-schema-version 1 - $d $HOST "record 2 (probe-yearly)" "SchemaVersion is 12" "not the measured 11"
+d=$(fresh repeat-interval)
+edit $d/$FOLDER/PendingNotifications.plist set-key probe-once TriggerRepeatInterval 60
+check record-nonzero-repeat-interval 1 - $d $HOST "record 1 (probe-once)" "TriggerRepeatInterval is 60" "not the measured 0"
+d=$(fresh real-schema-version)
+edit $d/$FOLDER/PendingNotifications.plist set-key probe-interval SchemaVersion 11.0
+check record-real-schema-version 1 - $d $HOST "record 0 (probe-interval)" "SchemaVersion is 11.0" "not the measured 11"
+for marker in SchemaVersion TriggerRepeatInterval; do
+  d=$(fresh missing-$marker)
+  edit $d/$FOLDER/PendingNotifications.plist drop-key $marker
+  check record-missing-$marker 1 - $d $HOST "record 0 (probe-interval)" "missing key $marker"
+  d=$(fresh wrong-type-$marker)
+  edit $d/$FOLDER/PendingNotifications.plist set-key probe-interval $marker '"11"'
+  check record-$marker-wrong-type 1 - $d $HOST "record 0 (probe-interval)" "key $marker is str" "not int"
 done
 
 d=$(fresh self-reference)

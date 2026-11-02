@@ -93,6 +93,45 @@ function authorizationOf(input: RequestInfo | URL, init?: RequestInit): string |
   return null;
 }
 
+/** Does this parsed auth-server body carry a session, as auth-js `hasSession` reads one? */
+function isSessionBody(body: unknown): body is Record<string, unknown> {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
+  const { access_token, refresh_token, expires_in } = body as Record<string, unknown>;
+  return Boolean(access_token) && Boolean(refresh_token) && Boolean(expires_in);
+}
+
+/**
+ * The response without the `expires_at` GoTrue stamped on its session, or the
+ * response itself when it is not a successful session-shaped JSON answer.
+ *
+ * GoTrue computes `expires_at` on the server's clock. A device whose clock is
+ * ahead of it sees every new session as already expired, refreshes in a loop
+ * until GoTrue answers 429, and auth-js then removes the session (DW-383).
+ * Without `expires_at`, auth-js `_sessionResponse` derives it from
+ * `expires_in` on the device's own clock. The server still validates tokens on
+ * its clock.
+ */
+async function withoutServerExpiry(response: Response): Promise<Response> {
+  try {
+    if (!response.ok) return response;
+    if (!response.headers.get('Content-Type')?.toLowerCase().includes('json')) return response;
+    const body: unknown = await response.clone().json();
+    if (!isSessionBody(body) || !('expires_at' in body)) return response;
+    const { expires_at: _serverExpiry, ...rest } = body;
+    const headers = new Headers(response.headers);
+    headers.delete('Content-Length');
+    return new Response(JSON.stringify(rest), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    // An unparsable or unreadable body: auth-js reads the original as it would
+    // have without this wrapper.
+    return response;
+  }
+}
+
 /**
  * A `fetch` that refuses a data request carrying no user token while the SDK
  * still holds a session in storage.
@@ -110,6 +149,11 @@ function authorizationOf(input: RequestInfo | URL, init?: RequestInit): string |
  * that ends this state goes out with no user token. Requests outside the
  * project URL, requests with a user token, and every request while nothing is
  * stored (anon is legitimate when nobody is signed in) pass through unchanged.
+ *
+ * It also removes `expires_at` from the auth server's successful session
+ * responses, so the SDK measures a new session's expiry on the device clock
+ * rather than the server's -- see `withoutServerExpiry`. Every other response
+ * is returned as it came.
  */
 export function createSessionGuardedFetch({
   supabaseUrl,
@@ -120,17 +164,20 @@ export function createSessionGuardedFetch({
   const basePath = base?.pathname.replace(/\/+$/, '') ?? '';
   const anonBearer = `Bearer ${supabaseKey}`;
 
-  /** The path of a request to the project outside the auth server, else `null`. */
-  const dataRequestPath = (input: RequestInfo | URL): string | null => {
+  /** The path of a request to the project, relative to the project URL, else `null`. */
+  const projectPath = (input: RequestInfo | URL): string | null => {
     const url = base ? requestUrl(input) : null;
     if (!base || !url || url.origin !== base.origin) return null;
     if (!url.pathname.startsWith(`${basePath}/`)) return null;
-    const path = url.pathname.slice(basePath.length);
-    return `${path}/`.startsWith('/auth/v1/') ? null : path;
+    return url.pathname.slice(basePath.length);
   };
+  const isAuthPath = (path: string): boolean => `${path}/`.startsWith('/auth/v1/');
 
   return (input, init) => {
-    const path = dataRequestPath(input);
+    const path = projectPath(input);
+    if (path !== null && isAuthPath(path)) {
+      return fetchImpl(input, init).then(withoutServerExpiry);
+    }
     if (path !== null) {
       const authorization = authorizationOf(input, init);
       const hasUserToken = authorization !== null && authorization !== anonBearer;

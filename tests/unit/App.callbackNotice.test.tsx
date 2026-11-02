@@ -253,6 +253,33 @@ describe('App callback notice lifetime', () => {
     expect(screen.queryByTestId('login-notice')).toBeNull();
   });
 
+  it('shows a signed-in person no notice for an error redirect, then or after sign-out', async () => {
+    // DW-388: on an implicit-grant `error=` redirect the SDK keeps the stored
+    // session and `getAuthCallbackOutcome()` still answers `cancelled`, before
+    // any session read. Here that outcome resolves before any session
+    // notification, so `checkAuth` stores it -- the order the guard does not
+    // cover. The notice must reach nobody: not the signed-in shell, and not
+    // the login screen after a later sign-out.
+    auth.getSession.mockResolvedValue(session());
+    auth.getAuthCallbackOutcome.mockResolvedValue('cancelled');
+
+    render(<App />);
+    await act(async () => {});
+
+    expect(auth.getAuthCallbackOutcome).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-notice')).toBeNull();
+
+    // WHEN: the subscription's INITIAL_SESSION arrives with the stored session,
+    // as it does on every load that has one, and the person later signs out.
+    await act(async () => auth.listener!(session()));
+    await act(async () => auth.listener!(null));
+
+    // THEN: the login screen says nothing about the redirect they arrived on.
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-notice')).toBeNull();
+  });
+
   it('opens a stored session without waiting for the callback outcome', async () => {
     // Offline with an expired token, `getAuthCallbackOutcome()` waits on
     // `supabase.auth.initialize()`, which retries the refresh for up to 30 s.

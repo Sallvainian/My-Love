@@ -155,9 +155,17 @@ function request(body: unknown, headers: Record<string, string> = { 'x-push-secr
   });
 }
 
+/** The tests' fixed clock; a handler without a `now` override runs on the real one. */
+const NOW = 1800000000000;
+const DAY_MS = 86_400_000;
+/** Far in the future, so it is fresh on the real clock and on `now: () => NOW`, whenever the tests run. */
+const FRESH = '2100-01-01T00:00:00.000Z';
+/** 31 days before NOW: older than the 30-day limit. */
+const STALE = new Date(NOW - 31 * DAY_MS).toISOString();
+
 const TWO_DEVICES: DeviceRow[] = [
-  { token: 'tok-a', environment: 'sandbox' },
-  { token: 'tok-b', environment: 'production' },
+  { token: 'tok-a', environment: 'sandbox', updated_at: FRESH },
+  { token: 'tok-b', environment: 'production', updated_at: FRESH },
 ];
 
 Deno.test('unconfigured: every device gets a recorded request and nothing is sent', async () => {
@@ -360,7 +368,7 @@ Deno.test('a 410 deletes that registration, sends the others and counts it gone'
   const response = await handleSendPush(request({ note_id: NOTE_ID }), {
     db: fakeDb({ devices: TWO_DEVICES, claimed, released, deletedGone }),
     apns,
-    now: () => 1800000000000,
+    now: () => NOW,
   });
   assertEquals(response.status, 200);
   assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 0, gone: 1 });
@@ -378,7 +386,7 @@ Deno.test('a 410 with no timestamp keeps a registration made after the send star
   const response = await handleSendPush(request({ note_id: NOTE_ID }), {
     db: fakeDb({ devices: [TWO_DEVICES[0]], deletedGone }),
     apns,
-    now: () => 1800000000000,
+    now: () => NOW,
   });
   assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 1 });
   assertEquals(deletedGone, [['tok-a', 1800000000000]]);
@@ -437,6 +445,95 @@ Deno.test('a failing release on a 410 still deletes the registration (counted fa
     assertEquals(response.status, 200);
     assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 1, gone: 0 });
     assertEquals(deletedGone, [['tok-a', 1700000000000]]);
+  } finally {
+    console.error = original;
+  }
+});
+
+Deno.test('a stale registration is neither claimed nor sent, is deleted at now minus 30 days and counts gone', async () => {
+  const sends: string[] = [];
+  const apns: ApnsClient = {
+    send: (token) => {
+      sends.push(token);
+      return Promise.resolve({ ok: true, status: 200, reason: null, timestamp: null });
+    },
+  };
+  const claimed: PushRequestRow[] = [];
+  const deletedGone: [string, number][] = [];
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({
+      devices: [
+        { token: 'tok-old', environment: 'sandbox', updated_at: STALE },
+        { token: 'tok-new', environment: 'sandbox', updated_at: FRESH },
+      ],
+      claimed,
+      deletedGone,
+    }),
+    apns,
+    now: () => NOW,
+  });
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), { sent: 1, recorded: 0, skipped: 0, failed: 0, gone: 1 });
+  assertEquals(sends, ['tok-new']);
+  assertEquals(claimed.map((c) => c.token), ['tok-new']);
+  assertEquals(deletedGone, [['tok-old', NOW - 30 * DAY_MS]]);
+});
+
+Deno.test('a stale registration is pruned when nothing is sent too (recorded path)', async () => {
+  const claimed: PushRequestRow[] = [];
+  const deletedGone: [string, number][] = [];
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({
+      devices: [
+        { token: 'tok-old', environment: 'sandbox', updated_at: STALE },
+        { token: 'tok-new', environment: 'sandbox', updated_at: FRESH },
+      ],
+      claimed,
+      deletedGone,
+    }),
+    apns: null,
+    now: () => NOW,
+  });
+  assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 0, gone: 1 });
+  assertEquals(claimed.map((c) => c.token), ['tok-new']);
+  assertEquals(deletedGone, [['tok-old', NOW - 30 * DAY_MS]]);
+});
+
+Deno.test('a registration just inside 30 days is still sent to', async () => {
+  const claimed: PushRequestRow[] = [];
+  const deletedGone: [string, number][] = [];
+  const response = await handleSendPush(request({ note_id: NOTE_ID }), {
+    db: fakeDb({
+      devices: [
+        { token: 'tok-edge', environment: 'sandbox', updated_at: new Date(NOW - 30 * DAY_MS + 1000).toISOString() },
+      ],
+      claimed,
+      deletedGone,
+    }),
+    apns: null,
+    now: () => NOW,
+  });
+  assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 0, gone: 0 });
+  assertEquals(deletedGone, []);
+});
+
+Deno.test('a failed delete of a stale registration is counted failed and spares the others', async () => {
+  const original = console.error;
+  console.error = () => {};
+  try {
+    const claimed: PushRequestRow[] = [];
+    const db = fakeDb({
+      devices: [
+        { token: 'tok-old', environment: 'sandbox', updated_at: STALE },
+        { token: 'tok-new', environment: 'sandbox', updated_at: FRESH },
+      ],
+      claimed,
+    });
+    db.deleteGoneDevice = () => Promise.reject(new Error('db down'));
+    const response = await handleSendPush(request({ note_id: NOTE_ID }), { db, apns: null, now: () => NOW });
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { sent: 0, recorded: 1, skipped: 0, failed: 1, gone: 0 });
+    assertEquals(claimed.map((c) => c.token), ['tok-new']);
   } finally {
     console.error = original;
   }
