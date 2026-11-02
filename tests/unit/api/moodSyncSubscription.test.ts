@@ -12,6 +12,8 @@
  * the unsolicited-CLOSED reopen in `moodSyncSubscription.reopen.test.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthRetryableFetchError } from '@supabase/supabase-js';
+import { AUTH_STORAGE_KEY } from '@/api/authStorage';
 import {
   ackNextLeave,
   channelConfigs,
@@ -418,6 +420,39 @@ describe('subscribeMoodUpdates channel ownership', () => {
     expect(onMood.mock.calls[0][0]).toMatchObject({ updated_at: MOOD_CREATED_AT });
 
     unsubscribe();
+  });
+
+  it('opens the channel on the stored session while the server is unreachable', async () => {
+    // An offline cold start on an expired token: the SDK reports no session,
+    // but still holds it in storage, and the person stays signed in.
+    const userId = TOPIC.slice('mood-updates:'.length);
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        access_token: 'stored-access-token',
+        refresh_token: 'stored-refresh-token',
+        user: { id: userId },
+      })
+    );
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      const resolve = sessionQueue.shift();
+      resolve?.({
+        data: { session: null },
+        error: new AuthRetryableFetchError('Failed to fetch', 0),
+      });
+
+      const unsubscribe = await pending;
+
+      expect(constructedChannels).toHaveLength(1);
+      expect(openChannels.get(TOPIC)).toBe(constructedChannels[0]);
+
+      unsubscribe();
+    } finally {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
   });
 
   it('returns a no-op unsubscribe when there is no session', async () => {

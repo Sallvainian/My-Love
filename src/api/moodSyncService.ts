@@ -14,6 +14,7 @@ import { moodService } from '../services/moodService';
 import { moodSyncFingerprint, moodSyncPayload } from '../services/moodSyncPayload';
 import type { MoodEntry } from '../types';
 import { logger } from '../utils/logger';
+import { getSession } from './auth/sessionService';
 import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { handleNetworkError, isOnline } from './errorHandlers';
 import { waitForSocketReady } from './realtimeSocket';
@@ -828,10 +829,12 @@ class MoodSyncService {
     onStatusChange?: (status: string) => void,
     onPartnerLinked?: () => void
   ): Promise<() => void> {
-    // Get current user ID - we subscribe to OUR OWN channel
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    // Get current user ID - we subscribe to OUR OWN channel. Through
+    // `getSession`, which answers with the stored session while the server is
+    // unreachable: the SDK alone reports none then, and the channel would never
+    // open. Its join is refused until the token refreshes, and the SDK rejoins
+    // an errored channel with the new token.
+    const session = await getSession();
     const currentUserId = session?.user?.id;
 
     if (!currentUserId) {
