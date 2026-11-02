@@ -490,6 +490,8 @@ jobs:
       # keys on it and an empty slice costs a checkout rather than a provision.
       - name: Detect changed E2E test files
         id: changed-tests
+        env:
+          TRIAL_HEAD_REF: ${{ github.head_ref }} # TEMPORARY (measurement on #436)
         run: |
           # set -e, not the bare shell the single-job version used: a transient
           # `git fetch` failure leaves CHANGED empty, which the `|| true` below
@@ -513,6 +515,22 @@ jobs:
             # something; three narrow invocations do not. PR #125 is
             # exactly this shape: 4 changed specs, one of them a deletion.
             CHANGED=$(git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | grep -E '^tests/e2e/.*\.(spec|test)\.(ts|tsx|js|jsx)$' || true)
+          fi
+
+          # TEMPORARY (measurement on #436; reverted before merge): this branch
+          # changes no spec, so burn-in would skip. Burn in the 8 most recently
+          # changed E2E specs (25 tests) to measure 5 passes on 3 shards
+          # against the 4 E2E shards in the same run.
+          if [[ "${TRIAL_HEAD_REF:-}" == "ci/trial-shards-ghcr-burn-in" ]]; then
+            CHANGED=$(printf '%s\n' \
+              tests/e2e/auth/login.spec.ts \
+              tests/e2e/settings/push-switches-web.spec.ts \
+              tests/e2e/notes/love-notes-read-marker.spec.ts \
+              tests/e2e/offline/birthdays-wedding-offline.spec.ts \
+              tests/e2e/navigation/dock.spec.ts \
+              tests/e2e/account-data/account-data.spec.ts \
+              tests/e2e/auth/implicit-fragment-rejection.spec.ts \
+              tests/e2e/auth/logout.spec.ts)
           fi
 
           # NF drops the blank line `echo` emits for an empty CHANGED, which
