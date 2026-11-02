@@ -5,8 +5,9 @@
 -- (src/services/dateReminders.ts); no server sends them. A person who does not
 -- want them turns them off in Settings. The switch rides on story 3.7's
 -- `push_preferences` row, so it is account-kept like the six push switches: it
--- follows the person to a new device and shows in the shell offline through
--- the `push-preferences` local copy.
+-- follows the person to a new device. The reminder planner reads it offline
+-- through the `push-preferences` local copy; Settings shows it only from a
+-- server read.
 --
 -- A missing row, like the default, means on. The `send-push` Edge Function
 -- reads one named column per kind of push, so it neither reads nor is affected
