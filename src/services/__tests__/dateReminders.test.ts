@@ -1016,6 +1016,7 @@ describe('cancelDateReminders', () => {
     });
     const reminders = plan({ anniversaries: [{ label: 'Dinner', date: '2020-11-06' }] });
 
+    // The schedule's own cancel comes first; the sign-out cancel must wait for the schedule.
     const scheduled = scheduleDateReminders(reminders, () => true);
     await vi.waitFor(() => expect(order).toEqual(['cancel', 'schedule:start']));
     const cancelled = cancelDateReminders();

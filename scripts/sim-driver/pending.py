@@ -198,9 +198,11 @@ def main(argv):
         raise Fail("%s: folder for %s is %r" % (library, bundle, folder))
     file = base / folder / "PendingNotifications.plist"
     # Measured: an app's folder has no pending file until it first schedules,
-    # so this is the usual state, but a renamed file would look the same.
+    # so this is the usual state, but a renamed file would look the same. iOS
+    # also writes the file some seconds (up to about 25) after a schedule.
     if not file.is_file():
-        print("sim: %s does not exist: nothing has been scheduled since %s was installed"
+        print("sim: %s does not exist: nothing has been scheduled since %s was installed,"
+              " or iOS has not yet written a recent schedule: read again"
               % (file, bundle), file=sys.stderr)
         print("[]")
         return 0

@@ -3115,7 +3115,8 @@ location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driv
 source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
 severity: low
 reason: Found by story 4.7's review. `host_apply` runs `xcrun simctl launch --terminate-running-process` on the host, which leaves the host in front where a check may expect the shell, and `permission reset` runs `simctl uninstall`. Both appear in `sim help`, not in AGENTS.md. The fix edits AGENTS.md, so it is deferred: add both to the sim-driver paragraph.
-status: open
+status: done 2026-11-01
+resolution: story 4.4: AGENTS.md's sim-driver paragraph now says `schedule` and `unschedule` launch the host, leaving it in front of the shell, and that `sim permission reset --host` uninstalls the host and wipes its pending requests.
 
 ### DW-369: The AGENTS.md sentence on `sim schedule` does not say the host needs `sim permission allow --host` first, so a later story's first schedule exits 1 and has to be rerun.
 origin: spec-deferred e0029a1bba77
@@ -3123,7 +3124,8 @@ location: AGENTS.md (Maintained by hand, sim-driver paragraph)
 source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
 severity: low
 reason: host_apply dies with "the host has no notification permission: run sim permission allow --host" when the host's result file reads "not authorized", and `sim help` says so, but AGENTS.md's sim-driver paragraph does not. The fix edits AGENTS.md, so it is deferred.
-status: open
+status: done 2026-11-01
+resolution: story 4.4: AGENTS.md's sim-driver paragraph now says `schedule` needs `sim permission allow --host` first.
 
 ### DW-370: On a first sign-in the launch plan can find notification permission not yet granted, and nothing re-plans once the person taps Allow until the next launch.
 origin: spec-deferred ec751e5258fa
@@ -3140,7 +3142,8 @@ location: scripts/sim-driver/sim:67-75, AGENTS.md (sim-driver paragraph)
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
 reason: scripts/sim-driver/sim:71-72 reads "kinds and many first remove the seeded events"; AGENTS.md's sim-driver paragraph reads "replacing the seeded events"; scripts/sim-driver/dates.ts runs clearDates before kinds and many, as its own header states. The fix edits AGENTS.md, an agent-context file.
-status: open
+status: done 2026-11-01
+resolution: story 4.4: `sim help` and AGENTS.md now say `kinds` and `many` first do what `clear` does (both people's events and anniversaries, the pair's couple settings, both birthdays), and that their event and birthday writes send the other person date-change pushes (story 4.1's residual risk).
 
 ### DW-372: `sim pending` can report "nothing has been scheduled since ... installed" (and []) while requests are pending, because the simulator writes PendingNotifications.plist some time after `schedule`
 origin: spec-deferred 533ac45bf375
@@ -3148,7 +3151,8 @@ location: scripts/sim-driver/sim cmd_pending
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
 reason: Found during this pass's simulator verification, not by a review lens. After the first sign-in and a network-off relaunch, `sim pending` 15 s after launch said the plist did not exist; the next launch's console showed LocalNotifications.getPending returning 11 pending requests. Later launches rewrote the plist within 25 s. A check that reads the list right after the first schedule on a fresh install can see a false empty list. Story 7's reader (scripts/sim-driver) could wait for the plist's mtime to pass the launch, as the previous pass did by hand.
-status: open
+status: done 2026-11-01
+resolution: story 4.4: documented, behaviour kept. `sim help`, pending.py's missing-file note and AGENTS.md say iOS writes PendingNotifications.plist up to about 25 s after a schedule, so an empty or stale list read right after one is not proof. A wait would need the schedule's time, which `sim pending` does not know.
 
 ### DW-373: A re-plan cancels only the ids `getPending` reports, so if a follow-up re-plan's `getPending` misses requests the previous run just scheduled, ids above the new N stay pending.
 origin: spec-deferred 4cdc45753d6d
@@ -3205,4 +3209,29 @@ location: AGENTS.md (Known pitfalls)
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
 reason: Three rules a later agent needs are only in code comments: only an empty SDK session store means signed out (`readStoredSession`, `src/api/authStorage.ts`); `getSession` can return a stored session whose access token has expired while the server is unreachable, so code that sends `session.access_token` itself must expect a 401; and the session guard fails a data request with a synthetic `TypeError('Failed to fetch')` even when the network is up (the SDK's 60 s refresh cooldown, or GoTrue down). The edit touches an agent-context file, so it is deferred.
+status: done 2026-11-01
+resolution: story 4.4: the three session rules are a Maintained-by-hand bullet in AGENTS.md (outside the generated block, so a context refresh keeps them).
+
+### DW-380: A countdown mark on the partner's birthday is keyed `partner-birthday`, not by the partner, so after an unlink and a link to someone else it marks the new partner's birthday.
+origin: story 4.2 residual risk, carried in by story 4.4, 2026-11-01
+location: src/services/dateReminders.ts (MARK_KEYS); the countdown marks table and its local copy (story 4.2)
+source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
+severity: low
+reason: Story 4.2 keys the fixed dates `relationship-start`, `wedding`, `own-birthday` and `partner-birthday`, so a mark outlives the link it was made under; the same holds for `relationship-start` and `wedding`, which are the couple settings of whichever pair the person is in. Whether a mark should carry over to a new partner is an owner decision; a fix would key the partner-scoped marks by the partner's id (or clear them in `accept_partner_request`) and needs a migration. Recorded only in the plan's residual risks until now.
+status: open
+
+### DW-381: Offline, or after a failed read, Settings shows the "Date reminders" switch on (disabled) while the saved copy says off, because nothing seeds the store's push preferences from the `push-preferences` local copy.
+origin: story 4.3 review (rejected there under its unchanged-load-behaviour rule), carried in by story 4.4, 2026-11-01
+location: src/components/Settings/CountdownMarks.tsx (the switch's `?? true` default; PushSettings.tsx's six rows the same); src/stores/slices/settingsSlice.ts `loadPushPreferences`
+source_spec: `tickets/epic-date-reminders/tickets/story-a-settings-switch-turns-date-reminders-off-plan.md`
+severity: low
+reason: `loadPushPreferences` returns early offline and the row renders `?? true`, the same as story 3.7's six push rows. Planning is unaffected, because the re-plan reads the copy, so no reminder is scheduled; only the switch's shown state is wrong. A fix seeds the store from the copy before the online read, for all seven rows, which is a load-behaviour change and not cleanup.
+status: open
+
+### DW-382: The docs this sweep added for DW-372 say iOS writes PendingNotifications.plist "up to about 25 s after a schedule", but no measurement bounds the lag on a fresh install's first schedule.
+origin: spec-deferred 8a19bda4005c
+location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (help, pending); scripts/sim-driver/pending.py (missing-file comment); _bmad-output/initiative-my-love/deferred-work.md
+source_spec: `tickets/epic-date-reminders/tickets/story-refactor-sweep-plan.md`
+severity: low
+reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred.
 status: open

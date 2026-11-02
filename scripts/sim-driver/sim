@@ -68,11 +68,14 @@ Accounts (local stack only):
                          Set the dates the date reminders are planned from, for
                          Casey and Jessie only. kinds: one date of each kind,
                          3 to 8 days ahead. many: 50 events and 10 anniversaries
-                         (70 reminders). clear: remove every date. kinds and many
-                         first remove the seeded events. sim provision restores
-                         only those events, not anniversaries, couple settings or
-                         birthdays: run sim dates clear, then sim provision, to
-                         get back the provisioned state.
+                         (70 reminders). clear: remove every date (both people's
+                         events and anniversaries, the pair's couple settings and
+                         both birthdays). kinds and many clear first, so only the
+                         listed dates remain. The event and birthday writes send
+                         the other person date-change pushes. sim provision
+                         restores only the seeded events, not anniversaries,
+                         couple settings or birthdays: run sim dates clear, then
+                         sim provision, to get back the provisioned state.
   signin [partner|other|other-partner|unlinked|unlinked-other] [--decline-push]
                          Sign in through the login form (default: Casey;
                          partner: Jessie; other: Harper; other-partner: Morgan;
@@ -134,7 +137,10 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          those set}, repeats} or {type:"interval", seconds,
                          repeats}. Default: the shell; BUNDLE names another.
                          Decoded from the simulator's own files, so it needs
-                         no runner step; [] when the app has none. It exits 1,
+                         no runner step; [] when the app has none. iOS writes
+                         the file some seconds (up to about 25) after a
+                         schedule, so an empty or stale list read right after
+                         one is not proof: read again. It exits 1,
                          naming the record and key, on a record it does not
                          recognise, and prints nothing then.
   schedule FILE          Have the host schedule the requests in FILE (JSON
