@@ -435,16 +435,18 @@ function App() {
   // registered kind on each signed-in start, including an in-place account
   // switch. Each kind shows its saved copy first and keeps it if the read fails.
   //
-  // The native shell's date reminders re-plan once the refreshers have saved
-  // their copies. The re-plan reads the five saved copies, not the store, and
-  // this launch run also covers an offline start, when no copy is written (each
+  // The native shell's date reminders plan at once from the saved copies, and
+  // again once the refresh settles, so one refresher that never answers cannot
+  // hold the launch plan. The re-plan reads the saved copies, not the store, and
+  // the first run also covers an offline start, when no copy is written (each
   // copy written triggers its own re-plan). A no-op on the web.
   useEffect(() => {
     if (!authUserId) return;
     // The identity this start belongs to: a refresh that settles after an
     // account switch must not plan for the next identity, which has its own run.
     const owner = { userId: authUserId, authSessionVersion };
-    void refreshLocalCopies().then(() => scheduleDateRemindersAtLaunch(owner));
+    const refreshed = refreshLocalCopies();
+    void scheduleDateRemindersAtLaunch(owner, refreshed);
   }, [authUserId, authSessionVersion]);
 
   // The native shell asks for notification permission once and registers this
@@ -463,8 +465,10 @@ function App() {
   }, [authUserId, authSessionVersion]);
 
   // Date reminders re-plan from the saved copies on every return to the
-  // foreground and every date copy written for the signed-in account. A no-op
-  // on the web and in a shell without the local-notifications plugin.
+  // foreground and every date copy written for the signed-in account; a
+  // foreground return and a token renewal also refresh the date copies (at most
+  // once every 5 minutes) and re-plan. A no-op on the web and in a shell
+  // without the local-notifications plugin.
   useEffect(() => startDateReminderTriggers(), []);
 
   // A tapped date reminder opens Home through the push taps below. Added once;

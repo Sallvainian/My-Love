@@ -3344,7 +3344,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/services/dateRemindersAtLaunch.ts:179-182 (visibilitychange re-plan); src/App.tsx:434 and :500 (copy refreshes); src/hooks/useRealtimeMessages.ts:711 (only TOKEN_REFRESHED listener)
 severity: medium
 reason: The epic defines open as every launch and every return to the foreground, but story 4.6's frozen intent says no server refresh on foreground, so visibilitychange re-plans from unchanged copies; copies refresh only on a signed-in start, on online, and when a view loads, and nothing refreshes after TOKEN_REFRESHED. So the partner changing their birthday, or the person marking a date on another device, reaches a resumed phone only at its next cold start.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-date-reminders-replan-timing
+resolution-undo: bef106d32d6d3e89afddaca578b91d4c6b34a9a99e40b6aa110e3f7db7e29975 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 refresh-on-foreground — owner, 2026-11-02 (supersedes story 4.6's "no server refresh on foreground" for this purpose): on a return to the foreground while online, and after TOKEN_REFRESHED, refresh the seven date-reminder copies (throttled to at most once every few minutes) and then re-plan; offline it keeps planning from the saved copies.
 
 ### DW-390: Date reminders fire with no sound.
@@ -3443,7 +3445,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/App.tsx:434; src/stores/slices/settingsSlice.ts:836-837
 severity: low (unverified)
 reason: The re-plan is chained onto refreshLocalCopies(), so a stalled connection the browser reports as online can hold the launch plan until a foreground return. Plausible from the code, not reproduced. Settle it with a unit test that stalls one refresher and checks when the re-plan runs; if it waits, plan from the saved copies first and re-plan after the refresh.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-date-reminders-replan-timing
+resolution-undo: bef106d32d6d3e89afddaca578b91d4c6b34a9a99e40b6aa110e3f7db7e29975 2026-11-02 7374617475733a206f70656e
 
 ### DW-401: Date reminders may never fire on a device set to a non-Gregorian calendar.
 
