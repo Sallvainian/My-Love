@@ -2886,7 +2886,8 @@ origin: raised 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refacto
 location: scripts/sim-driver/sim (cmd_rotate, the pose and state commands, every `ax` call)
 severity: low
 reason: `ax` drives the device whose window Device Hub shows, and sim takes --device but never selects that device in Device Hub, so on an iPhone 17 beside the Duo, `sim rotate` and `sim state` act on whichever phone the window shows. Story 2 switched the window with System Events selecting the sidebar row for its iPhone 17 rotations and switched it back to the Duo afterwards, by hand; story 8 used the iPhone 17 in portrait only and recorded no switch. Fix by having sim select --device's row in Device Hub before an `ax` call (and saying so in its help), or by refusing when `ax state`'s device is not --device. 2026-11-02 triage: `ax` 0.2.2's help and error strings suggest that with --device it looks up that device's window and exits 4 ("No Device Hub window shows X") rather than acting on another phone, and that Device Hub can hold several device windows; neither is checked on a simulator. Absorbs DW-337: settle both with one hand test (boot a clone beside the Duo, open both in Device Hub, run `sim --device <clone> rotate` with the Duo in front); if ax refuses or drives the right window, the fix is wording only (AGENTS.md's sim-driver line says each clone needs its own Device Hub window, plus a clearer sim error), else sim selects --device's row first. Outside the loop: needs a simulator and edits AGENTS.md.
-status: open
+status: done 2026-11-02
+resolution: checked on the simulators 2026-11-02, no driver change needed. With the iPhone Duo and an iPhone 17 (iOS 27.2) booted and Device Hub showing one window per device (File > New Window, then the device selected in that window's sidebar), `sim --device <iPhone 17> rotate` with the Duo's window in front turned only the iPhone 17 (unknown to landscapeLeft) and left the Duo in portrait. With no window showing the iPhone 17, `ax` refused it ("No Device Hub window shows iPhone 17 …") instead of acting on the Duo. AGENTS.md's sim-driver line now says each concurrent device needs its own Device Hub window.
 
 ### DW-335: AGENTS.md's "never write an email address into `_bmad-output/`" rule cannot be followed as written: fictional fixture addresses and the required commit trailer already break it.
 origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (rejected there, because the fix edits that build's own plan); recorded 2026-10-31 by story 4 (the refactor sweep)
@@ -2977,7 +2978,8 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium
 reason: In unfolded portrait, the first `sim banner FILE --host --tap cold` read the banner's label, printed `before tap: notRunning`, then failed with "Failed to tap NotificationShortLookView … No matches found": the banner had gone before the tap. The next three cold runs and the background run passed. `banner` was not changed by story 3.14, so this is pre-existing timing between the read, the state check and the tap, and a later story's unattended check could fail once on it. Settle it by running `--tap cold` ten times unfolded and folded; if misses recur, tap the element found at read time immediately, or re-wait for the banner before tapping.
-status: open
+status: done 2026-11-02
+resolution: not reproduced. `sim banner FILE --host --tap cold` ran 10 times folded and 10 times unfolded on the iPhone Duo simulator on 2026-11-02 and passed all 20; the driver is left as it is. Reopen if a cold tap misses again.
 
 ### DW-345: sim center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups that are not listed, undercounting silently
 origin: spec-deferred story-3.14 review
@@ -3221,7 +3223,8 @@ location: src/services/dateReminders.ts, @capacitor/local-notifications (willPre
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
 reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes: set the clock, `sim reboot`, `sim launch`, then `sim watch --front --for 180` started by 8:58, since the runner takes 6-12 s to start and first waits up to 20 s for any earlier banner to clear. `sim banner FILE --front` does not fit, because it pushes FILE and watches only 20 s.
-status: open
+status: done 2026-11-02
+resolution: observed on the iPhone Duo simulator 2026-11-02, after DW-390 shipped: with the shell (built from main at 646facdf) in front and the Mac clock set to 2026-11-04 08:55 followed by `sim reboot`, `sim watch --front` saw the banner at 09:00:02 ("MY LOVE, now, Tomorrow: Lake weekend"). The plugin's default presentation shows the banner in front. The sound was not heard: the simulator's audio is not checked.
 decision: 2026-11-02 observe-with-sound — owner, 2026-11-02: keep the plugin's banner when the shell is in front, and give reminders a sound (DW-390); check both together in one device or simulator run after DW-390 ships and the shell is reinstalled. Outside the loop: the run moves the Mac clock with sudo.
 
 ### DW-377: An offline sign-out leaves the account's refresh token valid on the server indefinitely, because nothing revokes it once the device is back online and no session timebox is set.
@@ -3470,7 +3473,8 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: node_modules/@capacitor/local-notifications ios LocalNotificationsPlugin.swift:576-579 (DateComponents with no calendar)
 severity: low (unverified)
 reason: The plugin builds DateComponents with no calendar, so a device on a Buddhist or Japanese calendar might read year 2026 in that calendar and the reminders never fire. Settle it on a simulator set to another calendar with `sim pending` after a schedule; outside the loop.
-status: open
+status: done 2026-11-02
+resolution: won't fix -- owner, 2026-11-02: neither the owner's nor the partner's phone uses a non-Gregorian calendar, so the case does not apply. Not checked on a simulator. Reopen if anyone using the app sets their phone to another calendar.
 
 ### DW-402: A lost phone keeps its scheduled date reminders after "Sign out of all devices".
 
@@ -3488,7 +3492,8 @@ origin: split from DW-348 by the 2026-11-02 ledger triage
 location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
 severity: medium (unverified)
 reason: Needs two runs after DW-348 lands its fallback log line: one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (read whether the fallback ran), and one `center --host` started in landscape on an iPhone 17 simulator, comparing `ax state` before and after (the iPhone 17 needs selecting in Device Hub, DW-334). Outside the loop.
-status: open
+status: done 2026-11-02
+resolution: checked on the simulators 2026-11-02. The restore on a Rotate-Left-only phone first failed: `ax state` says "pose: n/a" on the iPhone 17, so center tried to unfold it and died ("could not unfold"); test-center-exit.zsh's stub printed no pose line and so passed. Fixed at 646facdf (center treats n/a as no pose; the stub prints "pose: n/a" and fails without the fix). After the fix a `center --host` started in landscapeLeft with Settings in front ended in landscapeLeft. The coordinate fallback was never needed: in 10 runs with a stacked group placed 7th to 11th, XCUITest called the stack hittable every time and tapped it directly, so no fallback note was printed. The fallback stays as it is, unobserved.
 
 ### DW-404: A failed center's restore skips its "could not restore" report: when die's exit (nested below cmd_center) runs center's EXIT trap, zsh 5.9 ends the trap as soon as a function it calls directly
 origin: spec-deferred 9f0d4541ec07
@@ -3506,7 +3511,8 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (center)
 source_spec: `plan-dw-sim-center-one-screen.md`
 severity: low
 reason: The drag-then-swipe sequence is the one every passing 8-group run ended on, and those runs printed no extra stacked-cell group, so neither check should fire at 8 groups; a run with 8 groups (exit 0) and one with more than fit (exit 1 with the message) would prove it. Needs the Duo simulator, like DW-403.
-status: open
+status: done 2026-11-02
+resolution: run on the iPhone Duo simulator 2026-11-02, after two faults the first runs found were fixed at 646facdf (displayInUse() read SpringBoard's windows one query at a time and failed on a vanished index right after a burst of pushes; a fresh Notification Center at times opened with the new notifications in the bottom pile, so center read too few). Then: 7 groups with one stack of 2 exit 0 twice (the stack counted 2); 8 single groups exit 0; 14 groups exit 1 with "a drag down the list moved it (13 cells before, 14 after)". The Duo was put back folded and in portrait each time. The check counts every app's cells, not only the app's: DW-414.
 
 ### DW-406: After "Sign out everywhere", another device whose access token has not yet expired can re-register its push_devices row, so a lost phone opened within about an hour keeps receiving pushes until an
 origin: spec-deferred 15f1bfb60d36
@@ -3525,7 +3531,8 @@ location: src/services/pushNotifications.ts (stopDevicePushes)
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: The intent names a simulator check of the shell as a follow-up outside the loop. Unit tests mock the plugin, so they cannot show that `Capacitor.isPluginAvailable('LocalNotifications')` is true in the installed shell or that the plugin's iOS method (`UNUserNotificationCenter.removeAllDeliveredNotifications()`, LocalNotificationsPlugin.swift:879-888) removes delivered APNs pushes there. Settle it with `scripts/sim-driver/sim`: push a love note and let a date reminder fire, sign out, then `sim center` shows no group for the app.
-status: open
+status: done 2026-11-02
+resolution: observed on the iPhone Duo simulator 2026-11-02 with the shell built from main at 646facdf, signed in as Casey: a pushed love note showed as a banner, `sim center` then read {"groups":[{"count":1,"text":"Jessie, New love note"}]}; after `sim signout`, `sim center` read {"groups":[]} and `sim badge` none. A date reminder delivered at 09:00 in the DW-376 run was also gone after sign-out, but only the after-read covers it (the before-read was blocked by another app's notifications, DW-414).
 
 ### DW-408: An account switch without a sign-out (in place, or a fresh sign-in whose owner marker names another account) leaves the outgoing account's delivered notifications in Notification Center.
 origin: spec-deferred ff783ef05e40
@@ -3586,3 +3593,17 @@ severity: low
 reason: On the in-place switch and the fresh-sign-in leftover paths nothing deletes this device's `push_devices` row first (only `actionService.signOut` calls `removePushRegistration`, src/api/auth/actionService.ts:100). The token moves to the incoming account only when `register_push_device` upserts it (supabase/migrations/20261102010000_register_push_device_session_check.sql:64-69), after App.tsx's effect re-runs `startPushRegistration()`, APNs answers and `recordDevice` sends the RPC. That is normally seconds. If the RPC fails, `recordDevice` only logs it (src/services/pushNotifications.ts:216-218), and the token stays with the outgoing account until the next signed-in start or the 12-hour foreground renewal. The gap predates DW-408, and the intent rules out the APNs unregister on these paths. Options: a second `clearDeliveredNotifications()` once `recordDevice` succeeds after a switch, or have the switch delete the outgoing row server-side while the outgoing session still exists, which the
 status: done 2026-11-02
 resolution: owner, 2026-11-02: fix it on PR #444. An account switch's Notification Center clear now passes untilReregistered (src/stores/slices/authSlice.ts clearDeliveredForSwitch), which saves a device flag holding an id unique to that switch (localStorage my-love-push-clear-after-record); the next successful register_push_device record, which moves this device's row to the incoming account, clears Notification Center and the badge once more and drops the flag (src/services/pushNotifications.ts recordDevice). A refused record keeps the flag: every return to the foreground then records again instead of once every 12 hours, and a restart's record still clears because the flag is on disk. A record clears only when the id it read before its request is still the saved one, so a record sent before a switch, including the previous account's still in flight during a second switch, cannot take that switch's clear. Any other clear, sign-out's included, drops the flag. Left as it is: while the app stays open after a refused record, nothing retries until the next return or start.
+
+### DW-414: sim center's one-screen check counts every app's notifications, so another app's pile fails a read and the message blames the app read.
+origin: raised 2026-11-02 by the DW-407 simulator check (owner-run session)
+location: scripts/sim-driver/RunnerUITests/Notify.swift (center, cellFrames)
+severity: low
+reason: `cellFrames()` collects every ListCell in Notification Center's combined list, whichever app it belongs to, and the drag and swipe checks compare those. After DW-344's 20 cold taps left 20 Runner notifications, `sim center` for the shell failed with "Notification Center holds more My Love notifications than fit on one screen … (12 cells before, 12 after)" though the shell had none; once the Runner's notifications were wiped (`sim permission reset --host`), the same read gave {"groups":[]}. So any app's leftover notifications block a read, and the message names the wrong app. Options: say "more notifications than fit" without the app's name, or clear other apps first; filtering by app does not work, since an overfull list hides the app's own cells too. Separately, on the iPhone 17 a fresh read with 3 Runner notifications failed the drag check before 646facdf; not re-run after it, so whether center reads on the iPhone 17 at all is unchecked.
+status: open
+
+### DW-415: sim signout fails whenever the shell shows its welcome screen, which it does after every restart.
+origin: raised 2026-11-02 by the DW-407 simulator check (owner-run session)
+location: scripts/sim-driver/RunnerUITests/Drive.swift (signout); scripts/sim-driver/sim (cmd_signout)
+severity: low
+reason: `sim signin` dismisses the welcome splash, but the shell shows it again after a relaunch or `sim reboot`, and `sim signout` then fails with "no Settings button: signed out already, or the page did not load" (Drive.swift:133), because the splash covers the dock. Tapping the splash's Continue (found with `sim dump`, tapped with `sim tap`) let `sim signout` pass. A check that restarts the simulator before signing out (any clock change does) fails at sign-out. Fix by having signout dismiss the splash the way signin does.
+status: open
