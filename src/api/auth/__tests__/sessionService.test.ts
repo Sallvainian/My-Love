@@ -337,6 +337,25 @@ describe('sessionService: a stored session survives an unreachable server', () =
       await expect(read).resolves.toBeNull();
     });
 
+    it('a sign-in redirect waits for the SDK even offline, so a stored account never opens first', async () => {
+      store(storedSession);
+      vi.stubGlobal('navigator', { ...navigator, onLine: false });
+      window.history.replaceState({}, '', '/?code=redirect-code');
+      try {
+        const settle = slowSdk();
+        const read = getSession();
+        let answered = false;
+        void read.then(() => (answered = true));
+        await Promise.resolve();
+        expect(answered).toBe(false);
+
+        settle({ data: { session: refreshedSession }, error: null });
+        await expect(read).resolves.toBe(refreshedSession);
+      } finally {
+        window.history.replaceState({}, '', '/');
+      }
+    });
+
     it('nothing stored: offline still waits for the SDK', async () => {
       vi.stubGlobal('navigator', { ...navigator, onLine: false });
       mockGetSession.mockResolvedValue({ data: { session: null }, error: null });

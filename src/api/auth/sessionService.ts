@@ -30,6 +30,9 @@ const SDK_TOO_SLOW = Symbol('sdk-too-slow');
 export const getSession = async (): Promise<Session | null> => {
   const sdkRead = readSdkSession();
   if (!readStoredSession()) return sdkRead;
+  // A sign-in redirect (`?code=` or `#code=`) may be exchanging a code for a
+  // different account; the stored session must not open the app first.
+  if (carriesAuthCode()) return sdkRead;
 
   if (globalThis.navigator?.onLine === false) {
     const stored = readStoredSession();
@@ -54,6 +57,17 @@ export const getSession = async (): Promise<Session | null> => {
   if (!stored) return sdkRead;
   console.warn('[AuthService] Session read is slow; using the stored session');
   return stored;
+};
+
+/** Whether this page load is a sign-in redirect carrying a code, as `supabaseClient`'s `returnedWithCode` reads it. */
+const carriesAuthCode = (): boolean => {
+  try {
+    const url = new URL(globalThis.location?.href ?? '');
+    if (url.searchParams.has('code')) return true;
+    return url.hash.startsWith('#') && new URLSearchParams(url.hash.substring(1)).has('code');
+  } catch {
+    return false;
+  }
 };
 
 /** The SDK's answer, with the stored session standing in for an unreachable server. */

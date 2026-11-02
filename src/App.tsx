@@ -258,6 +258,12 @@ function App() {
           }
 
           logger.debug('[App] Auth check:', currentSession ? 'authenticated' : 'not authenticated');
+
+          // Signed in: open the app now. The outcome below starts with
+          // `supabase.auth.initialize()`, which with an expired token and no
+          // server retries the refresh for up to 30 s, and a session present
+          // means its outcome is `null` and no notice is shown anyway.
+          if (currentSession) setAuthLoading(false);
         }
 
         // The callback this load arrived with, read once. `initialize()` is
