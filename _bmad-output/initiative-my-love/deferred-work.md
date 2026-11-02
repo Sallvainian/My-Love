@@ -3166,3 +3166,43 @@ source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-cou
 severity: low
 reason: Quick review finding. On CLI 2.122.0 the command prints unformatted output, 621 lines against the committed 977, with `ComputedFields: never` in all 22 tables. A whole-file regeneration would rewrite every table's lines. Story 3.8 (b430cde6) and this story both inserted only their own table's block, which matches the generator's Row/Insert/Update shape. Settling it is a decision for the owner: either commit one full regeneration on the current CLI and run Prettier on that generated file, or amend the AGENTS.md rule. The rule edit touches an agent-context file.
 status: open
+
+### DW-375: The iOS simulator ignores a host clock jump until it is rebooted, and the sim driver has no step for it, so a check that moves the Mac clock to make a reminder fire sees nothing fire.
+origin: story 4.8 simulator checks, 2026-11-01
+location: scripts/sim-driver/sim
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: Observed in story 4.8's first pass: with the Mac clock set to 11-02 08:58:30 by `sudo /bin/date`, the 8 reminders due at 09:00 stayed pending; after a simulator reboot at 08:57 all 8 fired at 09:00. Every firing check in that story rebooted the simulator by hand after each clock jump. A `sim` command that reboots the simulator (or sets the clock and reboots) would make the step repeatable. The device check in story 5 is unaffected.
+status: open
+
+### DW-376: A date reminder firing while the shell is in the foreground was never observed; the plugin's default `willPresent` should show a banner, but no check confirms it.
+origin: story 4.8 simulator checks, 2026-11-01
+location: src/services/dateReminders.ts, @capacitor/local-notifications (willPresent presentation options)
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes; `sim banner FILE --front` watches for a banner in that state.
+status: open
+
+### DW-377: An offline sign-out leaves the account's refresh token valid on the server indefinitely, because nothing revokes it once the device is back online and no session timebox is set.
+origin: story 4.8 thorough review, 2026-11-01
+location: src/api/auth/actionService.ts (signOut, retryable fallback); supabase/config.toml ([auth.sessions] commented out)
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: The owner chose a device-only sign-out when the server is unreachable (story 4.8 decisions). The device deletes its stored session, so the token is gone from that phone; the server session stays usable by anyone who already holds the refresh token. Settling it means either a revoke of the previous refresh token at the next online start (the token would have to be kept somewhere after sign-out) or an `[auth.sessions]` timebox/inactivity timeout in the hosted project; the hosted setting is unverified.
+status: open
+
+### DW-378: While the app runs on a stored session the SDK cannot use, Realtime channels may join with the publishable key and stay muted after the token renews.
+origin: story 4.8 thorough review, 2026-11-01
+location: src/api/supabaseClient.ts (guard covers HTTP fetch only); src/services/moodSyncService.ts, src/services/interactionService.ts, src/hooks/useRealtimeMessages.ts
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: medium (unverified)
+reason: The session guard wraps `global.fetch`, which the Realtime WebSocket never uses; supabase-js 2.118 gives Realtime `_getAccessToken`, which falls back to the publishable key when `getSession` has no session (index.mjs:836-840). A null `INITIAL_SESSION` therefore leaves channels joining as anon until `TOKEN_REFRESHED` calls `realtime.setAuth`. Whether private Broadcast channels rejoin and `postgres_changes` subscriptions pick up the new token afterwards is unverified; AGENTS.md notes nothing re-arms a muted channel. Settle it on the simulator: offline cold start with an expired token, gateway back, then a partner mood, note and interaction must arrive live.
+status: open
+
+### DW-379: AGENTS.md does not yet state the session rules story 4.8 introduced.
+origin: story 4.8 thorough review, 2026-11-01
+location: AGENTS.md (Known pitfalls)
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+reason: Three rules a later agent needs are only in code comments: only an empty SDK session store means signed out (`readStoredSession`, `src/api/authStorage.ts`); `getSession` can return a stored session whose access token has expired while the server is unreachable, so code that sends `session.access_token` itself must expect a 401; and the session guard fails a data request with a synthetic `TypeError('Failed to fetch')` even when the network is up (the SDK's 60 s refresh cooldown, or GoTrue down). The edit touches an agent-context file, so it is deferred.
+status: open
