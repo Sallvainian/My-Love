@@ -46,8 +46,10 @@ export interface LaunchOwner {
  * marks list is a loaded "no marks"). If any of the seven reads `null` (absent,
  * failed or malformed) the whole re-plan is skipped and the pending list
  * stays: planning the other kinds would cancel that kind's reminders, which is
- * the wipe this rule forbids. It never loads anything from the server itself:
- * it reads only saved copies.
+ * the wipe this rule forbids. The one exception is a push switches copy with
+ * `dateReminders` off (DW-392): off plans nothing whatever the dates are, so
+ * the pending reminders are cancelled without the other six copies. It never
+ * loads anything from the server itself: it reads only saved copies.
  *
  * Single-flight: while a re-plan runs, any number of further requests collapse
  * into one more run after it. The native calls themselves run in
@@ -130,6 +132,12 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
       readSavedPushPreferences(userId),
     ]);
     if (!isCurrent(owner)) return;
+    // The switch off is a complete answer: cancel everything pending without
+    // waiting for the date copies, which an off switch would not plan anyway.
+    if (prefs && !prefs.dateReminders) {
+      await scheduleDateReminders([], () => isCurrent(owner));
+      return;
+    }
     // A copy that is missing is not yet loaded: keep whatever is pending.
     if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner || !marks || !prefs) return;
 

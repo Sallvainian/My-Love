@@ -3374,7 +3374,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/services/dateRemindersAtLaunch.ts:96 (planOnce)
 severity: low
 reason: planOnce returns before anything when any of the seven copies is null, so switching the reminders off while another copy is missing or malformed leaves every pending reminder scheduled, against R6 ("off cancels every scheduled reminder"). Fix: when the push-preferences copy says off, cancel without needing the other copies; unit-test it.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-date-reminders-off-cancels-alone
+resolution-undo: ac06a2ca4ec8837963f0ec6925b2f1334207ebbcd80800986a1e27e7948e4d78 2026-11-02 7374617475733a206f70656e
 
 ### DW-393: A failed background refresh of the push settings disables an open Settings section.
 

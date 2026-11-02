@@ -556,6 +556,61 @@ describe('the Date reminders switch', () => {
     expect(localNotifications.schedule).not.toHaveBeenCalled();
   });
 
+  const OTHER_KINDS = DATE_KINDS.filter((kind) => kind !== PUSH_PREFERENCES_COPY_KIND);
+
+  // DW-392: off is an answer on its own, while on still needs every copy (each
+  // kind's "on" case is in 'replanDateReminders reads only loaded copies').
+  it.each(OTHER_KINDS)(
+    'cancels every reminder and schedules nothing when the switch is off and the %s copy is missing',
+    async (kind) => {
+      await seedCopies({ [PUSH_PREFERENCES_COPY_KIND]: SWITCH_OFF }, [kind]);
+      localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }, { id: 2 }] });
+
+      await replanDateReminders();
+
+      expect(localNotifications.cancel).toHaveBeenCalledTimes(1);
+      expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
+      expect(localNotifications.schedule).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(OTHER_KINDS)(
+    'cancels every reminder when the switch is off and the %s copy read fails',
+    async (kind) => {
+      await seedCopies({ [PUSH_PREFERENCES_COPY_KIND]: SWITCH_OFF });
+      readFailure.kind = kind;
+
+      await replanDateReminders();
+
+      expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
+      expect(localNotifications.schedule).not.toHaveBeenCalled();
+    }
+  );
+
+  it('cancels with only the switch copy saved', async () => {
+    await seedCopies({ [PUSH_PREFERENCES_COPY_KIND]: SWITCH_OFF }, OTHER_KINDS);
+
+    await replanDateReminders();
+
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('stops before the cancel when the account changes during the switch-off run', async () => {
+    await seedCopies({ [PUSH_PREFERENCES_COPY_KIND]: SWITCH_OFF }, [EVENTS_COPY_KIND]);
+    localNotifications.getPending.mockImplementation(() => {
+      state().setAuthUser(B);
+      return Promise.resolve({ notifications: [{ id: 1 }] });
+    });
+
+    await replanDateReminders();
+
+    expect(localNotifications.getPending).toHaveBeenCalledTimes(1);
+    expect(localNotifications.cancel).not.toHaveBeenCalled();
+    expect(localNotifications.checkPermissions).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
   it('keeps the other push switches out of it: only dateReminders decides', async () => {
     await seedCopies({
       [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON, dates: false, loveNotes: false },
