@@ -3495,7 +3495,9 @@ location: scripts/sim-driver/sim (center_restore, die); scripts/sim-driver/test-
 source_spec: `plan-dw-sim-center-one-screen.md`
 severity: low
 reason: Reproduced in plain zsh 5.9: with `f() { trap restore EXIT; die; }` and `die() { exit 1; }`, `restore() { inner || print report; print after; exit 7; }` runs inner's whole body, then stops (exit 1, no "report", no "after"); with `exit 1` called in f directly it prints both and exits 7. In sim, center_restore's only direct function call is `rotate_to` (sim:824), so a failed read still turns the device back, but a restore failure on that path is never reported and CENTER_DONE is never set. In test-center-exit.zsh ax, xcrun and sleep are stub functions, so a failed read's restore stops at its first stubbed call; a phone read-fails case starting in landscape ended in portrait for that reason and was left out. Fix: call rotate_to in a subshell, `( rotate_to $CENTER_ORIENT )`, and make the stubbed restore checkable.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-center-restore-subshell
+resolution-undo: 52a3cbe47b39286c8cb6953e0f685f3409c738a1713e9c550f0323a99e5e80c8 2026-11-02 7374617475733a206f70656e
 
 ### DW-405: center's one-screen check (no stacked cell left, and neither a drag nor a swipe down the list moves a cell) has not been run on a simulator.
 origin: spec-deferred f1809e113bbf
