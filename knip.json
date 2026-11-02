@@ -14,7 +14,8 @@
     "supabase"
   ],
   "ignoreDependencies": [
-    "dotenv"
+    "dotenv",
+    "oxfmt"
   ],
   "ignoreExportsUsedInFile": true
 }
