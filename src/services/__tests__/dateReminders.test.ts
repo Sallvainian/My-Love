@@ -909,6 +909,7 @@ describe('scheduleDateReminders thread id', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localNotifications.getPending.mockResolvedValue({ notifications: [] });
+    localNotifications.cancel.mockResolvedValue(undefined);
     localNotifications.checkPermissions.mockResolvedValue({ display: 'granted' });
     localNotifications.schedule.mockResolvedValue({ notifications: [] });
     vi.spyOn(console, 'error').mockImplementation(() => {});
