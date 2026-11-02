@@ -69,6 +69,15 @@ export const MAX_SCHEDULED_REMINDERS = 64;
  */
 export const REMINDER_THREAD_ID = 'partner-activity';
 
+/**
+ * `sound` of every reminder, so iOS plays the default notification sound.
+ * `@capacitor/local-notifications` 8.3.1 sets a sound only for a non-empty
+ * name, so a missing or empty one is silent; a name with no extension and no
+ * bundled file of that name falls back to the default sound, as the plugin's
+ * `LocalNotificationSchema.sound` documents.
+ */
+export const REMINDER_SOUND = 'default';
+
 /** One person's birthday; `name` `null` reads as "You" (Home's own card with no name chosen). */
 export interface ReminderBirthday {
   name: string | null;
@@ -348,6 +357,7 @@ export function scheduleDateReminders(
           title: reminder.text,
           body: '',
           threadIdentifier: REMINDER_THREAD_ID,
+          sound: REMINDER_SOUND,
           schedule: { on: reminder.on },
         })),
       });

@@ -3355,7 +3355,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/services/dateReminders.ts (scheduleDateReminders); capacitor.config.ts (LocalNotifications); node_modules/@capacitor/local-notifications ios LocalNotificationsPlugin.swift:472-473, LocalNotificationsHandler.swift:35
 severity: medium (unverified)
 reason: scheduleDateReminders passes no sound, and the plugin sets content.sound only for a non-empty string, so reminders are most likely silent; story 4.5's device run did not record sound. In front, reminders use the plugin's default [.badge, .sound, .banner, .list] while pushes use presentationOptions ['badge'].
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-date-reminders-default-sound
+resolution-undo: 4c116e065311b4a915de0daf0a0c2bc8378770ff6ce0121464318a44c7512fe7 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 default-sound-keep-banner — owner, 2026-11-02: reminders play the default notification sound (the plugin's supported way to request it), and a reminder due while the shell is in front keeps showing a banner. Unit-test the scheduled payload; the audible check on a device after a reinstall belongs to DW-376's run, outside the loop.
 
 ### DW-391: The love-notes re-arm can get stuck reconnecting when its openChannel rejects.

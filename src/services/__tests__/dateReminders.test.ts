@@ -32,6 +32,7 @@ import { getNextAnniversaryDate, getNextBirthday, toBirthdayInfo } from '../../u
 import {
   MARK_KEYS,
   MAX_SCHEDULED_REMINDERS,
+  REMINDER_SOUND,
   REMINDER_THREAD_ID,
   cancelDateReminders,
   hasNativeReminders,
@@ -794,6 +795,7 @@ describe('scheduleDateReminders', () => {
           title: 'Tomorrow: Dinner',
           body: '',
           threadIdentifier: 'partner-activity',
+          sound: 'default',
           schedule: { on: { year: 2026, month: 11, day: 5, hour: 9, minute: 0 } },
         },
         {
@@ -801,6 +803,7 @@ describe('scheduleDateReminders', () => {
           title: 'Today: Dinner',
           body: '',
           threadIdentifier: 'partner-activity',
+          sound: 'default',
           schedule: { on: { year: 2026, month: 11, day: 6, hour: 9, minute: 0 } },
         },
       ],
@@ -902,6 +905,25 @@ describe('scheduleDateReminders', () => {
     await expect(scheduleDateReminders(reminders, () => true)).resolves.toBeUndefined();
 
     expect(console.error).toHaveBeenCalled();
+  });
+
+  it('asks for the default notification sound on every scheduled reminder', async () => {
+    // The plugin drops an empty or missing sound (silent on iOS); a name with
+    // no bundled file of that name plays the default sound.
+    const several = plan({
+      anniversaries: [{ label: 'Dinner', date: '2020-11-06' }],
+      events: [{ label: 'Trip', date: new Date(2026, 10, 9) }],
+    });
+    expect(several.length).toBeGreaterThan(1);
+
+    await scheduleDateReminders(several, () => true);
+
+    const [options] = localNotifications.schedule.mock.calls[0] as [
+      { notifications: { sound?: string }[] },
+    ];
+    expect(options.notifications).toHaveLength(several.length);
+    expect(options.notifications.map((n) => n.sound)).toEqual(several.map(() => 'default'));
+    expect(REMINDER_SOUND).toBe('default');
   });
 });
 
