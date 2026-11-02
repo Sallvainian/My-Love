@@ -28,7 +28,8 @@ interface UseLoveNotesResult {
   notes: LoveNote[];
   /**
    * How the live subscription is doing, so a consumer can say when the chat has
-   * stopped receiving notes. `disconnected` is terminal for this mount.
+   * stopped receiving notes. `disconnected` holds until the network comes back
+   * or the sign-in renews.
    */
   realtimeStatus: NoteFeedStatus;
   /** Whether notes are currently being fetched */
@@ -160,10 +161,10 @@ export function useLoveNotes(autoFetch = true): UseLoveNotesResult {
   // Story 2.3: Real-time subscription via dedicated hook
   // Using Broadcast API per useRealtimeMessages implementation
   //
-  // The return value is no longer discarded. The subscription can give up for
-  // good -- five failed re-joins and it stops trying, with nothing in the app
-  // re-arming it -- and until that reached a caller the chat simply stopped
-  // receiving notes with no way for anyone to tell (DW-113).
+  // The return value is no longer discarded. The subscription can give up --
+  // five failed re-joins and it stops trying until the network comes back or
+  // the sign-in renews -- and until that reached a caller the chat simply
+  // stopped receiving notes with no way for anyone to tell (DW-113).
   const { status: realtimeStatus } = useRealtimeMessages({ enabled: autoFetch });
 
   return {
