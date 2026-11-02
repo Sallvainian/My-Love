@@ -11,6 +11,9 @@ import { useEffect, useState } from 'react';
 import { moodSyncService, type SupabaseMoodRecord } from '../api/moodSyncService';
 import { logger } from '../utils/logger';
 
+const REALTIME_LOST_ERROR = 'Real-time connection lost. Refresh to reconnect.';
+const LOAD_ERROR = 'Unable to load partner mood. Please try again later.';
+
 interface UsePartnerMoodResult {
   partnerMood: SupabaseMoodRecord | null;
   isLoading: boolean;
@@ -69,7 +72,7 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
       } catch (err) {
         console.error('[usePartnerMood] Failed to load partner mood:', err);
         if (!isMounted) return;
-        setError('Unable to load partner mood. Please try again later.');
+        setError(LOAD_ERROR);
         setIsLoading(false);
       }
     }
@@ -90,9 +93,15 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
             // Update connection status
             if (status === 'SUBSCRIBED') {
               setConnectionStatus('connected');
+              // Delivery is back, so the lost-connection message is stale. Only
+              // that message: the load and subscribe-throw errors describe
+              // something a SUBSCRIBED does not fix.
+              setError((current) => (current === REALTIME_LOST_ERROR ? null : current));
             } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
               setConnectionStatus('disconnected');
-              setError('Real-time connection lost. Refresh to reconnect.');
+              // A failed load stays the error: the mood on screen is unknown,
+              // and a later SUBSCRIBED must not turn it into "no mood logged".
+              setError((current) => (current === LOAD_ERROR ? current : REALTIME_LOST_ERROR));
             }
           }
         );

@@ -347,6 +347,62 @@ describe('useRealtimeMessages', () => {
       hook.unmount();
     });
 
+    it('reports disconnected, not a stuck reconnecting, when a re-arm open rejects, and re-arms on the next signal', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { supabase, hook } = await driveToGiveUp();
+
+      // The re-arm clears the give-up and reports reconnecting, then the open
+      // rejects on the token install before it builds any channel.
+      mocks.setAuth.mockRejectedValueOnce(new Error('token install failed'));
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[useRealtimeMessages] Re-arm failed:',
+        expect.any(Error)
+      );
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+      expect(hook.result.current.status).toBe('disconnected');
+
+      // Given up again, so the next signal opens exactly one channel.
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+      expect(hook.result.current.status).toBe('reconnecting');
+
+      hook.unmount();
+      errorSpy.mockRestore();
+    });
+
+    it('re-arms on this account\'s token renewal after a re-arm open rejected', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { supabase, hook } = await driveToGiveUp();
+
+      mocks.setAuth.mockRejectedValueOnce(new Error('token install failed'));
+      await act(async () => {
+        window.dispatchEvent(new Event('online'));
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(hook.result.current.status).toBe('disconnected');
+      expect(supabase.channel).toHaveBeenCalledTimes(6);
+
+      await act(async () => {
+        mocks.authListener?.('TOKEN_REFRESHED', { user: { id: USER_ID } });
+        await vi.runOnlyPendingTimersAsync();
+      });
+
+      expect(supabase.channel).toHaveBeenCalledTimes(7);
+      expect(hook.result.current.status).toBe('reconnecting');
+
+      hook.unmount();
+      errorSpy.mockRestore();
+    });
+
     it('opens no second channel when re-arm signals repeat, or when the feed never gave up', async () => {
       const { supabase, hook, callbacks } = await driveToGiveUp();
 

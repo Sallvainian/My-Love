@@ -3235,7 +3235,9 @@ location: src/api/interactionService.ts and src/stores/slices/interactionsSlice.
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
 reason: The session guard wraps global.fetch, which the Realtime WebSocket never uses, so with a null INITIAL_SESSION channels join as anon until TOKEN_REFRESHED calls realtime.setAuth. 2026-11-02 triage: supabase-js re-sends the new token to joined channels and rejoins refused private ones, and a local-stack probe saw both the private mood channel and the interactions postgres_changes recover about 5 s after the token arrived. Mood (3f551b1b) and love notes (b64ceb38, ccf6ab2d) were since fixed. Two gaps remain, from reading the code: (1) pokes and kisses: the partner check stays empty after renewal because no second SUBSCRIBED fires, so live interactions are dropped as from no partner (interactionsSlice.ts:451-520); (2) usePartnerMood sets "Real-time connection lost. Refresh to reconnect." on CHANNEL_ERROR and never clears it on a later SUBSCRIBED, so the card stays on its error after delivery recovers. Fix both, with a local-stack E2E that blocks the token endpoint, lets the token renew, and sees a partner mood, note and poke arrive live.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-realtime-recovery-after-renewal
+resolution-undo: db00046158db0bae449549e28442c6371d4363a2028fc0fa225a0e94cabb8016 2026-11-02 7374617475733a206f70656e
 
 ### DW-379: AGENTS.md does not yet state the session rules story 4.8 introduced.
 origin: story 4.8 thorough review, 2026-11-01
@@ -3352,7 +3354,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/hooks/useRealtimeMessages.ts:685-701 (rearm)
 severity: low
 reason: rearm() sets gaveUp = false and reports 'reconnecting' before openChannel; if that rejects, the catch only logs, so every later rearm() sees gaveUp false with a zero retry count and returns, and the feed stays reconnecting with no channel until Love Notes remounts. Fix: in the catch, restore gaveUp = true and report disconnected, with a test for a rejected openChannel. Fits one bundle with DW-378.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-realtime-recovery-after-renewal
+resolution-undo: db00046158db0bae449549e28442c6371d4363a2028fc0fa225a0e94cabb8016 2026-11-02 7374617475733a206f70656e
 
 ### DW-392: Turning date reminders off cancels nothing while any other saved copy is missing.
 
@@ -3509,4 +3513,12 @@ location: supabase/functions/send-push/index.ts:19; supabase/functions/upload-lo
 source_spec: `plan-dw-pin-edge-supabase-js.md`
 severity: medium
 reason: package-lock.json declares @supabase/storage-js 2.118.0 dependency "iceberg-js": "^0.8.1" (every other sub-package dependency is exact: tslib 2.8.1, @supabase/phoenix 0.4.5). esm.sh's built https://esm.sh/@supabase/storage-js@2.118.0/es2022/storage-js.mjs imports "/iceberg-js@^0.8.1?target=es2022", a range esm.sh resolves per request, so a new iceberg-js 0.8.x can reach both Edge Functions on the next deploy with no reviewed change. Pre-existing and outside the owner's 2026-11-02 decision, which pins supabase-js only. A fix would add ?deps=iceberg-js@0.8.1 to both import URLs (or vendor the import), which needs an owner call.
+status: open
+
+### DW-411: After a stale-session boot the Mood screen never mounts the partner card, so a later renewal cannot bring it back until the screen is re-entered; the usePartnerMood realtime-lost error is therefore
+origin: spec-deferred 22a6050e1943
+location: src/components/MoodTracker/MoodTracker.tsx (loadPartnerId effect)
+source_spec: `plan-dw-realtime-recovery-after-renewal.md`
+severity: low
+reason: MoodTracker looks its partner up through lookupPartnerId on mount and again only when store.partner.id changes; on a boot whose stored session the SDK cannot use that lookup fails and nothing re-runs it on TOKEN_REFRESHED. Observed in tests/e2e/partner/realtime-recovery-after-renewal.spec.ts on the local stack: no card and no error card after TOKEN_REFRESHED; Home then Mood mounts it.
 status: open

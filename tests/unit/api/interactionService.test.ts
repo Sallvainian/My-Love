@@ -39,6 +39,31 @@ const backend = new FakeInteractionsBackend();
 type RealtimeStatus = 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT';
 type RealtimePayload = { new: Record<string, unknown> };
 
+/**
+ * The SDK's auth listener, as the service registers it for a token renewal.
+ * `listener` is the callback of the most recent registration; `unsubscribe`
+ * is the spy its subscription handle returns.
+ */
+const authEvents = vi.hoisted(() => {
+  type AuthListener = (event: string, session: { user?: { id?: string } } | null) => void;
+  let listener: AuthListener | null = null;
+  const unsubscribe = vi.fn();
+  const onAuthStateChange = vi.fn((callback: AuthListener) => {
+    listener = callback;
+    return { data: { subscription: { unsubscribe } } };
+  });
+  return {
+    onAuthStateChange,
+    unsubscribe,
+    emit: (event: string, session: { user?: { id?: string } } | null) => listener?.(event, session),
+    reset: () => {
+      listener = null;
+      onAuthStateChange.mockClear();
+      unsubscribe.mockClear();
+    },
+  };
+});
+
 const realtime = vi.hoisted(() => {
   // One listener per event type, as the service registers them.
   const listeners = new Map<string, (payload: never) => void>();
@@ -99,6 +124,7 @@ vi.mock('@/api/supabaseClient', () => ({
     from: (table: string) => backend.client().from(table),
     channel: realtime.channelFactory,
     removeChannel: realtime.removeChannel,
+    auth: { onAuthStateChange: authEvents.onAuthStateChange },
   },
   getPartnerId: () => partnerLookup.resolve(),
   resolvePartnerIdForDelivery: () => partnerLookup.resolve(),
@@ -137,6 +163,7 @@ describe('interactionService', () => {
   beforeEach(() => {
     backend.reset();
     realtime.reset();
+    authEvents.reset();
     realtime.channelFactory.mockClear();
     realtime.removeChannel.mockClear();
     setOnline(true);
@@ -218,6 +245,76 @@ describe('interactionService', () => {
 
       expect(realtime.removeChannel).toHaveBeenCalledTimes(1);
       expect(realtime.removeChannel).toHaveBeenCalledWith(realtime.channel);
+    });
+
+    describe('onTokenRenewed', () => {
+      const subscribeWithRenewal = async () => {
+        const onTokenRenewed = vi.fn();
+        const unsubscribe = await interactionService.subscribeInteractions(
+          USER_ID,
+          vi.fn(),
+          vi.fn(),
+          undefined,
+          onTokenRenewed
+        );
+        return { onTokenRenewed, unsubscribe };
+      };
+
+      it('registers no auth listener when no callback is passed', async () => {
+        await interactionService.subscribeInteractions(USER_ID, vi.fn(), vi.fn());
+
+        expect(authEvents.onAuthStateChange).not.toHaveBeenCalled();
+      });
+
+      it("calls back on a later task when this user's token refreshes", async () => {
+        vi.useFakeTimers();
+        try {
+          const { onTokenRenewed } = await subscribeWithRenewal();
+
+          authEvents.emit('TOKEN_REFRESHED', { user: { id: USER_ID } });
+          // Deferred: never run inside the auth listener itself.
+          expect(onTokenRenewed).not.toHaveBeenCalled();
+
+          vi.advanceTimersByTime(0);
+          expect(onTokenRenewed).toHaveBeenCalledTimes(1);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('ignores other events, other users and a missing session', async () => {
+        vi.useFakeTimers();
+        try {
+          const { onTokenRenewed } = await subscribeWithRenewal();
+
+          authEvents.emit('SIGNED_IN', { user: { id: USER_ID } });
+          authEvents.emit('INITIAL_SESSION', { user: { id: USER_ID } });
+          authEvents.emit('TOKEN_REFRESHED', { user: { id: STRANGER_ID } });
+          authEvents.emit('TOKEN_REFRESHED', null);
+          vi.advanceTimersByTime(0);
+
+          expect(onTokenRenewed).not.toHaveBeenCalled();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('removes the listener on teardown, once, and drops a callback already queued', async () => {
+        vi.useFakeTimers();
+        try {
+          const { onTokenRenewed, unsubscribe } = await subscribeWithRenewal();
+
+          authEvents.emit('TOKEN_REFRESHED', { user: { id: USER_ID } });
+          unsubscribe();
+          unsubscribe();
+          vi.advanceTimersByTime(0);
+
+          expect(authEvents.unsubscribe).toHaveBeenCalledTimes(1);
+          expect(onTokenRenewed).not.toHaveBeenCalled();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     });
   });
 
