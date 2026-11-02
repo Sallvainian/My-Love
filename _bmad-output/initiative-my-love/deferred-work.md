@@ -2811,19 +2811,22 @@ reason: Both call navigator.vibrate, which Safari on iOS does not implement (fro
 status: done
 resolution: fixed 2026-10-29 on fix/native-haptics. Every buzz now goes through playHaptic in src/utils/haptics.ts, which in the native shell plays Apple's haptics through @capacitor/haptics (success and error as notification haptics, a selection as a light impact, an arriving love note as a medium one) and elsewhere keeps navigator.vibrate. useVibration and the incoming-note buzz in useRealtimeMessages route through it. The home-screen PWA on iPhone is unchanged (still no navigator.vibrate).
 
-### DW-326: The native shell still has Capacitor's default app icon and splash; its iPhone Duo dock moved to an epic.
+### DW-326: The native shell still shows Capacitor's default splash screen.
 origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
 location: src/components/Navigation/AppNavigation.tsx; ios/App/App
 severity: low
 reason: The shell exists so the five DESTINATIONS can move into iOS's right-hand system column on iPhone Duo (folded and inner landscape), as Instagram, Netflix and others do; iOS keeps web content out of that column, so only a native UITabBar/TabView gets there. Research: _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/. Not yet proven that a native tab bar around one shared WKWebView lands in the column; prove that first. The shell also still has Capacitor's default app icon and splash. 2026-10-30: the owner's Duo shows the current shell drawing web content into the column (index.html has set viewport-fit=cover since 2026-08-18), so the premise that only a native tab bar reaches it no longer holds; the dock half is now epic-iphone-duo-native-tab-bar (retitled iPhone Duo Side-Column Dock), which moves the app's own HTML dock into the column. Open here: the default app icon and splash. 2026-10-31: the app icon is now the Two Hearts mark (public/icons/icon.svg rendered at 1024, fix/ios-app-icon); only Capacitor's default splash remains open.
 status: open
+decision: 2026-11-02 build-outside-loop — the splash becomes the Two Hearts mark (public/icons/icon.svg, as fix/ios-app-icon made the icon) on the app's light and dark background colours; done interactively, because the launch screen shows only after a reinstall and a person has to look at it.
 
 ### DW-327: The dock's unseen-count badges are never fed, so the dock never shows one.
 origin: raised 2026-10-29 while slicing epic-iphone-duo-native-tab-bar
 location: src/App.tsx (`<AppNavigation>`); src/components/Navigation/AppNavigation.tsx (`badgeCounts`)
 severity: low
 reason: AppNavigation renders a badge per destination from its `badgeCounts` prop, but its only caller in App.tsx passes none, so no badge has ever shown. The owner parked badges until a feature supplies real counts; when it does, the column dock from epic-iphone-duo-native-tab-bar shows them too.
-status: open
+status: done 2026-11-02
+resolution: moved to the backlog story `_bmad-output/backlog/story-dock-shows-unread-counts.md`: the owner wants unread counts on the dock buttons, which is a feature, not a defect.
+decision: 2026-11-02 move-to-backlog — owner, 2026-11-02.
 
 ### DW-328: The column rule's "both side insets non-zero means no column" case is unmeasured on a non-Duo iPhone.
 origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 7 (the side-column detection spike)
@@ -2856,7 +2859,8 @@ location: src/hooks/useSideColumn.ts (sideColumnFromInsets); src/components/Navi
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-dock-becomes-a-capsule-in-the-side-column-without-coveri-plan.md`
 severity: medium
 reason: sideColumnFromInsets switches to the column form for any single non-zero side inset, and the capsule is exactly w-[env(safe-area-inset-left|right)] while each button is w-11 (44 px); index.html sets viewport-fit=cover. Unverified: no Android device or emulator was measured. Settle it by reading env(safe-area-inset-left/right) in Android Chrome in landscape on a punch-hole phone; if one side is non-zero and small, add a minimum column width (for example a button's 44 px) to the rule, which the ticket's "exactly one non-zero" wording does not settle. (declared severity: medium (unverified))
-status: open
+status: done 2026-11-02
+resolution: already resolved by ab3b0abb (2026-10-30): sideColumnFromInsets takes the column form only from a 44 px inset, and since ee0edd39 the capsule is 40 px, so a small one-sided Android cutout keeps the bottom dock; found by the 2026-11-02 ledger triage.
 
 ### DW-332: The sim driver's signin appends to whatever the login fields already hold, so a retry after a failed first attempt types onto the leftover email and is refused.
 origin: spec-deferred 45d95a4edb9e
@@ -2880,22 +2884,24 @@ resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refa
 origin: raised 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), from story 9's and story 2's residual risks
 location: scripts/sim-driver/sim (cmd_rotate, the pose and state commands, every `ax` call)
 severity: low
-reason: `ax` drives the device whose window Device Hub shows, and sim takes --device but never selects that device in Device Hub, so on an iPhone 17 beside the Duo, `sim rotate` and `sim state` act on whichever phone the window shows. Story 2 switched the window with System Events selecting the sidebar row for its iPhone 17 rotations and switched it back to the Duo afterwards, by hand; story 8 used the iPhone 17 in portrait only and recorded no switch. Fix by having sim select --device's row in Device Hub before an `ax` call (and saying so in its help), or by refusing when `ax state`'s device is not --device.
+reason: `ax` drives the device whose window Device Hub shows, and sim takes --device but never selects that device in Device Hub, so on an iPhone 17 beside the Duo, `sim rotate` and `sim state` act on whichever phone the window shows. Story 2 switched the window with System Events selecting the sidebar row for its iPhone 17 rotations and switched it back to the Duo afterwards, by hand; story 8 used the iPhone 17 in portrait only and recorded no switch. Fix by having sim select --device's row in Device Hub before an `ax` call (and saying so in its help), or by refusing when `ax state`'s device is not --device. 2026-11-02 triage: `ax` 0.2.2's help and error strings suggest that with --device it looks up that device's window and exits 4 ("No Device Hub window shows X") rather than acting on another phone, and that Device Hub can hold several device windows; neither is checked on a simulator. Absorbs DW-337: settle both with one hand test (boot a clone beside the Duo, open both in Device Hub, run `sim --device <clone> rotate` with the Duo in front); if ax refuses or drives the right window, the fix is wording only (AGENTS.md's sim-driver line says each clone needs its own Device Hub window, plus a clearer sim error), else sim selects --device's row first. Outside the loop: needs a simulator and edits AGENTS.md.
 status: open
 
-### DW-335: Story 9's frozen intent contract names the sim driver's two fixture email addresses inside `_bmad-output/`.
+### DW-335: AGENTS.md's "never write an email address into `_bmad-output/`" rule cannot be followed as written: fictional fixture addresses and the required commit trailer already break it.
 origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (rejected there, because the fix edits that build's own plan); recorded 2026-10-31 by story 4 (the refactor sweep)
-location: _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-simulator-driver-is-a-repo-tool-plan.md (Boundaries & Constraints, Always, the fixture pair)
+location: AGENTS.md (Policy, the public-repo line; inside the generated block)
 severity: low
-reason: AGENTS.md Policy says never to write an email address into `_bmad-output/`. The two addresses are fictional (`test.example.com`, local stack only) and also appear in scripts/sim-driver/sim, provision.ts and AGENTS.md itself, and other epics' plans and findings files in `_bmad-output/` already hold fictional test addresses, so whether the rule covers fictional fixture addresses is the owner's call. The line sits inside the plan's `<intent-contract>`, which only a person may change; if the rule covers them, replace the addresses there with "the sim driver's two fixture accounts", or reword the Policy line to exempt fictional `test.example.com` fixtures.
+reason: AGENTS.md Policy says never to write an email address into `_bmad-output/`. The two addresses are fictional (`test.example.com`, local stack only) and also appear in scripts/sim-driver/sim, provision.ts and AGENTS.md itself, and other epics' plans and findings files in `_bmad-output/` already hold fictional test addresses, so whether the rule covers fictional fixture addresses is the owner's call. The line sits inside the plan's `<intent-contract>`, which only a person may change; if the rule covers them, replace the addresses there with "the sim driver's two fixture accounts", or reword the Policy line to exempt fictional `test.example.com` fixtures. 2026-11-02 triage: the cited line in story 9's plan was already reworded by 31eafa9b; 19 addresses remain in 10 tracked _bmad-output files (7 at test.example.com, 8 at example.com, 4 noreply@anthropic.com), and every commit carries the required noreply@anthropic.com trailer.
 status: open
+decision: 2026-11-02 reword-rule — owner, 2026-11-02: the Policy line forbids real addresses only; addresses at reserved domains (example.com, example.org, *.test, *.invalid, RFC 2606) and the commit trailer noreply@anthropic.com are allowed, any other address counts as real. The line sits in AGENTS.md's generated block, so the edit goes through bmad-project-context, outside the loop; with it, the fixture addresses in story-partner-requests-push-plan.md:49 and elsewhere need no change.
 
 ### DW-336: The sim driver's old shared folders at the cache root are orphaned since the work dir became per checkout.
 origin: raised 2026-10-31 by the quick review of epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), which moved the default work dir (DW-329)
 location: ~/Library/Caches/my-love-sim-driver (stage/, runner/, derived/, logs/, serve/, serve.pid at its root)
 severity: low
 reason: Before story 4 every checkout used ~/Library/Caches/my-love-sim-driver itself; it now uses a <checkout>-<hash> folder inside it, so the root-level stage/, runner/, derived/, logs/ and serve/ (about 1.6 GB on 2026-10-31, mostly the stage's node_modules and derived data) are read by no code path. Story 4 ran unattended and left them, since deleting is the owner's call. Fix: once no update server started by the old driver runs (`pgrep -fl ThreadingHTTPServer` prints nothing), delete those five folders and serve.pid from the cache root, keeping every <checkout>-<hash> folder and any folder another session made there.
-status: open
+status: done 2026-11-02
+resolution: already resolved: on 2026-11-02 the cache root holds only per-checkout folders (no stage/, runner/, derived/, logs/, serve/ or serve.pid) and `pgrep -fl ThreadingHTTPServer` prints nothing; found by the 2026-11-02 ledger triage.
 
 ### DW-337: AGENTS.md's sim-driver line says concurrent Duo stories may each run in their own worktree on their own simulator clone, but the driver's `ax` commands may reach only the device Device Hub's window
 origin: spec-deferred f5609f6c2d08
@@ -2903,15 +2909,17 @@ location: AGENTS.md, Maintained by hand (the sim-driver line); scripts/sim-drive
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-refactor-sweep-plan.md`
 severity: medium
 reason: Story 9's residual risks say a non-Duo phone is reachable by ax only while Device Hub's window shows it, and sim never selects --device's window (DW-334); pose, rotate, state, background and screenshot all go through ax. The "each on its own xcrun simctl clone" wording predates this change (story 9); story 4 split the work dir per checkout, which removes the shared-files clash only. Unverified: whether Device Hub can show two device windows at once and ax then drives each by --device. Settle it by booting a clone beside the Duo, opening both in Device Hub, and running `sim --device <clone> rotate` while the Duo's window is in front; if the clone does not rotate, AGENTS.md's line must say one Duo story at a time until DW-334 is fixed. The fix edits AGENTS.md, so it is deferred. (declared severity: medium (unverified))
-status: open
+status: done 2026-11-02
+resolution: duplicate of DW-334, which now carries both the driver fix and the AGENTS.md wording; one cause (sim never selects --device in Device Hub).
 
 ### DW-338: The sim driver's `center` reads Notification Center past one screen unreliably: its scroll-and-merge code is unproven and can merge, split or cut short groups
 origin: spec-deferred story-3.12 review
 location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
 severity: medium
-reason: Story 12's review found, by reading the code, that the multi-screen path has four faults. The read-and-scroll loop stops after 30 screens and still exits 0 with partial groups. Groups on different screens count as one when they share any notification text, so two threads with identical wording merge, and duplicates collapse. A stacked cell that is never reachable is reported as one notification. `merge`'s return value is unused, although the plan said to scroll "until none is new". The scrolling code changed after its only 8-group run, so none of this is proven either way. The owner moved the multi-group case to story 3.14 on 2026-10-31; 3.14 reads up to 8 groups unfolded in portrait, on one screen, so these faults stay open past 8 groups. Settle it with a run of more groups than fit on the unfolded inner display, plus one thread whose expanded group is taller than a drag step.
+reason: Story 12's review found, by reading the code, that the multi-screen path has four faults. The read-and-scroll loop stops after 30 screens and still exits 0 with partial groups. Groups on different screens count as one when they share any notification text, so two threads with identical wording merge, and duplicates collapse. A stacked cell that is never reachable is reported as one notification. `merge`'s return value is unused, although the plan said to scroll "until none is new". center is unchanged since 4c089033 and story 3.14's 8-group runs used that code, but the multi-screen path has never run. The owner moved the multi-group case to story 3.14 on 2026-10-31; 3.14 reads up to 8 groups unfolded in portrait, on one screen, so these faults stay open past 8 groups. Settle it with a run of more groups than fit on the unfolded inner display, plus one thread whose expanded group is taller than a drag step.
 status: open
+decision: 2026-11-02 one-screen-limit — owner, 2026-11-02: `center` reads one screen only and exits non-zero with a clear message when Notification Center holds more than fits (no ticket needs more than 8 groups); remove the multi-screen scroll-and-merge path, update `sim help` and test-center-exit.zsh, then close this and DW-345.
 
 ### DW-339: sim center's multi-screen read (scroll and merge) is unproven and can cut groups short, merge two threads with identical text, collapse duplicates, or count an unreachable stack as one notification.
 origin: spec-deferred cbe0cc5a3421
@@ -2928,7 +2936,9 @@ location: supabase/functions/send-push/handler.ts
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium
 reason: The handler inserts the push_requests row, then sends. If the isolate dies or times out between the two, the row blocks every later call for that note and device, and pg_net calls the sender once per insert, so no retry exists. A failed APNs answer releases its claim, but nothing calls again. Settle it with story 13's real APNs run and a choice between a pending state that a later call may retake and a retrier.
-status: open
+status: done 2026-11-02
+resolution: accepted by the owner: a push lost when send-push dies between its claim and the APNs call loses only the banner; the note itself still arrives in the app, and no failure has been seen.
+decision: 2026-11-02 accept-and-close — owner, after the 2026-11-02 triage; no retrier and no pending state.
 
 ### DW-341: send-push treats a picture-only note as one with an image and blank text, but the real stand-in text is unverified
 origin: spec-deferred story-3.1 review
@@ -2972,6 +2982,7 @@ source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver
 severity: medium (unverified)
 reason: Story 3.14 found that on the first opening after a delivery Notification Center keeps a summary cell (body `phraseThatEnumeratesAllRemainingNotificationsInSection`, "+6 from Runner") beside the 8 expanded groups, and `center` printed it as a 9th group; `screenGroups` now ignores such cells unless they are stacked "Grouped" cells. With 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (the DW-338 multi-screen case) a summary might stand for notifications never listed, and dropping it would undercount with no warning. Settle it with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the notifications pushed.
 status: open
+decision: 2026-11-02 one-screen-limit — owner, 2026-11-02: settled with DW-338's one-screen limit; when a summary cell ("+N from <app>") is present, `center` reports it rather than dropping it silently, so an undercount is never quiet.
 
 ### DW-346: sim banner --tap cold on the unfolded Duo can miss once because the banner is gone before the tap reaches it.
 origin: spec-deferred 4e4a0337de4b
@@ -2991,12 +3002,12 @@ reason: At 8 groups every notification the summary stood for was also read as it
 status: done 2026-10-31
 resolution: duplicate of DW-345 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
 
-### DW-348: center's restore on a Rotate-Left-only phone and tap(_:)'s coordinate fallback on the inner display have never been run.
+### DW-348: center's coordinate-tap fallback logs nothing, and test-center-exit.zsh never stubs a phone with only Rotate Left, so neither path can be shown to work.
 origin: spec-deferred c0f2e3e5b8e2
 location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
-severity: medium
-reason: No run so far has used either path. The 8-group runs passed, but nobody observed whether any tap went through displayInUse()'s coordinate fallback. The restore's rotate_to path through cmd_rotate on a phone with only Rotate Left (iPhone 17) was not run. If either is wrong, a read past a shrunk cell misses, or a phone is left turned. Settle it with one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (log whether the fallback ran), and one center --host started in landscape on an iPhone 17 simulator, comparing ax state before and after. (declared severity: medium (unverified))
+severity: medium (unverified)
+reason: No run so far has used either path. The 8-group runs passed, but nobody observed whether any tap went through displayInUse()'s coordinate fallback. The restore's rotate_to path through cmd_rotate on a phone with only Rotate Left (iPhone 17) was not run. If either is wrong, a read past a shrunk cell misses, or a phone is left turned. Settle it with one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (log whether the fallback ran), and one center --host started in landscape on an iPhone 17 simulator, comparing ax state before and after. 2026-11-02 triage: the coordinate fallback (Notify.swift tap) logs nothing, so no run can show whether it was used, and test-center-exit.zsh never stubs a phone with only Rotate Left and no fold. This entry is the code half: log a line when the fallback taps, and add the Rotate-Left-only stub to test-center-exit.zsh. The two simulator runs move to DW-403.
 status: open
 
 ### DW-349: AGENTS.md's sim-driver clause says center puts the pose and orientation back, without sim help's exception for a folded landscape.
@@ -3026,21 +3037,23 @@ reason: banner's trap is `trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null
 status: done 2026-11-01
 resolution: banner's trap is split: INT exits 130 and TERM 143, as center does (story 3.10).
 
-### DW-352: Sign-out leaves the outgoing account's delivered notifications in Notification Center, so the next person on a shared device can read them.
+### DW-352: Sign-out leaves the outgoing account's delivered notifications (love-note pushes and date reminders) in Notification Center, so the next person on a shared device can read them.
 origin: spec-deferred story-3.2 plan
 location: src/services/pushNotifications.ts (stopDevicePushes)
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
 reason: Sign-out now removes the device's registration, unregisters from APNs and clears the badge, but the ticket does not ask for delivered notifications to go, and stopDevicePushes deliberately avoids the push plugin's removeAllDeliveredNotifications(), which rejects unless register() ran this launch. Each banner already delivered keeps its sender's name and note text in Notification Center after sign-out. Settle it in a later story with a native removal (UNUserNotificationCenter removeAllDeliveredNotifications) gated on its own plugin check, and a decision on whether a sign-out should empty the app's whole Notification Center group.
 status: open
+decision: 2026-11-02 clear-whole-group — owner, 2026-11-02: sign-out removes every delivered notification of the app, pushes and date reminders alike (retro L7), using @capacitor/local-notifications' removeAllDeliveredNotifications(), which needs no register() this launch, behind its own Capacitor.isPluginAvailable check; web-only, no new Swift. A simulator check of the shell is a follow-up outside the loop.
 
-### DW-353: A reinstalled shell leaves its old token's push_devices row on the account, and only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
+### DW-353: A push_devices row outlives the install or session that registered it (reinstall, offline sign-out, or a session ended elsewhere), and only an APNs 410 removes it, which may never come.
 origin: review story-3.2
-location: src/services/pushNotifications.ts (removePushRegistration); supabase/functions/send-push/handler.ts (410 branch)
+location: supabase/functions/send-push/handler.ts (410 branch, row selection); supabase/migrations/20261031000000_push_devices.sql (register_push_device); src/services/pushNotifications.ts (removePushRegistration); src/api/auth/actionService.ts (signOut everywhere); scripts/sim-driver (provision)
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
-reason: Sign-out removes only the row for the token this install stored. An uninstall and reinstall gets a new APNs token, so the old row stays registered to the account. With a real APNs key the next send to it answers 410 and the sender deletes it; on the local stack there is no key, so the stale row stays, and every `sim build` (which uninstalls first) leaves one. Story 3.2's simulator check deleted one such row by hand before it ran. Settle it with a decision: either the driver clears the fixture accounts' push_devices rows when it provisions or reinstalls, or registration drops the account's other rows for this device (which needs a device identity APNs does not give).
+reason: Sign-out removes only the row for the token this install stored. An uninstall and reinstall gets a new APNs token, so the old row stays registered to the account. With a real APNs key the next send to it answers 410 and the sender deletes it; on the local stack there is no key, so the stale row stays, and every `sim build` (which uninstalls first) leaves one. Story 3.2's simulator check deleted one such row by hand before it ran. Settle it with a decision: either the driver clears the fixture accounts' push_devices rows when it provisions or reinstalls, or registration drops the account's other rows for this device (which needs a device identity APNs does not give). Absorbs DW-356 (an offline sign-out's old token: APNs answered 200 for about 30 minutes, never 410) and DW-384 (a session ended by the SDK or a global sign-out elsewhere leaves the row). Registration bumps updated_at on every online signed-in start with permission (App.tsx:443-449 -> register_push_device), not on a foreground return. "Sign out of all devices" removes only the calling device's row, so a lost phone keeps receiving love-note pushes until its app runs again (from the code; not checked on a device).
 status: open
+decision: 2026-11-02 prune-and-sign-out-everywhere — owner, 2026-11-02, after Firebase's token-management guidance (timestamp each registration, prune stale ones, delete on an invalid-token answer): (1) send-push skips and deletes any push_devices row whose updated_at is older than one month; (2) "Sign out of all devices" deletes every push_devices row of the account through a SECURITY DEFINER RPC before the global sign-out (pgTAP for the RPC and its grants); (3) on the local stack, `sim provision` deletes the fixture accounts' push_devices rows so each `sim build` reinstall starts clean.
 
 ### DW-354: A reinstalled shell leaves its old token's push_devices row on the account; only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
 origin: spec-deferred 24a607eba37a
@@ -3053,11 +3066,12 @@ resolution: duplicate of DW-353 (the same review finding, carried in from story 
 
 ### DW-355: Every push to main now rebuilds both Edge Functions from the unpinned esm.sh import, so production functions can change with no reviewed change, and an esm.sh outage blocks a frontend-only site deploy.
 origin: review story-3.3
-location: .github/workflows/deploy.yml (functions job); supabase/functions/send-push/index.ts:15; supabase/functions/upload-love-note-image/index.ts:22
+location: .github/workflows/deploy.yml (functions job); supabase/functions/send-push/index.ts:19; supabase/functions/upload-love-note-image/index.ts:22
 source_spec: `tickets/epic-push-notifications/tickets/story-every-edge-function-deploys-from-deploy-yml-plan.md`
 severity: medium (unverified)
 reason: Both entrypoints import `https://esm.sh/@supabase/supabase-js@2`, and `supabase functions deploy --use-api` resolves that on Supabase's side at every deploy. Story 3.3's ticket asks for every function on every run, and for `build` to need the function deploy, so a newer 2.x on esm.sh reaches production on the next frontend-only push, and an esm.sh or bundler outage stops the site deploy. test.yml leaves `index.ts` out of `deno test` to avoid exactly this CDN dependency. That the resolved version drifts between deploys is unverified; compare the deployed bundle's supabase-js version across two runs to settle it. To fix, decide between pinning the import to an exact version in both functions and deploying functions only when `supabase/functions/**` or `supabase/config.toml` changed (which needs the owner to amend the "every run" decision).
 status: open
+decision: 2026-11-02 pin-and-keep-every-run — owner, 2026-11-02: pin `https://esm.sh/@supabase/supabase-js@2` to one exact 2.x version in both entrypoints (the version package-lock.json resolves for the app is the natural choice); keep deploying every function on every run, so the deploy.yml job stays ungated.
 
 ### DW-356: A device that signs out offline leaves its old token's push_devices row, APNs keeps accepting pushes to that unregistered token with 200 instead of 410, so the sender never deletes it and sends to it on every note.
 origin: story-3.13
@@ -3065,7 +3079,8 @@ location: supabase/functions/send-push/handler.ts (410 branch); src/services/pus
 source_spec: `tickets/epic-push-notifications/tickets/story-pushes-arrive-through-apns-on-a-device-and-from-the-hosted-p-plan.md`
 severity: low
 reason: Story 3.13's device run on 2026-11-01: after two offline sign-outs, the iPhone got a new APNs token on each sign-in, and the fixture account kept both old rows. For about 30 minutes, APNs answered 200 to every push for them, never 410, while the phone showed nothing for them, so nothing leaked on screen. Each stale row costs one APNs request per note, and any further rows a reinstall leaves (DW-353) add to that. A row deleted only on a 410 may never be deleted. Settle it with a decision: prune a registration not re-registered within some age (registration bumps `updated_at` on every signed-in start), or have the client remove its previous token's row on the next online sign-in (it would need to keep that token across sign-out). Whether APNs ever answers 410 for these tokens is unverified; re-read the fixture rows' send results after a day.
-status: open
+status: done 2026-11-02
+resolution: merged into DW-353 (one stale push_devices problem with three causes: reinstall, offline sign-out, a session ended elsewhere); the owner chose one fix for all three there.
 
 ### DW-357: `src/types/database.types.ts` is not what AGENTS.md's regeneration command writes: since story 3.1 each regeneration has been reformatted to the file's style with the CLI's `ComputedFields: never` lines dropped, so the documented command now rewrites the whole file.
 origin: review story-3.4
@@ -3091,9 +3106,10 @@ location: src/components/love-notes/MessageInput.tsx (handleSend); src/stores/sl
 source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
 severity: medium
 reason: Found while settling DW-341. With no text, `handleSend` passes '' as the content beside the picture, and `sendNote` uploads the picture and then inserts '' unchanged. `love_notes_content_check` requires `char_length(content) >= 1`, so the insert fails with 23514. `sendNote` removes the uploaded object, sets `notesError` to `CHECK_CONSTRAINT_MESSAGE` ("Some values are not allowed - check length and format limits"), marks the note failed and returns without throwing, so `handleSend` fires the success vibration and clears the text and the picture as if the note had gone; the message shows only in Love Notes' page banner (`notes-error-banner`). `retryFailedMessage` re-inserts the same '' and fails the same way, so the note can never be sent. A rolled-back insert of '' with an `image_url` on the local stack, run on 2026-11-01, failed the constraint. No E2E or api spec sends a picture-only note through the app: the push spec inserts ' '. That the hosted constraint is the same is UNVERIFIED; read `pg_get_constraintdef` for `love_notes_content_check` read-only to settle it. Fixing it is a behavior change, outside a cleanup sweep, and needs a choice: allow empty content when `image_url` is set (a migration, plus `love_notes_visible` and every reader of `content`), or have the client send a stand-in, which send-push's `hasCaption` would then push as text.
-status: open
+status: done 2026-11-02
+resolution: moved to the P1 backlog bug `_bmad-output/backlog/bug-a-picture-only-love-note-never-sends.md`, which carries the reproduction and acceptance criteria; the hosted `love_notes_content_check` was read on 2026-11-02 and matches the migration (`char_length(content) >= 1 AND <= 1000`).
 
-### DW-364: The new center wording in sim help and AGENTS.md ("ends on the Home Screen, except that a folded-landscape start gets its front app back") misses two cases: a landscape start on a phone with no pose
+### DW-364: sim help and AGENTS.md say center "ends on the Home Screen, except that a folded-landscape start gets its front app back", which misses a landscape start on a phone with no pose and a front step that found no app.
 origin: spec-deferred 608c912c1e07
 location: scripts/sim-driver/sim (help, center line; cmd_center; center_restore); AGENTS.md (Maintained by hand, sim-driver paragraph)
 source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
@@ -3169,7 +3185,8 @@ location: src/types/database.types.ts, AGENTS.md (Policy, database.types.ts)
 source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
 severity: low
 reason: Quick review finding. On CLI 2.122.0 the command prints unformatted output, 621 lines against the committed 977, with `ComputedFields: never` in all 22 tables. A whole-file regeneration would rewrite every table's lines. Story 3.8 (b430cde6) and this story both inserted only their own table's block, which matches the generator's Row/Insert/Update shape. Settling it is a decision for the owner: either commit one full regeneration on the current CLI and run Prettier on that generated file, or amend the AGENTS.md rule. The rule edit touches an agent-context file.
-status: open
+status: done 2026-11-02
+resolution: duplicate of DW-357, fixed by 9717aa5d (`npm run db:types` formats with the pinned oxfmt and CI checks the committed file) and 5cc03752 (the missing ComputedFields line); story 4.3 then regenerated on the pinned CLI and changed only its own lines, and the types check passes on main.
 
 ### DW-375: The iOS simulator ignores a host clock jump until it is rebooted, and the sim driver has no step for it, so a check that moves the Mac clock to make a reminder fire sees nothing fire.
 origin: story 4.8 simulator checks, 2026-11-01
@@ -3187,6 +3204,7 @@ source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-a
 severity: low
 reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes: set the clock, `sim reboot`, `sim launch`, then `sim watch --front --for 180` started by 8:58, since the runner takes 6-12 s to start and first waits up to 20 s for any earlier banner to clear. `sim banner FILE --front` does not fit, because it pushes FILE and watches only 20 s.
 status: open
+decision: 2026-11-02 observe-with-sound — owner, 2026-11-02: keep the plugin's banner when the shell is in front, and give reminders a sound (DW-390); check both together in one device or simulator run after DW-390 ships and the shell is reinstalled. Outside the loop: the run moves the Mac clock with sudo.
 
 ### DW-377: An offline sign-out leaves the account's refresh token valid on the server indefinitely, because nothing revokes it once the device is back online and no session timebox is set.
 origin: story 4.8 thorough review, 2026-11-01
@@ -3194,14 +3212,16 @@ location: src/api/auth/actionService.ts (signOut, retryable fallback); supabase/
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
 reason: The owner chose a device-only sign-out when the server is unreachable (story 4.8 decisions). The device deletes its stored session, so the token is gone from that phone; the server session stays usable by anyone who already holds the refresh token. Settling it means either a revoke of the previous refresh token at the next online start (the token would have to be kept somewhere after sign-out) or an `[auth.sessions]` timebox/inactivity timeout in the hosted project; the hosted setting is unverified.
-status: open
+status: done 2026-11-02
+resolution: accepted by the owner: the hosted project offers no session timebox or inactivity timeout on its plan (Auth settings show only access-token expiry 3600 s, refresh-token reuse interval 10 s and compromised-token detection on), and "Sign out of all devices" (d47ea7c5) revokes an orphaned session from any signed-in device.
+decision: 2026-11-02 accept-and-close — owner, 2026-11-02; keeping the old refresh token after sign-out to revoke it later was rejected, because it leaves a credential on a shared device.
 
 ### DW-378: While the app runs on a stored session the SDK cannot use, Realtime channels may join with the publishable key and stay muted after the token renews.
 origin: story 4.8 thorough review, 2026-11-01
-location: src/api/supabaseClient.ts (guard covers HTTP fetch only); src/services/moodSyncService.ts, src/services/interactionService.ts, src/hooks/useRealtimeMessages.ts
+location: src/api/interactionService.ts and src/stores/slices/interactionsSlice.ts (partner check after renewal, about :451-520); src/hooks/usePartnerMood.ts:89-96 (error never cleared); src/api/supabaseClient.ts (guard covers HTTP fetch only)
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
-severity: medium (unverified)
-reason: The session guard wraps `global.fetch`, which the Realtime WebSocket never uses; supabase-js 2.118 gives Realtime `_getAccessToken`, which falls back to the publishable key when `getSession` has no session (index.mjs:836-840). A null `INITIAL_SESSION` therefore leaves channels joining as anon until `TOKEN_REFRESHED` calls `realtime.setAuth`. Whether private Broadcast channels rejoin and `postgres_changes` subscriptions pick up the new token afterwards is unverified; AGENTS.md notes nothing re-arms a muted channel. Settle it on the simulator: offline cold start with an expired token, gateway back, then a partner mood, note and interaction must arrive live.
+severity: low
+reason: The session guard wraps global.fetch, which the Realtime WebSocket never uses, so with a null INITIAL_SESSION channels join as anon until TOKEN_REFRESHED calls realtime.setAuth. 2026-11-02 triage: supabase-js re-sends the new token to joined channels and rejoins refused private ones, and a local-stack probe saw both the private mood channel and the interactions postgres_changes recover about 5 s after the token arrived. Mood (3f551b1b) and love notes (b64ceb38, ccf6ab2d) were since fixed. Two gaps remain, from reading the code: (1) pokes and kisses: the partner check stays empty after renewal because no second SUBSCRIBED fires, so live interactions are dropped as from no partner (interactionsSlice.ts:451-520); (2) usePartnerMood sets "Real-time connection lost. Refresh to reconnect." on CHANNEL_ERROR and never clears it on a later SUBSCRIBED, so the card stays on its error after delivery recovers. Fix both, with a local-stack E2E that blocks the token endpoint, lets the token renew, and sees a partner mood, note and poke arrive live.
 status: open
 
 ### DW-379: AGENTS.md does not yet state the session rules story 4.8 introduced.
@@ -3219,7 +3239,9 @@ location: src/services/dateReminders.ts (MARK_KEYS); the countdown marks table a
 source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
 severity: low
 reason: Story 4.2 keys the fixed dates `relationship-start`, `wedding`, `own-birthday` and `partner-birthday`, so a mark outlives the link it was made under; the same holds for `relationship-start` and `wedding`, which are the couple settings of whichever pair the person is in. Whether a mark should carry over to a new partner is an owner decision; a fix would key the partner-scoped marks by the partner's id (or clear them in `accept_partner_request`) and needs a migration. Recorded only in the plan's residual risks until now.
-status: open
+status: done 2026-11-02
+resolution: closed as unreachable: the app has no unlink, and accept_partner_request refuses when either person already has a partner, so a role-keyed mark (partner-birthday, and equally relationship-start and wedding, retro finding L13) can never meet a second partner; reopen if an unlink is ever built.
+decision: 2026-11-02 close-unreachable — owner, 2026-11-02; covers retro L13 too.
 
 ### DW-381: Offline, or after a failed read, Settings shows the "Date reminders" switch on (disabled) while the saved copy says off, because nothing seeds the store's push preferences from the `push-preferences` local copy.
 origin: story 4.3 review (rejected there under its unchanged-load-behaviour rule), carried in by story 4.4, 2026-11-01
@@ -3234,7 +3256,7 @@ origin: spec-deferred 8a19bda4005c
 location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (help, pending); scripts/sim-driver/pending.py (missing-file comment); _bmad-output/initiative-my-love/deferred-work.md
 source_spec: `tickets/epic-date-reminders/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred.
+reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred. 2026-11-02 triage: rewording DW-372's resolution line is an orchestrator edit, so do it in the same interactive docs commit as the AGENTS.md change, not in a loop session.
 status: open
 
 ### DW-383: A device clock far ahead of real time, online, makes supabase-js refresh the session in a loop until GoTrue answers 429, and the SDK then signs the device out.
@@ -3244,6 +3266,7 @@ source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-t
 severity: low
 reason: Seen on the owner's iPhone on 2026-11-02 against production: with the clock five days ahead and Wi-Fi still on, every token the server issued already looked expired to the device, so it refreshed about 30 times in 3 s (06:11:49-52 UTC, all 200), then GoTrue answered 429 `over_request_rate_limit`. A 429 is not an `AuthRetryableFetchError`, and with the access token expired by the device's clock `_callRefreshToken` calls `_removeSession()`, which emits SIGNED_OUT. Only a wrong device clock reaches it, and iOS sets the clock itself unless the person turns that off. Settle it with a decision: accept it, or treat a 429 refresh like an unreachable server (keep the stored session) in the app's auth layer.
 status: open
+decision: 2026-11-02 fix-device-relative-expiry — owner, 2026-11-02 (well-built clients tolerate a wrong device clock): in the app's session-guarded fetch wrapper (supabaseClient.ts createSessionGuardedFetch), strip expires_at from GoTrue token responses so auth-js computes expiry from expires_in on the device's own clock (@supabase/auth-js 2.118.0 lib/fetch.js:140); the server still checks expiry with its own clock. Unit-test a token response with expires_at days in the past and a clock days ahead; no refresh loop and no SIGNED_OUT.
 
 ### DW-384: A session that ends without the app's Sign out (a refresh the SDK gives up on, or a sign-out of all devices from elsewhere) leaves the device's push_devices row on the account.
 origin: spec-deferred story-4-5-ship
@@ -3251,12 +3274,164 @@ location: src/services/pushNotifications.ts (removePushRegistration); src/api/au
 source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
 severity: low
 reason: Only the app's own Sign out calls `removePushRegistration()` while the session still exists. On 2026-11-02 two Claude Bot rows were left on production by sessions that ended otherwise (the DW-383 sign-out, and a global sign-out from the simulator); story 4.5's cleanup deleted them. The rows keep pushing to a device that is signed out of the account until APNs answers 410. Related to DW-353 (a reinstall's old row). Settle it with DW-353's decision on who removes a device's stale rows.
-status: open
+status: done 2026-11-02
+resolution: merged into DW-353 (one stale push_devices problem with three causes); the owner chose one fix for all three there.
 
 ### DW-385: AGENTS.md's sim-driver paragraph does not name `sim reboot` or `sim watch`.
 origin: plan-dw-375-376-sim-reboot-and-watch review, 2026-11-02
 location: AGENTS.md (Maintained by hand, the sim-driver paragraph)
 source_spec: `plan-dw-375-376-sim-reboot-and-watch.md`
 severity: low
-reason: The paragraph lists the driver's notification commands and names `banner FILE --front` for watching while the shell is in front, which covers a push only. It does not say that a Mac clock jump needs `sim reboot` before a scheduled notification fires, or that `sim watch [--front] [--for SECONDS]` watches for a banner with nothing pushed. `sim help` lists both. The edit touches an agent-context file, so it is deferred.
+reason: The paragraph lists the driver's notification commands and names `banner FILE --front` for watching while the shell is in front, which covers a push only. It does not say that a Mac clock jump needs `sim reboot` before a scheduled notification fires, or that `sim watch [--front] [--for SECONDS]` watches for a banner with nothing pushed. `sim help` lists both. The edit touches an agent-context file, so it is deferred. 2026-11-02: the same paragraph's `sim dates` sentence must also say that clear removes both people's countdown marks and resets the date-reminders switch once DW-397 lands.
+status: open
+
+### DW-386: "Sign out of all devices" reports success when only this device was signed out.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L1, 2026-11-02
+location: src/api/auth/actionService.ts:99-109 (signOut, retryable fallback); src/components/Settings/Settings.tsx:548
+severity: medium
+reason: Settings refuses the row only when isOnline() is false. With the browser online but the auth server unreachable, signOut({ everywhere: true }) turns the AuthRetryableFetchError into error = null, or falls back to a local sign-out, and Settings reports success although the other devices stay signed in. The only test of { everywhere: true } uses error: null. It is in d47ea7c5, pushed without review.
+status: open
+decision: 2026-11-02 report-partial — owner, 2026-11-02: when the global sign-out meets a retryable error, sign this device out as now but tell the person the other devices could not be signed out and to try again online; add a test with a retryable error on { everywhere: true }. Fits one bundle with DW-353 and DW-387.
+
+### DW-387: "Sign out of all devices" acts on one tap, with no confirmation.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L16, 2026-11-02
+location: src/components/Settings/Settings.tsx (the row, d47ea7c5)
+severity: low
+reason: The row sits directly under Sign out, so one wrong tap signs the account out on every phone, simulator and browser.
+status: open
+decision: 2026-11-02 confirm-first — owner, 2026-11-02: a confirmation dialog, "Sign out on every device? You'll need to sign in again on each one.", with Cancel and Sign out everywhere.
+
+### DW-388: App.tsx's auth-check comment says a present session means the callback outcome is null, which is false for an implicit-grant error redirect.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L17, verified 2026-11-02
+location: src/App.tsx:262-266; src/api/supabaseClient.ts:200-206 (getAuthCallbackOutcome)
+severity: low
+reason: getAuthCallbackOutcome returns 'provider-error' or 'cancelled' for an AuthImplicitGrantRedirectError before it reads the session, so a signed-in person landing on an error redirect gets a notice, contrary to the comment. Decide while fixing whether a signed-in person should see that notice (getAuthCallbackOutcome already returns null for a code callback with a session); then make the code and the comment agree, with a unit test.
+status: open
+
+### DW-389: A device that is only resumed keeps planning date reminders from stale copies: a mark, switch or partner birthday changed elsewhere arrives only after a full restart or reconnect.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A6/L3, 2026-11-02
+location: src/services/dateRemindersAtLaunch.ts:179-182 (visibilitychange re-plan); src/App.tsx:434 and :500 (copy refreshes); src/hooks/useRealtimeMessages.ts:711 (only TOKEN_REFRESHED listener)
+severity: medium
+reason: The epic defines open as every launch and every return to the foreground, but story 4.6's frozen intent says no server refresh on foreground, so visibilitychange re-plans from unchanged copies; copies refresh only on a signed-in start, on online, and when a view loads, and nothing refreshes after TOKEN_REFRESHED. So the partner changing their birthday, or the person marking a date on another device, reaches a resumed phone only at its next cold start.
+status: open
+decision: 2026-11-02 refresh-on-foreground — owner, 2026-11-02 (supersedes story 4.6's "no server refresh on foreground" for this purpose): on a return to the foreground while online, and after TOKEN_REFRESHED, refresh the seven date-reminder copies (throttled to at most once every few minutes) and then re-plan; offline it keeps planning from the saved copies.
+
+### DW-390: Date reminders fire with no sound.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L2, 2026-11-02
+location: src/services/dateReminders.ts (scheduleDateReminders); capacitor.config.ts (LocalNotifications); node_modules/@capacitor/local-notifications ios LocalNotificationsPlugin.swift:472-473, LocalNotificationsHandler.swift:35
+severity: medium (unverified)
+reason: scheduleDateReminders passes no sound, and the plugin sets content.sound only for a non-empty string, so reminders are most likely silent; story 4.5's device run did not record sound. In front, reminders use the plugin's default [.badge, .sound, .banner, .list] while pushes use presentationOptions ['badge'].
+status: open
+decision: 2026-11-02 default-sound-keep-banner — owner, 2026-11-02: reminders play the default notification sound (the plugin's supported way to request it), and a reminder due while the shell is in front keeps showing a banner. Unit-test the scheduled payload; the audible check on a device after a reinstall belongs to DW-376's run, outside the loop.
+
+### DW-391: The love-notes re-arm can get stuck reconnecting when its openChannel rejects.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L4, 2026-11-02
+location: src/hooks/useRealtimeMessages.ts:685-701 (rearm)
+severity: low
+reason: rearm() sets gaveUp = false and reports 'reconnecting' before openChannel; if that rejects, the catch only logs, so every later rearm() sees gaveUp false with a zero retry count and returns, and the feed stays reconnecting with no channel until Love Notes remounts. Fix: in the catch, restore gaveUp = true and report disconnected, with a test for a rejected openChannel. Fits one bundle with DW-378.
+status: open
+
+### DW-392: Turning date reminders off cancels nothing while any other saved copy is missing.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A7, 2026-11-02
+location: src/services/dateRemindersAtLaunch.ts:96 (planOnce)
+severity: low
+reason: planOnce returns before anything when any of the seven copies is null, so switching the reminders off while another copy is missing or malformed leaves every pending reminder scheduled, against R6 ("off cancels every scheduled reminder"). Fix: when the push-preferences copy says off, cancel without needing the other copies; unit-test it.
+status: open
+
+### DW-393: A failed background refresh of the push settings disables an open Settings section.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L5, 2026-11-02
+location: src/stores/slices/settingsSlice.ts:1024-1031 (loadPushPreferences catch)
+severity: low
+reason: Story 4.3 made loadPushPreferences the push-preferences refresher, so it runs on every signed-in start and reconnect; a failed read sets pushPreferences: null and pushPreferencesLoadFailed: true, and an open Settings section then shows its load failure and disables all seven rows although the saved copy is fine. Same function as DW-381: fix together, so a failed read falls back to the saved copy and only a missing copy shows the failure.
+status: open
+
+### DW-394: PushSettings.test.tsx asserts only that console.error was called.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A5, 2026-11-02
+location: src/components/Settings/__tests__/PushSettings.test.tsx:357
+severity: low
+reason: The bare expect(console.error).toHaveBeenCalled() has passed vacuously twice when a newly mounted native module logged an unrelated error (4.6's local-notifications mock, 4.2's countdown-marks mock). Assert the expected message instead. Fits the DW-381 bundle.
+status: open
+
+### DW-395: The countdown marks list offers dates that can never schedule a reminder.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A4/L10, 2026-11-02
+location: src/components/Settings/CountdownMarks.tsx:75-87; src/services/dateRemindersAtLaunch.ts:79-117 (planOnce); src/services/dateReminders.ts:193-285 (reminderDateEntries, planDateReminders, :263)
+severity: low
+reason: Two builders of the planner's input diverge: planOnce builds ReminderDates from the saved copies, CountdownMarks from the store, and each kind has its own eligibility rule, so the list offers rows the planner skips (an event tomorrow after 9:00 today, a relationship start dated today or later). Fix: one shared builder and eligibility rule for both, so the list shows only dates that can remind; unit-test the two examples.
+status: open
+
+### DW-396: The date reminders switch says "At 9:00 before each date.", but birthdays and anniversaries also remind on the day.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L11, 2026-11-02
+location: src/components/Settings/CountdownMarks.tsx:40 (REMINDERS_HELPER)
+severity: low
+reason: The helper text describes only the day-before reminder.
+status: open
+decision: 2026-11-02 reword — owner, 2026-11-02: "At 9:00 the day before, and on the day for birthdays and anniversaries." Update any test that pins the old text.
+
+### DW-397: `sim dates kinds|many|clear` leaves countdown marks and the date-reminders switch behind.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L6, 2026-11-02
+location: scripts/sim-driver/dates.ts:53-63 (clearDates); scripts/sim-driver/sim (help, dates)
+severity: low
+reason: clearDates deletes events, anniversaries, couple_settings and birthdays but not countdown_marks or push_preferences.date_reminders, so leftovers from a 4.2 or 4.3 check change later seeds. Fix: delete both people's countdown_marks and reset date_reminders to true, and update `sim help`. The AGENTS.md sentence is DW-385's, outside the loop.
+status: open
+
+### DW-398: AGENTS.md does not warn that every date-reminder re-plan cancels every pending local notification.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L14, 2026-11-02
+location: src/services/dateReminders.ts (reminderIdsToCancel); AGENTS.md (Known pitfalls)
+severity: low
+reason: reminderIdsToCancel adds every pending id, which is correct today because the shell schedules no other local notification (story 4.1's review), but a future local-notification feature would have its notifications cancelled on every re-plan. Accepted as design; the remedy is a pitfall line telling such a feature to reserve an id range or tag and narrow the cancel. Outside the loop: it edits AGENTS.md.
+status: open
+
+### DW-399: settingsSlice.ts has grown to 1116 lines with six registerLocalCopy kinds.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A2, 2026-11-02
+location: src/stores/slices/settingsSlice.ts
+severity: low
+reason: It grew from 930 lines at 58da06ce as stories 4.2, 4.3 and 4.6 added the countdown-marks and push-preferences copies, readers, refreshers and setters. A split candidate (copy kinds and readers by domain), not broken; a refactor story if ever, not a sweep bundle.
+status: open
+
+### DW-400: The launch re-plan of date reminders waits for the slowest copy refresher, and the partner lookup has no request timeout.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L9, 2026-11-02
+location: src/App.tsx:434; src/stores/slices/settingsSlice.ts:836-837
+severity: low (unverified)
+reason: The re-plan is chained onto refreshLocalCopies(), so a stalled connection the browser reports as online can hold the launch plan until a foreground return. Plausible from the code, not reproduced. Settle it with a unit test that stalls one refresher and checks when the re-plan runs; if it waits, plan from the saved copies first and re-plan after the refresh.
+status: open
+
+### DW-401: Date reminders may never fire on a device set to a non-Gregorian calendar.
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L12, 2026-11-02
+location: node_modules/@capacitor/local-notifications ios LocalNotificationsPlugin.swift:576-579 (DateComponents with no calendar)
+severity: low (unverified)
+reason: The plugin builds DateComponents with no calendar, so a device on a Buddhist or Japanese calendar might read year 2026 in that calendar and the reminders never fire. Settle it on a simulator set to another calendar with `sim pending` after a schedule; outside the loop.
+status: open
+
+### DW-402: A lost phone keeps its scheduled date reminders after "Sign out of all devices".
+
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L8, 2026-11-02
+location: src/services/dateReminders.ts (cancel on sign-out)
+severity: low
+reason: Reminders are local to the phone and are cancelled only by its own JavaScript after it sees the sign-out, so up to 64 stay scheduled on a lost phone.
+status: done 2026-11-02
+resolution: accepted by the owner; recorded so later retros stop re-flagging it.
+decision: 2026-11-02 accept-and-close — owner, 2026-11-02: apps do not normally reach a lost phone's local notifications (a silent push is not reliably delivered); the remedy is Find My's Erase iPhone, and DW-353 stops new pushes.
+
+### DW-403: center's restore on a Rotate-Left-only phone and tap(_:)'s coordinate fallback on the inner display have never been observed on a simulator.
+
+origin: split from DW-348 by the 2026-11-02 ledger triage
+location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
+severity: medium (unverified)
+reason: Needs two runs after DW-348 lands its fallback log line: one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (read whether the fallback ran), and one `center --host` started in landscape on an iPhone 17 simulator, comparing `ax state` before and after (the iPhone 17 needs selecting in Device Hub, DW-334). Outside the loop.
 status: open
