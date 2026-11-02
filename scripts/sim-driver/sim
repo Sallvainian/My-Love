@@ -151,11 +151,11 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          XCUITest calls not hittable) is noted on stderr.
                          Unfolds the Duo and turns it to portrait to read
                          (proven with 8 groups), then puts the pose and
-                         orientation back; a folded landscape comes back
-                         only when the shell, the host, Settings or Safari
-                         was in front. It ends on the Home Screen, except
-                         that a folded-landscape start gets its front app
-                         back.
+                         orientation back; a landscape start that is not
+                         unfolded (a folded Duo, or a phone with no pose)
+                         comes back only when the shell, the host, Settings
+                         or Safari was in front. It ends on the Home Screen,
+                         except that such a start gets that app back.
   badge [--host]         The app icon's badge ("3 new items"), or none.
   pending [BUNDLE|--host]
                          The app's scheduled (pending) local notifications as
@@ -166,9 +166,10 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          repeats}. Default: the shell; BUNDLE names another.
                          Decoded from the simulator's own files, so it needs
                          no runner step; [] when the app has none. iOS writes
-                         the file some seconds (up to about 25) after a
-                         schedule, so an empty or stale list read right after
-                         one is not proof: read again. It exits 1,
+                         the file some time after a schedule, after a fresh
+                         install's first one sometimes not until the app's
+                         next launch, so an empty or stale list read right
+                         after one is not proof: read again. It exits 1,
                          naming the record and key, on a record it does not
                          recognise, and prints nothing then.
   schedule FILE          Have the host schedule the requests in FILE (JSON
