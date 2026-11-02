@@ -254,6 +254,65 @@ require_booted() {
   booted || die 4 "simulator $UDID is not booted"
 }
 
+# ax drives a device only through a Device Hub window that shows it, and
+# refuses one no window shows (exit 4). Before a step that uses ax this
+# shows the device: it selects the device's sidebar row in a window that
+# shows no other booted simulator, opening a new window (File > New Window)
+# when every window shows one, then waits until ax reaches it.
+require_window() {
+  require_booted
+  # ax state answers without a window; ax controls needs one.
+  local code=0
+  ax controls --device $UDID >/dev/null 2>&1 || code=$?
+  (( code == 4 )) || return 0
+  local -a others
+  others=(${(f)"$(xcrun simctl list devices booted -j | node -e '
+    const udid = process.argv[1];
+    for (const d of Object.values(JSON.parse(require("fs").readFileSync(0, "utf8")).devices).flat())
+      if (d.udid !== udid) console.log(d.name);
+  ' $UDID)"})
+  say "no Device Hub window shows $UDID; selecting it"
+  osascript - $UDID $others >/dev/null 2>&1 <<'OSA' || true
+on run argv
+  set udid to item 1 of argv
+  set others to rest of argv
+  tell application "System Events" to tell process "DeviceHub"
+    set target to missing value
+    repeat with w in windows
+      set busy to false
+      repeat with n in others
+        if (name of w) starts with ((n as text) & " –") then set busy to true
+      end repeat
+      if not busy then
+        set target to w
+        exit repeat
+      end if
+    end repeat
+    if target is missing value then
+      click menu item "New Window" of menu 1 of menu bar item "File" of menu bar 1
+      delay 1
+      set target to window 1
+    end if
+    set ol to outline 1 of scroll area 1 of group 1 of splitter group 1 of group 1 of splitter group 1 of group 1 of target
+    repeat with r in rows of ol
+      try
+        if (value of attribute "AXIdentifier" of static text 1 of UI element 1 of r) contains udid then
+          set selected of r to true
+          exit repeat
+        end if
+      end try
+    end repeat
+  end tell
+end run
+OSA
+  local i
+  for i in {1..20}; do
+    ax controls --device $UDID >/dev/null 2>&1 && return 0
+    sleep 0.5
+  done
+  die 4 "no Device Hub window shows $UDID, and selecting it failed: open Device Hub, select it in a window's sidebar and keep that window on screen"
+}
+
 # ---- local stack -------------------------------------------------------------
 
 supabase_url() {
@@ -852,7 +911,7 @@ center_restore() {
 cmd_center() {
   target_args "$@"
   (( $#REST == 0 )) || die 2 "center takes only --host"
-  require_booted
+  require_window
   ensure_runner
   CENTER_POSE=$(state_value pose) CENTER_ORIENT=$(state_value orientation)
   # ax state says "pose: n/a" for a phone with no fold (the iPhone 17); it
@@ -1118,11 +1177,11 @@ case $cmd in
   signout) (( $# == 0 )) || die 2 "signout takes nothing"; drive signout ;;
   pose)
     [[ ${1:-} == (closed|partial|open) ]] || die 2 "pose takes closed, partial or open"
-    require_booted; ax pose $1 --device $UDID ;;
+    require_window; ax pose $1 --device $UDID ;;
   rotate)
     [[ -z ${1:-} || $1 == <1-9> ]] || die 2 "rotate takes a count from 1 to 9"
-    require_booted; cmd_rotate ${1:-1} ;;
-  state) require_booted; ax state --device $UDID ;;
+    require_window; cmd_rotate ${1:-1} ;;
+  state) require_window; ax state --device $UDID ;;
   reboot) cmd_reboot "$@" ;;
   tap)
     [[ $# == 2 && $1 == <->(|.<->) && $2 == <->(|.<->) ]] || die 2 "tap takes X Y in page points"
@@ -1132,7 +1191,7 @@ case $cmd in
     drive scroll $1 ;;
   dump) drive dump ;;
   readout) cmd_readout ;;
-  background) require_booted; ax control Home --device $UDID >/dev/null; say "pressed Home" ;;
+  background) require_window; ax control Home --device $UDID >/dev/null; say "pressed Home" ;;
   launch) require_booted; xcrun simctl launch $UDID $BUNDLE >/dev/null; say "launched $BUNDLE" ;;
   screenshot) cmd_screenshot "$@" ;;
   uninstall) require_booted; xcrun simctl uninstall $UDID $BUNDLE; say "uninstalled $BUNDLE" ;;
