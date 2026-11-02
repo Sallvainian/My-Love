@@ -278,10 +278,6 @@ jobs:
           npm run db:types
           git diff --exit-code -- src/types/database.types.ts
 
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop --no-backup
-
   # ============================================
   # Stage 4: Backend Tests (Integration + API via matrix)
   # ============================================
@@ -320,10 +316,6 @@ jobs:
 
       - name: Run ${{ matrix.project }} tests
         run: npx playwright test --project=${{ matrix.project }}
-
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop --no-backup
 
       - name: Upload ${{ matrix.project }} test results
         uses: actions/upload-artifact@v7
@@ -386,13 +378,12 @@ jobs:
           E2E_BLOB_REPORT: '1'
         run: npx playwright test --project=chromium --shard=${{ matrix.shard }}/2
 
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop --no-backup
-
+      # Only on failure: the merged report (merge-reports) already carries
+      # every shard's traces, videos and screenshots through the blob reports,
+      # so on a green run this upload repeated them (128-186 MB per shard).
       - name: Upload test results
         uses: actions/upload-artifact@v7
-        if: always()
+        if: failure()
         with:
           name: e2e-results-shard-${{ matrix.shard }}
           path: |
@@ -549,10 +540,6 @@ jobs:
             npx playwright test --project=chromium --retries=0 $SPECS || exit 1
           done
           echo "Burn-in passed: 5/5 stable on shard ${{ matrix.shard }}/3"
-
-      - name: Stop Supabase
-        if: always() && steps.changed-tests.outputs.specs != ''
-        run: supabase stop --no-backup
 
       - name: Upload burn-in failures
         if: failure() && steps.changed-tests.outputs.specs != ''
