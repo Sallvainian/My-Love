@@ -57,6 +57,7 @@ import {
   scheduleDateRemindersAtLaunch,
   startDateReminderTriggers,
 } from '../../../src/services/dateRemindersAtLaunch';
+import { MAX_SCHEDULED_REMINDERS } from '../../../src/services/dateReminders';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesService';
 import { anniversariesService } from '../../../src/services/anniversariesService';
@@ -197,6 +198,9 @@ afterEach(async () => {
   await clearCopies();
 });
 
+/** Every id a date reminder can hold: what each re-plan cancels. */
+const ALL_REMINDER_IDS = Array.from({ length: MAX_SCHEDULED_REMINDERS }, (_, i) => ({ id: i + 1 }));
+
 describe('scheduleDateRemindersAtLaunch', () => {
   it('schedules one date of each kind from the five saved copies, not the store', async () => {
     await seedOneOfEachKind();
@@ -207,7 +211,7 @@ describe('scheduleDateRemindersAtLaunch', () => {
 
     await scheduleDateRemindersAtLaunch(owner());
 
-    expect(localNotifications.cancel).not.toHaveBeenCalled();
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
     expect(localNotifications.requestPermissions).not.toHaveBeenCalled();
     expect(scheduledTitles()).toEqual([
       'Tomorrow: Trip @ 11/3 9:00',
@@ -300,7 +304,7 @@ describe('scheduleDateRemindersAtLaunch', () => {
 
     await scheduleDateRemindersAtLaunch(owner());
 
-    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [{ id: 3 }] });
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
     expect(localNotifications.schedule).not.toHaveBeenCalled();
     expect(localNotifications.requestPermissions).not.toHaveBeenCalled();
   });
@@ -441,7 +445,7 @@ describe('replanDateReminders reads only loaded copies', () => {
     await replanDateReminders();
 
     // Loaded and empty is an answer: the stale reminder goes, nothing is scheduled.
-    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [{ id: 4 }] });
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
     expect(localNotifications.schedule).not.toHaveBeenCalled();
   });
 
@@ -474,13 +478,15 @@ describe('replanDateReminders reads only loaded copies', () => {
 describe('the Date reminders switch', () => {
   const SWITCH_OFF = { ...ALL_PUSH_PREFERENCES_ON, dateReminders: false };
 
-  it('cancels every pending reminder and schedules nothing when the saved row has it off', async () => {
+  it('cancels every reminder, even one the pending list misses, and schedules nothing when the saved row has it off', async () => {
     await seedCopies({ [PUSH_PREFERENCES_COPY_KIND]: SWITCH_OFF });
-    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }, { id: 2 }] });
+    // The pending list can lag a fresh schedule: an empty answer must not
+    // leave a reminder the person turned off.
+    localNotifications.getPending.mockResolvedValue({ notifications: [] });
 
     await replanDateReminders();
 
-    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [{ id: 1 }, { id: 2 }] });
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
     expect(localNotifications.schedule).not.toHaveBeenCalled();
   });
 

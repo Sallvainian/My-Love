@@ -304,10 +304,24 @@ function runSerial(task: () => Promise<void>): Promise<void> {
 }
 
 /**
+ * Every id a date reminder can hold, `1..MAX_SCHEDULED_REMINDERS` (ids are
+ * positional), plus each id in `pending`, because `schedule` resolves before
+ * iOS's add completes and the pending list can lag a fresh schedule. Never
+ * empty, so it is always safe to pass to `cancel`, which rejects an empty list.
+ */
+function reminderIdsToCancel(pending: { id: number }[]): { id: number }[] {
+  const ids = new Set<number>();
+  for (let id = 1; id <= MAX_SCHEDULED_REMINDERS; id++) ids.add(id);
+  for (const { id } of pending) ids.add(id);
+  return [...ids].map((id) => ({ id }));
+}
+
+/**
  * Replaces the shell's pending local notifications with `reminders`: cancels
- * every pending one, then schedules the list if permission is already granted.
- * Never asks for permission (`schedule` would prompt when it is undetermined,
- * hence the check). `isCurrent` is asked before each plugin call so an account
+ * every reminder id (`reminderIdsToCancel`), so a reminder the pending list
+ * missed is cancelled too, then schedules the list if permission is already
+ * granted. Never asks for permission (`schedule` would prompt when it is
+ * undetermined, hence the check). `isCurrent` is asked before each plugin call so an account
  * switch stops the run. Runs in the serial chain. Failures are logged, never
  * thrown.
  */
@@ -320,11 +334,8 @@ export function scheduleDateReminders(
       if (!isCurrent()) return;
       const { notifications: pending } = await LocalNotifications.getPending();
 
-      if (pending.length > 0) {
-        if (!isCurrent()) return;
-        // `cancel` rejects an empty list.
-        await LocalNotifications.cancel({ notifications: pending.map(({ id }) => ({ id })) });
-      }
+      if (!isCurrent()) return;
+      await LocalNotifications.cancel({ notifications: reminderIdsToCancel(pending) });
 
       if (!isCurrent()) return;
       const { display } = await LocalNotifications.checkPermissions();
@@ -347,27 +358,23 @@ export function scheduleDateReminders(
 }
 
 /**
- * Cancels every date reminder: ids `1..MAX_SCHEDULED_REMINDERS` (ids are
- * positional) plus every id `getPending` reports, because `schedule` resolves
- * before iOS's add completes and the pending list can lag a fresh schedule.
- * Called on sign-out, an account switch and a no-session boot
- * (`deleteAccountData`). Does nothing on the web or in a shell without the
- * plugin. Runs in the serial chain, after any schedule in flight. Never
- * throws.
+ * Cancels every date reminder (`reminderIdsToCancel`), with only ids
+ * `1..MAX_SCHEDULED_REMINDERS` when the pending list cannot be read. Called on
+ * sign-out, an account switch and a no-session boot (`deleteAccountData`).
+ * Does nothing on the web or in a shell without the plugin. Runs in the serial
+ * chain, after any schedule in flight. Never throws.
  */
 export function cancelDateReminders(): Promise<void> {
   if (!hasNativeReminders()) return Promise.resolve();
   return runSerial(async () => {
-    const ids = new Set<number>();
-    for (let id = 1; id <= MAX_SCHEDULED_REMINDERS; id++) ids.add(id);
+    let pending: { id: number }[] = [];
     try {
-      const { notifications: pending } = await LocalNotifications.getPending();
-      for (const { id } of pending) ids.add(id);
+      ({ notifications: pending } = await LocalNotifications.getPending());
     } catch (error) {
       console.error('[DateReminders] Could not list the pending date reminders:', error);
     }
     try {
-      await LocalNotifications.cancel({ notifications: [...ids].map((id) => ({ id })) });
+      await LocalNotifications.cancel({ notifications: reminderIdsToCancel(pending) });
     } catch (error) {
       console.error('[DateReminders] Could not cancel the date reminders:', error);
     }

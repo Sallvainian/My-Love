@@ -755,6 +755,9 @@ describe('hasNativeReminders', () => {
   });
 });
 
+/** Every id a date reminder can hold: the ids each cancel covers. */
+const allIds = Array.from({ length: MAX_SCHEDULED_REMINDERS }, (_, i) => ({ id: i + 1 }));
+
 describe('scheduleDateReminders', () => {
   const reminders = plan({ anniversaries: [{ label: 'Dinner', date: '2020-11-06' }] });
 
@@ -767,8 +770,10 @@ describe('scheduleDateReminders', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('cancels every pending reminder, then schedules the list numbered from 1', async () => {
-    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 7 }, { id: 9 }] });
+  it('cancels every reminder id and any other pending one, then schedules the list numbered from 1', async () => {
+    localNotifications.getPending.mockResolvedValue({
+      notifications: [{ id: 7 }, { id: 9 }, { id: 65 }],
+    });
     const order: string[] = [];
     localNotifications.cancel.mockImplementation(() => {
       order.push('cancel');
@@ -781,7 +786,7 @@ describe('scheduleDateReminders', () => {
 
     await scheduleDateReminders(reminders, () => true);
 
-    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [{ id: 7 }, { id: 9 }] });
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [...allIds, { id: 65 }] });
     expect(localNotifications.schedule).toHaveBeenCalledWith({
       notifications: [
         {
@@ -803,10 +808,23 @@ describe('scheduleDateReminders', () => {
     expect(order).toEqual(['cancel', 'schedule']);
   });
 
-  it('does not call cancel when nothing is pending', async () => {
+  it('cancels every reminder id even when nothing is pending', async () => {
     await scheduleDateReminders(reminders, () => true);
 
-    expect(localNotifications.cancel).not.toHaveBeenCalled();
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: allIds });
+    expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a fresh schedule the pending list has not caught up with yet', async () => {
+    // `schedule` resolves before iOS's add completes, so the next run's
+    // `getPending` may list only part of it: id 2 must go anyway.
+    await scheduleDateReminders(reminders, () => true);
+    expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
+    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }] });
+
+    await scheduleDateReminders([], () => true);
+
+    expect(localNotifications.cancel).toHaveBeenLastCalledWith({ notifications: allIds });
     expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
   });
 
@@ -872,6 +890,9 @@ describe('scheduleDateReminders', () => {
     await expect(scheduleDateReminders(reminders, () => true)).resolves.toBeUndefined();
 
     expect(console.error).toHaveBeenCalled();
+    // Unlike cancelDateReminders, a re-plan that cannot read the pending list
+    // stops before cancelling anything.
+    expect(localNotifications.cancel).not.toHaveBeenCalled();
     expect(localNotifications.schedule).not.toHaveBeenCalled();
   });
 
@@ -914,8 +935,6 @@ describe('scheduleDateReminders thread id', () => {
 });
 
 describe('cancelDateReminders', () => {
-  const allIds = Array.from({ length: MAX_SCHEDULED_REMINDERS }, (_, i) => ({ id: i + 1 }));
-
   beforeEach(() => {
     vi.clearAllMocks();
     capacitor.isNativePlatform.mockReturnValue(true);
@@ -998,16 +1017,16 @@ describe('cancelDateReminders', () => {
     const reminders = plan({ anniversaries: [{ label: 'Dinner', date: '2020-11-06' }] });
 
     const scheduled = scheduleDateReminders(reminders, () => true);
-    await vi.waitFor(() => expect(order).toEqual(['schedule:start']));
+    await vi.waitFor(() => expect(order).toEqual(['cancel', 'schedule:start']));
     const cancelled = cancelDateReminders();
     // Let the cancel's turn come round: it must still be waiting.
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(order).toEqual(['schedule:start']);
+    expect(order).toEqual(['cancel', 'schedule:start']);
 
     finishSchedule();
     await Promise.all([scheduled, cancelled]);
 
-    expect(order).toEqual(['schedule:start', 'schedule:end', 'cancel']);
+    expect(order).toEqual(['cancel', 'schedule:start', 'schedule:end', 'cancel']);
   });
 
   it('keeps the chain going after a failed run', async () => {
