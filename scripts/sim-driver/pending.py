@@ -9,7 +9,9 @@ folder. The format is private and can change between iOS releases, so there
 are two layers: resolve() turns the archive into plain Python without knowing
 any key, and pending() maps each record to the output shape and refuses, by
 name, any record it does not recognise. A guessed or partial record would let
-a story pass on a list it never read.
+a story pass on a list it never read. Each record must also carry the schema
+markers measured on the iOS 27 simulator (MARKERS), since a release could keep
+the key names read here but change what they mean.
 
 Stdout is one JSON line, an array sorted by identifier of
 {identifier, title, body, threadId, trigger}, where trigger is
@@ -37,6 +39,11 @@ COMPONENTS = ("era", "year", "month", "day", "hour", "minute", "second",
 # day) fires differently from the floating one printed here, so each is
 # refused unless it holds its default.
 DATE_EXTRAS = {"calendar": None, "timeZone": None, "leapMonth": 0, "repeatedDay": False}
+# Record keys this reader does not print but requires at the value measured in
+# the fixture (fixtures/UserNotifications, iOS 27 simulator): every record
+# there has SchemaVersion 11 and TriggerRepeatInterval 0. Another value means
+# a format this reader was not checked against, so the record is refused.
+MARKERS = {"SchemaVersion": 11, "TriggerRepeatInterval": 0}
 
 
 class Fail(Exception):
@@ -148,6 +155,11 @@ def pending(root):
             raise Fail("%s is %s, not a dict" % (where, type(record).__name__))
         identifier = need(record, where, "AppNotificationIdentifier", str)
         where = "record %d (%s)" % (index, identifier)
+        for key, measured in MARKERS.items():
+            value = need(record, where, key, int)
+            # need() accepts a real; a marker stored as one is a changed shape.
+            if type(value) is not int or value != measured:
+                raise Fail("%s: %s is %r, not the measured %r" % (where, key, value, measured))
         out.append({
             "identifier": identifier,
             "title": need(record, where, "AppNotificationTitle", str),

@@ -3135,7 +3135,9 @@ location: scripts/sim-driver/pending.py (pending, trigger_of)
 source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
 severity: medium (unverified)
 reason: Found by story 4.7's review. Each record in the fixture `PendingNotifications.plist` carries about 60 keys, `SchemaVersion` 11 and `TriggerRepeatInterval` 0 among them, but the mapper reads only the identifier, text, thread and trigger keys and fails loudly only when one of those is missing or holds an unknown shape. Whether an iOS release changes a key's meaning while keeping its name is UNVERIFIED. To settle it, decode a pending archive from a later simulator runtime (`python3 -I scripts/sim-driver/pending.py --raw FILE`) and compare it with the fixture. If it is real, the fix is to require the measured `SchemaVersion` and `TriggerRepeatInterval` 0.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-pending-schema-markers
+resolution-undo: 29c914fde9708340ccb345f20f477c926e50327447685d7ef04c2cee1d2d3ad4 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 Require the markers now — In scripts/sim-driver/pending.py, require each record's SchemaVersion to equal the measured 11 and TriggerRepeatInterval to be 0, failing loudly (exit 1 with the record's identifier and the found value) otherwise, matching the decoder's existing fail-loudly rule; extend scripts/sim-driver/test-pending.zsh with fixtures for a changed SchemaVersion and a non-zero TriggerRepeatInterval.
 
 ### DW-366: AGENTS.md's sentence on `sim schedule`/`sim unschedule` omits two side effects: both launch the host app and bring it to the front, and `sim permission reset --host` uninstalls the host and so wipes its pending requests
