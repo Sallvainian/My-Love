@@ -71,12 +71,15 @@ Accounts (local stack only):
                          3 to 8 days ahead. many: 50 events and 10 anniversaries
                          (70 reminders). clear: remove every date (both people's
                          events and anniversaries, the pair's couple settings and
-                         both birthdays). kinds and many clear first, so only the
-                         listed dates remain. The event and birthday writes send
-                         the other person date-change pushes. sim provision
-                         restores only the seeded events, not anniversaries,
-                         couple settings or birthdays: run sim dates clear, then
-                         sim provision, to get back the provisioned state.
+                         both birthdays), delete both people's countdown marks
+                         and turn both people's date reminders back on. kinds
+                         and many clear first, so only the listed dates remain,
+                         none marked, reminders on. The event and birthday
+                         writes send the other person date-change pushes.
+                         sim provision restores only the seeded events, not
+                         anniversaries, couple settings or birthdays: run
+                         sim dates clear, then sim provision, to get back the
+                         provisioned state.
   signin [partner|other|other-partner|unlinked|unlinked-other] [--decline-push]
                          Sign in through the login form (default: Casey;
                          partner: Jessie; other: Harper; other-partner: Morgan;

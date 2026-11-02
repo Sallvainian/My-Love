@@ -3391,7 +3391,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: scripts/sim-driver/dates.ts:53-63 (clearDates); scripts/sim-driver/sim (help, dates)
 severity: low
 reason: clearDates deletes events, anniversaries, couple_settings and birthdays but not countdown_marks or push_preferences.date_reminders, so leftovers from a 4.2 or 4.3 check change later seeds. Fix: delete both people's countdown_marks and reset date_reminders to true, and update `sim help`. The AGENTS.md sentence is DW-385's, outside the loop.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-dates-clear-marks
+resolution-undo: bc6330b9d88371af0a1a8d44a6c0475988b2b4ec8826a2b408f3f7723e3dd3c7 2026-11-02 7374617475733a206f70656e
 
 ### DW-398: AGENTS.md does not warn that every date-reminder re-plan cancels every pending local notification.
 

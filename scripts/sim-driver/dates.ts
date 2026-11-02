@@ -11,8 +11,10 @@
 // many   More due reminders than iOS keeps: 50 Casey events 2..51 days ahead
 //        and 10 Casey anniversaries 2..11 days ahead, which plan 70 reminders
 //        (50 + 10 x 2), and no other date.
-// clear  Deletes both people's events and anniversaries and the pair's
-//        couple_settings row, and nulls both birthdays.
+// clear  Deletes both people's events, anniversaries and countdown marks and
+//        the pair's couple_settings row, nulls both birthdays, and turns both
+//        people's date reminders back on (push_preferences.date_reminders),
+//        so a story 4.2 or 4.3 check leaves nothing behind.
 //
 // kinds and many each clear first, so the result is exactly what is listed
 // and the 6 events `sim provision` seeds do not add reminders. `sim provision`
@@ -60,6 +62,13 @@ async function clearDates(admin: SupabaseClient, ids: Ids) {
     (await admin.from('couple_settings').delete().eq('user_a', user_a).eq('user_b', user_b)).error
   );
   check('clearing the birthdays', (await admin.from('users').update({ birthday: null }).in('id', both)).error);
+  check('deleting the countdown marks', (await admin.from('countdown_marks').delete().in('user_id', both)).error);
+  // An update, not an upsert: a missing row already means on, and the other
+  // push switches on an existing row stay as they are.
+  check(
+    'turning the date reminders back on',
+    (await admin.from('push_preferences').update({ date_reminders: true }).in('user_id', both)).error
+  );
 }
 
 async function seedKinds(admin: SupabaseClient, ids: Ids) {
@@ -138,7 +147,7 @@ async function main() {
   else if (command === 'many') await seedMany(admin, ids);
   else {
     await clearDates(admin, ids);
-    console.log('clear: dates removed; run `sim provision` now to restore the seeded events');
+    console.log('clear: dates and countdown marks removed, date reminders on; run `sim provision` now to restore the seeded events');
   }
 }
 
