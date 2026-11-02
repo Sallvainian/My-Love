@@ -19,6 +19,7 @@ const {
   mockClearAuthToken,
   mockUnsubscribe,
   mockRpc,
+  mockSetHeader,
   mockCapacitor,
 } = vi.hoisted(() => ({
   mockSignInWithPassword: vi.fn(),
@@ -33,6 +34,7 @@ const {
   mockClearAuthToken: vi.fn(),
   mockUnsubscribe: vi.fn(),
   mockRpc: vi.fn(),
+  mockSetHeader: vi.fn(),
   // A browser unless a test says otherwise, so sign-out makes no push call.
   mockCapacitor: {
     isNativePlatform: vi.fn(() => false),
@@ -82,6 +84,21 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+/**
+ * Answers every RPC with a fresh `make()`, as a builder: `setHeader` (which
+ * the sign-out-everywhere removal sends its captured token through, DW-412)
+ * returns the same call.
+ */
+function answerRpc(make: () => Promise<{ error: { message: string } | null }>) {
+  mockRpc.mockImplementation(() => {
+    const call = Object.assign(make(), { setHeader: mockSetHeader });
+    mockSetHeader.mockReturnValue(call);
+    return call;
+  });
+}
+
+const rpcOk = () => answerRpc(() => Promise.resolve({ error: null }));
+
 // Token persistence runs on the subscription's promise queue after the
 // callback returns, so each test waits for the queue step it asserts on: a
 // positive `vi.waitFor` on its side effect, or the deferred it settled (the
@@ -128,6 +145,8 @@ describe('auth session/action services', () => {
     authStateCallback = null;
     mockStoreAuthToken.mockResolvedValue(undefined);
     mockClearAuthToken.mockResolvedValue(undefined);
+    // The session the sign-out-everywhere removal reads its token from.
+    mockGetSession.mockResolvedValue({ data: { session: listenerSession }, error: null });
 
     mockOnAuthStateChange.mockImplementation(
       (callback: (event: string, session: Session | null) => void | Promise<void>) => {
@@ -182,23 +201,62 @@ describe('auth session/action services', () => {
     expect(mockRpc).not.toHaveBeenCalledWith('unregister_all_push_devices');
   });
 
-  it('signs out of every device with the global scope when asked, after dropping every push registration', async () => {
+  it('signs out of every device with the global scope when asked, then drops every push registration', async () => {
     mockSignOut.mockResolvedValue({ error: null });
-    mockRpc.mockResolvedValue({ error: null });
+    rpcOk();
 
     await expect(signOut({ everywhere: true })).resolves.toEqual({ otherDevicesSignedOut: true });
 
     expect(mockRpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
     expect(mockSignOut).toHaveBeenCalledExactlyOnceWith({ scope: 'global' });
-    expect(mockRpc.mock.invocationCallOrder[0]).toBeLessThan(
+    // After the global sign-out, so a device that registered before it is
+    // removed too (DW-412), with the token read before the sign-out.
+    expect(mockSignOut.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRpc.mock.invocationCallOrder[0]!
+    );
+    expect(mockGetSession.mock.invocationCallOrder[0]).toBeLessThan(
       mockSignOut.mock.invocationCallOrder[0]!
+    );
+    expect(mockSetHeader).toHaveBeenCalledExactlyOnceWith(
+      'Authorization',
+      `Bearer ${listenerSession.access_token}`
     );
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
   });
 
+  it('signs out everywhere with the stored token when the SDK gives no session', async () => {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(listenerSession));
+    mockGetSession.mockResolvedValueOnce({ data: { session: null }, error: null });
+    mockSignOut.mockImplementationOnce(() => {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      return Promise.resolve({ error: null });
+    });
+    rpcOk();
+
+    await expect(signOut({ everywhere: true })).resolves.toEqual({ otherDevicesSignedOut: true });
+
+    expect(mockSetHeader).toHaveBeenCalledExactlyOnceWith(
+      'Authorization',
+      `Bearer ${listenerSession.access_token}`
+    );
+  });
+
+  it('reports the partial result when there is no token to remove the registrations with', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetSession.mockResolvedValueOnce({ data: { session: null }, error: null });
+    mockSignOut.mockResolvedValue({ error: null });
+    rpcOk();
+
+    await expect(signOut({ everywhere: true })).resolves.toEqual({ otherDevicesSignedOut: false });
+
+    expect(mockSignOut).toHaveBeenCalledExactlyOnceWith({ scope: 'global' });
+    expect(mockRpc).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
   it.each([
-    ['an RPC error', () => mockRpc.mockResolvedValue({ error: { message: 'nope' } })],
-    ['an RPC throw', () => mockRpc.mockRejectedValue(new Error('network'))],
+    ['an RPC error', () => answerRpc(() => Promise.resolve({ error: { message: 'nope' } }))],
+    ['an RPC throw', () => answerRpc(() => Promise.reject(new Error('network')))],
   ])('still signs out everywhere after %s, but reports the partial result', async (_case, arrange) => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockSignOut.mockResolvedValue({ error: null });
@@ -218,7 +276,7 @@ describe('auth session/action services', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockSignOut.mockResolvedValue({ error: null });
-    mockRpc.mockReturnValue(new Promise(() => {}));
+    answerRpc(() => new Promise(() => {}));
 
     const done = signOut({ everywhere: true });
     await vi.advanceTimersByTimeAsync(3_100);
@@ -279,7 +337,7 @@ describe('auth session/action services', () => {
     });
 
     it('everywhere, on a stored session: signs out here, then reports the other devices were not', async () => {
-      mockRpc.mockResolvedValue({ error: null });
+      rpcOk();
       mockSignOut
         .mockResolvedValueOnce({ error: unreachable() })
         .mockResolvedValueOnce({ error: null });
@@ -294,7 +352,7 @@ describe('auth session/action services', () => {
     });
 
     it('everywhere, with the session already removed by the SDK: done, reporting the partial result', async () => {
-      mockRpc.mockResolvedValue({ error: null });
+      rpcOk();
       mockSignOut.mockImplementationOnce(() => {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         return Promise.resolve({ error: unreachable() });
@@ -333,7 +391,7 @@ describe('auth session/action services', () => {
       // `_signOut` removes the session before it returns any error but a
       // 401/403/404, so this device is already signed out.
       const rejected = new AuthApiError('Internal error', 500, 'unexpected_failure');
-      mockRpc.mockResolvedValue({ error: null });
+      rpcOk();
       mockSignOut.mockImplementationOnce(() => {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         return Promise.resolve({ error: rejected });
@@ -353,7 +411,7 @@ describe('auth session/action services', () => {
 
     it('everywhere, a non-retryable error with the session still stored: throws', async () => {
       const rejected = new AuthApiError('Internal error', 500, 'unexpected_failure');
-      mockRpc.mockResolvedValue({ error: null });
+      rpcOk();
       mockSignOut.mockResolvedValueOnce({ error: rejected });
 
       await expect(signOut({ everywhere: true })).rejects.toBe(rejected);

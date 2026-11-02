@@ -826,7 +826,12 @@ center_restore() {
     xcrun simctl launch $UDID $CENTER_FRONT >/dev/null 2>&1 || bad=1
     sleep 2
   fi
-  rotate_to $CENTER_ORIENT 2>/dev/null || bad=1
+  # When die's exit (nested below cmd_center) runs this trap, zsh 5.9 ends
+  # the trap as soon as a function it calls directly returns, so rotate_to
+  # runs in a subshell. On that path the subshell's status comes back 0
+  # whatever rotate_to returned, so the orientation is read again here.
+  ( rotate_to $CENTER_ORIENT ) 2>/dev/null
+  [[ $(state_value orientation) == $CENTER_ORIENT ]] || bad=1
   (( bad )) && print -u2 -- "sim: center could not restore pose ${CENTER_POSE:-none} and orientation $CENTER_ORIENT; ax state says: ${(j:, :)${(@M)${(@f)$(ax state --device $UDID 2>&1)}:#(pose|orientation):*}}"
   (( bad && code == 0 )) && code=1
   CENTER_DONE=$code

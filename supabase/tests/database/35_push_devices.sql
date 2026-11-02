@@ -8,11 +8,11 @@
 --
 -- Pinned here: the exact policy sets (a policy added, renamed or dropped fails
 -- this file), who can touch each table, the register RPC (reassignment by
--- token, bad environment, no session), the unregister RPC (own row only, no
--- session, anon), and the trigger -- it queues exactly one
--- pg_net call per new note with the note id and the shared secret, does nothing
--- without settings, fires nothing for an insert ignored as a duplicate, and
--- cannot fail the insert.
+-- token, bad environment, no session, an ended session -- 20261102010000), the
+-- unregister RPC (own row only, no session, anon), and the trigger -- it queues
+-- exactly one pg_net call per new note with the note id and the shared secret,
+-- does nothing without settings, fires nothing for an insert ignored as a
+-- duplicate, and cannot fail the insert.
 --
 -- net.http_post only queues the call in net.http_request_queue inside the
 -- caller's transaction, so the queue rows are read back here. Nothing is sent.
@@ -23,7 +23,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(114);
+select plan(121);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -37,11 +37,33 @@ begin
   return user_id;
 end; $$;
 
-create or replace function tests.authenticate_as(test_user_id uuid)
+-- The account's live session, made on first use: register_push_device
+-- (20261102010000) refuses claims whose session_id names no auth.sessions row
+-- of the caller, as a real access token's does after a global sign-out.
+create or replace function tests.session_for(test_user_id uuid)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_session_id uuid;
+begin
+  select id into v_session_id from auth.sessions where user_id = test_user_id limit 1;
+  if v_session_id is null then
+    insert into auth.sessions (id, user_id, created_at, updated_at)
+    values (gen_random_uuid(), test_user_id, now(), now())
+    returning id into v_session_id;
+  end if;
+  return v_session_id;
+end; $$;
+
+create or replace function tests.authenticate_with_session(test_user_id uuid, test_session_id text)
 returns void language plpgsql set search_path = '' as $$
 begin
   perform set_config('role', 'authenticated', true);
-  perform set_config('request.jwt.claims', json_build_object('sub', test_user_id::text, 'role', 'authenticated', 'aud', 'authenticated')::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', test_user_id::text, 'role', 'authenticated', 'aud', 'authenticated', 'session_id', test_session_id)::text, true);
+end; $$;
+
+create or replace function tests.authenticate_as(test_user_id uuid)
+returns void language plpgsql set search_path = '' as $$
+begin
+  perform tests.authenticate_with_session(test_user_id, tests.session_for(test_user_id)::text);
 end; $$;
 
 create or replace function tests.clear_jwt()
@@ -1083,6 +1105,66 @@ select results_eq(
   $$select 'accepted'::text, d_id, c_id from t_pr$$,
   'PUSH-DB-114: and the request is accepted and the pair linked'
 );
+
+-- ============================================
+-- register_push_device refuses an ended session (20261102010000, DW-406)
+-- ============================================
+-- A global sign-out deletes every auth.sessions row of the account while its
+-- access tokens stay valid until they expire. Those claims must not register.
+select tests.authenticate_as((select b_id from t_ids));
+select lives_ok(
+  $$select public.register_push_device('session-held', 'sandbox')$$,
+  'PUSH-DB-115: a caller with a live session registers a device'
+);
+reset role;
+
+create temporary table t_ended as
+select tests.session_for((select a_id from t_ids))::text as a_session;
+delete from auth.sessions where user_id = (select a_id from t_ids);
+
+select tests.authenticate_with_session((select a_id from t_ids), (select a_session from t_ended));
+select throws_ok(
+  $$select public.register_push_device('session-new', 'production')$$,
+  '42501',
+  'Session has ended',
+  'PUSH-DB-116: claims whose session was deleted by a global sign-out are refused'
+);
+select throws_ok(
+  $$select public.register_push_device('session-held', 'production')$$,
+  '42501',
+  'Session has ended',
+  'PUSH-DB-117: and cannot take over a token another account holds'
+);
+reset role;
+select results_eq(
+  $$select token, user_id, environment from public.push_devices where token like 'session-%' order by token$$,
+  $$select 'session-held'::text, b_id, 'sandbox'::text from t_ids$$,
+  'PUSH-DB-118: the refused calls created no row and left the held token with its owner'
+);
+
+select tests.authenticate_with_session((select a_id from t_ids), null);
+select throws_ok(
+  $$select public.register_push_device('session-new', 'sandbox')$$,
+  '42501',
+  'Session has ended',
+  'PUSH-DB-119: claims with no session_id are refused'
+);
+select tests.authenticate_with_session((select a_id from t_ids), tests.session_for((select b_id from t_ids))::text);
+select throws_ok(
+  $$select public.register_push_device('session-new', 'sandbox')$$,
+  '42501',
+  'Session has ended',
+  'PUSH-DB-120: another account''s live session does not count as the caller''s'
+);
+select tests.authenticate_with_session((select a_id from t_ids), 'not-a-uuid');
+select throws_ok(
+  $$select public.register_push_device('session-new', 'sandbox')$$,
+  '42501',
+  'Session has ended',
+  'PUSH-DB-121: a malformed session_id is refused, not a cast error'
+);
+reset role;
+select tests.clear_jwt();
 
 select * from finish();
 rollback;

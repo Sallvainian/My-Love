@@ -1,7 +1,7 @@
 import { AnimatePresence, m as motion } from 'motion/react';
 import { CircleCheckBig, Cloud, CloudOff, Plus, RefreshCw, WifiOff } from 'lucide-react';
 import { useEffect, useState, type SubmitEvent } from 'react';
-import { lookupPartnerId } from '../../api/supabaseClient';
+import { lookupPartnerId, supabase } from '../../api/supabaseClient';
 import { CHALLENGING_MOODS, MOOD_DISPLAY, POSITIVE_MOODS } from '../../constants/moodDisplay';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppStore } from '../../stores/useAppStore';
@@ -106,22 +106,52 @@ export function MoodTracker() {
   // while this screen was open (this device accepted, or the sender heard the
   // partner-linked broadcast) invisible here until a remount. Only a conclusive
   // answer is kept: a failed read must not blank a partner already shown.
+  //
+  // It also runs again when this user's session renews (`TOKEN_REFRESHED`). A
+  // boot on a stored session the SDK cannot use answers `error` here, nothing
+  // else re-runs the lookup, and the card would stay unmounted until the screen
+  // was re-entered. Answers are applied in the order their lookups started, so
+  // a slow older lookup cannot overwrite a newer one.
   const storePartnerId = useAppStore((s) => s.partner?.id ?? null);
+  const userId = user?.id ?? null;
   useEffect(() => {
     let mounted = true;
+    let started = 0;
+    let applied = 0;
 
     async function loadPartnerId() {
+      const seq = ++started;
       const lookup = await lookupPartnerId();
-      if (!mounted || lookup.status === 'error') return;
+      if (!mounted || lookup.status === 'error' || applied > seq) return;
+      applied = seq;
       setPartnerId(lookup.status === 'linked' ? lookup.partnerId : null);
     }
 
     void loadPartnerId();
 
+    // Kept synchronous: auth-js awaits its listeners, and a nested auth call from
+    // inside one can deadlock (see useRealtimeMessages), so the lookup runs on
+    // the next task.
+    let renewalTimer: ReturnType<typeof setTimeout> | null = null;
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted || event !== 'TOKEN_REFRESHED' || !userId) return;
+      if (session?.user?.id !== userId) return;
+      if (renewalTimer !== null) clearTimeout(renewalTimer);
+      renewalTimer = setTimeout(() => {
+        renewalTimer = null;
+        void loadPartnerId();
+      }, 0);
+    });
+
     return () => {
       mounted = false;
+      authSubscription.unsubscribe();
+      if (renewalTimer !== null) clearTimeout(renewalTimer);
+      renewalTimer = null;
     };
-  }, [storePartnerId]);
+  }, [storePartnerId, userId]);
 
   // Seed the form from today's saved entry (AC-5). This used to be an effect keyed on
   // `moods`, which cost a second commit every time it fired — the store outlives this view,

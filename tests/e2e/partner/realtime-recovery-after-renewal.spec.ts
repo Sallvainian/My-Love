@@ -21,11 +21,12 @@
  *  - love notes (`useRealtimeMessages`): the feed gives up while the token is
  *    stale and is re-armed by the renewal;
  *  - the partner mood card on the Mood screen. A boot that cannot read the
- *    server never mounts that card (`MoodTracker` looks its partner up once,
- *    on mount), so the "Real-time connection lost" error `usePartnerMood`
- *    keeps and now clears is not reachable from a cold stale boot and is
- *    covered by its unit tests; this part re-enters the Mood screen after the
- *    renewal and checks the card receives the partner's mood live.
+ *    server never mounts that card (`MoodTracker`'s partner lookup answers an
+ *    error and keeps no partner), so the "Real-time connection lost" error
+ *    `usePartnerMood` keeps and now clears is not reachable from a cold stale
+ *    boot and is covered by its unit tests. `MoodTracker` looks its partner up
+ *    again on `TOKEN_REFRESHED`, so after the renewal the card appears on the
+ *    open screen, with no navigation, and receives the partner's mood live.
  *
  * The poke screen only mounts its tiles once it knows the partner, which a
  * cold stale boot never does, so that context saves the partner local copy on
@@ -59,7 +60,6 @@ import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
 import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { ownMoodHistoryRead } from '../../support/helpers/reads';
-import { navigateTo } from '../../support/helpers/navigation';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { deleteRowById } from '../../support/helpers/teardown';
@@ -377,27 +377,37 @@ test.describe('Realtime recovery after the token renews', () => {
         predicate: (message) => POKES_ARMED_LOG.test(message.text()),
         timeout: RENEWAL_TIMEOUT_MS,
       });
+      // Armed before the unroute below: the card joins its channel as soon as
+      // the renewal lets the lookup answer.
+      const moodJoined = mood.page.waitForEvent('console', {
+        predicate: (message) => MOOD_SUBSCRIBED_LOG.test(message.text()),
+        timeout: RENEWAL_TIMEOUT_MS,
+      });
       const notesJoined = notes.page.waitForEvent('console', {
         predicate: (message) => NOTES_SUBSCRIBED_LOG.test(message.text()),
         timeout: RENEWAL_TIMEOUT_MS,
       });
+      // The card is the partner's mood, or its empty state while the partner has
+      // logged none, which is what shows here until the partner's mood arrives.
+      const partnerCard = mood.page
+        .getByTestId('partner-mood-display')
+        .or(mood.page.getByTestId('no-mood-logged-state'));
+      // Before the renewal the screen shows no partner card (loading, loaded or
+      // empty) and no error card.
+      await expect(partnerCard).toHaveCount(0);
+      await expect(mood.page.getByTestId('loading-state')).toHaveCount(0);
+      await expect(mood.page.getByTestId('partner-mood-error')).toHaveCount(0);
       for (const receiving of [mood, partner, notes]) {
         await receiving.context.unroute(REFRESH_ROUTE);
       }
       await renewals;
 
-      await log.step('The notes feed rejoins; the Mood screen is re-entered and joins too');
+      await log.step('The notes feed rejoins; the Mood screen shows its card in place');
       await notesJoined;
-      // The Mood screen looks its partner up once, when it mounts, and a boot
-      // that could not read the server never mounted the card, so there is no
-      // error card to wait out: the screen is entered again, as a person
-      // would, and the card joins its channel on the renewed token.
-      const moodJoined = mood.page.waitForEvent('console', {
-        predicate: (message) => MOOD_SUBSCRIBED_LOG.test(message.text()),
-        timeout: 60_000,
-      });
-      await navigateTo(mood.page, 'home');
-      await navigateTo(mood.page, 'mood');
+      // `MoodTracker` looks its partner up again when this user's token
+      // renews, so the card mounts on the screen that is already open and
+      // joins its channel on the renewed token. Nothing navigates.
+      await expect(partnerCard).toBeVisible();
       await moodJoined;
       await expect(mood.page.getByTestId('partner-mood-error')).toHaveCount(0);
 

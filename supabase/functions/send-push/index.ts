@@ -16,7 +16,7 @@
  * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the runtime.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0?deps=iceberg-js@0.8.1';
 
 import { apnsConfigFromEnv, createApnsClient } from './apns.ts';
 import { handleSendPush, type DateChangeRow, type PushDb, type PushKind } from './handler.ts';

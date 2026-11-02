@@ -3495,7 +3495,9 @@ location: scripts/sim-driver/sim (center_restore, die); scripts/sim-driver/test-
 source_spec: `plan-dw-sim-center-one-screen.md`
 severity: low
 reason: Reproduced in plain zsh 5.9: with `f() { trap restore EXIT; die; }` and `die() { exit 1; }`, `restore() { inner || print report; print after; exit 7; }` runs inner's whole body, then stops (exit 1, no "report", no "after"); with `exit 1` called in f directly it prints both and exits 7. In sim, center_restore's only direct function call is `rotate_to` (sim:824), so a failed read still turns the device back, but a restore failure on that path is never reported and CENTER_DONE is never set. In test-center-exit.zsh ax, xcrun and sleep are stub functions, so a failed read's restore stops at its first stubbed call; a phone read-fails case starting in landscape ended in portrait for that reason and was left out. Fix: call rotate_to in a subshell, `( rotate_to $CENTER_ORIENT )`, and make the stubbed restore checkable.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sim-center-restore-subshell
+resolution-undo: 52a3cbe47b39286c8cb6953e0f685f3409c738a1713e9c550f0323a99e5e80c8 2026-11-02 7374617475733a206f70656e
 
 ### DW-405: center's one-screen check (no stacked cell left, and neither a drag nor a swipe down the list moves a cell) has not been run on a simulator.
 origin: spec-deferred f1809e113bbf
@@ -3511,7 +3513,9 @@ location: supabase/migrations/20261031000000_push_devices.sql (register_push_dev
 source_spec: `plan-dw-sign-out-everywhere.md`
 severity: medium
 reason: Global sign-out revokes refresh tokens, but access tokens stay valid until they expire (supabase/config.toml jwt_expiry = 3600). register_push_device checks only auth.uid() (20261031000000_push_devices.sql), and App.tsx re-registers on every signed-in start with permission. The same happens if a registration lands in the up-to-3 s gap between unregister_all_push_devices() and the global sign-out. Pre-existing: register_push_device never checked whether the caller's session was revoked. Settling it needs a server-side check that the JWT's session_id still exists in auth.sessions, or an owner decision to accept the window.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-push-register-session-check
+resolution-undo: 0a5864b1b6284bf808388361b35ec0695f3ddb78b43e86ad46388a30fc0f93fb 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 server-session-check — owner, 2026-11-02: register_push_device refuses a caller whose JWT session_id no longer exists in auth.sessions, so a device signed out by "Sign out of all devices" cannot re-register while its access token is still valid; this also covers a registration landing between unregister_all_push_devices() and the global sign-out. Keep jwt_expiry as is. Scope is push registration only: a still-valid access token reading app data until it expires is accepted.
 
 ### DW-407: DW-352's native removal is unverified on a shell: no simulator check yet shows sign-out emptying Notification Center of delivered pushes and date reminders.
@@ -3528,7 +3532,9 @@ location: src/stores/slices/authSlice.ts:331-336, 456-459
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: `discardAccountState` calls `stopPushesForSignOut()` only when `identity.userId === null` (src/stores/slices/authSlice.ts:336), and the fresh-sign-in leftover path calls `deleteAccountData(leftover)` alone (authSlice.ts:457-459). `deleteAccountData` cancels pending date reminders but does not remove delivered ones, so delivered pushes and reminders stay for the incoming account on those paths. This predates DW-352, and the owner's decision covers sign-out only. Reachability is unverified: a device normally goes through signed out, which now runs the removal. The fix would be a removal call on those paths (not the APNs unregister, which would race `startPushRegistration`), plus a decision that a switch should empty Notification Center too.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-account-switch-clears-delivered
+resolution-undo: 92e0c22e3cba748ed6298bc6f8c758ca82890213e08ffd6f0f26614b21af443f 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 switch-clears-too — owner, 2026-11-02: any account switch empties the app's delivered notifications from Notification Center, as sign-out does (DW-352): add the delivered-notification removal on the in-place switch and the fresh-sign-in leftover paths, without the APNs unregister, which would race startPushRegistration.
 
 ### DW-409: PartnerMoodView.kit.test.tsx "enables refresh when online" failed once under the full unit suite with the refresh button still `aria-busy` and disabled, and passed on 3 isolated reruns and 2 later
@@ -3537,7 +3543,9 @@ location: src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: First `npm run test:unit` of this run: 1 failed of 3759, `expect(element).toBeEnabled()` at src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166, with the button rendered `aria-busy="true" disabled`. `findByTestId` resolves on presence, not enablement, so an in-flight refresh still busy under load fails it. Unrelated to this change, which touches no PartnerMoodView code. Settle by asserting through `waitFor(() => expect(...).toBeEnabled())` after confirming what keeps it busy.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-partner-mood-refresh-test-flake
+resolution-undo: 4e6874687b678d5b27c3d7d79dc252b4e1195449554a010f7c0cbdc6540fa67a 2026-11-02 7374617475733a206f70656e
 
 ### DW-410: The pinned esm.sh supabase-js 2.118.0 bundle still floats one transitive dependency: storage-js 2.118.0 imports iceberg-js through the range ^0.8.1.
 origin: spec-deferred 3f3158bf60a9
@@ -3545,7 +3553,9 @@ location: supabase/functions/send-push/index.ts:19; supabase/functions/upload-lo
 source_spec: `plan-dw-pin-edge-supabase-js.md`
 severity: medium
 reason: package-lock.json declares @supabase/storage-js 2.118.0 dependency "iceberg-js": "^0.8.1" (every other sub-package dependency is exact: tslib 2.8.1, @supabase/phoenix 0.4.5). esm.sh's built https://esm.sh/@supabase/storage-js@2.118.0/es2022/storage-js.mjs imports "/iceberg-js@^0.8.1?target=es2022", a range esm.sh resolves per request, so a new iceberg-js 0.8.x can reach both Edge Functions on the next deploy with no reviewed change. Pre-existing and outside the owner's 2026-11-02 decision, which pins supabase-js only. A fix would add ?deps=iceberg-js@0.8.1 to both import URLs (or vendor the import), which needs an owner call.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-edge-pin-iceberg-js
+resolution-undo: 3e3cad4e23563016d63b082448d5ee7a9cc230415fc6fd9d1dcd33e84bbd304e 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 pin-iceberg — owner, 2026-11-02: pin iceberg-js to 0.8.1 exactly by adding `deps=iceberg-js@0.8.1` to both Edge Function supabase-js import URLs (send-push, upload-love-note-image), finishing the DW-355 pin.
 
 ### DW-411: After a stale-session boot the Mood screen never mounts the partner card, so a later renewal cannot bring it back until the screen is re-entered; the usePartnerMood realtime-lost error is therefore
@@ -3554,4 +3564,24 @@ location: src/components/MoodTracker/MoodTracker.tsx (loadPartnerId effect)
 source_spec: `plan-dw-realtime-recovery-after-renewal.md`
 severity: low
 reason: MoodTracker looks its partner up through lookupPartnerId on mount and again only when store.partner.id changes; on a boot whose stored session the SDK cannot use that lookup fails and nothing re-runs it on TOKEN_REFRESHED. Observed in tests/e2e/partner/realtime-recovery-after-renewal.spec.ts on the local stack: no card and no error card after TOKEN_REFRESHED; Home then Mood mounts it.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-mood-partner-lookup-on-renewal
+resolution-undo: 1fef8da71dc9785856aad71f8c8803d5481f487b98c3027a7d1736d3769aa159 2026-11-02 7374617475733a206f70656e
+
+### DW-412: A register_push_device call that lands between unregister_all_push_devices() and the global sign-out still has a live session, so the session check accepts it and its push_devices row outlives "Sign
+origin: spec-deferred 716063194f07
+location: supabase/migrations/20261102010000_register_push_device_session_check.sql (register_push_device); src/api/auth/actionService.ts (signOut, everywhere)
+source_spec: `plan-dw-push-register-session-check.md`
+severity: medium
+reason: src/api/auth/actionService.ts signOut({ everywhere }) awaits removeAllPushRegistrations() before supabase.auth.signOut({ scope: 'global' }). In that window the other device's auth.sessions row still exists, so the new check in 20261102010000 passes and the insert commits; the later session delete does not touch push_devices, and send-push reads only push_devices. The 2026-11-02 owner decision expected the session check to cover this window, but it closes only registrations after the sign-out. Closing the window needs new state, for example an account-level fence written by unregister_all_push_devices() that refuses sessions created before it, or the registering session id stored on each push_devices row and checked or pruned by send-push. Either needs an owner decision, because the intent limited this change to replacing the function.
+status: done 2026-11-02
+resolution: owner, 2026-11-02: fix it. "Sign out of all devices" now signs out with scope=global first and calls unregister_all_push_devices() after it, sending the access token read before the sign-out (src/api/auth/actionService.ts signOut, src/services/pushNotifications.ts removeAllPushRegistrations). A registration before the sign-out is removed by that call, and one after it is refused by DW-406's session check, so no row outlives the sign-out. No new state.
+
+### DW-413: On an account switch without a sign-out, a love-note push sent to the outgoing account between the Notification Center clear and the incoming account's `register_push_device` still lands, so it stays
+origin: spec-deferred 3168721c2825
+location: src/stores/slices/authSlice.ts (clearDeliveredForSwitch callers); src/services/pushNotifications.ts (recordDevice)
+source_spec: `plan-dw-account-switch-clears-delivered.md`
+severity: low
+reason: On the in-place switch and the fresh-sign-in leftover paths nothing deletes this device's `push_devices` row first (only `actionService.signOut` calls `removePushRegistration`, src/api/auth/actionService.ts:100). The token moves to the incoming account only when `register_push_device` upserts it (supabase/migrations/20261102010000_register_push_device_session_check.sql:64-69), after App.tsx's effect re-runs `startPushRegistration()`, APNs answers and `recordDevice` sends the RPC. That is normally seconds. If the RPC fails, `recordDevice` only logs it (src/services/pushNotifications.ts:216-218), and the token stays with the outgoing account until the next signed-in start or the 12-hour foreground renewal. The gap predates DW-408, and the intent rules out the APNs unregister on these paths. Options: a second `clearDeliveredNotifications()` once `recordDevice` succeeds after a switch, or have the switch delete the outgoing row server-side while the outgoing session still exists, which the
+status: done 2026-11-02
+resolution: owner, 2026-11-02: fix it on PR #444. An account switch's Notification Center clear now passes untilReregistered (src/stores/slices/authSlice.ts clearDeliveredForSwitch), which saves a device flag holding an id unique to that switch (localStorage my-love-push-clear-after-record); the next successful register_push_device record, which moves this device's row to the incoming account, clears Notification Center and the badge once more and drops the flag (src/services/pushNotifications.ts recordDevice). A refused record keeps the flag: every return to the foreground then records again instead of once every 12 hours, and a restart's record still clears because the flag is on disk. A record clears only when the id it read before its request is still the saved one, so a record sent before a switch, including the previous account's still in flight during a second switch, cannot take that switch's clear. Any other clear, sign-out's included, drops the flag. Left as it is: while the app stays open after a refused record, nothing retries until the next return or start.

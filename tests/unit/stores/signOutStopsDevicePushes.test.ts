@@ -1,12 +1,16 @@
 /**
- * Every transition to signed out stops this device's pushes; nothing else does
+ * Every transition to signed out stops this device's pushes; an account switch
+ * only empties Notification Center
  *
- * `discardAccountState` calls `stopDevicePushes()` (APNs unregister, badge
- * clear, token forgotten) beside `deleteAccountData` when an account leaves and
- * nobody takes its place: a sign-out, or a boot with no session whose owner
- * marker names an account. An in-place account switch or a fresh sign-in must
- * not call it — `startPushRegistration` is registering the same device for the
- * incoming account then, and an unregister would race it.
+ * `discardAccountState` calls `stopDevicePushes()` (APNs unregister, delivered
+ * notifications removed, badge clear, token forgotten) beside
+ * `deleteAccountData` when an account leaves and nobody takes its place: a
+ * sign-out, or a boot with no session whose owner marker names an account. An
+ * in-place account switch or a fresh sign-in must not call it —
+ * `startPushRegistration` is registering the same device for the incoming
+ * account then, and an unregister would race it. Those two paths, when they
+ * replace another account, call `clearDeliveredNotifications({
+ * untilReregistered: true })` instead (DW-408, DW-413).
  *
  * Drives the composed store, as signOutClearsAccountState.test.ts does. The
  * on-disk deletes are stubbed to settle at once, so nothing this file starts
@@ -20,6 +24,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 }));
 vi.mock('../../../src/services/pushNotifications', () => ({
   stopDevicePushes: vi.fn(() => Promise.resolve()),
+  clearDeliveredNotifications: vi.fn(() => Promise.resolve()),
   startPushRegistration: vi.fn(() => Promise.resolve('unavailable')),
 }));
 vi.mock('../../../src/services/localCopy', async (importOriginal) => {
@@ -34,15 +39,21 @@ vi.mock('../../../src/services/imageCache', async (importOriginal) => {
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
 import { moodService } from '../../../src/services/moodService';
-import { stopDevicePushes } from '../../../src/services/pushNotifications';
+import {
+  clearDeliveredNotifications,
+  stopDevicePushes,
+} from '../../../src/services/pushNotifications';
 
 const stop = vi.mocked(stopDevicePushes);
+const clearDelivered = vi.mocked(clearDeliveredNotifications);
 
-describe('stopDevicePushes on transitions to signed out', () => {
+describe('device pushes and Notification Center on account transitions', () => {
   beforeEach(() => {
     vi.spyOn(moodService, 'deleteSyncedForUser').mockResolvedValue(0);
     stop.mockClear();
     stop.mockResolvedValue(undefined);
+    clearDelivered.mockClear();
+    clearDelivered.mockResolvedValue(undefined);
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
     useAppStore.setState({ userId: null, userEmail: null, isAuthenticated: false });
   });
@@ -115,6 +126,62 @@ describe('stopDevicePushes on transitions to signed out', () => {
     expect(useAppStore.getState().userId).toBeNull();
     await vi.waitFor(() =>
       expect(errorLog).toHaveBeenCalledWith("[AuthSlice] Failed to stop this device's pushes:", failure)
+    );
+  });
+
+  it('sign-out stops them without a separate removal: stopDevicePushes already removes', () => {
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+
+    useAppStore.getState().clearAuth();
+
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(clearDelivered).not.toHaveBeenCalled();
+  });
+
+  it('an in-place account switch empties Notification Center once', () => {
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+    expect(clearDelivered).not.toHaveBeenCalled();
+
+    useAppStore.getState().setAuthUser('USER-C-ID', 'c@example.com');
+
+    // Again once this device is recorded for the incoming account (DW-413).
+    expect(clearDelivered).toHaveBeenCalledExactlyOnceWith({ untilReregistered: true });
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('a fresh sign-in over a marker naming another account empties it once', () => {
+    localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, 'USER-B-ID');
+
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+
+    expect(clearDelivered).toHaveBeenCalledExactlyOnceWith({ untilReregistered: true });
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('a fresh sign-in with no marker, or the marker\'s own account, leaves it', () => {
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+    useAppStore.setState({ userId: null, userEmail: null, isAuthenticated: false });
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+
+    expect(clearDelivered).not.toHaveBeenCalled();
+  });
+
+  it('a rejected removal on a switch is logged and the switch still completes', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failure = new Error('bridge gone');
+    clearDelivered.mockRejectedValueOnce(failure);
+    useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
+
+    expect(() => useAppStore.getState().setAuthUser('USER-C-ID', 'c@example.com')).not.toThrow();
+
+    expect(useAppStore.getState().userId).toBe('USER-C-ID');
+    await vi.waitFor(() =>
+      expect(errorLog).toHaveBeenCalledWith(
+        '[AuthSlice] Failed to clear the delivered notifications:',
+        failure
+      )
     );
   });
 });

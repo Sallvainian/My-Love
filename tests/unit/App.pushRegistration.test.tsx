@@ -32,6 +32,8 @@ vi.mock('../../src/services/pushNotifications', () => ({
   startPushRegistration: push.startPushRegistration,
   startPushRenewalOnForeground: push.startPushRenewalOnForeground,
   onPushTap: push.onPushTap,
+  // An account switch empties Notification Center (DW-408).
+  clearDeliveredNotifications: vi.fn(async () => {}),
 }));
 
 vi.mock('../../src/services/localCopy', () => ({

@@ -73,6 +73,21 @@ export const signUp = async (credentials: AuthCredentials): Promise<AuthResult> 
 };
 
 /**
+ * The access token the SDK would send now, renewed first if it was about to
+ * expire, as the global sign-out's own request uses; the stored one when the
+ * SDK has none to give. Never throws.
+ */
+async function currentAccessToken(): Promise<string | undefined> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) return data.session.access_token;
+  } catch (error) {
+    console.warn('[AuthService] Could not read the session before signing out:', error);
+  }
+  return readStoredSession()?.access_token;
+}
+
+/**
  * Signs out. By default only this device's session ends (owner decision
  * 2026-11-02); `everywhere` ends the account's sessions on every device, for a
  * lost or given-away phone. Callers check the connection before `everywhere`:
@@ -89,13 +104,21 @@ export const signOut = async ({
   try {
     let otherDevicesSignedOut = true;
 
-    // While the session still exists: the RPC that drops push registrations
-    // needs it. At most ~3 s, never throws. Everywhere drops every device's
-    // row, the web included; otherwise only this device's, online in the shell.
-    // The native half (APNs unregister, badge) runs from clearAuth once the
-    // SIGNED_OUT event below arrives, offline too.
+    // A plain sign-out drops this device's push row while the session still
+    // exists: the RPC needs it. At most ~3 s, never throws; online, in the
+    // shell only. The native half (APNs unregister, badge) runs from clearAuth
+    // once the SIGNED_OUT event below arrives, offline too.
+    //
+    // Everywhere drops every device's row only after the global sign-out
+    // (DW-412): before it, another device's session is still live, so a
+    // registration landing in between passed register_push_device's session
+    // check and outlived the sign-out. Afterwards that check refuses every
+    // device, and this access token stays valid until it expires, which is all
+    // unregister_all_push_devices reads (auth.uid()). It is read here because
+    // the sign-out removes the session from the client.
+    let accessToken: string | undefined;
     if (everywhere) {
-      if (!(await removeAllPushRegistrations())) otherDevicesSignedOut = false;
+      accessToken = await currentAccessToken();
     } else {
       await removePushRegistration();
     }
@@ -103,6 +126,10 @@ export const signOut = async ({
     // 'local' ends this device's session only; the SDK's default, 'global',
     // ends the account's sessions on every device.
     let { error } = await supabase.auth.signOut({ scope: everywhere ? 'global' : 'local' });
+
+    if (everywhere && !(await removeAllPushRegistrations(accessToken))) {
+      otherDevicesSignedOut = false;
+    }
 
     // The server is unreachable. With a valid access token the SDK has already
     // removed the session and emitted SIGNED_OUT, so the sign-out is done. On a

@@ -94,7 +94,14 @@ vi.mock('../../../api/supabaseClient', () => {
       const partnerId = await getPartnerId();
       return partnerId ? { status: 'linked', partnerId } : { status: 'unlinked' };
     },
-    supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
+    supabase: {
+      from: vi.fn(),
+      auth: {
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }),
+      },
+      channel: vi.fn(),
+      removeChannel: vi.fn(),
+    },
   };
 });
 

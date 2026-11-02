@@ -25,7 +25,9 @@ import type { ViewType } from '../stores/slices/navigationSlice';
  * empties the app's delivered notifications (DW-352) and clears the badge on
  * every transition to signed out. Each native plugin is checked on its own: a
  * shell from story 3.1 has `PushNotifications` but no `AppBadge`, and one from
- * before story 4.1 has no `LocalNotifications`.
+ * before story 4.1 has no `LocalNotifications`. An account switch without a
+ * sign-out empties Notification Center and the badge alone, through
+ * `clearDeliveredNotifications` (DW-408).
  *
  * The Settings switches (story 3.7) read the same gate through
  * `hasNativePush()` and ask iOS for the permission state through
@@ -103,6 +105,36 @@ function forgetToken(): void {
 export type PushRegistrationOutcome = 'unavailable' | 'denied' | 'registering';
 
 let listening: Promise<void> | null = null;
+
+/**
+ * localStorage key set by an account switch's Notification Center clear and
+ * kept until this device's token is next recorded, which moves its server row
+ * to the incoming account (DW-413). Until then the outgoing account's pushes
+ * still reach this device, so a successful record clears again. Kept on disk,
+ * not in memory, so a refused record followed by a restart still clears on
+ * the next start's record. Each switch saves its own id, so a record started
+ * under one switch cannot take a later switch's clear. Device state, like the
+ * token: any other clear, sign-out's included, drops it.
+ */
+export const PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY = 'my-love-push-clear-after-record';
+
+/** The pending switch's id, or null when no switch is waiting for a record. */
+function clearAfterNextRecord(): string | null {
+  try {
+    return localStorage.getItem(PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setClearAfterNextRecord(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY, crypto.randomUUID());
+    else localStorage.removeItem(PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY);
+  } catch (error) {
+    console.error('[Push] Could not save the account switch clear:', error);
+  }
+}
 
 const foregroundPushHandlers = new Set<() => void>();
 
@@ -206,6 +238,9 @@ export function hasNativePush(): boolean {
 }
 
 async function recordDevice(token: string): Promise<void> {
+  // Read before the request and compared after it: a record sent before a
+  // switch, answering after it, must not take that switch's clear (DW-413).
+  const switchId = clearAfterNextRecord();
   const { environment } = await PushEnvironment.get();
   const { error } = await supabase.rpc('register_push_device', {
     p_token: token,
@@ -213,6 +248,10 @@ async function recordDevice(token: string): Promise<void> {
   });
   if (error) {
     console.error('[Push] Could not record the device:', error.message);
+    return;
+  }
+  if (switchId !== null && clearAfterNextRecord() === switchId) {
+    await clearDeliveredNotifications();
   }
 }
 
@@ -314,15 +353,19 @@ export const PUSH_RENEWAL_INTERVAL_MS = 12 * 60 * 60 * 1000;
  * brought back from the background would otherwise age out. On a return to
  * the foreground while online, with permission granted and a token stored,
  * this re-records the stored token, at most once every 12 hours (the start
- * that set this up has just registered). Call while signed in; returns the
- * function that stops it. A no-op on the web and in a shell without push.
+ * that set this up has just registered), but on every return while an
+ * account switch's record has not yet succeeded: until then the outgoing
+ * account's pushes still reach this device (DW-413). Call while signed in;
+ * returns the function that stops it. A no-op on the web and in a shell
+ * without push.
  */
 export function startPushRenewalOnForeground(): () => void {
   if (!hasNativePush()) return () => {};
   let lastRenewal = Date.now();
   const onVisibility = () => {
     if (document.visibilityState !== 'visible' || !navigator.onLine) return;
-    if (Date.now() - lastRenewal < PUSH_RENEWAL_INTERVAL_MS) return;
+    const switchWaiting = clearAfterNextRecord() !== null;
+    if (!switchWaiting && Date.now() - lastRenewal < PUSH_RENEWAL_INTERVAL_MS) return;
     const token = storedToken();
     if (!token) return;
     lastRenewal = Date.now();
@@ -374,9 +417,12 @@ export async function removePushRegistration(): Promise<void> {
 }
 
 /**
- * Deletes every push registration the signed-in account owns, on every
- * device, for "Sign out of all devices" (DW-353). Call before the global
- * `supabase.auth.signOut()`: the RPC needs the session.
+ * Deletes every push registration the account owns, on every device, for
+ * "Sign out of all devices" (DW-353). Called after the global
+ * `supabase.auth.signOut()` with the access token read before it (DW-412):
+ * the sign-out removes the session from the client, but the token stays valid
+ * until it expires, and the RPC reads only `auth.uid()`. With no token there
+ * is nothing to send it with, so it resolves false.
  *
  * No native or token gate, unlike `removePushRegistration`: the other devices'
  * rows are removed from wherever the person signs out, the web included.
@@ -384,14 +430,24 @@ export async function removePushRegistration(): Promise<void> {
  * answered without an error; false on an error, a throw or the timeout, so the
  * caller can tell the person the other devices may still get pushes.
  */
-export async function removeAllPushRegistrations(): Promise<boolean> {
+export async function removeAllPushRegistrations(
+  accessToken: string | undefined
+): Promise<boolean> {
+  if (!accessToken) {
+    console.error('[Push] No access token to remove every device registration with');
+    return false;
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const timedOut = new Promise<'timeout'>((resolve) => {
       timer = setTimeout(() => resolve('timeout'), UNREGISTER_TIMEOUT_MS);
     });
     const outcome = await Promise.race([
-      Promise.resolve(supabase.rpc('unregister_all_push_devices')),
+      Promise.resolve(
+        supabase
+          .rpc('unregister_all_push_devices')
+          .setHeader('Authorization', `Bearer ${accessToken}`)
+      ),
       timedOut,
     ]);
     if (outcome === 'timeout') {
@@ -418,7 +474,7 @@ export async function removeAllPushRegistrations(): Promise<boolean> {
  * clears the app icon's badge and forgets the stored token. Called on every
  * transition to signed out (sign-out online or offline, and a boot that finds
  * the session gone), never on sign-in or an account switch, so it cannot race
- * `startPushRegistration`.
+ * `startPushRegistration`; a switch runs `clearDeliveredNotifications` alone.
  *
  * Never throws; logs only failures.
  */
@@ -432,6 +488,32 @@ export async function stopDevicePushes(): Promise<void> {
       console.error('[Push] Could not unregister from APNs:', error);
     }
   }
+  await clearDeliveredNotifications();
+  forgetToken();
+}
+
+/**
+ * Removes every notification of the app still in Notification Center (pushes
+ * and date reminders alike) and clears the app icon's badge, without touching
+ * the APNs registration or the stored token. `stopDevicePushes` runs it on
+ * sign-out (DW-352); an account switch runs it alone (DW-408), because an
+ * unregister there would race `startPushRegistration` for the incoming account.
+ * Does nothing outside the native shell, and skips the removal in a shell with
+ * no `LocalNotifications` plugin (one installed before story 4.1).
+ *
+ * `untilReregistered` is the account switch's: until this device's token is
+ * recorded for the incoming account, its server row still belongs to the
+ * outgoing one, whose pushes keep arriving, so the next successful record
+ * clears once more (DW-413). Any other call, sign-out's included, drops that.
+ *
+ * Never throws; logs only failures.
+ */
+export async function clearDeliveredNotifications({
+  untilReregistered = false,
+}: { untilReregistered?: boolean } = {}): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  setClearAfterNextRecord(untilReregistered);
+
   // The local-notifications plugin's removal, not the push plugin's: that one
   // rejects unless register() ran this launch. Both empty the app's whole
   // Notification Center group, pushes included (DW-352).
@@ -443,7 +525,6 @@ export async function stopDevicePushes(): Promise<void> {
     }
   }
   await clearAppBadge();
-  forgetToken();
 }
 
 /**
