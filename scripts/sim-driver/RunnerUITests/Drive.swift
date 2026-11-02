@@ -112,23 +112,30 @@ final class Drive: XCTestCase {
             return XCTFail("still on the login form: " + texts.joined(separator: " | "))
         }
         say("signed in as \(email)")
-        // The welcome splash shows after some sign-ins; its Continue reaches Home.
         let home = app.webViews.buttons["Home"]
+        pastWelcome(to: home)
+        if !home.waitForExistence(timeout: 10) { XCTFail("signed in, but the Home button never showed") }
+    }
+
+    // The welcome splash covers the app after some sign-ins and after every
+    // restart, hiding the dock; its Continue reaches Home. Waits up to 20 s
+    // for `target`, tapping Continue whenever the splash shows.
+    func pastWelcome(to target: XCUIElement) {
         let welcome = app.webViews.staticTexts["Welcome to Your App"]
-        for _ in 0..<20 where !home.exists {
+        for _ in 0..<20 where !target.exists {
             if welcome.exists {
                 app.webViews.buttons["Continue"].tap()
                 say("dismissed the welcome splash")
             }
             sleep(1)
         }
-        if !home.waitForExistence(timeout: 10) { XCTFail("signed in, but the Home button never showed") }
     }
 
     // Settings is the header's gear in the bottom dock and the capsule's sixth
     // button in the column form; both are labelled "Settings".
     func signOut() {
         let settings = app.webViews.buttons["Settings"].firstMatch
+        pastWelcome(to: settings)
         guard settings.waitForExistence(timeout: 15) else {
             return XCTFail("no Settings button: signed out already, or the page did not load")
         }

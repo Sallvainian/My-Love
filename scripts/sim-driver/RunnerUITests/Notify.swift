@@ -204,6 +204,11 @@ final class Notify: XCTestCase {
         let tooMany = "Notification Center holds more \(icon) notifications than fit on one screen,"
             + " and center reads one screen only (8 groups fit unfolded in portrait)"
         if stacked.count > 0 { return XCTFail(tooMany + ": a stacked group could not be expanded") }
+        // The drag and swipe checks below measure the whole list, every app's
+        // notifications together, so another app's pile fails them too; the
+        // message counts the cells by app so a run shows whose to clear.
+        let full = "Notification Center holds more notifications, from every app together, than fit on one"
+            + " screen, and center reads one screen only (8 groups fit unfolded in portrait)"
         let read = try screenGroups(icon)
         // A summary cell stands for notifications that may have no cell of
         // their own, so it is reported, never dropped quietly.
@@ -214,7 +219,7 @@ final class Notify: XCTestCase {
         drag(list, by: -step)
         let dragged = try cellFrames()
         if dragged != before {
-            return XCTFail(tooMany + ": a drag down the list moved it (\(before.count) cells before, \(dragged.count) after)")
+            return XCTFail(full + ": a drag down the list moved it (\(before.count) cells before, \(dragged.count) after; by app: \(try cellsByApp()))")
         }
         list.swipeUp()
         sleep(1)
@@ -225,7 +230,7 @@ final class Notify: XCTestCase {
             return XCTFail("Notification Center closed on the end-of-list swipe, so center could not confirm the list fits one screen; run it again")
         }
         if after != before {
-            return XCTFail(tooMany + ": a swipe down the list moved it (\(before.count) cells before, \(after.count) after)")
+            return XCTFail(full + ": a swipe down the list moved it (\(before.count) cells before, \(after.count) after; by app: \(try cellsByApp()))")
         }
         let doc: [String: Any] = ["groups": read.groups.map { ["text": $0[0], "count": $0.count] }]
         let data = try JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys])
@@ -245,6 +250,21 @@ final class Notify: XCTestCase {
         guard let cell = first(list) else { return 0 }
         if !cell.label.isEmpty { return frame.height * 0.4 }
         return max(0, frame.minY - cell.frame.minY)
+    }
+
+    // How many of the list's cells each app has, as "MY LOVE 3, RUNNER 12":
+    // a notification cell's label starts with its app's name in capitals.
+    // The list's empty first cell and any cell without a name are left out.
+    func cellsByApp() throws -> String {
+        var counts: [String: Int] = [:]
+        func walk(_ n: XCUIElementSnapshot) {
+            if n.identifier == "ListCell", let name = n.label.split(separator: ",").first, !name.isEmpty {
+                counts[String(name), default: 0] += 1
+            }
+            n.children.forEach(walk)
+        }
+        walk(try springboard.descendants(matching: .any).matching(identifier: "combined-list-view").firstMatch.snapshot())
+        return counts.isEmpty ? "none named" : counts.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
     }
 
     // The frames of the list's cells: a drag that leaves them all in place

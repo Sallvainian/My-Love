@@ -144,9 +144,13 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          title and body) and notification count.
                          Reads one screen only: when Notification Center
                          holds more than fits, it prints no groups and
-                         exits 1 saying so. A "+N from <app>" summary cell
-                         is not a group; each is reported on stderr, since
-                         notifications it stands for may be uncounted. A
+                         exits 1 saying so. Every app's notifications
+                         count toward that, and the message lists the
+                         cells by app; clear the others' first (the
+                         runner's go with permission reset --host). A
+                         "+N from <app>" summary cell is not a group; each
+                         is reported on stderr, since notifications it
+                         stands for may be uncounted. A
                          tap made through screen coordinates (a cell
                          XCUITest calls not hittable) is noted on stderr.
                          Unfolds the Duo and turns it to portrait to read
