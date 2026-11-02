@@ -3073,7 +3073,8 @@ location: src/types/database.types.ts; AGENTS.md (Policy, the regeneration comma
 source_spec: `tickets/epic-push-notifications/tickets/story-moods-photos-pokes-and-kisses-push-plan.md`
 severity: low
 reason: On 2026-10-31 with CLI 2.122, `supabase gen types typescript --local | grep -v '^Connecting to'` differed from the committed file by 1268 diff lines, both at the story's baseline (74897fd9) and after it. Story 3.4's diff to the file is only the `push_requests` columns and relationships, matching the migration. Stories 3.1, 3.2 and 3.4 all reformatted the output by hand, against "never hand-edit" and the Prettier rule against reformatting untouched code, because the raw output would rewrite the whole file. Settle it with a decision: commit the raw output once, as its own commit, and keep it raw from then on; or document the formatting step in AGENTS.md beside the command.
-status: open
+status: done 2026-11-01
+resolution: the CLI prints its types unformatted by design (it says to run oxfmt). `npm run db:types` now formats them with the pinned oxfmt (no semicolons, 80 columns), which reproduces the file's layout; the file was regenerated once with it, restoring the CLI 2.122 `ComputedFields: never` lines. CI's Database Tests job regenerates and fails on any difference, and the CI CLI pins moved to 2.122.0 to match.
 
 ### DW-361: A push that arrives while Love Notes is in front can leave its badge showing on a real iPhone, because the second badge clear waits a fixed 1 s that was measured only on the simulator.
 origin: review story-3.8
