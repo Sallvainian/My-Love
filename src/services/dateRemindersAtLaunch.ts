@@ -1,8 +1,10 @@
 import {
   ANNIVERSARIES_COPY_KIND,
+  COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
   readSavedAnniversaries,
+  readSavedCountdownMarks,
   readSavedCoupleSettings,
   readSavedOwnProfile,
 } from '../stores/slices/settingsSlice';
@@ -24,19 +26,20 @@ export interface LaunchOwner {
 }
 
 /**
- * The date reminders' re-plan and its triggers (stories 4.1 and 4.6).
+ * The date reminders' re-plan and its triggers (stories 4.1, 4.2 and 4.6).
  *
  * `replanDateReminders()` plans from the saved local copies of all five date
  * kinds (`events`, `anniversaries`, `couple-settings`, `profile`, `partner`)
- * and replaces the shell's pending reminders. It never reads the store's copy
- * of a date, because the store cannot tell "not loaded" apart for these kinds:
- * the anniversaries start as `[]` and the partner is `null` both when unlinked
- * and before it has loaded. A copy exists only after a server answer or a
- * confirmed write, so a copy is a loaded value. If any of the five reads
- * `null` (absent, failed or malformed) the whole re-plan is skipped and the
- * pending list stays: planning the other kinds would cancel that kind's
- * reminders, which is the wipe this rule forbids. It never loads anything
- * from the server.
+ * and the marks copy (`countdown-marks`, the dates marked for the month and
+ * week reminders), and replaces the shell's pending reminders. It never reads
+ * the store's copy of a date, because the store cannot tell "not loaded" apart
+ * for these kinds: the anniversaries start as `[]` and the partner is `null`
+ * both when unlinked and before it has loaded. A copy exists only after a
+ * server answer or a confirmed write, so a copy is a loaded value (an empty
+ * marks list is a loaded "no marks"). If any of the six reads `null` (absent,
+ * failed or malformed) the whole re-plan is skipped and the pending list
+ * stays: planning the other kinds would cancel that kind's reminders, which is
+ * the wipe this rule forbids. It never loads anything from the server.
  *
  * Single-flight: while a re-plan runs, any number of further requests collapse
  * into one more run after it. The native calls themselves run in
@@ -45,8 +48,9 @@ export interface LaunchOwner {
  * Triggers: the signed-in start (`scheduleDateRemindersAtLaunch`), the push
  * permission answer (App), `startDateReminderTriggers()`'s foreground return
  * (`visibilitychange` to visible) and every successful write of a date kind's
- * copy for the signed-in user. The write hook fires after the copy lands, so
- * the re-plan reads the new value; a store subscription would fire before it.
+ * copy, the marks copy included, for the signed-in user. The write hook fires
+ * after the copy lands, so the re-plan reads the new value; a store
+ * subscription would fire before it.
  *
  * Like `pushNotifications.ts`, it is a no-op on the web and in a shell without
  * the plugin: no plugin call, no IndexedDB read, no listener. It never throws.
@@ -58,6 +62,7 @@ const DATE_COPY_KINDS: ReadonlySet<string> = new Set([
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
   PARTNER_COPY_KIND,
+  COUNTDOWN_MARKS_COPY_KIND,
 ]);
 
 function isCurrent({ userId, authSessionVersion }: LaunchOwner): boolean {
@@ -72,16 +77,17 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
 
   try {
     const { userId } = owner;
-    const [events, anniversaries, coupleSettings, ownProfile, partner] = await Promise.all([
+    const [events, anniversaries, coupleSettings, ownProfile, partner, marks] = await Promise.all([
       readSavedEvents(userId),
       readSavedAnniversaries(userId),
       readSavedCoupleSettings(userId),
       readSavedOwnProfile(userId),
       readSavedPartner(userId),
+      readSavedCountdownMarks(userId),
     ]);
     if (!isCurrent(owner)) return;
     // A copy that is missing is not yet loaded: keep whatever is pending.
-    if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner) return;
+    if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner || !marks) return;
 
     const linked = coupleSettings.status === 'linked' ? coupleSettings : null;
     const dates: ReminderDates = {
@@ -94,6 +100,7 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
         partner.status === 'linked'
           ? { name: partner.partner.displayName, birthday: partner.partner.birthday }
           : null,
+      marks: new Set(marks),
     };
 
     await scheduleDateReminders(planDateReminders(dates, new Date()), () => isCurrent(owner));

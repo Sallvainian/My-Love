@@ -222,6 +222,8 @@ export function signedOutState() {
     // The outgoing account's push switches.
     pushPreferences: null,
     pushPreferencesLoadFailed: false,
+    // The outgoing account's marked dates ("not loaded" for the next account).
+    countdownMarks: null,
   } satisfies Partial<AppState>;
 }
 

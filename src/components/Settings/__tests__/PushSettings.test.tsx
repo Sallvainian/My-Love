@@ -39,6 +39,12 @@ vi.mock('../../../api/supabaseClient', () => ({
   lookupPartnerId: vi.fn(),
   isSeedFallbackName: () => false,
 }));
+vi.mock('../../../services/countdownMarksService', () => ({
+  countdownMarksService: {
+    fetchCountdownMarks: vi.fn(() => Promise.resolve([])),
+    setCountdownMark: vi.fn(() => Promise.resolve()),
+  },
+}));
 vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/pushPreferencesService')>()),
   pushPreferencesService: service,

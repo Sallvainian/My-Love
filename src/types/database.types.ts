@@ -87,6 +87,24 @@ export type Database = {
         }
         Relationships: []
       }
+      countdown_marks: {
+        Row: {
+          created_at: string
+          date_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       couple_settings: {
         Row: {
           relationship_start: string | null

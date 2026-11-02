@@ -28,7 +28,12 @@ import { routeNotificationTap } from './pushNotifications';
  * fan-out (`listenForReminderTaps`).
  *
  * Every date gets a "Tomorrow: ..." reminder and, except an event, a
- * "Today: ..." one, both at 9:00 local time. Each is a dated calendar trigger
+ * "Today: ..." one, both at 9:00 local time. A date the person marked for the
+ * countdown (`marks`, story 4.2) also gets "In a month: ..." (the same day of
+ * the previous month, clamped to the last day of a shorter one) and "In a
+ * week: ..." (7 days before), at 9:00 too, for the same occurrence as the
+ * day-before reminder. `reminderDateEntries` lists the dates a person can mark
+ * and the key each is marked under. Each is a dated calendar trigger
  * (`schedule.on` with the year set): the plugin always makes it repeating, but
  * with the year pinned it matches only once. Each occurrence is its own
  * request because a birthday's text names an age and the wedding's text
@@ -67,21 +72,37 @@ export interface ReminderBirthday {
   birthday: string | null;
 }
 
+/**
+ * The keys a date is marked under (`public.countdown_marks.date_key`). An event
+ * is `event:<events.id>` and an anniversary `anniversary:<anniversaries.id>`
+ * (its copy's `serverId`); the four fixed dates have a key of their own.
+ */
+export const MARK_KEYS = {
+  relationshipStart: 'relationship-start',
+  wedding: 'wedding',
+  ownBirthday: 'own-birthday',
+  partnerBirthday: 'partner-birthday',
+  event: (id: string) => `event:${id}`,
+  anniversary: (serverId: string) => `anniversary:${serverId}`,
+} as const;
+
 /** Every date the planner reads. */
 export interface ReminderDates {
-  events: { label: string; date: Date }[];
-  /** The person's own anniversaries; `date` is `YYYY-MM-DD`. */
-  anniversaries: { label: string; date: string }[];
+  events: { id: string; label: string; date: Date }[];
+  /** The person's own anniversaries; `date` is `YYYY-MM-DD`, `serverId` is `anniversaries.id`. */
+  anniversaries: { label: string; date: string; serverId?: string }[];
   /** ISO instant, or `null` when not set. */
   relationshipStart: string | null;
   /** `YYYY-MM-DD`, or `null` when not set. */
   weddingDate: string | null;
   ownBirthday: ReminderBirthday | null;
   partnerBirthday: ReminderBirthday | null;
+  /** The keys of the dates marked for the month and week reminders. */
+  marks: ReadonlySet<string>;
 }
 
 export interface PlannedReminder {
-  /** The notification title, "Tomorrow: {name}" or "Today: {name}". */
+  /** The notification title: "In a month: {name}", "In a week: {name}", "Tomorrow: {name}" or "Today: {name}". */
   text: string;
   /** The moment it fires (9:00 local). */
   fireAt: Date;
@@ -109,18 +130,96 @@ function addReminder(planned: PlannedReminder[], prefix: string, name: string, f
   });
 }
 
-/** The day-before reminder for `day`, and the on-the-day one unless `onTheDay` is false. */
-function addDay(planned: PlannedReminder[], day: Date, name: string, onTheDay: boolean, now: Date) {
+/**
+ * 9:00 local on the same day of the month, one month before `day`; the day is
+ * clamped to the last day of a shorter month (31 March gives 28 or 29 February).
+ */
+function monthBefore(day: Date): Date {
+  const month = new Date(day.getFullYear(), day.getMonth() - 1, 1, REMINDER_HOUR, 0);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  month.setDate(Math.min(day.getDate(), last));
+  return month;
+}
+
+/**
+ * The day-before reminder for `day`, and the on-the-day one unless `onTheDay`
+ * is false. A `marked` date also gets the month-before and week-before ones.
+ */
+function addDay(
+  planned: PlannedReminder[],
+  day: Date,
+  name: string,
+  onTheDay: boolean,
+  marked: boolean,
+  now: Date
+) {
+  if (marked) {
+    addReminder(planned, 'In a month', name, monthBefore(day), now);
+    addReminder(planned, 'In a week', name, reminderMoment(day, -7), now);
+  }
   addReminder(planned, 'Tomorrow', name, reminderMoment(day, -1), now);
   if (onTheDay) addReminder(planned, 'Today', name, reminderMoment(day, 0), now);
 }
 
-function addBirthday(planned: PlannedReminder[], birthday: ReminderBirthday | null, now: Date) {
+function addBirthday(
+  planned: PlannedReminder[],
+  birthday: ReminderBirthday | null,
+  marked: boolean,
+  now: Date
+) {
   const info = toBirthdayInfo(birthday?.birthday ?? null);
   if (!birthday || !info) return;
   const age = getUpcomingAge(info, now);
   const name = birthday.name === null ? `You turn ${age}` : `${birthday.name} turns ${age}`;
-  addDay(planned, getNextBirthday(info, now), name, true, now);
+  addDay(planned, getNextBirthday(info, now), name, true, marked, now);
+}
+
+/**
+ * The dates a person can mark, each with its key and the name the marks list
+ * shows, in the list's order: events in list order, the anniversaries,
+ * `Our anniversary`, `Wedding`, `Your birthday`, `{partner}'s birthday`. Only a
+ * date that is set and readable is listed, an event dated `now`'s day or
+ * earlier is not (an event has no on-the-day reminder, so none of its moments
+ * is ahead), and an anniversary with no `serverId` is not (it has no key yet). The names are the Home cards' labels;
+ * the relationship start is the exception, since its card ("Together for")
+ * does not name a date.
+ */
+export function reminderDateEntries(
+  dates: Omit<ReminderDates, 'marks'>,
+  now: Date
+): { key: string; name: string }[] {
+  const entries: { key: string; name: string }[] = [];
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  for (const event of dates.events) {
+    if (Number.isNaN(event.date.getTime()) || event.date.getTime() <= startOfToday.getTime()) continue;
+    entries.push({ key: MARK_KEYS.event(event.id), name: event.label });
+  }
+
+  for (const anniversary of dates.anniversaries) {
+    if (!anniversary.serverId || !parseEventDate(anniversary.date)) continue;
+    entries.push({ key: MARK_KEYS.anniversary(anniversary.serverId), name: anniversary.label });
+  }
+
+  if (dates.relationshipStart && !Number.isNaN(new Date(dates.relationshipStart).getTime())) {
+    entries.push({ key: MARK_KEYS.relationshipStart, name: 'Our anniversary' });
+  }
+
+  if (dates.weddingDate && parseEventDate(dates.weddingDate)) {
+    entries.push({ key: MARK_KEYS.wedding, name: 'Wedding' });
+  }
+
+  if (toBirthdayInfo(dates.ownBirthday?.birthday ?? null)) {
+    entries.push({ key: MARK_KEYS.ownBirthday, name: 'Your birthday' });
+  }
+  if (dates.partnerBirthday && toBirthdayInfo(dates.partnerBirthday.birthday)) {
+    entries.push({
+      key: MARK_KEYS.partnerBirthday,
+      name: `${dates.partnerBirthday.name ?? 'Your partner'}'s birthday`,
+    });
+  }
+
+  return entries;
 }
 
 /**
@@ -134,12 +233,13 @@ export function planDateReminders(dates: ReminderDates, now: Date): PlannedRemin
   // An event happens once, so it has no on-the-day reminder.
   for (const event of dates.events) {
     if (Number.isNaN(event.date.getTime())) continue;
-    addDay(planned, event.date, event.label, false, now);
+    addDay(planned, event.date, event.label, false, dates.marks.has(MARK_KEYS.event(event.id)), now);
   }
 
   for (const anniversary of dates.anniversaries) {
     if (!parseEventDate(anniversary.date)) continue;
-    addDay(planned, getNextAnniversaryDate(anniversary.date, now), anniversary.label, true, now);
+    const marked = !!anniversary.serverId && dates.marks.has(MARK_KEYS.anniversary(anniversary.serverId));
+    addDay(planned, getNextAnniversaryDate(anniversary.date, now), anniversary.label, true, marked, now);
   }
 
   // The start recurs on its calendar date in the device's time zone; the start's
@@ -149,21 +249,24 @@ export function planDateReminders(dates: ReminderDates, now: Date): PlannedRemin
     if (!Number.isNaN(start.getTime())) {
       const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
       const next = getNextAnniversaryDate(formatDateISO(startDay), now);
-      if (next.getTime() > startDay.getTime()) addDay(planned, next, 'Our anniversary', true, now);
+      if (next.getTime() > startDay.getTime()) {
+        addDay(planned, next, 'Our anniversary', true, dates.marks.has(MARK_KEYS.relationshipStart), now);
+      }
     }
   }
 
   const wedding = dates.weddingDate ? parseEventDate(dates.weddingDate) : null;
   if (dates.weddingDate && wedding) {
+    const marked = dates.marks.has(MARK_KEYS.wedding);
     if (wedding.getTime() >= startOfToday.getTime()) {
-      addDay(planned, wedding, 'Wedding day', true, now);
+      addDay(planned, wedding, 'Wedding day', true, marked, now);
     } else {
-      addDay(planned, getNextAnniversaryDate(dates.weddingDate, now), 'Wedding anniversary', true, now);
+      addDay(planned, getNextAnniversaryDate(dates.weddingDate, now), 'Wedding anniversary', true, marked, now);
     }
   }
 
-  addBirthday(planned, dates.ownBirthday, now);
-  addBirthday(planned, dates.partnerBirthday, now);
+  addBirthday(planned, dates.ownBirthday, dates.marks.has(MARK_KEYS.ownBirthday), now);
+  addBirthday(planned, dates.partnerBirthday, dates.marks.has(MARK_KEYS.partnerBirthday), now);
 
   // Array.prototype.sort is stable, so reminders at one moment keep this order.
   planned.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime());

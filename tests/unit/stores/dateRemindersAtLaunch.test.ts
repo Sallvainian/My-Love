@@ -1,6 +1,7 @@
 /**
- * The re-plan for date reminders and its triggers (stories 4.1 and 4.6): a real
- * store, real local copies of all five date kinds in fake-indexeddb, and the
+ * The re-plan for date reminders and its triggers (stories 4.1, 4.2 and 4.6): a
+ * real store, real local copies of the five date kinds and the countdown marks
+ * in fake-indexeddb, and the
  * Capacitor plugin mocked. The sign-out cancel is stubbed here (a switch of
  * account in these cases would otherwise call the plugin); its own cases are in
  * `signOutCancelsDateReminders.test.ts` and `dateReminders.test.ts`.
@@ -62,6 +63,7 @@ import { EVENTS_COPY_KIND } from '../../../src/stores/slices/eventsSlice';
 import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import {
   ANNIVERSARIES_COPY_KIND,
+  COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
 } from '../../../src/stores/slices/settingsSlice';
@@ -111,6 +113,7 @@ const DATE_KINDS = [
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
   PARTNER_COPY_KIND,
+  COUNTDOWN_MARKS_COPY_KIND,
 ] as const;
 
 function partnerInfo(birthday: string | null = '1995-11-09') {
@@ -123,7 +126,7 @@ function partnerInfo(birthday: string | null = '1995-11-09') {
   };
 }
 
-/** One date of each kind, 3 to 8 days ahead of `NOW`, as the five saved copies. */
+/** One date of each kind, 3 to 8 days ahead of `NOW`, as the saved copies; nothing is marked. */
 function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
   return {
     [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04')],
@@ -136,10 +139,11 @@ function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
     },
     [PROFILE_COPY_KIND]: { displayName: null, birthday: '1996-11-08' },
     [PARTNER_COPY_KIND]: { status: 'linked', partner: partnerInfo() },
+    [COUNTDOWN_MARKS_COPY_KIND]: [],
   };
 }
 
-/** Writes the five copies for A; `overrides` replaces a kind's value, `omit` leaves a kind unsaved. */
+/** Writes the copies for A; `overrides` replaces a kind's value, `omit` leaves a kind unsaved. */
 async function seedCopies(
   overrides: Partial<Record<(typeof DATE_KINDS)[number], unknown>> = {},
   omit: readonly string[] = []
@@ -218,6 +222,34 @@ describe('scheduleDateRemindersAtLaunch', () => {
     expect(localNotifications.schedule.mock.calls[0][0].notifications[0].schedule).toEqual({
       on: { year: 2026, month: 11, day: 3, hour: 9, minute: 0 },
     });
+  });
+
+  it('adds In a month and In a week for the dates in the marks copy, and only for those', async () => {
+    await seedCopies({
+      [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04'), savedEvent('Far', '2026-12-11')],
+      [ANNIVERSARIES_COPY_KIND]: [{ id: 1, date: '2021-12-20', label: 'Dinner', serverId: 'ann-1' }],
+      [COUNTDOWN_MARKS_COPY_KIND]: ['event:event-Far', 'anniversary:ann-1', 'event:deleted-event'],
+    });
+
+    await scheduleDateRemindersAtLaunch(owner());
+
+    const titles = scheduledTitles();
+    expect(titles).toContain('In a month: Far @ 11/11 9:00');
+    expect(titles).toContain('In a week: Far @ 12/4 9:00');
+    expect(titles).toContain('Tomorrow: Far @ 12/10 9:00');
+    expect(titles).toContain('In a month: Dinner @ 11/20 9:00');
+    expect(titles).toContain('In a week: Dinner @ 12/13 9:00');
+    // Unmarked dates stay as they were.
+    expect(titles.filter((title) => title.startsWith('In a'))).toHaveLength(4);
+    expect(titles).toContain('Tomorrow: Trip @ 11/3 9:00');
+  });
+
+  it('plans an empty marks copy as a loaded "no marks"', async () => {
+    await seedCopies({ [COUNTDOWN_MARKS_COPY_KIND]: [] });
+
+    await scheduleDateRemindersAtLaunch(owner());
+
+    expect(scheduledTitles().some((title) => title.startsWith('In a'))).toBe(false);
   });
 
   it('names an own birthday after a chosen display name', async () => {
@@ -367,6 +399,8 @@ describe('replanDateReminders reads only loaded copies', () => {
     [PROFILE_COPY_KIND, 'not a profile'],
     [PARTNER_COPY_KIND, { status: 'linked' }],
     [EVENTS_COPY_KIND, { not: 'a list' }],
+    [COUNTDOWN_MARKS_COPY_KIND, 'not a list'],
+    [COUNTDOWN_MARKS_COPY_KIND, ['wedding', 7]],
   ] as const)('treats a malformed %s copy as missing', async (kind, value) => {
     await seedCopies({ [kind]: value });
 
@@ -588,6 +622,20 @@ describe('startDateReminderTriggers', () => {
   it.each(DATE_KINDS)('re-plans when the %s copy is written', async (kind) => {
     await writeLocalCopy(A, kind, defaultCopies()[kind]);
     await scheduledTimes(1);
+  });
+
+  it('re-plans with a marks copy write: marking a far date adds its month and week reminders', async () => {
+    await writeLocalCopy(A, EVENTS_COPY_KIND, [savedEvent('Far', '2026-12-11')]);
+    await scheduledTimes(1);
+    expect(scheduledTitles().some((title) => title.startsWith('In a'))).toBe(false);
+
+    await writeLocalCopy(A, COUNTDOWN_MARKS_COPY_KIND, ['event:event-Far']);
+    await scheduledTimes(2);
+
+    const titles = localNotifications.schedule.mock.calls[1][0].notifications.map((n) => n.title);
+    expect(titles).toEqual(
+      expect.arrayContaining(['In a month: Far', 'In a week: Far', 'Tomorrow: Far'])
+    );
   });
 
   it('does not re-plan for a kind that holds no date', async () => {

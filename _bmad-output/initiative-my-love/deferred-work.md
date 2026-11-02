@@ -3157,3 +3157,11 @@ source_spec: `tickets/epic-date-reminders/tickets/story-reminders-re-plan-on-eve
 severity: medium
 reason: Quick review finding, verdict maybe-false. The plugin's `schedule` calls `center.add` and resolves without waiting for its completion (LocalNotificationsPlugin.swift:211-227), and this story makes back-to-back re-plans routine (single-flight follow-up, copy-write bursts). Whether a `getPendingNotificationRequests` issued right after can miss an `add` still in flight is undocumented. On the simulator in this pass, a delete took the list from 12 to 10 and both stale ids were cancelled, but a single run does not settle the race. To settle it, schedule N and then immediately run getPending in a loop on a device or simulator and check whether it ever lists fewer than N. The fix, if needed, is the sign-out cancel's id union (1..64 plus pending) in scheduleDateReminders' cancel step. (declared severity: medium (unverified))
 status: open
+
+### DW-374: `src/types/database.types.ts` gets each new table's block inserted in the committed file's style, because `supabase gen types typescript --local` on CLI 2.122.0 no longer reproduces the committed
+origin: spec-deferred 8482db9d6aac
+location: src/types/database.types.ts, AGENTS.md (Policy, database.types.ts)
+source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
+severity: low
+reason: Quick review finding. On CLI 2.122.0 the command prints unformatted output, 621 lines against the committed 977, with `ComputedFields: never` in all 22 tables. A whole-file regeneration would rewrite every table's lines. Story 3.8 (b430cde6) and this story both inserted only their own table's block, which matches the generator's Row/Insert/Update shape. Settling it is a decision for the owner: either commit one full regeneration on the current CLI and run Prettier on that generated file, or amend the AGENTS.md rule. The rule edit touches an agent-context file.
+status: open

@@ -30,11 +30,13 @@ vi.mock('../../api/supabaseClient', () => ({ supabase: {} }));
 
 import { getNextAnniversaryDate, getNextBirthday, toBirthdayInfo } from '../../utils/countdownService';
 import {
+  MARK_KEYS,
   MAX_SCHEDULED_REMINDERS,
   REMINDER_THREAD_ID,
   cancelDateReminders,
   hasNativeReminders,
   planDateReminders,
+  reminderDateEntries,
   scheduleDateReminders,
   type PlannedReminder,
   type ReminderDates,
@@ -51,10 +53,25 @@ const NO_DATES: ReminderDates = {
   weddingDate: null,
   ownBirthday: null,
   partnerBirthday: null,
+  marks: new Set(),
 };
 
-function plan(dates: Partial<ReminderDates>, now: Date = NOW): PlannedReminder[] {
-  return planDateReminders({ ...NO_DATES, ...dates }, now);
+/** What `plan` takes: an event's id defaults to `event-<label>`, and the marks are a list. */
+type PlanInput = Partial<Omit<ReminderDates, 'events' | 'marks'>> & {
+  events?: { id?: string; label: string; date: Date }[];
+  marks?: readonly string[];
+};
+
+function plan({ events = [], marks = [], ...dates }: PlanInput, now: Date = NOW): PlannedReminder[] {
+  return planDateReminders(
+    {
+      ...NO_DATES,
+      ...dates,
+      events: events.map((event) => ({ id: `event-${event.label}`, ...event })),
+      marks: new Set(marks),
+    },
+    now
+  );
 }
 
 /** `text` and the local `YYYY-M-D H:mm` of each reminder. */
@@ -306,6 +323,213 @@ describe('planDateReminders', () => {
     });
   });
 
+  describe('marked dates', () => {
+    const TRIP = MARK_KEYS.event('event-Trip');
+
+    it('adds In a month and In a week for an event 40 days ahead, beside Tomorrow', () => {
+      const reminders = plan({
+        events: [{ label: 'Trip', date: new Date(2026, 11, 11) }],
+        marks: [TRIP],
+      });
+
+      expect(summary(reminders)).toEqual([
+        'In a month: Trip @ 2026-11-11 9:00',
+        'In a week: Trip @ 2026-12-4 9:00',
+        'Tomorrow: Trip @ 2026-12-10 9:00',
+      ]);
+      expect(reminders[0].fireAt).toEqual(new Date(2026, 10, 11, 9, 0));
+      expect(reminders[0].on).toEqual({ year: 2026, month: 11, day: 11, hour: 9, minute: 0 });
+    });
+
+    it('drops the month and week reminders that are already past (5 days ahead)', () => {
+      const relationshipStart = new Date(2020, 10, 6, 22, 30).toISOString();
+
+      expect(summary(plan({ relationshipStart, marks: [MARK_KEYS.relationshipStart] }))).toEqual([
+        'Tomorrow: Our anniversary @ 2026-11-5 9:00',
+        'Today: Our anniversary @ 2026-11-6 9:00',
+      ]);
+    });
+
+    it('keeps only In a week for a date 10 days ahead', () => {
+      expect(
+        summary(
+          plan({
+            anniversaries: [{ label: 'Dinner', date: '2020-11-11', serverId: 'ann-1' }],
+            marks: [MARK_KEYS.anniversary('ann-1')],
+          })
+        )
+      ).toEqual([
+        'In a week: Dinner @ 2026-11-4 9:00',
+        'Tomorrow: Dinner @ 2026-11-10 9:00',
+        'Today: Dinner @ 2026-11-11 9:00',
+      ]);
+    });
+
+    it('keeps an In a month reminder that is still ahead earlier the same day', () => {
+      // 9:00 on 1 Nov is the moment, so at 08:00 it is still ahead.
+      expect(
+        summary(
+          plan({ events: [{ label: 'Trip', date: new Date(2026, 11, 1) }], marks: [TRIP] }, EARLY)
+        )
+      ).toEqual([
+        'In a month: Trip @ 2026-11-1 9:00',
+        'In a week: Trip @ 2026-11-24 9:00',
+        'Tomorrow: Trip @ 2026-11-30 9:00',
+      ]);
+    });
+
+    it('plans an unmarked date exactly as before', () => {
+      const dates = {
+        events: [{ label: 'Trip', date: new Date(2026, 11, 11) }],
+        anniversaries: [{ label: 'Dinner', date: '2020-11-11', serverId: 'ann-1' }],
+        weddingDate: '2026-12-20',
+        ownBirthday: { name: null, birthday: '1996-12-24' },
+      };
+
+      expect(plan({ ...dates, marks: [] })).toEqual(plan({ ...dates, marks: ['event:other'] }));
+      expect(summary(plan({ ...dates, marks: [] })).some((line) => line.startsWith('In a'))).toBe(false);
+    });
+
+    it('ignores a mark that matches no current date', () => {
+      const reminders = plan({
+        events: [{ label: 'Trip', date: new Date(2026, 11, 11) }],
+        marks: ['event:deleted-event', 'anniversary:deleted', MARK_KEYS.wedding, 'garbage'],
+      });
+
+      expect(summary(reminders)).toEqual(['Tomorrow: Trip @ 2026-12-10 9:00']);
+    });
+
+    it('gives an anniversary with no serverId no month and week reminders', () => {
+      const reminders = plan({
+        anniversaries: [{ label: 'Dinner', date: '2020-12-20' }],
+        marks: ['anniversary:undefined', 'anniversary:', 'anniversary:ann-1'],
+      });
+
+      expect(summary(reminders)).toEqual([
+        'Tomorrow: Dinner @ 2026-12-19 9:00',
+        'Today: Dinner @ 2026-12-20 9:00',
+      ]);
+    });
+
+    it('clamps the month-before day to the last day of a shorter month', () => {
+      // 31 March 2027: February has 28 days.
+      expect(
+        summary(plan({ events: [{ label: 'Trip', date: new Date(2027, 2, 31) }], marks: [TRIP] }))
+      ).toEqual([
+        'In a month: Trip @ 2027-2-28 9:00',
+        'In a week: Trip @ 2027-3-24 9:00',
+        'Tomorrow: Trip @ 2027-3-30 9:00',
+      ]);
+      // 31 March 2028: February has 29 days.
+      expect(
+        summary(
+          plan({ events: [{ label: 'Trip', date: new Date(2028, 2, 31) }], marks: [TRIP] }, new Date(2028, 0, 2))
+        )[0]
+      ).toBe('In a month: Trip @ 2028-2-29 9:00');
+      // 31 December: November has 30 days.
+      expect(
+        summary(plan({ events: [{ label: 'Trip', date: new Date(2026, 11, 31) }], marks: [TRIP] }))[0]
+      ).toBe('In a month: Trip @ 2026-11-30 9:00');
+    });
+
+    it('takes the month before across a year boundary', () => {
+      expect(
+        summary(
+          plan({ events: [{ label: 'Trip', date: new Date(2027, 0, 15) }], marks: [TRIP] }, new Date(2026, 10, 20))
+        )[0]
+      ).toBe('In a month: Trip @ 2026-12-15 9:00');
+    });
+
+    it('uses the next occurrence of a yearly date', () => {
+      // 15 October has passed this year, so the occurrence is 15 October 2027.
+      expect(
+        summary(
+          plan({
+            anniversaries: [{ label: 'Dinner', date: '2020-10-15', serverId: 'ann-1' }],
+            marks: [MARK_KEYS.anniversary('ann-1')],
+          })
+        )
+      ).toEqual([
+        'In a month: Dinner @ 2027-9-15 9:00',
+        'In a week: Dinner @ 2027-10-8 9:00',
+        'Tomorrow: Dinner @ 2027-10-14 9:00',
+        'Today: Dinner @ 2027-10-15 9:00',
+      ]);
+    });
+
+    it('marks the relationship start under its own key', () => {
+      const relationshipStart = new Date(2020, 11, 20, 22, 30).toISOString();
+
+      expect(summary(plan({ relationshipStart, marks: [MARK_KEYS.relationshipStart] }))).toEqual([
+        'In a month: Our anniversary @ 2026-11-20 9:00',
+        'In a week: Our anniversary @ 2026-12-13 9:00',
+        'Tomorrow: Our anniversary @ 2026-12-19 9:00',
+        'Today: Our anniversary @ 2026-12-20 9:00',
+      ]);
+    });
+
+    it('marks the wedding, before and after the day', () => {
+      const marks = [MARK_KEYS.wedding];
+
+      expect(summary(plan({ weddingDate: '2026-12-20', marks }))).toEqual([
+        'In a month: Wedding day @ 2026-11-20 9:00',
+        'In a week: Wedding day @ 2026-12-13 9:00',
+        'Tomorrow: Wedding day @ 2026-12-19 9:00',
+        'Today: Wedding day @ 2026-12-20 9:00',
+      ]);
+      expect(summary(plan({ weddingDate: '2020-12-20', marks }))).toEqual([
+        'In a month: Wedding anniversary @ 2026-11-20 9:00',
+        'In a week: Wedding anniversary @ 2026-12-13 9:00',
+        'Tomorrow: Wedding anniversary @ 2026-12-19 9:00',
+        'Today: Wedding anniversary @ 2026-12-20 9:00',
+      ]);
+    });
+
+    it('marks each birthday on its own and names them as the day-before reminder does', () => {
+      const dates = {
+        ownBirthday: { name: null, birthday: '1996-12-24' },
+        partnerBirthday: { name: 'Jessie', birthday: '1995-12-26' },
+      };
+
+      expect(summary(plan({ ...dates, marks: [MARK_KEYS.ownBirthday] }))).toEqual([
+        'In a month: You turn 30 @ 2026-11-24 9:00',
+        'In a week: You turn 30 @ 2026-12-17 9:00',
+        'Tomorrow: You turn 30 @ 2026-12-23 9:00',
+        'Today: You turn 30 @ 2026-12-24 9:00',
+        'Tomorrow: Jessie turns 31 @ 2026-12-25 9:00',
+        'Today: Jessie turns 31 @ 2026-12-26 9:00',
+      ]);
+      expect(summary(plan({ ...dates, marks: [MARK_KEYS.partnerBirthday] })).filter((l) => l.startsWith('In a'))).toEqual([
+        'In a month: Jessie turns 31 @ 2026-11-26 9:00',
+        'In a week: Jessie turns 31 @ 2026-12-19 9:00',
+      ]);
+    });
+
+    it('cuts to the soonest 64 across the month and week reminders too', () => {
+      const day = (offset: number) => new Date(2026, 10, 1 + offset);
+      // 20 marked events 40..59 days ahead (3 reminders each) and 10 unmarked ones 2..11 days ahead.
+      const marked = Array.from({ length: 20 }, (_, i) => ({ label: `Marked ${i}`, date: day(40 + i) }));
+      const unmarked = Array.from({ length: 10 }, (_, i) => ({ label: `Plain ${i}`, date: day(2 + i) }));
+      const expected = [
+        ...marked.flatMap((_, i) => [
+          new Date(2026, 10, 11 + i, 9, 0).getTime(), // the month before: 11 Nov..30 Nov
+          day(40 + i - 7).setHours(9, 0, 0, 0),
+          day(40 + i - 1).setHours(9, 0, 0, 0),
+        ]),
+        ...unmarked.map((_, i) => day(2 + i - 1).setHours(9, 0, 0, 0)),
+      ].sort((a, b) => a - b);
+      expect(expected).toHaveLength(70);
+
+      const reminders = plan({
+        events: [...unmarked, ...marked],
+        marks: marked.map((event) => MARK_KEYS.event(`event-${event.label}`)),
+      });
+
+      expect(reminders).toHaveLength(MAX_SCHEDULED_REMINDERS);
+      expect(reminders.map((r) => r.fireAt.getTime())).toEqual(expected.slice(0, 64));
+    });
+  });
+
   describe('order and limit', () => {
     it('sorts every kind by moment', () => {
       const reminders = plan({
@@ -385,6 +609,99 @@ describe('planDateReminders', () => {
     it('plans nothing without dates', () => {
       expect(plan({})).toEqual([]);
     });
+  });
+});
+
+describe('reminderDateEntries', () => {
+  const dates = {
+    events: [
+      { id: 'e1', label: 'Trip', date: new Date(2026, 11, 11) },
+      { id: 'e2', label: 'Move', date: new Date(2027, 0, 5) },
+    ],
+    anniversaries: [
+      { label: 'Dinner', date: '2020-11-06', serverId: 'a1' },
+      { label: 'Not saved yet', date: '2020-11-07' },
+      { label: 'Garbage', date: 'garbage', serverId: 'a3' },
+    ],
+    relationshipStart: new Date(2020, 10, 6, 22, 30).toISOString(),
+    weddingDate: '2026-12-20',
+    ownBirthday: { name: 'Casey', birthday: '1996-12-24' },
+    partnerBirthday: { name: 'Jessie', birthday: '1995-12-26' },
+  };
+
+  it('lists the set dates in the marks list order, with the Home cards names', () => {
+    expect(reminderDateEntries(dates, NOW)).toEqual([
+      { key: 'event:e1', name: 'Trip' },
+      { key: 'event:e2', name: 'Move' },
+      { key: 'anniversary:a1', name: 'Dinner' },
+      { key: 'relationship-start', name: 'Our anniversary' },
+      { key: 'wedding', name: 'Wedding' },
+      { key: 'own-birthday', name: 'Your birthday' },
+      { key: 'partner-birthday', name: "Jessie's birthday" },
+    ]);
+  });
+
+  it('leaves out every date that is not set or cannot be read', () => {
+    expect(
+      reminderDateEntries({
+        events: [{ id: 'e1', label: 'Broken', date: new Date('garbage') }],
+        anniversaries: [],
+        relationshipStart: 'garbage',
+        weddingDate: null,
+        ownBirthday: { name: null, birthday: null },
+        partnerBirthday: null,
+      }, NOW)
+    ).toEqual([]);
+  });
+
+  it('leaves out an event dated today or before, keeps one dated tomorrow', () => {
+    const entries = reminderDateEntries({
+      ...dates,
+      events: [
+        { id: 'past', label: 'Last week', date: new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - 7) },
+        { id: 'today', label: 'Today', date: new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate()) },
+        { id: 'tomorrow', label: 'Tomorrow', date: new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + 1) },
+      ],
+    }, NOW);
+
+    expect(entries.filter((entry) => entry.key.startsWith('event:'))).toEqual([
+      { key: 'event:tomorrow', name: 'Tomorrow' },
+    ]);
+  });
+
+  it('names an own birthday "Your birthday" with or without a chosen name', () => {
+    const entries = reminderDateEntries({
+      ...dates,
+      events: [],
+      anniversaries: [],
+      relationshipStart: null,
+      weddingDate: null,
+      ownBirthday: { name: null, birthday: '1996-12-24' },
+      partnerBirthday: null,
+    }, NOW);
+
+    expect(entries).toEqual([{ key: 'own-birthday', name: 'Your birthday' }]);
+  });
+
+  it('uses the keys the planner reads: marking every entry marks every date that is far enough ahead', () => {
+    const keys = reminderDateEntries(dates, NOW).map((entry) => entry.key);
+    const marked = planDateReminders({ ...dates, marks: new Set(keys) }, NOW);
+
+    // Dinner and Our anniversary are 5 days ahead, so their month and week reminders are already past.
+    expect(marked.filter((r) => r.text.startsWith('In a month')).map((r) => r.text)).toEqual([
+      'In a month: Trip',
+      'In a month: Wedding day',
+      'In a month: Casey turns 30',
+      'In a month: Jessie turns 31',
+      'In a month: Move',
+    ]);
+    expect(marked.filter((r) => r.text.startsWith('In a week')).map((r) => r.text)).toEqual([
+      'In a week: Trip',
+      'In a week: Wedding day',
+      'In a week: Casey turns 30',
+      'In a week: Jessie turns 31',
+      'In a week: Move',
+    ]);
   });
 });
 

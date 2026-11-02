@@ -10,6 +10,7 @@ import { anniversariesService } from '../../../src/services/anniversariesService
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
 import { registerLocalCopy } from '../../../src/services/localCopy';
 import {
+  COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
 } from '../../../src/stores/slices/settingsSlice';
@@ -225,6 +226,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     const unregisterLoveNotesNoop = registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {});
     const unregisterPhotosNoop = registerLocalCopy(PHOTOS_COPY_KIND, async () => {});
     const unregisterPartnerNoop = registerLocalCopy(PARTNER_COPY_KIND, async () => {});
+    const unregisterCountdownMarksNoop = registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
       unregisterProfileNoop();
@@ -233,9 +235,11 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       unregisterLoveNotesNoop();
       unregisterPhotosNoop();
       unregisterPartnerNoop();
+      unregisterCountdownMarksNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
       registerLocalCopy(PARTNER_COPY_KIND, () => useAppStore.getState().loadPartner());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
+      registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, () => useAppStore.getState().loadCountdownMarks());
       registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
       registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {
         if (!useAppStore.getState().userId) return;
