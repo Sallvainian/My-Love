@@ -34,7 +34,10 @@ runs:
     - name: Start npm dependencies install (background)
       shell: bash
       run: |
-        ( npm ci > "$RUNNER_TEMP/npm-ci.log" 2>&1; echo $? > "$RUNNER_TEMP/npm-ci.exit" ) &
+        # The exit code is written to a temp name and renamed: the wait loop
+        # stops as soon as npm-ci.exit exists, and a rename is atomic where a
+        # redirect creates the file empty before writing the code.
+        ( npm ci > "$RUNNER_TEMP/npm-ci.log" 2>&1; echo $? > "$RUNNER_TEMP/npm-ci.exit.tmp"; mv "$RUNNER_TEMP/npm-ci.exit.tmp" "$RUNNER_TEMP/npm-ci.exit" ) &
         echo $! > "$RUNNER_TEMP/npm-ci.pid"
         echo "npm ci started in the background (pid $(cat "$RUNNER_TEMP/npm-ci.pid"))"
 
