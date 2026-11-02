@@ -352,23 +352,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2 shards, not 4. Measured on run 35056348791 (head 0a83dec8): E2E
-        # jobs 197/224/251/259s total, setup 129/129/138/129s, test-step
-        # 49/70/86/101s (306s combined). Historical 381s is run 32279178457,
-        # not this run. The setup floor (129-138s) is paid per shard and this
-        # work cannot move it. Two jobs share those 306s of tests plus one
-        # setup floor each. Residual job time besides setup and tests
-        # (checkout, node, stop, upload) measured 19/25/27/29s. Conservative
-        # worst wall from max setup, 86+101 test-step, and max residual:
-        # 138+187+29 = 354s versus 259s at 4. Runner time 931s at 4 versus
-        # 2×(setup+residual)+306; typical 129+25 gives 614s. N=1 serialises
-        # all 306s of tests (138+306+29 = 473s wall) and is the first N that
-        # stops making sense against wall-clock.
-        # TRIAL (ci/trial-shards-ghcr-burn-in): 4 shards. The suite has grown
-        # to ~511s of test time over 2 shards (2026-11-01/02, 18 runs), and a
+        # 4 shards. Measured on run 41398404930 (head 0dce8011), against
+        # run 41394367324 (head c185620a) at 2 shards: E2E jobs 185/199/253/252s
+        # with test steps 78/79/129/121s, against 291/402s at 2. The suite had
+        # grown to ~511s of test time over 2 shards (2026-11-01/02), and a
         # simulation from 8 runs' per-test times put the wait at ~6.8 min for
-        # 2, ~5.6 for 3, ~4.9 for 4 and under 25s saved per shard beyond 4.
-        # This run measures it; keep whichever count measures fastest.
+        # 2, ~5.6 for 3, ~4.9 for 4 and under 25s saved per shard beyond 4,
+        # because each shard pays ~2 min of setup whatever its share. More
+        # shards also cost queue time when several PRs run at once: in run
+        # 41398404930, with #435's run beside it, the last E2E shard started
+        # 227s after the run was created against 60s in 41394367324.
+        # Historical: 2 shards were chosen at 306s of tests (run 35056348791),
+        # and 381s is run 32279178457.
         shard: [1, 2, 3, 4]
     env:
       CI: 'true'
@@ -456,7 +451,7 @@ jobs:
   # burns exactly one runner.
   # ============================================
   burn-in:
-    name: Burn-In (Shard ${{ matrix.shard }}/4)
+    name: Burn-In (Shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     # The weekly run repeats the whole suite: about 511s of tests over 2 E2E
     # shards (2026-11), so roughly 3 minutes per pass per burn-in shard, more on
@@ -479,7 +474,7 @@ jobs:
       # job is the report, and a second shard's result is evidence too.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3]
     env:
       CI: 'true'
     steps:
@@ -522,11 +517,11 @@ jobs:
 
           # NF drops the blank line `echo` emits for an empty CHANGED, which
           # would otherwise hand shard 1 a one-element list of "".
-          MINE=$(echo "$CHANGED" | awk -v s="${{ matrix.shard }}" -v t=4 'NF && (NR % t) == (s % t)')
+          MINE=$(echo "$CHANGED" | awk -v s="${{ matrix.shard }}" -v t=3 'NF && (NR % t) == (s % t)')
 
           echo "All E2E specs to burn in (${{ github.event_name }}):"
           echo "${CHANGED:-  (none)}"
-          echo "This shard (${{ matrix.shard }}/4) will burn in:"
+          echo "This shard (${{ matrix.shard }}/3) will burn in:"
           echo "${MINE:-  (none)}"
 
           echo "specs<<EOF" >> "$GITHUB_OUTPUT"
@@ -535,7 +530,7 @@ jobs:
 
       - name: Skip burn-in (no E2E specs for this shard)
         if: steps.changed-tests.outputs.specs == ''
-        run: echo "Nothing for shard ${{ matrix.shard }}/4 — skipped"
+        run: echo "Nothing for shard ${{ matrix.shard }}/3 — skipped"
 
       - uses: actions/setup-node@v7
         if: steps.changed-tests.outputs.specs != ''
@@ -547,17 +542,12 @@ jobs:
         if: steps.changed-tests.outputs.specs != ''
         uses: ./.github/actions/setup-playwright-e2e
 
-      # 10 cold passes on a PR, 5 on the weekly run, which repeats the whole
-      # suite. A test that fails 1 time in 10 is caught 65% of the time in 10
-      # passes against 41% in 5; on the 2026-11-01/02 runs 5 passes took
-      # 37-64s per shard and burn-in never finished last.
-      - name: Run burn-in
+      - name: Run burn-in (5 iterations)
         if: steps.changed-tests.outputs.specs != ''
         env:
           SPECS: ${{ steps.changed-tests.outputs.specs }}
-          RUNS: ${{ github.event_name == 'schedule' && 5 || 10 }}
         run: |
-          echo "Running $RUNS iterations on shard ${{ matrix.shard }}/4's E2E test files"
+          echo "Running 5 iterations on shard ${{ matrix.shard }}/3's E2E test files"
           # --retries=0 is load-bearing. The job sets CI=true, and
           # playwright.config.ts reads `retries: process.env.CI ? 2 : 0`, so
           # without this flag each iteration retries a failure twice and burn-in
@@ -569,11 +559,11 @@ jobs:
           # login — which is the state most flakes surface in. --repeat-each
           # would interleave all 25 executions into one warm scheduler pool and
           # lose both that and the `|| exit 1` fail-fast below.
-          for i in $(seq 1 "$RUNS"); do
-            echo "--- Burn-in iteration $i/$RUNS (shard ${{ matrix.shard }}/4) ---"
+          for i in {1..5}; do
+            echo "--- Burn-in iteration $i/5 (shard ${{ matrix.shard }}/3) ---"
             npx playwright test --project=chromium --retries=0 $SPECS || exit 1
           done
-          echo "Burn-in passed: $RUNS/$RUNS stable on shard ${{ matrix.shard }}/4"
+          echo "Burn-in passed: 5/5 stable on shard ${{ matrix.shard }}/3"
 
       - name: Upload burn-in failures
         if: failure() && steps.changed-tests.outputs.specs != ''

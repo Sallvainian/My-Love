@@ -27,10 +27,13 @@ const BASE_REPORTERS = [
 /**
  * GitHub Actions run ids the e2e shard-count comment in
  * `.github/workflows/test.yml` cites as its evidence: the run whose timings
- * justify 2 shards, and the run behind the historical 381s figure. The comment
- * must keep both, so the choice stays checkable.
+ * justify 4 shards, the 2-shard run it was measured against, and the two
+ * runs behind the earlier 2-shard choice. The comment must keep them all, so
+ * the choice stays checkable.
  */
-const SHARD_MEASUREMENT_RUN_ID = '35056348791';
+const SHARD_MEASUREMENT_RUN_ID = '41398404930';
+const TWO_SHARD_COMPARISON_RUN_ID = '41394367324';
+const EARLIER_TWO_SHARD_RUN_ID = '35056348791';
 const HISTORICAL_BASELINE_RUN_ID = '32279178457';
 
 // Each re-import of playwright.config.ts takes 0.6-0.95 s and hit the 5 s default under shuffled full-suite load.
@@ -70,10 +73,12 @@ describe('Playwright shard reporting', () => {
     expect(shards).toMatch(/path: blob-report\/\s+if-no-files-found: error\s+retention-days: 30/);
   });
 
-  it('e2e-tests: the shard-count comment cites both measurement runs', () => {
+  it('e2e-tests: the shard-count comment cites its measurement runs', () => {
     const shards = workflowJob('e2e-tests');
 
     expect(shards).toContain(SHARD_MEASUREMENT_RUN_ID);
+    expect(shards).toContain(TWO_SHARD_COMPARISON_RUN_ID);
+    expect(shards).toContain(EARLIER_TWO_SHARD_RUN_ID);
     expect(shards).toContain(HISTORICAL_BASELINE_RUN_ID);
   });
 
@@ -90,10 +95,10 @@ describe('Playwright shard reporting', () => {
     expect(merge).toMatch(/path: playwright-report\/\s+if-no-files-found: error/);
   });
 
-  it('burn-in: runs its own 4-shard matrix without blob reports', () => {
+  it('burn-in: runs its own 3-shard matrix without blob reports', () => {
     const burnIn = workflowJob('burn-in');
 
-    expect(burnIn).toMatch(/shard: \[1, 2, 3, 4\]/);
+    expect(burnIn).toMatch(/shard: \[1, 2, 3\]/);
     expect(burnIn).not.toContain('E2E_BLOB_REPORT');
   });
 
