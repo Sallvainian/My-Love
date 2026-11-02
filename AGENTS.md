@@ -18,7 +18,7 @@ PWA for couples — daily messages, mood tracking, photos, love-notes chat, and 
 - Fix the cause rather than the symptom, and do not expand scope past it.
 - For migrations, mass renames and restructures: propose a config-level alternative first, get approval, then execute step by step. Never delete a source file before its replacement is confirmed working.
 - When fixing CI, check every failure mode — lint, typecheck, coverage, tests — before pushing.
-- Sallvain starts every bmad-loop run and sweep. Prepare the branch and hand over the command; never launch one yourself. Before each run or sweep, delete the local `loop/integration` branch — bmad-loop reuses an existing one as it is — and keep every `refs/loop-archive/*` ref.
+- bmad-loop `run`, `resume`, `resolve`, `sweep`, `stop` and `archive` are Sallvain's. Run one only when Sallvain names it in that session, and then in a tmux window Sallvain can attach to, never detached or under `nohup`: a detached engine answers every `[y/N]` prompt with no. Otherwise prepare the branch and hand over the command as one line. Before each run or sweep, delete the local `loop/integration` branch — bmad-loop reuses an existing one as it is — and keep every `refs/loop-archive/*` ref.
 - Keep loop story specs short and split large ones — `.bmad-loop/policy.toml` budgets 2M tokens per story, and long specs have cost 2.8–7.6M each.
 
 ## Where things are
