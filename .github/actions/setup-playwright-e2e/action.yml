@@ -14,12 +14,25 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Keyed on the playwright-core version, the one thing that decides which
+    # browser build it downloads. The key was the whole lockfile's hash, so
+    # every dependency bump (18 lockfile changes in October 2026, one
+    # Playwright change since September) missed the cache and paid 9-28s for
+    # `playwright install --with-deps`, plus the apt mirror tail noted below.
+    - name: Read Playwright version
+      id: pw-version
+      shell: bash
+      run: |
+        v=$(jq -er '.packages["node_modules/playwright-core"].version' package-lock.json)
+        echo "version=$v" >> "$GITHUB_OUTPUT"
+        echo "playwright-core $v"
+
     - name: Cache Playwright browsers
       uses: actions/cache@v6
       id: pw-cache
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+        key: ${{ runner.os }}-playwright-${{ steps.pw-version.outputs.version }}
         restore-keys: ${{ runner.os }}-playwright-
 
     # `npm ci` and `supabase start` share nothing: the Supabase steps use the
