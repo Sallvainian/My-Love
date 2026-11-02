@@ -105,8 +105,8 @@ test.describe('Login Flow', () => {
 
     // Same reason, for the mirror refresh App runs after sign-in: the
     // anniversary and message mirrors, the mood history, the poke/kiss
-    // history, the love-notes thread, the photo list and the countdown marks
-    // are read from the server.
+    // history, the love-notes thread, the photo list, the countdown marks and
+    // the push switches are read from the server.
     for (const table of [
       'anniversaries',
       'custom_messages',
@@ -116,6 +116,7 @@ test.describe('Login Flow', () => {
       'love_notes_visible',
       'photos',
       'countdown_marks',
+      'push_preferences',
     ]) {
       // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
       await page.route(`**/rest/v1/${table}?**`, serve([]));

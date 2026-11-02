@@ -1,7 +1,8 @@
 /**
- * The re-plan for date reminders and its triggers (stories 4.1, 4.2 and 4.6): a
- * real store, real local copies of the five date kinds and the countdown marks
- * in fake-indexeddb, and the
+ * The re-plan for date reminders and its triggers (stories 4.1, 4.2, 4.3 and
+ * 4.6): a real store, real local copies of the five date kinds, the countdown
+ * marks and the push switches (the "Date reminders" switch) in fake-indexeddb,
+ * and the
  * Capacitor plugin mocked. The sign-out cancel is stubbed here (a switch of
  * account in these cases would otherwise call the plugin); its own cases are in
  * `signOutCancelsDateReminders.test.ts` and `dateReminders.test.ts`.
@@ -57,6 +58,7 @@ import {
   startDateReminderTriggers,
 } from '../../../src/services/dateRemindersAtLaunch';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
+import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesService';
 import { anniversariesService } from '../../../src/services/anniversariesService';
 import { refreshLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { EVENTS_COPY_KIND } from '../../../src/stores/slices/eventsSlice';
@@ -66,6 +68,7 @@ import {
   COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
+  PUSH_PREFERENCES_COPY_KIND,
 } from '../../../src/stores/slices/settingsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { deferred, setOnline, type StoreState } from './accountDataFixtures';
@@ -114,6 +117,7 @@ const DATE_KINDS = [
   PROFILE_COPY_KIND,
   PARTNER_COPY_KIND,
   COUNTDOWN_MARKS_COPY_KIND,
+  PUSH_PREFERENCES_COPY_KIND,
 ] as const;
 
 function partnerInfo(birthday: string | null = '1995-11-09') {
@@ -126,7 +130,7 @@ function partnerInfo(birthday: string | null = '1995-11-09') {
   };
 }
 
-/** One date of each kind, 3 to 8 days ahead of `NOW`, as the saved copies; nothing is marked. */
+/** One date of each kind, 3 to 8 days ahead of `NOW`, as the saved copies; nothing is marked and the Date reminders switch is on. */
 function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
   return {
     [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04')],
@@ -140,6 +144,7 @@ function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
     [PROFILE_COPY_KIND]: { displayName: null, birthday: '1996-11-08' },
     [PARTNER_COPY_KIND]: { status: 'linked', partner: partnerInfo() },
     [COUNTDOWN_MARKS_COPY_KIND]: [],
+    [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON },
   };
 }
 
@@ -401,6 +406,9 @@ describe('replanDateReminders reads only loaded copies', () => {
     [EVENTS_COPY_KIND, { not: 'a list' }],
     [COUNTDOWN_MARKS_COPY_KIND, 'not a list'],
     [COUNTDOWN_MARKS_COPY_KIND, ['wedding', 7]],
+    [PUSH_PREFERENCES_COPY_KIND, 'not a row'],
+    [PUSH_PREFERENCES_COPY_KIND, { ...ALL_PUSH_PREFERENCES_ON, dateReminders: 'yes' }],
+    [PUSH_PREFERENCES_COPY_KIND, { loveNotes: true, moods: true }],
   ] as const)('treats a malformed %s copy as missing', async (kind, value) => {
     await seedCopies({ [kind]: value });
 
@@ -460,6 +468,59 @@ describe('replanDateReminders reads only loaded copies', () => {
 
     expect(readLocalCopySpy).not.toHaveBeenCalled();
     expect(localNotifications.getPending).not.toHaveBeenCalled();
+  });
+});
+
+describe('the Date reminders switch', () => {
+  const SWITCH_OFF = { ...ALL_PUSH_PREFERENCES_ON, dateReminders: false };
+
+  it('cancels every pending reminder and schedules nothing when the saved row has it off', async () => {
+    await seedCopies({ [PUSH_PREFERENCES_COPY_KIND]: SWITCH_OFF });
+    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }, { id: 2 }] });
+
+    await replanDateReminders();
+
+    expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: [{ id: 1 }, { id: 2 }] });
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('keeps the other push switches out of it: only dateReminders decides', async () => {
+    await seedCopies({
+      [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON, dates: false, loveNotes: false },
+    });
+
+    await replanDateReminders();
+
+    expect(scheduledTitles().length).toBeGreaterThan(0);
+  });
+
+  it('makes no plugin call, and keeps the pending list, when the row was never saved', async () => {
+    await seedCopies({}, [PUSH_PREFERENCES_COPY_KIND]);
+    localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }] });
+
+    await replanDateReminders();
+
+    expect(localNotifications.getPending).not.toHaveBeenCalled();
+    expect(localNotifications.cancel).not.toHaveBeenCalled();
+    expect(localNotifications.schedule).not.toHaveBeenCalled();
+  });
+
+  it('re-plans on a write of the row: off cancels, on schedules again', async () => {
+    await seedOneOfEachKind();
+    const stop = startDateReminderTriggers();
+    try {
+      localNotifications.getPending.mockResolvedValue({ notifications: [{ id: 1 }, { id: 2 }] });
+      await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, SWITCH_OFF);
+      await vi.waitFor(() => expect(localNotifications.cancel).toHaveBeenCalledTimes(1));
+      expect(localNotifications.schedule).not.toHaveBeenCalled();
+
+      await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, { ...ALL_PUSH_PREFERENCES_ON });
+      await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalledTimes(1));
+      expect(scheduledTitles()).toContain('Today: Wedding day @ 11/7 9:00');
+    } finally {
+      stop();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
   });
 });
 

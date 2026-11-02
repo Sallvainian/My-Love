@@ -49,10 +49,15 @@
  *
  * Push switches (story 3.7): `pushPreferences` holds the account's
  * `public.push_preferences` row (a missing row reads as all on). It is NOT
- * persisted and has no local copy: Settings' push section calls
- * `loadPushPreferences` when it opens, and `setPushPreference` writes one
- * column server first, then updates state. `signedOutState()` clears both
- * fields.
+ * persisted: Settings' push section calls `loadPushPreferences` when it opens,
+ * and `setPushPreference` writes one column server first, then updates state.
+ * `signedOutState()` clears both fields. Story 4.3 added the date reminders'
+ * switch to the row (`dateReminders`) and keeps the whole row as the local copy
+ * of kind `push-preferences`, filled only from a successful read or a
+ * confirmed write (a failed read never writes or clears it), so the shell can
+ * plan the reminders offline. The kind's refresher runs
+ * `loadPushPreferences` only in a shell with the local-notifications plugin,
+ * so the web and an older shell never read the table on their own.
  *
  * Countdown marks (story 4.2): `countdownMarks` is the list of date keys the
  * account marked for the "In a month" and "In a week" reminders
@@ -336,6 +341,34 @@ export async function readSavedCountdownMarks(userId: string): Promise<string[] 
   return parseSavedCountdownMarks(await readLocalCopy<unknown>(userId, COUNTDOWN_MARKS_COPY_KIND));
 }
 
+/** Local-copy kind for the account's push switches (the whole `PushPreferences` row). */
+export const PUSH_PREFERENCES_COPY_KIND = 'push-preferences';
+
+const PUSH_PREFERENCE_KEYS: readonly (keyof PushPreferences)[] = [
+  'loveNotes',
+  'moods',
+  'photos',
+  'pokesAndKisses',
+  'dates',
+  'partnerRequests',
+  'dateReminders',
+];
+
+/** A saved push-preferences copy: an object whose seven switches are all booleans, otherwise `null`. */
+function parseSavedPushPreferences(value: unknown): PushPreferences | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (!PUSH_PREFERENCE_KEYS.every((key) => typeof record[key] === 'boolean')) return null;
+  return Object.fromEntries(
+    PUSH_PREFERENCE_KEYS.map((key) => [key, record[key]])
+  ) as unknown as PushPreferences;
+}
+
+/** The saved push-preferences copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedPushPreferences(userId: string): Promise<PushPreferences | null> {
+  return parseSavedPushPreferences(await readLocalCopy<unknown>(userId, PUSH_PREFERENCES_COPY_KIND));
+}
+
 const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
 
 /** Validate a form's anniversary before it is sent, with the form's error shape. */
@@ -393,6 +426,11 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
   registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => get().loadCoupleSettings());
   registerLocalCopy(PROFILE_COPY_KIND, () => get().loadOwnProfile());
   registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, () => get().loadCountdownMarks());
+  // Only a shell with the local-notifications plugin needs the date reminders'
+  // switch; the web and an older shell make no push_preferences read here.
+  registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, () =>
+    hasNativeReminders() ? get().loadPushPreferences() : Promise.resolve()
+  );
 
   /** After a confirmed server answer for `userId`: save the marks as the copy. A failed save is logged. */
   const saveCountdownMarksCopy = async (userId: string, value: string[]) => {
@@ -400,6 +438,15 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
       await writeLocalCopy(userId, COUNTDOWN_MARKS_COPY_KIND, value);
     } catch (error) {
       console.error('[Settings] Failed to save the countdown marks copy:', error);
+    }
+  };
+
+  /** After a confirmed server answer for `userId`: save the row as the copy. A failed save is logged. */
+  const savePushPreferencesCopy = async (userId: string, value: PushPreferences) => {
+    try {
+      await writeLocalCopy(userId, PUSH_PREFERENCES_COPY_KIND, value);
+    } catch (error) {
+      console.error('[Settings] Failed to save the push settings copy:', error);
     }
   };
 
@@ -974,6 +1021,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
           const next = await pushPreferencesService.fetchPushPreferences(requestedBy);
           if (!isCurrent()) return;
           set({ pushPreferences: next, pushPreferencesLoadFailed: false });
+          await savePushPreferencesCopy(requestedBy, next);
         });
       } catch (error) {
         console.error('[Settings] Failed to load the push settings:', error);
@@ -997,6 +1045,7 @@ export const createSettingsSlice: AppStateCreator<SettingsSlice> = (set, get, _a
         const next = await pushPreferencesService.savePushPreference(requestedBy, key, enabled);
         if (!isCurrent()) return;
         set({ pushPreferences: next, pushPreferencesLoadFailed: false });
+        await savePushPreferencesCopy(requestedBy, next);
       });
     },
 

@@ -54,6 +54,7 @@ const NO_DATES: ReminderDates = {
   ownBirthday: null,
   partnerBirthday: null,
   marks: new Set(),
+  remindersOn: true,
 };
 
 /** What `plan` takes: an event's id defaults to `event-<label>`, and the marks are a list. */
@@ -530,6 +531,30 @@ describe('planDateReminders', () => {
     });
   });
 
+  describe('the Settings switch', () => {
+    const TRIP = MARK_KEYS.event('event-Trip');
+    const input: PlanInput = {
+      events: [{ label: 'Trip', date: new Date(2026, 11, 11) }],
+      anniversaries: [{ label: 'Dinner', date: '2020-11-06', serverId: 'a1' }],
+      relationshipStart: new Date(2020, 10, 6, 22, 30).toISOString(),
+      weddingDate: '2027-06-12',
+      ownBirthday: { name: 'Casey', birthday: '1996-12-24' },
+      partnerBirthday: { name: 'Jessie', birthday: '1995-12-26' },
+      marks: [TRIP, MARK_KEYS.ownBirthday],
+    };
+
+    it('plans nothing when it is off, even with marked and far dates', () => {
+      expect(plan({ ...input, remindersOn: false })).toEqual([]);
+    });
+
+    it('plans the same reminders as before when it is on', () => {
+      const on = plan({ ...input, remindersOn: true });
+      expect(on.length).toBeGreaterThan(0);
+      expect(on).toEqual(plan(input));
+      expect(summary(on)).toContain('In a month: Trip @ 2026-11-11 9:00');
+    });
+  });
+
   describe('order and limit', () => {
     it('sorts every kind by moment', () => {
       const reminders = plan({
@@ -685,7 +710,7 @@ describe('reminderDateEntries', () => {
 
   it('uses the keys the planner reads: marking every entry marks every date that is far enough ahead', () => {
     const keys = reminderDateEntries(dates, NOW).map((entry) => entry.key);
-    const marked = planDateReminders({ ...dates, marks: new Set(keys) }, NOW);
+    const marked = planDateReminders({ ...dates, marks: new Set(keys), remindersOn: true }, NOW);
 
     // Dinner and Our anniversary are 5 days ahead, so their month and week reminders are already past.
     expect(marked.filter((r) => r.text.startsWith('In a month')).map((r) => r.text)).toEqual([

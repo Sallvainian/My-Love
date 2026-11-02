@@ -1,6 +1,12 @@
 /**
  * CountdownMarks — the "Reminders" group of Settings' "Push and reminders"
- * section (story 4.2): one switch for each date the app shows a countdown to,
+ * section. Its first row is the "Date reminders" switch (story 4.3), which
+ * turns every date reminder off or back on: it is the `dateReminders` field of
+ * the account's push switches (`settingsSlice.pushPreferences`, kept as the
+ * `push-preferences` local copy), and writing the copy re-plans the reminders.
+ * It is disabled until the switches have loaded and while a save is in flight;
+ * the marks rows below stay usable while it is off. Under it (story 4.2) is one
+ * switch for each date the app shows a countdown to,
  * so a person can ask for an earlier heads-up ("In a month" and "In a week",
  * at 9:00) on the dates that matter to them. Every date already has its
  * day-before reminder; a switch only adds the two earlier ones.
@@ -21,7 +27,7 @@
  * @component
  */
 
-import { Cake, CalendarDays, Gem, Heart, type LucideIcon } from 'lucide-react';
+import { Bell, Cake, CalendarDays, Gem, Heart, type LucideIcon } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { offlineMessage } from '../../services/accountDataError';
@@ -31,6 +37,7 @@ import { CARD, DIVIDER, FIELD_ERROR, GROUP_SUBTITLE, GROUP_TITLE } from '../shar
 import { SwitchRow } from './SwitchRow';
 
 const HELPER = 'Remind me a month and a week before.';
+const REMINDERS_HELPER = 'At 9:00 before each date.';
 
 /** The row's icon, from the kind of date its key names. */
 function iconFor(key: string): LucideIcon {
@@ -49,10 +56,13 @@ function CountdownMarksCard() {
   const coupleSettings = useAppStore((state) => state.coupleSettings);
   const ownProfile = useAppStore((state) => state.ownProfile);
   const partner = useAppStore((state) => state.partner);
+  const pushPreferences = useAppStore((state) => state.pushPreferences);
+  const setPushPreference = useAppStore((state) => state.setPushPreference);
 
   const [error, setError] = useState<string | null>(null);
   // Rows whose save is in flight: a second tap would compute from the stale state.
   const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
+  const [savingReminders, setSavingReminders] = useState(false);
 
   // The marks, when the section opens and when the connection returns.
   useEffect(() => {
@@ -100,18 +110,47 @@ function CountdownMarksCard() {
     [setCountdownMark]
   );
 
+  const toggleReminders = useCallback(
+    async (next: boolean) => {
+      if (!isOnline()) {
+        setError(offlineMessage('Reminders'));
+        return;
+      }
+      setError(null);
+      setSavingReminders(true);
+      try {
+        await setPushPreference('dateReminders', next);
+      } catch (caught) {
+        console.error('[CountdownMarks] Could not save the date reminders switch:', caught);
+        setError(caught instanceof Error ? caught.message : 'Could not save your reminders.');
+      } finally {
+        setSavingReminders(false);
+      }
+    },
+    [setPushPreference]
+  );
+
   return (
     <>
       <div className={CARD} data-testid="settings-reminder-marks">
         <h3 className={`${GROUP_TITLE} px-1`}>Reminders</h3>
+        <SwitchRow
+          id="settings-reminders-switch"
+          icon={Bell}
+          label="Date reminders"
+          helper={REMINDERS_HELPER}
+          checked={pushPreferences?.dateReminders ?? true}
+          onChange={(next) => void toggleReminders(next)}
+          disabled={pushPreferences === null || savingReminders}
+        />
         {entries.length === 0 ? (
           <p className={`${GROUP_SUBTITLE} px-1`} data-testid="settings-reminder-marks-empty">
             Dates you add show up here.
           </p>
         ) : (
-          entries.map((entry, index) => (
+          entries.map((entry) => (
             <Fragment key={entry.key}>
-              {index > 0 && <div className={DIVIDER} aria-hidden="true" />}
+              <div className={DIVIDER} aria-hidden="true" />
               <SwitchRow
                 id={`settings-reminder-mark-${entry.key}`}
                 icon={iconFor(entry.key)}

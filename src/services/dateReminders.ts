@@ -42,6 +42,10 @@ import { routeNotificationTap } from './pushNotifications';
  * so 9:00 stays 9:00 local when the device changes zone. `schedule.at` would
  * become a relative interval trigger instead, and is not used.
  *
+ * The Settings switch "Date reminders" (story 4.3) turns all of this off:
+ * `ReminderDates.remindersOn` false plans nothing, so the re-plan cancels
+ * every pending reminder and turning it on plans them again.
+ *
  * Only the soonest `MAX_SCHEDULED_REMINDERS` are scheduled: iOS keeps at most
  * 64 pending local notifications per app and drops the rest.
  *
@@ -99,6 +103,8 @@ export interface ReminderDates {
   partnerBirthday: ReminderBirthday | null;
   /** The keys of the dates marked for the month and week reminders. */
   marks: ReadonlySet<string>;
+  /** The Settings switch (story 4.3): `false` plans no reminder at all. */
+  remindersOn: boolean;
 }
 
 export interface PlannedReminder {
@@ -185,7 +191,7 @@ function addBirthday(
  * does not name a date.
  */
 export function reminderDateEntries(
-  dates: Omit<ReminderDates, 'marks'>,
+  dates: Omit<ReminderDates, 'marks' | 'remindersOn'>,
   now: Date
 ): { key: string; name: string }[] {
   const entries: { key: string; name: string }[] = [];
@@ -224,9 +230,14 @@ export function reminderDateEntries(
 
 /**
  * The reminders that should be pending at `now`, soonest first, at most
- * `MAX_SCHEDULED_REMINDERS`. A date that cannot be read is skipped.
+ * `MAX_SCHEDULED_REMINDERS`. A date that cannot be read is skipped. None when
+ * the Settings switch is off (`remindersOn`).
  */
 export function planDateReminders(dates: ReminderDates, now: Date): PlannedReminder[] {
+  // The Settings switch is off: an empty plan, which `scheduleDateReminders`
+  // turns into cancelling whatever is pending and scheduling nothing.
+  if (!dates.remindersOn) return [];
+
   const planned: PlannedReminder[] = [];
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 

@@ -529,6 +529,7 @@ describe('clearAuth on sign-out', () => {
         pokesAndKisses: true,
         dates: true,
         partnerRequests: true,
+        dateReminders: true,
       },
       pushPreferencesLoadFailed: true,
       countdownMarks: ['wedding', 'own-birthday'],

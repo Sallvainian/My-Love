@@ -1,8 +1,9 @@
 /**
- * CountdownMarks — the "Reminders" group (story 4.2): rendered only in the
- * native shell with the local-notifications plugin, one switch for each set
- * date (off until marked), a write per toggle through the store, and the
- * offline refusal. The marks service and the Capacitor plugins are mocked; the
+ * CountdownMarks — the "Reminders" group (stories 4.2 and 4.3): rendered only
+ * in the native shell with the local-notifications plugin, the "Date
+ * reminders" switch first, then one switch for each set date (off until
+ * marked), a write per toggle through the store, and the offline refusal. The
+ * marks and push-preferences services and the Capacitor plugins are mocked; the
  * store is the real one.
  */
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
@@ -16,6 +17,10 @@ const capacitor = vi.hoisted(() => ({
 const service = vi.hoisted(() => ({
   fetchCountdownMarks: vi.fn(),
   setCountdownMark: vi.fn(),
+}));
+const preferences = vi.hoisted(() => ({
+  fetchPushPreferences: vi.fn(),
+  savePushPreference: vi.fn(),
 }));
 
 vi.mock('@capacitor/core', () => ({
@@ -39,8 +44,13 @@ vi.mock('../../../api/supabaseClient', () => ({
 vi.mock('../../../services/countdownMarksService', () => ({
   countdownMarksService: service,
 }));
+vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../services/pushPreferencesService')>()),
+  pushPreferencesService: preferences,
+}));
 
 import { AccountDataError } from '../../../services/accountDataError';
+import { ALL_PUSH_PREFERENCES_ON } from '../../../services/pushPreferencesService';
 import { useAppStore } from '../../../stores/useAppStore';
 import { setOnline } from '../../../../tests/unit/stores/accountDataFixtures';
 import { CountdownMarks } from '../CountdownMarks';
@@ -117,6 +127,12 @@ const LABELS = [
 ];
 
 const rowId = (key: string) => `settings-reminder-mark-${key}`;
+const SWITCH = 'settings-reminders-switch';
+const REMINDERS_OFF = { ...ALL_PUSH_PREFERENCES_ON, dateReminders: false };
+
+/** Every switch in the card but the "Date reminders" one: the marks rows. */
+const marksSwitches = () =>
+  screen.getAllByRole('switch').filter((row) => row.getAttribute('data-testid') !== SWITCH);
 
 /** Renders the group and waits for the loaded marks to enable the first row. */
 async function renderLoaded(marks: string[] = []) {
@@ -131,9 +147,12 @@ beforeEach(() => {
   capacitor.isNativePlatform.mockReturnValue(true);
   capacitor.isPluginAvailable.mockReturnValue(true);
   service.setCountdownMark.mockResolvedValue(undefined);
+  preferences.savePushPreference.mockResolvedValue(REMINDERS_OFF);
   setOnline(true);
   useAppStore.getState().clearAuth();
   useAppStore.getState().setAuthUser('user-a');
+  // The push section loads the switches when it opens; here the test sets them.
+  useAppStore.setState({ pushPreferences: { ...ALL_PUSH_PREFERENCES_ON } });
 });
 
 afterEach(() => {
@@ -170,7 +189,7 @@ describe('CountdownMarks: the rows', () => {
     const card = screen.getByTestId('settings-reminder-marks');
     expect(within(card).getByRole('heading', { level: 3, name: 'Reminders' })).toBeInTheDocument();
     const switches = within(card).getAllByRole('switch');
-    expect(switches.map((row) => row.getAttribute('data-testid'))).toEqual(KEYS.map(rowId));
+    expect(switches.map((row) => row.getAttribute('data-testid'))).toEqual([SWITCH, ...KEYS.map(rowId)]);
     KEYS.forEach((key, index) => {
       const row = screen.getByTestId(rowId(key));
       expect(row).toHaveAccessibleName(LABELS[index]);
@@ -192,7 +211,7 @@ describe('CountdownMarks: the rows', () => {
 
     expect(screen.getByTestId(rowId('wedding'))).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId(rowId('own-birthday'))).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getAllByRole('switch')).toHaveLength(KEYS.length);
+    expect(marksSwitches()).toHaveLength(KEYS.length);
   });
 
   it('lists no partner birthday without a linked partner or a birthday', async () => {
@@ -201,7 +220,7 @@ describe('CountdownMarks: the rows', () => {
     await renderLoaded();
 
     expect(screen.queryByTestId(rowId('partner-birthday'))).not.toBeInTheDocument();
-    expect(screen.getAllByRole('switch')).toHaveLength(KEYS.length - 1);
+    expect(marksSwitches()).toHaveLength(KEYS.length - 1);
   });
 
   it('says so when there are no dates', async () => {
@@ -211,7 +230,8 @@ describe('CountdownMarks: the rows', () => {
     expect(await screen.findByTestId('settings-reminder-marks-empty')).toHaveTextContent(
       'Dates you add show up here.'
     );
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    // The Date reminders switch stays; there is no mark to switch.
+    expect(screen.getAllByRole('switch').map((row) => row.getAttribute('data-testid'))).toEqual([SWITCH]);
   });
 
   it('loads the marks once when it opens', async () => {
@@ -328,5 +348,147 @@ describe('CountdownMarks: toggling', () => {
 
     await waitFor(() => expect(screen.queryByTestId('settings-reminder-marks-error')).not.toBeInTheDocument());
     expect(screen.getByTestId(rowId('wedding'))).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
+describe('CountdownMarks: the Date reminders switch', () => {
+  it('is the first row of the card, before the marks rows, with its label, helper and bell', async () => {
+    seedAllDates();
+    await renderLoaded();
+
+    const card = screen.getByTestId('settings-reminder-marks');
+    const first = within(card).getAllByRole('switch')[0];
+    expect(first).toBe(screen.getByTestId(SWITCH));
+    expect(first).toHaveAccessibleName('Date reminders');
+    expect(first).toHaveAccessibleDescription('At 9:00 before each date.');
+    expect(first.querySelector('svg')).toBeInTheDocument();
+    // After the heading and before the first mark row.
+    const heading = within(card).getByRole('heading', { level: 3, name: 'Reminders' });
+    expect(heading.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(first.compareDocumentPosition(screen.getByTestId(rowId(KEYS[0]))) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('is first, before the empty line, when there are no dates', async () => {
+    service.fetchCountdownMarks.mockResolvedValue([]);
+    render(<CountdownMarks />);
+
+    const empty = await screen.findByTestId('settings-reminder-marks-empty');
+    expect(screen.getByTestId(SWITCH).compareDocumentPosition(empty) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('is on by default: a row with no values yet reads as on, but is disabled', async () => {
+    useAppStore.setState({ pushPreferences: null });
+    seedAllDates();
+    await renderLoaded();
+
+    expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId(SWITCH)).toBeDisabled();
+  });
+
+  it('is on and enabled once the push switches have loaded', async () => {
+    seedAllDates();
+    await renderLoaded();
+
+    expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId(SWITCH)).toBeEnabled();
+  });
+
+  it('shows off when the saved row has it off', async () => {
+    useAppStore.setState({ pushPreferences: REMINDERS_OFF });
+    seedAllDates();
+    await renderLoaded();
+
+    expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('turns off through the store, sending only that switch', async () => {
+    const user = userEvent.setup();
+    seedAllDates();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId(SWITCH));
+
+    await waitFor(() => expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'false'));
+    expect(preferences.savePushPreference).toHaveBeenCalledExactlyOnceWith('user-a', 'dateReminders', false);
+    expect(useAppStore.getState().pushPreferences).toEqual(REMINDERS_OFF);
+  });
+
+  it('turns on again from off', async () => {
+    const user = userEvent.setup();
+    useAppStore.setState({ pushPreferences: REMINDERS_OFF });
+    preferences.savePushPreference.mockResolvedValue(ALL_PUSH_PREFERENCES_ON);
+    seedAllDates();
+    await renderLoaded();
+
+    await user.click(screen.getByTestId(SWITCH));
+
+    await waitFor(() => expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'true'));
+    expect(preferences.savePushPreference).toHaveBeenCalledExactlyOnceWith('user-a', 'dateReminders', true);
+  });
+
+  it('is disabled while its save is in flight, and the marks rows stay usable', async () => {
+    const user = userEvent.setup();
+    seedAllDates();
+    await renderLoaded();
+    let finish!: (row: typeof REMINDERS_OFF) => void;
+    preferences.savePushPreference.mockReturnValue(
+      new Promise<typeof REMINDERS_OFF>((resolve) => {
+        finish = resolve;
+      })
+    );
+
+    await user.click(screen.getByTestId(SWITCH));
+
+    expect(screen.getByTestId(SWITCH)).toBeDisabled();
+    expect(screen.getByTestId(rowId('wedding'))).toBeEnabled();
+
+    finish(REMINDERS_OFF);
+    await waitFor(() => expect(screen.getByTestId(SWITCH)).toBeEnabled());
+  });
+
+  it('leaves the marks rows usable while it is off', async () => {
+    useAppStore.setState({ pushPreferences: REMINDERS_OFF });
+    seedAllDates();
+    await renderLoaded();
+
+    for (const row of marksSwitches()) expect(row).toBeEnabled();
+  });
+
+  it('refuses a toggle offline with the offline message and sends nothing', async () => {
+    const user = userEvent.setup();
+    seedAllDates();
+    await renderLoaded();
+    setOnline(false);
+
+    await user.click(screen.getByTestId(SWITCH));
+
+    expect(await screen.findByTestId('settings-reminder-marks-error')).toHaveTextContent(
+      'You are offline. Reminders need a connection to save.'
+    );
+    expect(preferences.savePushPreference).not.toHaveBeenCalled();
+    expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('shows the error and keeps state when the save fails', async () => {
+    const user = userEvent.setup();
+    seedAllDates();
+    await renderLoaded();
+    preferences.savePushPreference.mockRejectedValue(new AccountDataError('transport', 'Server said no'));
+
+    await user.click(screen.getByTestId(SWITCH));
+
+    expect(await screen.findByTestId('settings-reminder-marks-error')).toHaveTextContent('Server said no');
+    expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId(SWITCH)).toBeEnabled();
+    expect(useAppStore.getState().pushPreferences).toEqual(ALL_PUSH_PREFERENCES_ON);
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('renders nothing off the native platform', () => {
+    capacitor.isNativePlatform.mockReturnValue(false);
+    const { container } = render(<CountdownMarks />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByTestId(SWITCH)).not.toBeInTheDocument();
   });
 });

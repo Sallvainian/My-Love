@@ -581,6 +581,7 @@ export type Database = {
       push_preferences: {
         Row: {
           created_at: string
+          date_reminders: boolean
           dates: boolean
           love_notes: boolean
           moods: boolean
@@ -592,6 +593,7 @@ export type Database = {
         ComputedFields: never
         Insert: {
           created_at?: string
+          date_reminders?: boolean
           dates?: boolean
           love_notes?: boolean
           moods?: boolean
@@ -602,6 +604,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          date_reminders?: boolean
           dates?: boolean
           love_notes?: boolean
           moods?: boolean
