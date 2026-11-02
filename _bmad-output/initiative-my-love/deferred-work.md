@@ -3543,7 +3543,9 @@ location: src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: First `npm run test:unit` of this run: 1 failed of 3759, `expect(element).toBeEnabled()` at src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166, with the button rendered `aria-busy="true" disabled`. `findByTestId` resolves on presence, not enablement, so an in-flight refresh still busy under load fails it. Unrelated to this change, which touches no PartnerMoodView code. Settle by asserting through `waitFor(() => expect(...).toBeEnabled())` after confirming what keeps it busy.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-partner-mood-refresh-test-flake
+resolution-undo: 4e6874687b678d5b27c3d7d79dc252b4e1195449554a010f7c0cbdc6540fa67a 2026-11-02 7374617475733a206f70656e
 
 ### DW-410: The pinned esm.sh supabase-js 2.118.0 bundle still floats one transitive dependency: storage-js 2.118.0 imports iceberg-js through the range ^0.8.1.
 origin: spec-deferred 3f3158bf60a9

@@ -163,7 +163,13 @@ describe('PartnerMoodView on the kit', () => {
   it('enables refresh when online', async () => {
     renderSeveral();
 
-    expect(await screen.findByTestId('partner-mood-refresh-button')).toBeEnabled();
+    // The mount refresh holds the button disabled and aria-busy until its fetch settles, and
+    // that commit can land after findByTestId resolves on presence: wait for the settled state.
+    await waitFor(() => {
+      const refresh = screen.getByTestId('partner-mood-refresh-button');
+      expect(refresh).toBeEnabled();
+      expect(refresh).toHaveAttribute('aria-busy', 'false');
+    });
   });
 
   it('shows only the current card for a single mood', () => {
