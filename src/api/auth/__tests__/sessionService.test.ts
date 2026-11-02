@@ -8,7 +8,7 @@ import { AuthApiError, AuthRetryableFetchError, type Session } from '@supabase/s
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuthBootstrapSession } from '../../../../tests/support/factories/auth-bootstrap-notification-order';
 import { AUTH_STORAGE_KEY, readStoredSession } from '../../authStorage';
-import { getSession, onAuthStateChange } from '../sessionService';
+import { getSession, onAuthStateChange, STORED_SESSION_WAIT_MS } from '../sessionService';
 
 const { mockGetSession, mockOnAuthStateChange, mockStoreAuthToken, mockClearAuthToken } =
   vi.hoisted(() => ({
@@ -258,6 +258,91 @@ describe('sessionService: a stored session survives an unreachable server', () =
         '[AuthService] Could not read the stored session:',
         expect.any(Error)
       );
+    });
+  });
+
+  describe('the boot never waits on the SDK refresh retries while a session is stored', () => {
+    type SdkAnswer = { data: { session: Session | null }; error: unknown };
+
+    /** A `getSession` the test settles itself, as the SDK's retrying refresh would, much later. */
+    function slowSdk() {
+      let settle!: (answer: SdkAnswer) => void;
+      mockGetSession.mockReturnValue(new Promise<SdkAnswer>((resolve) => (settle = resolve)));
+      return settle;
+    }
+
+    afterEach(() => vi.useRealTimers());
+
+    it('offline: answers with the stored session at once', async () => {
+      store(storedSession);
+      vi.stubGlobal('navigator', { ...navigator, onLine: false });
+      const settle = slowSdk();
+
+      await expect(getSession()).resolves.toEqual(storedSession);
+      expect(console.warn).toHaveBeenCalledWith('[AuthService] Offline; using the stored session');
+
+      // The SDK's late answer settles here, so nothing logs after the file ends.
+      settle({ data: { session: null }, error: unreachable() });
+      await vi.waitFor(() =>
+        expect(console.warn).toHaveBeenCalledWith(
+          '[AuthService] Server unreachable; using the stored session:',
+          'Failed to fetch'
+        )
+      );
+    });
+
+    it('online but slow: answers with the stored session after the wait', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      store(storedSession);
+      const settle = slowSdk();
+
+      const read = getSession();
+      await vi.advanceTimersByTimeAsync(STORED_SESSION_WAIT_MS - 1);
+      let answered = false;
+      void read.then(() => (answered = true));
+      await Promise.resolve();
+      expect(answered).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(read).resolves.toEqual(storedSession);
+      expect(console.warn).toHaveBeenCalledWith(
+        '[AuthService] Session read is slow; using the stored session'
+      );
+
+      settle({ data: { session: refreshedSession }, error: null });
+    });
+
+    it('online: an SDK answer inside the wait wins', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      store(storedSession);
+      mockGetSession.mockResolvedValue({ data: { session: refreshedSession }, error: null });
+
+      await expect(getSession()).resolves.toBe(refreshedSession);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('storage emptied during the wait: waits for the SDK, which says signed out', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      store(storedSession);
+      const settle = slowSdk();
+
+      const read = getSession();
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      await vi.advanceTimersByTimeAsync(STORED_SESSION_WAIT_MS);
+      settle({
+        data: { session: null },
+        error: new AuthApiError('Invalid Refresh Token: Refresh Token Not Found', 400, undefined),
+      });
+
+      await expect(read).resolves.toBeNull();
+    });
+
+    it('nothing stored: offline still waits for the SDK', async () => {
+      vi.stubGlobal('navigator', { ...navigator, onLine: false });
+      mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+
+      await expect(getSession()).resolves.toBeNull();
+      expect(console.warn).not.toHaveBeenCalled();
     });
   });
 });

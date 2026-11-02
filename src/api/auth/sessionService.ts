@@ -6,13 +6,58 @@ import { supabase } from '../supabaseClient';
 import type { AuthStatus } from './types';
 
 /**
+ * How long `getSession` waits for the SDK, while a session is stored, before
+ * answering with the stored one. The SDK answers at once unless it is
+ * refreshing an expired access token, and a refresh that cannot reach the
+ * server retries with backoff for up to 30 s (auth-js
+ * `AUTO_REFRESH_TICK_DURATION_MS`), which held the app on its loading screen.
+ */
+export const STORED_SESSION_WAIT_MS = 1500;
+
+const SDK_TOO_SLOW = Symbol('sdk-too-slow');
+
+/**
  * The current session, or `null` when signed out or the read failed.
  *
  * While the server is unreachable this may return the session the SDK still
  * holds in storage, whose access token may have expired; the SDK renews it
- * once the server answers.
+ * once the server answers. With a session stored, it never waits on the SDK's
+ * refresh retries: offline (`navigator.onLine` false) it answers with the
+ * stored session at once, and otherwise after `STORED_SESSION_WAIT_MS`. The
+ * SDK's own outcome still reaches the app through `onAuthStateChange`
+ * (TOKEN_REFRESHED, or SIGNED_OUT when the server rejects the refresh token).
  */
 export const getSession = async (): Promise<Session | null> => {
+  const sdkRead = readSdkSession();
+  if (!readStoredSession()) return sdkRead;
+
+  if (globalThis.navigator?.onLine === false) {
+    const stored = readStoredSession();
+    if (stored) {
+      console.warn('[AuthService] Offline; using the stored session');
+      return stored;
+    }
+    return sdkRead;
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const tooSlow = new Promise<typeof SDK_TOO_SLOW>((resolve) => {
+    timer = setTimeout(() => resolve(SDK_TOO_SLOW), STORED_SESSION_WAIT_MS);
+  });
+  const first = await Promise.race([sdkRead, tooSlow]);
+  clearTimeout(timer);
+  if (first !== SDK_TOO_SLOW) return first;
+
+  // Read again: the SDK may have emptied its storage (a real sign-out) while
+  // this waited, and an empty store means signed out.
+  const stored = readStoredSession();
+  if (!stored) return sdkRead;
+  console.warn('[AuthService] Session read is slow; using the stored session');
+  return stored;
+};
+
+/** The SDK's answer, with the stored session standing in for an unreachable server. */
+const readSdkSession = async (): Promise<Session | null> => {
   try {
     const { data, error } = await supabase.auth.getSession();
 
