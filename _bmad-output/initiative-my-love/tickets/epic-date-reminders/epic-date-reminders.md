@@ -7,6 +7,7 @@ sources: [AGENTS.md, supabase/migrations/20260922000000_local_data_tables.sql, s
 companions: []
 after: []
 risk: medium
+status: done
 ---
 
 # Date Reminders
@@ -114,3 +115,6 @@ R12 (AGENTS.md native iOS shell): The website, the Home Screen web app and a she
 - Decision: 2026-10-30 the older-shell live-update check in stories 1 and 6 uses story 2.9's driver, which builds a shell from an earlier commit and serves the working tree's bundle as its live update.
 - Decision: 2026-10-30 gaps found by the replan's set checks fixed: the planner drops a reminder whose moment has passed, the birthday texts are written out from `BirthdayCountdown.tsx` and `getNextBirthday` is exported with the card unchanged, story 3 names its local copy, story 2 hides the marks list outside the shell, stories 2 and 3 check a network-off launch, story 5 checks what fires rather than what is scheduled and re-checks the sweep, and the refresher stub rule joins Constraints.
 - Decision: 2026-10-30 story 3.7's Settings section is named "Push and reminders", so it is not confused with the notifications page in _bmad-output/backlog/story-native-shell-live-update-prompt.md; earlier Notes lines that say "notifications section" mean this section.
+- Decision: 2026-11-02 the Home Screen web app check is dropped from R12 and Done when 4 for good; the older shell after a live update and the website were checked (story 4.5's plan) (owner decision).
+- Decision: 2026-11-02 the epic closes on the 2026-11-02 device run (shell built from `871463b0`) without a device re-check of PR #439's fixes (`dc42f9ec`, `56dcb749`, `43a72690`, `e1ebc189`), which have unit tests only; the reminder sound and the banner while the shell is in front stay open as DW-376, since neither is a Requirement (owner decision).
+- Decision: 2026-11-02 closed: the closure check found R1–R11 and every Constraint met, R12 and Done when 4 met apart from the dropped Home Screen web app check, Done when 3 met on the simulator, and CI green on main at `4213beea` (Tests `41498719400`, Lighthouse `41499576871`); owner confirmed completion.
