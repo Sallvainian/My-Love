@@ -181,6 +181,12 @@ final class Notify: XCTestCase {
         guard list.waitForExistence(timeout: 5) else { return XCTFail("Notification Center did not open") }
         sleep(1)
         let step = list.frame.height * 0.4
+        // Notification Center at times opens with new notifications still in
+        // the shrunk pile at the list's bottom edge (one run's first screen had
+        // 2 cells where 8 groups were waiting, and the drag below brought out
+        // the rest). One drag down the list brings them out before anything is
+        // read; the loop then takes the list back to its top.
+        drag(list, by: -step)
         var top = false
         for _ in 0..<30 {
             let left = try distanceToTop(list.frame)
@@ -206,7 +212,10 @@ final class Notify: XCTestCase {
         }
         let before = try cellFrames()
         drag(list, by: -step)
-        if try cellFrames() != before { return XCTFail(tooMany + ": a drag down the list moved it") }
+        let dragged = try cellFrames()
+        if dragged != before {
+            return XCTFail(tooMany + ": a drag down the list moved it (\(before.count) cells before, \(dragged.count) after)")
+        }
         list.swipeUp()
         sleep(1)
         // The list always keeps its empty first cell, so no cells (or no list,
@@ -215,7 +224,9 @@ final class Notify: XCTestCase {
         if after.isEmpty {
             return XCTFail("Notification Center closed on the end-of-list swipe, so center could not confirm the list fits one screen; run it again")
         }
-        if after != before { return XCTFail(tooMany + ": a swipe down the list moved it") }
+        if after != before {
+            return XCTFail(tooMany + ": a swipe down the list moved it (\(before.count) cells before, \(after.count) after)")
+        }
         let doc: [String: Any] = ["groups": read.groups.map { ["text": $0[0], "count": $0.count] }]
         let data = try JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys])
         say(String(decoding: data, as: UTF8.self))
@@ -263,9 +274,26 @@ final class Notify: XCTestCase {
     // SpringBoard's own frame is the outer display's even when the inner
     // one is on, and a coordinate off it misses; the largest window is the
     // display in use, so screen coordinates are made relative to it.
+    // SpringBoard has 40 or more windows, and banners add and remove some, so
+    // reading their frames one query at a time can reach an index that has
+    // just gone (every run right after a burst of pushes failed so). The
+    // frames come from one snapshot instead, and the window picked is checked
+    // to still have its frame, else read again.
     func displayInUse() -> XCUIElement {
-        springboard.windows.allElementsBoundByIndex
-            .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height } ?? springboard
+        func windowFrames(_ n: XCUIElementSnapshot, _ out: inout [CGRect]) {
+            if n.elementType == .window { out.append(n.frame) }
+            n.children.forEach { windowFrames($0, &out) }
+        }
+        for _ in 0..<5 {
+            var frames: [CGRect] = []
+            if let root = try? springboard.snapshot() { windowFrames(root, &frames) }
+            if let i = frames.indices.max(by: { frames[$0].width * frames[$0].height < frames[$1].width * frames[$1].height }) {
+                let window = springboard.windows.element(boundBy: i)
+                if (try? window.snapshot().frame) == frames[i] { return window }
+            }
+            sleep(1)
+        }
+        return springboard
     }
 
     // Cells near the list's bottom edge are drawn shrunk, and XCUITest calls

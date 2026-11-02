@@ -34,7 +34,8 @@ turn() {
 case $1 in
   state)
     if [[ $(<$DEV/pose) == none ]]; then
-      print "iPhone 17"
+      # ax 0.2.2 prints "pose: n/a" for a phone with no fold.
+      print "iPhone 17"; print "pose: n/a"
     else
       print "iPhone Duo"; print "pose: $(<$DEV/pose)"
     fi
@@ -73,7 +74,7 @@ chmod +x $TMP/bin/*
 # SIGNAL=INT|TERM, sent at the first Home press, after the unfold).
 # FOLD_FAILS and TURN_BACK_FAILS fail the restore, which must then say
 # "could not restore" once. START_POSE none is a phone with no fold whose
-# Device Hub has only Rotate Left (the iPhone 17): ax state shows no pose,
+# Device Hub has only Rotate Left (the iPhone 17): ax state shows "pose: n/a",
 # and ax pose and ax rotate (Rotate Right) fail there.
 check() {
   local name=$1 pose=$2 orient=$3 want=$4 dev=$TMP/$1

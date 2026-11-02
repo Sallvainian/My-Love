@@ -851,6 +851,9 @@ cmd_center() {
   require_booted
   ensure_runner
   CENTER_POSE=$(state_value pose) CENTER_ORIENT=$(state_value orientation)
+  # ax state says "pose: n/a" for a phone with no fold (the iPhone 17); it
+  # has no pose to unfold or put back.
+  [[ $CENTER_POSE == n/a ]] && CENTER_POSE=
   [[ -n $CENTER_ORIENT ]] || die 5 "center: ax state has no orientation"
   # Only a start in landscape that is not unfolded (folded, or a phone with
   # no pose) needs the front app back (see center_restore); asking costs one
