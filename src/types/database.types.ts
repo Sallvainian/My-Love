@@ -93,6 +93,7 @@ export type Database = {
           date_key: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           date_key: string
