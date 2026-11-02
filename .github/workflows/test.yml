@@ -561,7 +561,9 @@ jobs:
           # lose both that and the `|| exit 1` fail-fast below.
           for i in {1..5}; do
             echo "--- Burn-in iteration $i/5 (shard ${{ matrix.shard }}/3) ---"
-            npx playwright test --project=chromium --retries=0 $SPECS || exit 1
+            # --trace: the config records traces only on a first retry, and
+            # burn-in never retries, so a failing pass would carry none.
+            npx playwright test --project=chromium --retries=0 --trace=retain-on-failure $SPECS || exit 1
           done
           echo "Burn-in passed: 5/5 stable on shard ${{ matrix.shard }}/3"
 

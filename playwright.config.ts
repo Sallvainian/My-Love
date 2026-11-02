@@ -124,9 +124,15 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
-    trace: 'on',
+    // Trace and video record only on a test's first retry, not on every
+    // attempt: recording every passing test cost CPU on runners shared with
+    // the local Supabase stack, and the merged report kept artifacts nobody
+    // opens. A test that fails in CI is retried (retries: 2), so its retry
+    // carries both. Burn-in runs with --retries=0 and passes --trace
+    // retain-on-failure itself. Screenshots stay on: one per test is cheap.
+    trace: 'on-first-retry',
     screenshot: 'on',
-    video: 'on',
+    video: 'on-first-retry',
     actionTimeout: 15 * 1000, // Action timeout: 15s
     navigationTimeout: 30 * 1000, // Navigation timeout: 30s
   },
