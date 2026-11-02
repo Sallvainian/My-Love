@@ -867,6 +867,10 @@ export type Database = {
         Returns: undefined
       }
       unread_love_note_count: { Args: { p_user_id: string }; Returns: number }
+      unregister_all_push_devices: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       unregister_push_device: { Args: { p_token: string }; Returns: undefined }
     }
     Enums: {

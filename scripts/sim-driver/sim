@@ -64,7 +64,8 @@ Accounts (local stack only):
   provision              Create or reset the fixture accounts: Casey and Jessie,
                          linked and seeded so every view scrolls; Harper and
                          Morgan, linked, love notes wiped, nothing seeded; Riley
-                         and Quinn, unlinked, partner requests deleted.
+                         and Quinn, unlinked, partner requests deleted. All six
+                         lose their push device registrations.
   dates kinds|many|clear
                          Set the dates the date reminders are planned from, for
                          Casey and Jessie only. kinds: one date of each kind,

@@ -340,6 +340,44 @@ export async function removePushRegistration(): Promise<void> {
 }
 
 /**
+ * Deletes every push registration the signed-in account owns, on every
+ * device, for "Sign out of all devices" (DW-353). Call before the global
+ * `supabase.auth.signOut()`: the RPC needs the session.
+ *
+ * No native or token gate, unlike `removePushRegistration`: the other devices'
+ * rows are removed from wherever the person signs out, the web included.
+ * Waits at most ~3 s and never throws. Resolves true only when the server
+ * answered without an error; false on an error, a throw or the timeout, so the
+ * caller can tell the person the other devices may still get pushes.
+ */
+export async function removeAllPushRegistrations(): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timedOut = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), UNREGISTER_TIMEOUT_MS);
+    });
+    const outcome = await Promise.race([
+      Promise.resolve(supabase.rpc('unregister_all_push_devices')),
+      timedOut,
+    ]);
+    if (outcome === 'timeout') {
+      console.error('[Push] Removing every device registration timed out; signing out anyway');
+      return false;
+    }
+    if (outcome.error) {
+      console.error('[Push] Could not remove every device registration:', outcome.error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[Push] Could not remove every device registration:', error);
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Stops this device's pushes natively: unregisters from APNs, clears the app
  * icon's badge and forgets the stored token. Called on every transition to
  * signed out (sign-out online or offline, and a boot that finds the session

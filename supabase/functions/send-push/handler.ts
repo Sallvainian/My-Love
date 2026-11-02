@@ -91,6 +91,17 @@
  * send started): a token re-registered meanwhile is live again. Any other
  * refusal deletes nothing; a 400 `BadDeviceToken` is an environment mismatch,
  * not a dead device.
+ *
+ * ## Stale registrations
+ *
+ * A registration outlives its install or session (a reinstall, an offline
+ * sign-out, a session ended elsewhere) and only a 410 would remove it. A row
+ * whose `updated_at` is older than `STALE_AFTER_MS` (30 days) is therefore
+ * neither claimed nor sent to: it is deleted through `deleteGoneDevice` with
+ * the cutoff, so a row registered again meanwhile survives, and counted `gone`
+ * (a failed delete counts `failed`). A device registers on every signed-in
+ * start with permission, so one not started for 30 days stops getting pushes
+ * until it next starts.
  */
 
 import type { ApnsClient, ApnsResult } from './apns.ts';
@@ -184,6 +195,8 @@ export interface PartnerRequestRow {
 export interface DeviceRow {
   token: string;
   environment: string;
+  /** ISO timestamp of the last registration; `register_push_device` bumps it on every signed-in start. */
+  updated_at: string;
 }
 
 export interface PushRequestRow {
@@ -231,6 +244,9 @@ export interface SendPushDeps {
   /** Milliseconds since the epoch; defaults to `Date.now`. */
   now?: () => number;
 }
+
+/** A registration not renewed for this long (30 days, "one month") is stale: skipped and deleted. */
+export const STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_BODY_BYTES = 1024;
@@ -432,12 +448,20 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
     ]);
     const payload = withKind(withBadge(source.buildPayload(senderName), unread), source.kind);
     const now = deps.now ?? Date.now;
+    const staleCutoff = now() - STALE_AFTER_MS;
 
     await Promise.all(
       devices.map(async (device) => {
         // One device's failure must not lose the others' counts.
         let counted = false;
         try {
+          if (Date.parse(device.updated_at) < staleCutoff) {
+            // Not claimed and not sent; the delete re-checks updated_at, so a
+            // row registered again since the read stays.
+            await deps.db.deleteGoneDevice(device.token, staleCutoff);
+            gone++;
+            return;
+          }
           const claimed = await deps.db.claimRequest({
             kind: source.kind,
             source_id: source.id,

@@ -33,6 +33,7 @@ import {
 } from './services/dateRemindersAtLaunch';
 import { refreshLocalCopies, refreshLocalCopy } from './services/localCopy';
 import { onPushTap, startPushRegistration } from './services/pushNotifications';
+import { clearSignOutNotice } from './services/signOutNotice';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
@@ -353,6 +354,8 @@ function App() {
           // The flag keeps a still-in-flight `checkAuth` from putting it back.
           hasSessionNotification = true;
           setCallbackOutcome(null);
+          // Same reasoning for the partial sign-out notice (Settings sets it).
+          clearSignOutNotice();
           // The name lives in the profile row, not in auth metadata, so this is
           // a read and the gate settles a tick later.
           //

@@ -266,6 +266,83 @@ describe('removePushRegistration', () => {
   });
 });
 
+describe('removeAllPushRegistrations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    rpc.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.removeItem(TOKEN_KEY);
+  });
+
+  it('deletes every row the account owns and resolves true', async () => {
+    localStorage.setItem(TOKEN_KEY, 'device-token-1');
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
+  });
+
+  it.each([
+    ['in a browser', () => capacitor.isNativePlatform.mockReturnValue(false)],
+    ['with no token stored', () => localStorage.removeItem(TOKEN_KEY)],
+  ])('still calls the RPC %s', async (_case, arrange) => {
+    arrange();
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(true);
+
+    expect(rpc).toHaveBeenCalledExactlyOnceWith('unregister_all_push_devices');
+  });
+
+  it('logs a refusal and resolves false', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockResolvedValueOnce({ error: { message: 'nope' } });
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(false);
+
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('[Push]'), 'nope');
+    errorLog.mockRestore();
+  });
+
+  it('logs a thrown call and resolves false', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockRejectedValueOnce(new Error('network'));
+    const { removeAllPushRegistrations } = await freshModule();
+
+    await expect(removeAllPushRegistrations()).resolves.toBe(false);
+
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+
+  it('gives up after about 3 s and resolves false so sign-out never hangs', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockReturnValueOnce(new Promise(() => {}));
+    const { removeAllPushRegistrations } = await freshModule();
+
+    let result: boolean | undefined;
+    const done = removeAllPushRegistrations().then((value) => {
+      result = value;
+    });
+    await vi.advanceTimersByTimeAsync(2_900);
+    expect(result).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(200);
+    await done;
+
+    expect(result).toBe(false);
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('timed out'));
+    errorLog.mockRestore();
+  });
+});
+
 describe('stopDevicePushes', () => {
   beforeEach(() => {
     vi.clearAllMocks();

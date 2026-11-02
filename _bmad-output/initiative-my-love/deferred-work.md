@@ -3058,7 +3058,9 @@ location: supabase/functions/send-push/handler.ts (410 branch, row selection); s
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
 reason: Sign-out removes only the row for the token this install stored. An uninstall and reinstall gets a new APNs token, so the old row stays registered to the account. With a real APNs key the next send to it answers 410 and the sender deletes it; on the local stack there is no key, so the stale row stays, and every `sim build` (which uninstalls first) leaves one. Story 3.2's simulator check deleted one such row by hand before it ran. Settle it with a decision: either the driver clears the fixture accounts' push_devices rows when it provisions or reinstalls, or registration drops the account's other rows for this device (which needs a device identity APNs does not give). Absorbs DW-356 (an offline sign-out's old token: APNs answered 200 for about 30 minutes, never 410) and DW-384 (a session ended by the SDK or a global sign-out elsewhere leaves the row). Registration bumps updated_at on every online signed-in start with permission (App.tsx:443-449 -> register_push_device), not on a foreground return. "Sign out of all devices" removes only the calling device's row, so a lost phone keeps receiving love-note pushes until its app runs again (from the code; not checked on a device).
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sign-out-everywhere
+resolution-undo: 051accdf846088fbef5b51bd6f3357876d3a16d827d043cb8100d2787d2fb8df 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 prune-and-sign-out-everywhere — owner, 2026-11-02, after Firebase's token-management guidance (timestamp each registration, prune stale ones, delete on an invalid-token answer): (1) send-push skips and deletes any push_devices row whose updated_at is older than one month; (2) "Sign out of all devices" deletes every push_devices row of the account through a SECURITY DEFINER RPC before the global sign-out (pgTAP for the RPC and its grants); (3) on the local stack, `sim provision` deletes the fixture accounts' push_devices rows so each `sim build` reinstall starts clean.
 
 ### DW-354: A reinstalled shell leaves its old token's push_devices row on the account; only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
@@ -3298,7 +3300,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/api/auth/actionService.ts:99-109 (signOut, retryable fallback); src/components/Settings/Settings.tsx:548
 severity: medium
 reason: Settings refuses the row only when isOnline() is false. With the browser online but the auth server unreachable, signOut({ everywhere: true }) turns the AuthRetryableFetchError into error = null, or falls back to a local sign-out, and Settings reports success although the other devices stay signed in. The only test of { everywhere: true } uses error: null. It is in d47ea7c5, pushed without review.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sign-out-everywhere
+resolution-undo: 051accdf846088fbef5b51bd6f3357876d3a16d827d043cb8100d2787d2fb8df 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 report-partial — owner, 2026-11-02: when the global sign-out meets a retryable error, sign this device out as now but tell the person the other devices could not be signed out and to try again online; add a test with a retryable error on { everywhere: true }. Fits one bundle with DW-353 and DW-387.
 
 ### DW-387: "Sign out of all devices" acts on one tap, with no confirmation.
@@ -3307,7 +3311,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/components/Settings/Settings.tsx (the row, d47ea7c5)
 severity: low
 reason: The row sits directly under Sign out, so one wrong tap signs the account out on every phone, simulator and browser.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-sign-out-everywhere
+resolution-undo: 051accdf846088fbef5b51bd6f3357876d3a16d827d043cb8100d2787d2fb8df 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 confirm-first — owner, 2026-11-02: a confirmation dialog, "Sign out on every device? You'll need to sign in again on each one.", with Cancel and Sign out everywhere.
 
 ### DW-388: App.tsx's auth-check comment says a present session means the callback outcome is null, which is false for an implicit-grant error redirect.
@@ -3459,4 +3465,12 @@ location: scripts/sim-driver/RunnerUITests/Notify.swift (center)
 source_spec: `plan-dw-sim-center-one-screen.md`
 severity: low
 reason: The drag-then-swipe sequence is the one every passing 8-group run ended on, and those runs printed no extra stacked-cell group, so neither check should fire at 8 groups; a run with 8 groups (exit 0) and one with more than fit (exit 1 with the message) would prove it. Needs the Duo simulator, like DW-403.
+status: open
+
+### DW-406: After "Sign out everywhere", another device whose access token has not yet expired can re-register its push_devices row, so a lost phone opened within about an hour keeps receiving pushes until an
+origin: spec-deferred 15f1bfb60d36
+location: supabase/migrations/20261031000000_push_devices.sql (register_push_device); src/api/auth/actionService.ts (signOut, everywhere)
+source_spec: `plan-dw-sign-out-everywhere.md`
+severity: medium
+reason: Global sign-out revokes refresh tokens, but access tokens stay valid until they expire (supabase/config.toml jwt_expiry = 3600). register_push_device checks only auth.uid() (20261031000000_push_devices.sql), and App.tsx re-registers on every signed-in start with permission. The same happens if a registration lands in the up-to-3 s gap between unregister_all_push_devices() and the global sign-out. Pre-existing: register_push_device never checked whether the caller's session was revoked. Settling it needs a server-side check that the JWT's session_id still exists in auth.sessions, or an owner decision to accept the window.
 status: open

@@ -14,10 +14,15 @@
  */
 
 import { CircleAlert, Heart, Info, LoaderCircle } from 'lucide-react';
-import { useState, type SubmitEvent } from 'react';
+import { useState, useSyncExternalStore, type SubmitEvent } from 'react';
 import { signIn, signInWithGoogle } from '../../api/auth/actionService';
 import { NATIVE_AUTH_UNAVAILABLE } from '../../api/auth/types';
 import type { AuthCallbackOutcome } from '../../api/supabaseClient';
+import {
+  clearSignOutNotice,
+  getSignOutNotice,
+  subscribeSignOutNotice,
+} from '../../services/signOutNotice';
 import {
   FAILURE_BOX,
   NOTICE,
@@ -119,6 +124,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
   // notice is over either way.
   const [noticeDismissed, setNoticeDismissed] = useState(false);
 
+  // Handed over by Settings when "Sign out of all devices" reached only this
+  // device. A subscription, not a mount-time read: Settings sets it after this
+  // screen may already have mounted.
+  const signOutNotice = useSyncExternalStore(subscribeSignOutNotice, getSignOutNotice);
+
   const callbackNotice =
     !noticeDismissed && callbackOutcome ? CALLBACK_NOTICES[callbackOutcome] : null;
 
@@ -135,6 +145,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
     e.preventDefault();
     setError(null);
     setNoticeDismissed(true);
+    clearSignOutNotice();
 
     // Client-side validation. An empty field never gets here: both inputs are
     // required and the submit button is disabled until both are filled.
@@ -194,6 +205,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
   const handleGoogleSignIn = async () => {
     setError(null);
     setNoticeDismissed(true);
+    clearSignOutNotice();
     setIsGoogleLoading(true);
 
     try {
@@ -263,6 +275,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
                 data-testid="login-notice-icon"
               />
               <span>{callbackNotice}</span>
+            </div>
+          )}
+
+          {signOutNotice && (
+            <div
+              className={`${NOTICE} flex items-start gap-2 text-sm text-ink`}
+              data-testid="login-sign-out-notice"
+              role="status"
+              aria-live="polite"
+            >
+              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{signOutNotice}</span>
             </div>
           )}
 

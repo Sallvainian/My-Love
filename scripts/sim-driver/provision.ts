@@ -5,7 +5,10 @@
 // nothing, for checks that sign the shell out and in as another couple (story
 // 3.2's push takeover); and a third pair, Riley and Quinn, left unlinked with
 // every partner request involving either deleted, for checks of the partner
-// request and acceptance pushes (story 3.6). No E2E worker slot
+// request and acceptance pushes (story 3.6). Every run also deletes the six
+// accounts' push_devices rows, so a registration left by an earlier shell
+// install or session (they last until an APNs 410 or 30 days) cannot reach the
+// next run. No E2E worker slot
 // (tests/support/auth/worker-pool.ts) uses them, so a driver run never writes
 // another worker's rows.
 //
@@ -14,8 +17,8 @@
 // Idempotent, as ensureUser/linkUserPair in tests/support/auth/global-setup.ts
 // are: an existing account gets its password and name reset, the first pair's
 // rows and photo objects are wiped and seeded afresh, the second pair's love
-// notes are wiped, and the third pair is unlinked and loses its partner
-// requests. Needs
+// notes are wiped, the third pair is unlinked and loses its partner
+// requests, and all six lose their push devices. Needs
 // SIM_SUPABASE_URL and SIM_SUPABASE_SECRET_KEY (`sim` reads both from
 // `supabase status`) and refuses any host but 127.0.0.1 or localhost.
 
@@ -320,6 +323,16 @@ async function main() {
     ).error
   );
   console.log('third pair unlinked, partner requests deleted');
+
+  // Registrations outlive an install or a session; the sender only prunes them
+  // on a 410 or after 30 days, so a leftover row would be pushed to on a run
+  // that never registered it.
+  const fixtureIds = [first, second, ...other, ...unlinked];
+  check(
+    'wiping the six fixture accounts\' push devices',
+    (await admin.from('push_devices').delete().in('user_id', fixtureIds)).error
+  );
+  console.log(`push devices deleted for ${fixtureIds.length} fixture accounts`);
 }
 
 // dates.ts imports the helpers above, so main runs only when this file is the entry point.
