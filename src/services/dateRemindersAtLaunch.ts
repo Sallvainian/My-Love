@@ -16,6 +16,7 @@ import { useAppStore } from '../stores/useAppStore';
 import {
   hasNativeReminders,
   planDateReminders,
+  reminderDatesFrom,
   scheduleDateReminders,
   type ReminderDates,
 } from './dateReminders';
@@ -141,17 +142,14 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
     // A copy that is missing is not yet loaded: keep whatever is pending.
     if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner || !marks || !prefs) return;
 
-    const linked = coupleSettings.status === 'linked' ? coupleSettings : null;
     const dates: ReminderDates = {
-      events,
-      anniversaries,
-      relationshipStart: linked?.relationshipStart ?? null,
-      weddingDate: linked?.weddingDate ?? null,
-      ownBirthday: { name: ownProfile.displayName, birthday: ownProfile.birthday },
-      partnerBirthday:
-        partner.status === 'linked'
-          ? { name: partner.partner.displayName, birthday: partner.partner.birthday }
-          : null,
+      ...reminderDatesFrom({
+        events,
+        anniversaries,
+        coupleSettings,
+        ownProfile,
+        partner: partner.status === 'linked' ? partner.partner : null,
+      }),
       marks: new Set(marks),
       remindersOn: prefs.dateReminders,
     };

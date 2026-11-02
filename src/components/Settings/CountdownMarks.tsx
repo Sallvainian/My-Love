@@ -21,8 +21,10 @@
  * refused with `offlineMessage`.
  *
  * The rows come from `reminderDateEntries`, built from the store's events,
- * anniversaries, couple settings, own profile and partner. A mark whose date
- * no longer exists matches no row and is ignored.
+ * anniversaries, couple settings, own profile and partner (`reminderDatesFrom`).
+ * A date is listed only while marking it would still plan a reminder, so a row
+ * can disappear on the day (an event dated tomorrow after 9:00). A mark whose
+ * date has no row is ignored.
  *
  * @component
  */
@@ -31,13 +33,18 @@ import { Bell, Cake, CalendarDays, Gem, Heart, type LucideIcon } from 'lucide-re
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { offlineMessage } from '../../services/accountDataError';
-import { hasNativeReminders, MARK_KEYS, reminderDateEntries } from '../../services/dateReminders';
+import {
+  hasNativeReminders,
+  MARK_KEYS,
+  reminderDateEntries,
+  reminderDatesFrom,
+} from '../../services/dateReminders';
 import { useAppStore } from '../../stores/useAppStore';
 import { CARD, DIVIDER, FIELD_ERROR, GROUP_SUBTITLE, GROUP_TITLE } from '../shared/kitClasses';
 import { SwitchRow } from './SwitchRow';
 
 const HELPER = 'Remind me a month and a week before.';
-const REMINDERS_HELPER = 'At 9:00 before each date.';
+const REMINDERS_HELPER = 'At 9:00 the day before, and on the day for birthdays and anniversaries.';
 
 /** The row's icon, from the kind of date its key names. */
 function iconFor(key: string): LucideIcon {
@@ -73,17 +80,10 @@ function CountdownMarksCard() {
   }, [loadCountdownMarks]);
 
   const entries = useMemo(() => {
-    const linked = coupleSettings?.status === 'linked' ? coupleSettings : null;
-    return reminderDateEntries({
-      events,
-      anniversaries: anniversaries ?? [],
-      relationshipStart: linked?.relationshipStart ?? null,
-      weddingDate: linked?.weddingDate ?? null,
-      ownBirthday: ownProfile
-        ? { name: ownProfile.displayName, birthday: ownProfile.birthday }
-        : null,
-      partnerBirthday: partner ? { name: partner.displayName, birthday: partner.birthday } : null,
-    }, new Date());
+    return reminderDateEntries(
+      reminderDatesFrom({ events, anniversaries: anniversaries ?? [], coupleSettings, ownProfile, partner }),
+      new Date()
+    );
   }, [events, anniversaries, coupleSettings, ownProfile, partner]);
 
   const toggle = useCallback(

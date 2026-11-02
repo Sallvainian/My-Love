@@ -3406,7 +3406,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/components/Settings/CountdownMarks.tsx:75-87; src/services/dateRemindersAtLaunch.ts:79-117 (planOnce); src/services/dateReminders.ts:193-285 (reminderDateEntries, planDateReminders, :263)
 severity: low
 reason: Two builders of the planner's input diverge: planOnce builds ReminderDates from the saved copies, CountdownMarks from the store, and each kind has its own eligibility rule, so the list offers rows the planner skips (an event tomorrow after 9:00 today, a relationship start dated today or later). Fix: one shared builder and eligibility rule for both, so the list shows only dates that can remind; unit-test the two examples.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-countdown-marks-list-matches-plan
+resolution-undo: 96b338e4fac679710e3c04d2e8768cec101b1f4fe642204ed96b1344e5dcdbae 2026-11-02 7374617475733a206f70656e
 
 ### DW-396: The date reminders switch says "At 9:00 before each date.", but birthdays and anniversaries also remind on the day.
 
@@ -3414,7 +3416,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/components/Settings/CountdownMarks.tsx:40 (REMINDERS_HELPER)
 severity: low
 reason: The helper text describes only the day-before reminder.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-countdown-marks-list-matches-plan
+resolution-undo: 96b338e4fac679710e3c04d2e8768cec101b1f4fe642204ed96b1344e5dcdbae 2026-11-02 7374617475733a206f70656e
 decision: 2026-11-02 reword — owner, 2026-11-02: "At 9:00 the day before, and on the day for birthdays and anniversaries." Update any test that pins the old text.
 
 ### DW-397: `sim dates kinds|many|clear` leaves countdown marks and the date-reminders switch behind.

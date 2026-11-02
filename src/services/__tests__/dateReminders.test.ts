@@ -38,6 +38,7 @@ import {
   hasNativeReminders,
   planDateReminders,
   reminderDateEntries,
+  reminderDatesFrom,
   scheduleDateReminders,
   type PlannedReminder,
   type ReminderDates,
@@ -680,19 +681,101 @@ describe('reminderDateEntries', () => {
     ).toEqual([]);
   });
 
-  it('leaves out an event dated today or before, keeps one dated tomorrow', () => {
-    const entries = reminderDateEntries({
+  it('leaves out an event dated today or before, keeps one dated tomorrow while 9:00 is ahead', () => {
+    const day = (offset: number) => new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + offset);
+    const withEvents = {
       ...dates,
       events: [
-        { id: 'past', label: 'Last week', date: new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - 7) },
-        { id: 'today', label: 'Today', date: new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate()) },
-        { id: 'tomorrow', label: 'Tomorrow', date: new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + 1) },
+        { id: 'past', label: 'Last week', date: day(-7) },
+        { id: 'today', label: 'Today', date: day(0) },
+        { id: 'tomorrow', label: 'Tomorrow', date: day(1) },
       ],
-    }, NOW);
+    };
 
-    expect(entries.filter((entry) => entry.key.startsWith('event:'))).toEqual([
-      { key: 'event:tomorrow', name: 'Tomorrow' },
-    ]);
+    expect(
+      reminderDateEntries(withEvents, EARLY).filter((entry) => entry.key.startsWith('event:'))
+    ).toEqual([{ key: 'event:tomorrow', name: 'Tomorrow' }]);
+    // After 9:00 its only reminder ("Tomorrow" at 9:00 today) is past.
+    expect(
+      reminderDateEntries(withEvents, NOW).filter((entry) => entry.key.startsWith('event:'))
+    ).toEqual([]);
+  });
+
+  it('leaves out a relationship start dated today or later, keeps one a year or more ago', () => {
+    const only = { ...dates, events: [], anniversaries: [], weddingDate: null, ownBirthday: null, partnerBirthday: null };
+    const relationship = (start: Date, now: Date) =>
+      reminderDateEntries({ ...only, relationshipStart: start.toISOString() }, now).map((entry) => entry.key);
+
+    expect(relationship(new Date(2026, 10, 1, 7, 0), EARLY)).toEqual([]);
+    expect(relationship(new Date(2026, 10, 6, 22, 30), EARLY)).toEqual([]);
+    expect(relationship(new Date(2020, 10, 6, 22, 30), NOW)).toEqual(['relationship-start']);
+  });
+
+  it('leaves out a recurring date on its own day after 9:00, keeps it before 9:00', () => {
+    const only = {
+      ...dates,
+      events: [],
+      anniversaries: [],
+      relationshipStart: null,
+      weddingDate: null,
+      ownBirthday: { name: 'Casey', birthday: '1996-11-01' },
+      partnerBirthday: null,
+    };
+
+    expect(reminderDateEntries(only, EARLY)).toEqual([{ key: 'own-birthday', name: 'Your birthday' }]);
+    expect(reminderDateEntries(only, NOW)).toEqual([]);
+  });
+
+  it('lists exactly the keyed dates that plan a reminder when marked alone', () => {
+    const everything = {
+      ...dates,
+      events: [
+        { id: 'past', label: 'Past', date: new Date(2026, 9, 1) },
+        { id: 'today', label: 'Today', date: new Date(2026, 10, 1) },
+        { id: 'tomorrow', label: 'Tomorrow', date: new Date(2026, 10, 2) },
+        { id: 'later', label: 'Later', date: new Date(2027, 2, 2) },
+      ],
+      anniversaries: [
+        { label: 'On the day', date: '2020-11-01', serverId: 'a-today' },
+        { label: 'Soon', date: '2020-11-03', serverId: 'a-soon' },
+        { label: 'Not saved yet', date: '2020-11-07' },
+      ],
+      relationshipStart: new Date(2026, 10, 1, 7, 0).toISOString(),
+      ownBirthday: { name: 'Casey', birthday: '1996-11-01' },
+    };
+    const keyed = [
+      'event:past',
+      'event:today',
+      'event:tomorrow',
+      'event:later',
+      'anniversary:a-today',
+      'anniversary:a-soon',
+      'relationship-start',
+      'wedding',
+      'own-birthday',
+      'partner-birthday',
+    ];
+
+    for (const now of [EARLY, NOW]) {
+      const listed = new Set(reminderDateEntries(everything, now).map((entry) => entry.key));
+      for (const key of keyed) {
+        const alone = planDateReminders(
+          {
+            ...everything,
+            events: everything.events.filter((e) => `event:${e.id}` === key),
+            anniversaries: everything.anniversaries.filter((a) => a.serverId && `anniversary:${a.serverId}` === key),
+            relationshipStart: key === 'relationship-start' ? everything.relationshipStart : null,
+            weddingDate: key === 'wedding' ? everything.weddingDate : null,
+            ownBirthday: key === 'own-birthday' ? everything.ownBirthday : null,
+            partnerBirthday: key === 'partner-birthday' ? everything.partnerBirthday : null,
+            marks: new Set([key]),
+            remindersOn: true,
+          },
+          now
+        );
+        expect(alone.length > 0, `${key} at ${now.toISOString()}`).toBe(listed.has(key));
+      }
+    }
   });
 
   it('names an own birthday "Your birthday" with or without a chosen name', () => {
@@ -728,6 +811,50 @@ describe('reminderDateEntries', () => {
       'In a week: Jessie turns 31',
       'In a week: Move',
     ]);
+  });
+});
+
+describe('reminderDatesFrom', () => {
+  const sources = {
+    events: [{ id: 'e1', label: 'Trip', date: new Date(2026, 11, 11) }],
+    anniversaries: [{ label: 'Dinner', date: '2020-11-06', serverId: 'a1' }],
+    coupleSettings: {
+      status: 'linked',
+      relationshipStart: '2020-11-06T22:30:00.000Z',
+      weddingDate: '2026-12-20',
+    },
+    ownProfile: { displayName: 'Casey', birthday: '1996-12-24' },
+    partner: { displayName: 'Jessie', birthday: '1995-12-26' },
+  };
+
+  it('reads the start and wedding from linked couple settings', () => {
+    expect(reminderDatesFrom(sources)).toEqual({
+      events: sources.events,
+      anniversaries: sources.anniversaries,
+      relationshipStart: '2020-11-06T22:30:00.000Z',
+      weddingDate: '2026-12-20',
+      ownBirthday: { name: 'Casey', birthday: '1996-12-24' },
+      partnerBirthday: { name: 'Jessie', birthday: '1995-12-26' },
+    });
+  });
+
+  it('has no start or wedding when the couple is unlinked or not loaded', () => {
+    for (const coupleSettings of [{ status: 'unlinked' }, null]) {
+      const built = reminderDatesFrom({ ...sources, coupleSettings });
+      expect(built.relationshipStart).toBeNull();
+      expect(built.weddingDate).toBeNull();
+    }
+  });
+
+  it('has no birthday for a missing profile or partner', () => {
+    const built = reminderDatesFrom({ ...sources, ownProfile: null, partner: null });
+    expect(built.ownBirthday).toBeNull();
+    expect(built.partnerBirthday).toBeNull();
+  });
+
+  it('keeps a person with no birthday set as a birthday with a null date', () => {
+    const built = reminderDatesFrom({ ...sources, ownProfile: { displayName: null, birthday: null } });
+    expect(built.ownBirthday).toEqual({ name: null, birthday: null });
   });
 });
 

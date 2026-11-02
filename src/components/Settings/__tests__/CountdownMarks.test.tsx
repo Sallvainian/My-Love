@@ -56,8 +56,12 @@ import { setOnline } from '../../../../tests/unit/stores/accountDataFixtures';
 import { CountdownMarks } from '../CountdownMarks';
 
 const HELPER = 'Remind me a month and a week before.';
+const REMINDERS_HELPER = 'At 9:00 the day before, and on the day for birthdays and anniversaries.';
 
-/** Local midnight `days` from today: the marks list leaves out events dated today or earlier. */
+// Before 9:00 on a day the seeded anniversaries (6 Nov, 20/24/26 Dec) are all ahead.
+const TODAY = new Date(2026, 9, 20, 8, 0);
+
+/** Local midnight `days` from today: the marks list leaves out events with no reminder ahead. */
 function daysFromToday(days: number): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
@@ -142,6 +146,9 @@ async function renderLoaded(marks: string[] = []) {
 }
 
 beforeEach(() => {
+  // Only `Date` is faked: Testing Library's waits and user-event need real timers.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(TODAY);
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   capacitor.isNativePlatform.mockReturnValue(true);
@@ -157,6 +164,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   setOnline(true);
   vi.restoreAllMocks();
 });
@@ -221,6 +229,22 @@ describe('CountdownMarks: the rows', () => {
 
     expect(screen.queryByTestId(rowId('partner-birthday'))).not.toBeInTheDocument();
     expect(marksSwitches()).toHaveLength(KEYS.length - 1);
+  });
+
+  it('lists no event dated tomorrow once 9:00 has passed, and keeps the other dates', async () => {
+    vi.setSystemTime(new Date(2026, 9, 20, 10, 0));
+    seedAllDates();
+    useAppStore.setState({
+      events: [event('e1', 'Trip', daysFromToday(1)), event('e2', 'Move', daysFromToday(65))],
+    });
+    service.fetchCountdownMarks.mockResolvedValue([]);
+    render(<CountdownMarks />);
+    await waitFor(() => expect(screen.getByTestId(rowId('event:e2'))).toBeEnabled());
+
+    expect(screen.queryByTestId(rowId('event:e1'))).not.toBeInTheDocument();
+    expect(marksSwitches().map((row) => row.getAttribute('data-testid'))).toEqual(
+      KEYS.slice(1).map(rowId)
+    );
   });
 
   it('says so when there are no dates', async () => {
@@ -360,7 +384,7 @@ describe('CountdownMarks: the Date reminders switch', () => {
     const first = within(card).getAllByRole('switch')[0];
     expect(first).toBe(screen.getByTestId(SWITCH));
     expect(first).toHaveAccessibleName('Date reminders');
-    expect(first).toHaveAccessibleDescription('At 9:00 before each date.');
+    expect(first).toHaveAccessibleDescription(REMINDERS_HELPER);
     expect(first.querySelector('svg')).toBeInTheDocument();
     // After the heading and before the first mark row.
     const heading = within(card).getByRole('heading', { level: 3, name: 'Reminders' });
