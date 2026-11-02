@@ -45,7 +45,14 @@ vi.mock('../../../hooks/useAuth', () => ({
 
 vi.mock('../../../api/supabaseClient', () => ({
   lookupPartnerId: vi.fn().mockResolvedValue({ status: 'unlinked' }),
-  supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
+  supabase: {
+    from: vi.fn(),
+    auth: {
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
 }));
 
 vi.mock('../../../utils/backgroundSync', () => ({

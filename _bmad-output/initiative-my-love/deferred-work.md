@@ -3564,7 +3564,9 @@ location: src/components/MoodTracker/MoodTracker.tsx (loadPartnerId effect)
 source_spec: `plan-dw-realtime-recovery-after-renewal.md`
 severity: low
 reason: MoodTracker looks its partner up through lookupPartnerId on mount and again only when store.partner.id changes; on a boot whose stored session the SDK cannot use that lookup fails and nothing re-runs it on TOKEN_REFRESHED. Observed in tests/e2e/partner/realtime-recovery-after-renewal.spec.ts on the local stack: no card and no error card after TOKEN_REFRESHED; Home then Mood mounts it.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-mood-partner-lookup-on-renewal
+resolution-undo: 1fef8da71dc9785856aad71f8c8803d5481f487b98c3027a7d1736d3769aa159 2026-11-02 7374617475733a206f70656e
 
 ### DW-412: A register_push_device call that lands between unregister_all_push_devices() and the global sign-out still has a live session, so the session check accepts it and its push_devices row outlives "Sign
 origin: spec-deferred 716063194f07
