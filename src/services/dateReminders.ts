@@ -130,6 +130,17 @@ function reminderMoment(day: Date, offsetDays: number): Date {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate() + offsetDays, REMINDER_HOUR, 0);
 }
 
+/**
+ * The moment a recurring date's next occurrence is looked up from: `now`, or
+ * the start of tomorrow once today's 9:00 has passed. A recurring date whose
+ * day is today has fired its last reminder by then, so its next occurrence is
+ * next year's, not today's.
+ */
+function occurrenceFrom(now: Date): Date {
+  if (now.getTime() < reminderMoment(now, 0).getTime()) return now;
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+}
+
 function addReminder(planned: PlannedReminder[], prefix: string, name: string, fireAt: Date, now: Date) {
   if (fireAt.getTime() <= now.getTime()) return;
   planned.push({
@@ -184,9 +195,10 @@ function addBirthday(
 ) {
   const info = toBirthdayInfo(birthday?.birthday ?? null);
   if (!birthday || !info) return;
-  const age = getUpcomingAge(info, now);
+  const from = occurrenceFrom(now);
+  const age = getUpcomingAge(info, from);
   const name = birthday.name === null ? `You turn ${age}` : `${birthday.name} turns ${age}`;
-  addDay(planned, getNextBirthday(info, now), name, true, marked, now);
+  addDay(planned, getNextBirthday(info, from), name, true, marked, now);
 }
 
 /**
@@ -265,7 +277,14 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
       key: anniversary.serverId ? MARK_KEYS.anniversary(anniversary.serverId) : null,
       name: anniversary.label,
       plan: (planned, marked, now) =>
-        addDay(planned, getNextAnniversaryDate(anniversary.date, now), anniversary.label, true, marked, now),
+        addDay(
+          planned,
+          getNextAnniversaryDate(anniversary.date, occurrenceFrom(now)),
+          anniversary.label,
+          true,
+          marked,
+          now
+        ),
     });
   }
 
@@ -279,7 +298,7 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
         key: MARK_KEYS.relationshipStart,
         name: 'Our anniversary',
         plan: (planned, marked, now) => {
-          const next = getNextAnniversaryDate(formatDateISO(startDay), now);
+          const next = getNextAnniversaryDate(formatDateISO(startDay), occurrenceFrom(now));
           if (next.getTime() > startDay.getTime()) {
             addDay(planned, next, 'Our anniversary', true, marked, now);
           }
@@ -295,11 +314,12 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
       key: MARK_KEYS.wedding,
       name: 'Wedding',
       plan: (planned, marked, now) => {
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (wedding.getTime() >= startOfToday.getTime()) {
+        const from = occurrenceFrom(now);
+        const startOfFrom = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+        if (wedding.getTime() >= startOfFrom.getTime()) {
           addDay(planned, wedding, 'Wedding day', true, marked, now);
         } else {
-          addDay(planned, getNextAnniversaryDate(weddingDate, now), 'Wedding anniversary', true, marked, now);
+          addDay(planned, getNextAnniversaryDate(weddingDate, from), 'Wedding anniversary', true, marked, now);
         }
       },
     });
@@ -331,10 +351,11 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
  * `Our anniversary`, `Wedding`, `Your birthday`, `{partner}'s birthday`. A date
  * is listed only when marking it would plan at least one reminder at `now`,
  * computed by the same per-date code `planDateReminders` runs: an event dated
- * tomorrow after 9:00, a relationship start dated today or later, and a
- * recurring date on its own day after 9:00 have nothing ahead and are not
- * listed. An unreadable date is not listed, nor is an anniversary with no
- * `serverId` (it has no key yet). The names are the Home cards' labels; the
+ * tomorrow after 9:00 and a relationship start dated later than today (or
+ * today before 9:00) have nothing ahead and are not listed. A recurring date on
+ * its own day after 9:00 stays listed: its next occurrence is next year's. An
+ * unreadable date is not listed, nor is an anniversary with no `serverId` (it
+ * has no key yet). The names are the Home cards' labels; the
  * relationship start is the exception, since its card ("Together for") does not
  * name a date.
  */

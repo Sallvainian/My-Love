@@ -155,8 +155,17 @@ describe('planDateReminders', () => {
       ]);
     });
 
-    it('on the day after 9:00 plans nothing for it until the next launch', () => {
-      expect(plan({ anniversaries: [{ label: 'Dinner', date: '2020-11-01' }] })).toEqual([]);
+    it('on the day after 9:00 plans next year\'s occurrence', () => {
+      expect(summary(plan({ anniversaries: [{ label: 'Dinner', date: '2020-11-01' }] }))).toEqual([
+        'Tomorrow: Dinner @ 2027-10-31 9:00',
+        'Today: Dinner @ 2027-11-1 9:00',
+      ]);
+    });
+
+    it('at exactly 9:00 on the day plans next year\'s occurrence', () => {
+      expect(
+        summary(plan({ anniversaries: [{ label: 'Dinner', date: '2020-11-01' }] }, new Date(2026, 10, 1, 9, 0)))
+      ).toEqual(['Tomorrow: Dinner @ 2027-10-31 9:00', 'Today: Dinner @ 2027-11-1 9:00']);
     });
 
     it('matches getNextAnniversaryDate for a leap-day anniversary in a non-leap year', () => {
@@ -205,6 +214,16 @@ describe('planDateReminders', () => {
       expect(summary(plan({ ownBirthday: { name: null, birthday: '1996-11-06' } }))).toEqual([
         'Tomorrow: You turn 30 @ 2026-11-5 9:00',
         'Today: You turn 30 @ 2026-11-6 9:00',
+      ]);
+    });
+
+    it('on the birthday before 9:00 plans this year\'s, after 9:00 next year\'s with the next age', () => {
+      const birthday = { ownBirthday: { name: 'Casey', birthday: '1996-11-01' } };
+
+      expect(summary(plan(birthday, EARLY))).toEqual(['Today: Casey turns 30 @ 2026-11-1 9:00']);
+      expect(summary(plan(birthday))).toEqual([
+        'Tomorrow: Casey turns 31 @ 2027-10-31 9:00',
+        'Today: Casey turns 31 @ 2027-11-1 9:00',
       ]);
     });
 
@@ -273,6 +292,13 @@ describe('planDateReminders', () => {
 
     it('plans only "Today: Wedding day" when the wedding is today before 9:00', () => {
       expect(summary(plan({ weddingDate: '2026-11-01' }, EARLY))).toEqual(['Today: Wedding day @ 2026-11-1 9:00']);
+    });
+
+    it('plans next year\'s "Wedding anniversary" when the wedding is today after 9:00', () => {
+      expect(summary(plan({ weddingDate: '2026-11-01' }))).toEqual([
+        'Tomorrow: Wedding anniversary @ 2027-10-31 9:00',
+        'Today: Wedding anniversary @ 2027-11-1 9:00',
+      ]);
     });
 
     it('plans "Wedding anniversary" for the next year once the wedding has passed', () => {
@@ -711,7 +737,7 @@ describe('reminderDateEntries', () => {
     expect(relationship(new Date(2020, 10, 6, 22, 30), NOW)).toEqual(['relationship-start']);
   });
 
-  it('leaves out a recurring date on its own day after 9:00, keeps it before 9:00', () => {
+  it('keeps a recurring date listed on its own day, before and after 9:00', () => {
     const only = {
       ...dates,
       events: [],
@@ -723,7 +749,7 @@ describe('reminderDateEntries', () => {
     };
 
     expect(reminderDateEntries(only, EARLY)).toEqual([{ key: 'own-birthday', name: 'Your birthday' }]);
-    expect(reminderDateEntries(only, NOW)).toEqual([]);
+    expect(reminderDateEntries(only, NOW)).toEqual([{ key: 'own-birthday', name: 'Your birthday' }]);
   });
 
   it('lists exactly the keyed dates that plan a reminder when marked alone', () => {
