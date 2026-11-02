@@ -80,7 +80,9 @@ export const signOut = async (): Promise<void> => {
     // SIGNED_OUT event below arrives, offline too.
     await removePushRegistration();
 
-    let { error } = await supabase.auth.signOut();
+    // This device only (owner decision 2026-11-02): the SDK's default scope,
+    // 'global', ends the account's sessions on every device.
+    let { error } = await supabase.auth.signOut({ scope: 'local' });
 
     // The server is unreachable. With a valid access token the SDK has already
     // removed the session and emitted SIGNED_OUT, so the sign-out is done. On a

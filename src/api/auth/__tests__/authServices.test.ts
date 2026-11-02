@@ -175,7 +175,8 @@ describe('auth session/action services', () => {
 
     await signOut();
 
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    // This device only: never the SDK's default 'global' scope.
+    expect(mockSignOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
   });
 
@@ -202,7 +203,7 @@ describe('auth session/action services', () => {
 
       await expect(signOut()).resolves.toBeUndefined();
 
-      expect(mockSignOut.mock.calls).toEqual([[], [{ scope: 'local' }]]);
+      expect(mockSignOut.mock.calls).toEqual([[{ scope: 'local' }], [{ scope: 'local' }]]);
       expect(storedAtLocalSignOut).toBeNull();
       expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
       expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
@@ -222,7 +223,7 @@ describe('auth session/action services', () => {
 
       await expect(signOut()).resolves.toBeUndefined();
 
-      expect(mockSignOut).toHaveBeenCalledExactlyOnceWith();
+      expect(mockSignOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
       expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
       expect(console.warn).not.toHaveBeenCalled();
       expect(console.error).not.toHaveBeenCalled();
@@ -244,7 +245,7 @@ describe('auth session/action services', () => {
       mockSignOut.mockResolvedValueOnce({ error: rejected });
 
       await expect(signOut()).rejects.toBe(rejected);
-      expect(mockSignOut).toHaveBeenCalledExactlyOnceWith();
+      expect(mockSignOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
       expect(localStorage.getItem(AUTH_STORAGE_KEY)).not.toBeNull();
       expect(mockClearAuthToken).not.toHaveBeenCalled();
     });
