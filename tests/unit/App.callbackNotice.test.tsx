@@ -252,4 +252,25 @@ describe('App callback notice lifetime', () => {
     expect(screen.getByTestId('login-screen')).toBeInTheDocument();
     expect(screen.queryByTestId('login-notice')).toBeNull();
   });
+
+  it('opens a stored session without waiting for the callback outcome', async () => {
+    // Offline with an expired token, `getAuthCallbackOutcome()` waits on
+    // `supabase.auth.initialize()`, which retries the refresh for up to 30 s.
+    // A session in hand means no notice, so the app must not wait for it.
+    const outcome = deferred<AuthCallbackOutcome>();
+    auth.getAuthCallbackOutcome.mockReturnValue(outcome.promise);
+    auth.getSession.mockResolvedValue(session());
+
+    render(<App />);
+    await act(async () => {});
+
+    expect(screen.queryByTestId('auth-loading-screen')).toBeNull();
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+
+    await act(async () => {
+      outcome.resolve(null);
+      await outcome.promise;
+    });
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+  });
 });
