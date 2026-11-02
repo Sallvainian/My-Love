@@ -69,10 +69,6 @@ jobs:
           # every app function lives in public.
           supabase db lint --schema public --level error --fail-on error
 
-      - name: Stop Supabase
-        if: always()
-        run: supabase stop --no-backup
-
       - name: Migration Summary
         if: always()
         run: |
