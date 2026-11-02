@@ -3235,3 +3235,19 @@ source_spec: `tickets/epic-date-reminders/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred.
 status: open
+
+### DW-383: A device clock far ahead of real time, online, makes supabase-js refresh the session in a loop until GoTrue answers 429, and the SDK then signs the device out.
+origin: spec-deferred story-4-5-ship
+location: src/api/auth/sessionService.ts; node_modules/@supabase/auth-js (GoTrueClient `_callRefreshToken`)
+source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
+severity: low
+reason: Seen on the owner's iPhone on 2026-11-02 against production: with the clock five days ahead and Wi-Fi still on, every token the server issued already looked expired to the device, so it refreshed about 30 times in 3 s (06:11:49-52 UTC, all 200), then GoTrue answered 429 `over_request_rate_limit`. A 429 is not an `AuthRetryableFetchError`, and with the access token expired by the device's clock `_callRefreshToken` calls `_removeSession()`, which emits SIGNED_OUT. Only a wrong device clock reaches it, and iOS sets the clock itself unless the person turns that off. Settle it with a decision: accept it, or treat a 429 refresh like an unreachable server (keep the stored session) in the app's auth layer.
+status: open
+
+### DW-384: A session that ends without the app's Sign out (a refresh the SDK gives up on, or a sign-out of all devices from elsewhere) leaves the device's push_devices row on the account.
+origin: spec-deferred story-4-5-ship
+location: src/services/pushNotifications.ts (removePushRegistration); src/api/auth/actionService.ts (signOut)
+source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
+severity: low
+reason: Only the app's own Sign out calls `removePushRegistration()` while the session still exists. On 2026-11-02 two Claude Bot rows were left on production by sessions that ended otherwise (the DW-383 sign-out, and a global sign-out from the simulator); story 4.5's cleanup deleted them. The rows keep pushing to a device that is signed out of the account until APNs answers 410. Related to DW-353 (a reinstall's old row). Settle it with DW-353's decision on who removes a device's stale rows.
+status: open
