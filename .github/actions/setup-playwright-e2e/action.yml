@@ -22,15 +22,46 @@ runs:
         key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
         restore-keys: ${{ runner.os }}-playwright-
 
-    - name: Install npm dependencies
+    # `npm ci` and `supabase start` share nothing: the Supabase steps use the
+    # CLI binary, docker, curl and jq, never node_modules. Run in sequence they
+    # cost npm ci's time on every E2E, burn-in and backend job (median 33s,
+    # 8-56s over 50 jobs of 2026-11-01/02), so npm ci runs in the background
+    # while Supabase starts, and the step after it waits for it and fails the
+    # job with npm's own log if it failed. The exit code goes to a file because
+    # a background process's status cannot be read from a later step; the PID
+    # check stops a killed install from leaving the wait loop spinning until
+    # the job timeout.
+    - name: Start npm dependencies install (background)
       shell: bash
-      run: npm ci
+      run: |
+        ( npm ci > "$RUNNER_TEMP/npm-ci.log" 2>&1; echo $? > "$RUNNER_TEMP/npm-ci.exit" ) &
+        echo $! > "$RUNNER_TEMP/npm-ci.pid"
+        echo "npm ci started in the background (pid $(cat "$RUNNER_TEMP/npm-ci.pid"))"
 
     - name: Setup Supabase Local
       uses: ./.github/actions/setup-supabase
       with:
         needs-mail: ${{ inputs.needs-mail }}
         needs-edge-functions: ${{ inputs.needs-edge-functions }}
+
+    - name: Wait for npm dependencies install
+      shell: bash
+      run: |
+        pid=$(cat "$RUNNER_TEMP/npm-ci.pid")
+        while [ ! -f "$RUNNER_TEMP/npm-ci.exit" ]; do
+          if ! kill -0 "$pid" 2>/dev/null && [ ! -f "$RUNNER_TEMP/npm-ci.exit" ]; then
+            cat "$RUNNER_TEMP/npm-ci.log"
+            echo "::error::npm ci (pid $pid) ended without recording an exit code."
+            exit 1
+          fi
+          sleep 1
+        done
+        cat "$RUNNER_TEMP/npm-ci.log"
+        code=$(cat "$RUNNER_TEMP/npm-ci.exit")
+        if [ "$code" != "0" ]; then
+          echo "::error::npm ci failed with exit code $code; its log is above."
+          exit "$code"
+        fi
 
     - name: Install Playwright browsers
       if: steps.pw-cache.outputs.cache-hit != 'true'
