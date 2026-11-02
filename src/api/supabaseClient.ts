@@ -176,8 +176,14 @@ export type AuthCallbackOutcome =
  *    `{ error: null }`. The captured `code` plus the absent session are the
  *    only discriminator there is.
  *
- * A session present means the person is not on the login screen, so there is
- * nowhere to say it and nothing to say: that reads `null`.
+ * For a code callback, a session present means the person is not on the login
+ * screen, so there is nowhere to say it and nothing to say: that reads `null`.
+ * The implicit-grant error branch answers before any session is read, so a
+ * signed-in person landing on an `error=` redirect, in the query or the
+ * fragment (the SDK keeps their stored session), still gets `cancelled` or
+ * `provider-error`. App does not show it while they are signed in: the notice
+ * renders only on the login screen, and a session notification clears the
+ * outcome before any later sign-out.
  */
 /**
  * OAuth error names that are NOT the person changing their mind.

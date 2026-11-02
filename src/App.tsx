@@ -262,8 +262,18 @@ function App() {
 
           // Signed in: open the app now. The outcome below starts with
           // `supabase.auth.initialize()`, which with an expired token and no
-          // server retries the refresh for up to 30 s, and a session present
-          // means its outcome is `null` and no notice is shown anyway.
+          // server retries the refresh for up to 30 s, and with a session no
+          // notice is shown anyway. The outcome itself is not always `null`
+          // then: an implicit-grant error redirect (`error=` in the query or
+          // the fragment) reads `cancelled` or `provider-error` before any
+          // session is looked at, and the SDK keeps the stored session through
+          // it. The notice lives only on the login screen, which is not
+          // rendered while signed in, and once a session notification arrives
+          // it clears the outcome (or the guard keeps it from being stored),
+          // so a later sign-out shows a clean login screen. Only a load whose
+          // session dies before any such notification -- the SDK rejecting
+          // an expired token's refresh -- keeps it, and that person really is
+          // signed out on the load that carried the error.
           if (currentSession) setAuthLoading(false);
         }
 

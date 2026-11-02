@@ -3332,7 +3332,9 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/App.tsx:262-266; src/api/supabaseClient.ts:200-206 (getAuthCallbackOutcome)
 severity: low
 reason: getAuthCallbackOutcome returns 'provider-error' or 'cancelled' for an AuthImplicitGrantRedirectError before it reads the session, so a signed-in person landing on an error redirect gets a notice, contrary to the comment. Decide while fixing whether a signed-in person should see that notice (getAuthCallbackOutcome already returns null for a code callback with a session); then make the code and the comment agree, with a unit test.
-status: open
+status: done 2026-11-02
+resolution: resolved by sweep bundle dw-auth-callback-comment
+resolution-undo: e6ab390a78d48124a9fdc780e475154c434db77610befa807d870188423dccbc 2026-11-02 7374617475733a206f70656e
 
 ### DW-389: A device that is only resumed keeps planning date reminders from stale copies: a mark, switch or partner birthday changed elsewhere arrives only after a full restart or reconnect.
 
