@@ -58,13 +58,13 @@ describe('Playwright shard reporting', () => {
   const workflowJob = (name: string) =>
     readWorkflow().split(`\n  ${name}:\n`)[1]?.split(/\n {2}[\w-]+:\n/)[0] ?? '';
 
-  it('e2e-tests: each of the 2 shards writes a blob report and uploads it under its shard name', () => {
+  it('e2e-tests: each of the 4 shards writes a blob report and uploads it under its shard name', () => {
     const shards = workflowJob('e2e-tests');
 
-    expect(shards).toContain('name: E2E (Shard ${{ matrix.shard }}/2)');
-    expect(shards).toMatch(/shard: \[1, 2\]/);
+    expect(shards).toContain('name: E2E (Shard ${{ matrix.shard }}/4)');
+    expect(shards).toMatch(/shard: \[1, 2, 3, 4\]/);
     expect(shards).toMatch(
-      /E2E_BLOB_REPORT: '1'\s+run: npx playwright test --project=chromium --shard=\$\{\{ matrix\.shard \}\}\/2/
+      /E2E_BLOB_REPORT: '1'\s+run: npx playwright test --project=chromium --shard=\$\{\{ matrix\.shard \}\}\/4/
     );
     expect(shards).toContain('name: e2e-blob-report-shard-${{ matrix.shard }}');
     expect(shards).toMatch(/path: blob-report\/\s+if-no-files-found: error\s+retention-days: 30/);
@@ -77,23 +77,23 @@ describe('Playwright shard reporting', () => {
     expect(shards).toContain(HISTORICAL_BASELINE_RUN_ID);
   });
 
-  it('merge-reports: downloads every shard blob, requires both, and uploads the merged HTML report', () => {
+  it('merge-reports: downloads every shard blob, requires all 4, and uploads the merged HTML report', () => {
     const merge = workflowJob('merge-reports');
 
     expect(merge).toMatch(/pattern: e2e-blob-report-shard-\*\s+path: all-blob-reports\/\s+merge-multiple: true/);
     expect(merge).toContain('run: npm ci');
     expect(merge).toContain('reports=(all-blob-reports/*.zip)');
-    expect(merge).toContain('if (( ${#reports[@]} != 2 )); then');
-    expect(merge).toMatch(/Expected 2 shard blob reports[\s\S]+exit 1/);
+    expect(merge).toContain('if (( ${#reports[@]} != 4 )); then');
+    expect(merge).toMatch(/Expected 4 shard blob reports[\s\S]+exit 1/);
     expect(merge).toMatch(/^ {10}npx playwright merge-reports --reporter=html all-blob-reports\/\s*$/m);
     expect(merge).not.toContain('Merge skipped');
     expect(merge).toMatch(/path: playwright-report\/\s+if-no-files-found: error/);
   });
 
-  it('burn-in: runs its own 3-shard matrix without blob reports', () => {
+  it('burn-in: runs its own 4-shard matrix without blob reports', () => {
     const burnIn = workflowJob('burn-in');
 
-    expect(burnIn).toMatch(/shard: \[1, 2, 3\]/);
+    expect(burnIn).toMatch(/shard: \[1, 2, 3, 4\]/);
     expect(burnIn).not.toContain('E2E_BLOB_REPORT');
   });
 
