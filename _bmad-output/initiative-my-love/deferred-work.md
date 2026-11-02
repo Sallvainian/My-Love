@@ -3451,6 +3451,7 @@ location: src/stores/slices/settingsSlice.ts
 severity: low
 reason: It grew from 930 lines at 58da06ce as stories 4.2, 4.3 and 4.6 added the countdown-marks and push-preferences copies, readers, refreshers and setters. A split candidate (copy kinds and readers by domain), not broken; a refactor story if ever, not a sweep bundle.
 status: open
+decision: 2026-11-02 hold-for-settings-rework — owner, 2026-11-02: not a sweep bundle. Keep it open as an input to the owner's planned Settings page rework, which will decide how the slice splits; a sweep should leave it untouched until that work is planned.
 
 ### DW-400: The launch re-plan of date reminders waits for the slowest copy refresher, and the partner lookup has no request timeout.
 
@@ -3511,6 +3512,7 @@ source_spec: `plan-dw-sign-out-everywhere.md`
 severity: medium
 reason: Global sign-out revokes refresh tokens, but access tokens stay valid until they expire (supabase/config.toml jwt_expiry = 3600). register_push_device checks only auth.uid() (20261031000000_push_devices.sql), and App.tsx re-registers on every signed-in start with permission. The same happens if a registration lands in the up-to-3 s gap between unregister_all_push_devices() and the global sign-out. Pre-existing: register_push_device never checked whether the caller's session was revoked. Settling it needs a server-side check that the JWT's session_id still exists in auth.sessions, or an owner decision to accept the window.
 status: open
+decision: 2026-11-02 server-session-check — owner, 2026-11-02: register_push_device refuses a caller whose JWT session_id no longer exists in auth.sessions, so a device signed out by "Sign out of all devices" cannot re-register while its access token is still valid; this also covers a registration landing between unregister_all_push_devices() and the global sign-out. Keep jwt_expiry as is. Scope is push registration only: a still-valid access token reading app data until it expires is accepted.
 
 ### DW-407: DW-352's native removal is unverified on a shell: no simulator check yet shows sign-out emptying Notification Center of delivered pushes and date reminders.
 origin: spec-deferred e63b7bcda168
@@ -3527,6 +3529,7 @@ source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
 reason: `discardAccountState` calls `stopPushesForSignOut()` only when `identity.userId === null` (src/stores/slices/authSlice.ts:336), and the fresh-sign-in leftover path calls `deleteAccountData(leftover)` alone (authSlice.ts:457-459). `deleteAccountData` cancels pending date reminders but does not remove delivered ones, so delivered pushes and reminders stay for the incoming account on those paths. This predates DW-352, and the owner's decision covers sign-out only. Reachability is unverified: a device normally goes through signed out, which now runs the removal. The fix would be a removal call on those paths (not the APNs unregister, which would race `startPushRegistration`), plus a decision that a switch should empty Notification Center too.
 status: open
+decision: 2026-11-02 switch-clears-too — owner, 2026-11-02: any account switch empties the app's delivered notifications from Notification Center, as sign-out does (DW-352): add the delivered-notification removal on the in-place switch and the fresh-sign-in leftover paths, without the APNs unregister, which would race startPushRegistration.
 
 ### DW-409: PartnerMoodView.kit.test.tsx "enables refresh when online" failed once under the full unit suite with the refresh button still `aria-busy` and disabled, and passed on 3 isolated reruns and 2 later
 origin: spec-deferred 5bd4d01176e8
@@ -3543,6 +3546,7 @@ source_spec: `plan-dw-pin-edge-supabase-js.md`
 severity: medium
 reason: package-lock.json declares @supabase/storage-js 2.118.0 dependency "iceberg-js": "^0.8.1" (every other sub-package dependency is exact: tslib 2.8.1, @supabase/phoenix 0.4.5). esm.sh's built https://esm.sh/@supabase/storage-js@2.118.0/es2022/storage-js.mjs imports "/iceberg-js@^0.8.1?target=es2022", a range esm.sh resolves per request, so a new iceberg-js 0.8.x can reach both Edge Functions on the next deploy with no reviewed change. Pre-existing and outside the owner's 2026-11-02 decision, which pins supabase-js only. A fix would add ?deps=iceberg-js@0.8.1 to both import URLs (or vendor the import), which needs an owner call.
 status: open
+decision: 2026-11-02 pin-iceberg — owner, 2026-11-02: pin iceberg-js to 0.8.1 exactly by adding `deps=iceberg-js@0.8.1` to both Edge Function supabase-js import URLs (send-push, upload-love-note-image), finishing the DW-355 pin.
 
 ### DW-411: After a stale-session boot the Mood screen never mounts the partner card, so a later renewal cannot bring it back until the screen is re-entered; the usePartnerMood realtime-lost error is therefore
 origin: spec-deferred 22a6050e1943
