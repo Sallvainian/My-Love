@@ -21,13 +21,16 @@ import {
   Info,
   LoaderCircle,
   LogOut,
+  MonitorSmartphone,
   Pencil,
   RotateCcw,
   Signal,
 } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore, type SubmitEvent } from 'react';
 import { authService } from '../../api/authService';
+import { isOnline } from '../../api/errorHandlers';
 import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
+import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
 import {
   canTellMobileData,
@@ -463,6 +466,8 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // Which sign-out is running; both buttons wait while either does.
+  const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   /** `null` while the read is in flight; the lookup's own three answers after. */
@@ -536,12 +541,19 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     : [];
   const avatarInitial = firstGrapheme?.segment.toUpperCase() ?? '';
 
-  const handleLogout = async () => {
+  const handleLogout = async (everywhere = false) => {
     setError(null);
+    // Ending the other devices' sessions is a server call; refuse it up front
+    // rather than sign out only this device.
+    if (everywhere && !isOnline()) {
+      setError(offlineMessage('Signing out of all devices', 'go through', 'needs'));
+      return;
+    }
     setIsLoggingOut(true);
+    setSigningOutEverywhere(everywhere);
 
     try {
-      await authService.signOut();
+      await authService.signOut({ everywhere });
 
       logger.debug('[Settings] User signed out successfully');
 
@@ -551,6 +563,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
       console.error('[Settings] Logout failed:', err);
       setError('Failed to sign out. Please try again.');
       setIsLoggingOut(false);
+      setSigningOutEverywhere(false);
     }
   };
 
@@ -705,7 +718,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
       <div className={CARD} data-testid="settings-sign-out-card">
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => void handleLogout()}
           disabled={isLoggingOut}
           className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
           data-testid="settings-sign-out"
@@ -714,13 +727,35 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
             aria-hidden="true"
           >
-            {isLoggingOut ? (
+            {isLoggingOut && !signingOutEverywhere ? (
               <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
             ) : (
               <LogOut className="h-4.25 w-4.25" />
             )}
           </span>
-          {isLoggingOut ? 'Signing out…' : 'Sign out'}
+          {isLoggingOut && !signingOutEverywhere ? 'Signing out…' : 'Sign out'}
+        </button>
+        <div className={DIVIDER} aria-hidden="true" />
+        {/* For a lost or given-away phone: Sign out above ends this device's
+            session only. */}
+        <button
+          type="button"
+          onClick={() => void handleLogout(true)}
+          disabled={isLoggingOut}
+          className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
+          data-testid="settings-sign-out-everywhere"
+        >
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
+            aria-hidden="true"
+          >
+            {signingOutEverywhere ? (
+              <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
+            ) : (
+              <MonitorSmartphone className="h-4.25 w-4.25" />
+            )}
+          </span>
+          {signingOutEverywhere ? 'Signing out of all devices…' : 'Sign out of all devices'}
         </button>
       </div>
 

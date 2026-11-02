@@ -72,7 +72,13 @@ export const signUp = async (credentials: AuthCredentials): Promise<AuthResult> 
   }
 };
 
-export const signOut = async (): Promise<void> => {
+/**
+ * Signs out. By default only this device's session ends (owner decision
+ * 2026-11-02); `everywhere` ends the account's sessions on every device, for a
+ * lost or given-away phone. Callers check the connection before `everywhere`:
+ * a server it cannot reach still signs this device out, below, but no other.
+ */
+export const signOut = async ({ everywhere = false }: { everywhere?: boolean } = {}): Promise<void> => {
   try {
     // While the session still exists: the RPC that drops this device's push
     // registration needs it. Online only, at most ~3 s, never throws. The
@@ -80,9 +86,9 @@ export const signOut = async (): Promise<void> => {
     // SIGNED_OUT event below arrives, offline too.
     await removePushRegistration();
 
-    // This device only (owner decision 2026-11-02): the SDK's default scope,
-    // 'global', ends the account's sessions on every device.
-    let { error } = await supabase.auth.signOut({ scope: 'local' });
+    // 'local' ends this device's session only; the SDK's default, 'global',
+    // ends the account's sessions on every device.
+    let { error } = await supabase.auth.signOut({ scope: everywhere ? 'global' : 'local' });
 
     // The server is unreachable. With a valid access token the SDK has already
     // removed the session and emitted SIGNED_OUT, so the sign-out is done. On a

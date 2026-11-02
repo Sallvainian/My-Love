@@ -180,6 +180,15 @@ describe('auth session/action services', () => {
     expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
   });
 
+  it('signs out of every device with the global scope when asked', async () => {
+    mockSignOut.mockResolvedValue({ error: null });
+
+    await signOut({ everywhere: true });
+
+    expect(mockSignOut).toHaveBeenCalledExactlyOnceWith({ scope: 'global' });
+    expect(mockClearAuthToken).toHaveBeenCalledTimes(1);
+  });
+
   describe('sign-out while the server is unreachable, on a stored session', () => {
     const unreachable = () => new AuthRetryableFetchError('Failed to fetch', 0);
 

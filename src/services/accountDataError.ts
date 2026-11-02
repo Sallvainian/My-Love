@@ -41,7 +41,8 @@ export type NeedsConnectionAction =
   | 'remove'
   | 'accept'
   | 'decline'
-  | 'be marked as seen';
+  | 'be marked as seen'
+  | 'go through';
 
 /**
  * The one wording for an up-front offline refusal:

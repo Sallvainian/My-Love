@@ -120,6 +120,9 @@ describe('Settings on the kit', () => {
 
     await waitFor(() => expect(signOut).toBeDisabled());
     expect(signOut).toHaveTextContent('Signing out…');
+    // This device only: the everywhere row is the other scope.
+    expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: false });
+    expect(screen.getByTestId('settings-sign-out-everywhere')).toBeDisabled();
 
     await act(async () => {
       release?.();
@@ -139,6 +142,45 @@ describe('Settings on the kit', () => {
     expect(alert).toHaveClass('bg-dtint', 'text-danger');
     expect(signOut).toBeEnabled();
     expect(signOut).toHaveTextContent('Sign out');
+  });
+
+  it('signs out of all devices from its own row, and says so while in flight', async () => {
+    const user = userEvent.setup();
+    let release: (() => void) | undefined;
+    backend.signOut.mockImplementation(
+      () => new Promise<void>((resolve) => (release = resolve))
+    );
+    await renderSettings();
+
+    const everywhere = screen.getByTestId('settings-sign-out-everywhere');
+    expect(everywhere).toHaveTextContent('Sign out of all devices');
+    await user.click(everywhere);
+
+    await waitFor(() => expect(everywhere).toBeDisabled());
+    expect(everywhere).toHaveTextContent('Signing out of all devices…');
+    expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: true });
+    const signOut = screen.getByTestId('settings-sign-out');
+    expect(signOut).toBeDisabled();
+    expect(signOut).toHaveTextContent('Sign out');
+
+    await act(async () => {
+      release?.();
+    });
+  });
+
+  it('refuses to sign out of all devices offline, before any request', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await renderSettings();
+
+    await user.click(screen.getByTestId('settings-sign-out-everywhere'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'You are offline. Signing out of all devices needs a connection to go through.'
+    );
+    expect(backend.signOut).not.toHaveBeenCalled();
+    expect(screen.getByTestId('settings-sign-out-everywhere')).toBeEnabled();
   });
 
   it('disables the display-name row and says Loading... while the first read is in flight', async () => {
