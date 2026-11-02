@@ -106,11 +106,13 @@ function stopPushesForSignOut(): void {
  * notifications and its badge, so the incoming account cannot read the
  * outgoing one's pushes and date reminders (DW-408). Only that half of
  * `stopPushesForSignOut`: the APNs unregister and token forget would race
- * `startPushRegistration` for the incoming account. Fire-and-forget; it never
+ * `startPushRegistration` for the incoming account. It clears once more after
+ * this device is recorded for the incoming account, because the outgoing
+ * account's pushes reach it until then (DW-413). Fire-and-forget; it never
  * throws, and the catch only guards the contract.
  */
 function clearDeliveredForSwitch(): void {
-  clearDeliveredNotifications().catch((error: unknown) => {
+  clearDeliveredNotifications({ untilReregistered: true }).catch((error: unknown) => {
     console.error('[AuthSlice] Failed to clear the delivered notifications:', error);
   });
 }

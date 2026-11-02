@@ -32,6 +32,7 @@ const rpc = vi.hoisted(() =>
 );
 
 const TOKEN_KEY = 'my-love-push-token';
+const CLEAR_AFTER_RECORD_KEY = 'my-love-push-clear-after-record';
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: capacitor,
@@ -215,6 +216,7 @@ describe('startPushRenewalOnForeground', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(CLEAR_AFTER_RECORD_KEY);
   });
 
   it('re-records the stored token on a foreground return 12 hours after the start', async () => {
@@ -251,6 +253,31 @@ describe('startPushRenewalOnForeground', () => {
     await Promise.resolve();
     expect(rpc).toHaveBeenCalledTimes(1);
     stop();
+  });
+
+  it('after an account switch, re-records on every return until a record succeeds, then clears (DW-413)', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const mod = await freshModule();
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+    const stop = mod.startPushRenewalOnForeground();
+    rpc.mockResolvedValueOnce({ error: { message: 'nope' } });
+
+    // No 12-hour wait: the outgoing account's pushes still reach the device.
+    returnToForeground();
+    await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(errorLog).toHaveBeenCalled());
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+
+    returnToForeground();
+    await vi.waitFor(() => expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2));
+    expect(rpc).toHaveBeenCalledTimes(2);
+
+    // Recorded for the incoming account: back to once every 12 hours.
+    returnToForeground();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(rpc).toHaveBeenCalledTimes(2);
+    stop();
+    errorLog.mockRestore();
   });
 
   it('does nothing offline, when hidden, without a token or without permission', async () => {
@@ -654,6 +681,171 @@ describe('clearDeliveredNotifications', () => {
     );
     expect(badge.clear).toHaveBeenCalledTimes(1);
     errorLog.mockRestore();
+  });
+});
+
+describe('clearDeliveredNotifications after an account switch (DW-413)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capacitor.isNativePlatform.mockReturnValue(true);
+    capacitor.isPluginAvailable.mockReturnValue(true);
+    push.checkPermissions.mockResolvedValue({ receive: 'granted' });
+    rpc.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(CLEAR_AFTER_RECORD_KEY);
+  });
+
+  /** Lets a record that already started finish, clear included. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  /** Registers, then has APNs answer with `token`, and waits for its record. */
+  async function recordToken(
+    mod: Awaited<ReturnType<typeof freshModule>>,
+    token: string,
+    records: number
+  ) {
+    await mod.startPushRegistration();
+    handlerFor('registration')({ value: token });
+    await vi.waitFor(() =>
+      expect(rpc.mock.calls.filter(([name]) => name === 'register_push_device')).toHaveLength(
+        records
+      )
+    );
+  }
+
+  it('clears once more when this device is recorded for the incoming account, and only once', async () => {
+    const mod = await freshModule();
+
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+
+    await recordToken(mod, 'abc123', 1);
+    // The outgoing account's pushes could reach the device until this record.
+    await vi.waitFor(() => expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2));
+    expect(badge.clear).toHaveBeenCalledTimes(2);
+
+    // A later record (the 12-hour renewal, the next start) clears nothing.
+    handlerFor('registration')({ value: 'abc123' });
+    await vi.waitFor(() =>
+      expect(rpc.mock.calls.filter(([name]) => name === 'register_push_device')).toHaveLength(2)
+    );
+    await settle();
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps waiting through a refused record and clears on the next one that succeeds', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockResolvedValueOnce({ error: { message: 'nope' } });
+    const mod = await freshModule();
+
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+    await recordToken(mod, 'abc123', 1);
+    await settle();
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+
+    handlerFor('registration')({ value: 'abc123' });
+    await vi.waitFor(() => expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2));
+    errorLog.mockRestore();
+  });
+
+  it.each([
+    [
+      'a plain clear',
+      (mod: Awaited<ReturnType<typeof freshModule>>) => mod.clearDeliveredNotifications(),
+    ],
+    ['a sign-out', (mod: Awaited<ReturnType<typeof freshModule>>) => mod.stopDevicePushes()],
+  ])('clears nothing after the next record when %s came last', async (_case, last) => {
+    const mod = await freshModule();
+
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+    await last(mod);
+    const clearsBefore = local.removeAllDeliveredNotifications.mock.calls.length;
+
+    await recordToken(mod, 'abc123', 1);
+    await settle();
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(clearsBefore);
+  });
+
+  it('still clears on the first record after a restart that followed a refused one', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rpc.mockResolvedValueOnce({ error: { message: 'nope' } });
+    const before = await freshModule();
+    await before.clearDeliveredNotifications({ untilReregistered: true });
+    await recordToken(before, 'abc123', 1);
+    await settle();
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+
+    // The app restarts: module state is gone, the saved flag is not.
+    push.addListener.mockClear();
+    const after = await freshModule();
+    await recordToken(after, 'abc123', 2);
+    await vi.waitFor(() => expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2));
+    expect(localStorage.getItem(CLEAR_AFTER_RECORD_KEY)).toBeNull();
+    errorLog.mockRestore();
+  });
+
+  it('saves the switch before its first await, ahead of any record it starts', async () => {
+    const mod = await freshModule();
+
+    const done = mod.clearDeliveredNotifications({ untilReregistered: true });
+    // Synchronously: App.tsx's registration effect runs only after the switch.
+    expect(localStorage.getItem(CLEAR_AFTER_RECORD_KEY)).not.toBeNull();
+    await done;
+  });
+
+  it("a record started under one switch does not take a later switch's clear", async () => {
+    let answer: (value: { error: null }) => void = () => {};
+    const mod = await freshModule();
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+
+    // A to B: B's record is still in flight when B switches to C.
+    rpc.mockReturnValueOnce(
+      new Promise<{ error: null }>((resolve) => {
+        answer = resolve;
+      })
+    );
+    await mod.startPushRegistration();
+    handlerFor('registration')({ value: 'abc123' });
+    await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2);
+
+    // B's record moved the row to B, now the outgoing account: no clear.
+    answer({ error: null });
+    await settle();
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem(CLEAR_AFTER_RECORD_KEY)).not.toBeNull();
+
+    // C's own record clears.
+    handlerFor('registration')({ value: 'abc123' });
+    await vi.waitFor(() => expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(3));
+    expect(localStorage.getItem(CLEAR_AFTER_RECORD_KEY)).toBeNull();
+  });
+
+  it('a record the outgoing account sent before the switch does not take its clear', async () => {
+    let answer: (value: { error: null }) => void = () => {};
+    rpc.mockReturnValueOnce(
+      new Promise<{ error: null }>((resolve) => {
+        answer = resolve;
+      })
+    );
+    const mod = await freshModule();
+    await mod.startPushRegistration();
+    handlerFor('registration')({ value: 'abc123' });
+    await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+
+    await mod.clearDeliveredNotifications({ untilReregistered: true });
+    answer({ error: null });
+    await settle();
+    expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(CLEAR_AFTER_RECORD_KEY)).not.toBeNull();
+
+    // The incoming account's own record clears.
+    handlerFor('registration')({ value: 'abc123' });
+    await vi.waitFor(() => expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(2));
   });
 });
 

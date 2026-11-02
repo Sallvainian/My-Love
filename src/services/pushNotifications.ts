@@ -106,6 +106,36 @@ export type PushRegistrationOutcome = 'unavailable' | 'denied' | 'registering';
 
 let listening: Promise<void> | null = null;
 
+/**
+ * localStorage key set by an account switch's Notification Center clear and
+ * kept until this device's token is next recorded, which moves its server row
+ * to the incoming account (DW-413). Until then the outgoing account's pushes
+ * still reach this device, so a successful record clears again. Kept on disk,
+ * not in memory, so a refused record followed by a restart still clears on
+ * the next start's record. Each switch saves its own id, so a record started
+ * under one switch cannot take a later switch's clear. Device state, like the
+ * token: any other clear, sign-out's included, drops it.
+ */
+export const PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY = 'my-love-push-clear-after-record';
+
+/** The pending switch's id, or null when no switch is waiting for a record. */
+function clearAfterNextRecord(): string | null {
+  try {
+    return localStorage.getItem(PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setClearAfterNextRecord(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY, crypto.randomUUID());
+    else localStorage.removeItem(PUSH_CLEAR_AFTER_RECORD_STORAGE_KEY);
+  } catch (error) {
+    console.error('[Push] Could not save the account switch clear:', error);
+  }
+}
+
 const foregroundPushHandlers = new Set<() => void>();
 
 /**
@@ -208,6 +238,9 @@ export function hasNativePush(): boolean {
 }
 
 async function recordDevice(token: string): Promise<void> {
+  // Read before the request and compared after it: a record sent before a
+  // switch, answering after it, must not take that switch's clear (DW-413).
+  const switchId = clearAfterNextRecord();
   const { environment } = await PushEnvironment.get();
   const { error } = await supabase.rpc('register_push_device', {
     p_token: token,
@@ -215,6 +248,10 @@ async function recordDevice(token: string): Promise<void> {
   });
   if (error) {
     console.error('[Push] Could not record the device:', error.message);
+    return;
+  }
+  if (switchId !== null && clearAfterNextRecord() === switchId) {
+    await clearDeliveredNotifications();
   }
 }
 
@@ -316,15 +353,19 @@ export const PUSH_RENEWAL_INTERVAL_MS = 12 * 60 * 60 * 1000;
  * brought back from the background would otherwise age out. On a return to
  * the foreground while online, with permission granted and a token stored,
  * this re-records the stored token, at most once every 12 hours (the start
- * that set this up has just registered). Call while signed in; returns the
- * function that stops it. A no-op on the web and in a shell without push.
+ * that set this up has just registered), but on every return while an
+ * account switch's record has not yet succeeded: until then the outgoing
+ * account's pushes still reach this device (DW-413). Call while signed in;
+ * returns the function that stops it. A no-op on the web and in a shell
+ * without push.
  */
 export function startPushRenewalOnForeground(): () => void {
   if (!hasNativePush()) return () => {};
   let lastRenewal = Date.now();
   const onVisibility = () => {
     if (document.visibilityState !== 'visible' || !navigator.onLine) return;
-    if (Date.now() - lastRenewal < PUSH_RENEWAL_INTERVAL_MS) return;
+    const switchWaiting = clearAfterNextRecord() !== null;
+    if (!switchWaiting && Date.now() - lastRenewal < PUSH_RENEWAL_INTERVAL_MS) return;
     const token = storedToken();
     if (!token) return;
     lastRenewal = Date.now();
@@ -460,10 +501,18 @@ export async function stopDevicePushes(): Promise<void> {
  * Does nothing outside the native shell, and skips the removal in a shell with
  * no `LocalNotifications` plugin (one installed before story 4.1).
  *
+ * `untilReregistered` is the account switch's: until this device's token is
+ * recorded for the incoming account, its server row still belongs to the
+ * outgoing one, whose pushes keep arriving, so the next successful record
+ * clears once more (DW-413). Any other call, sign-out's included, drops that.
+ *
  * Never throws; logs only failures.
  */
-export async function clearDeliveredNotifications(): Promise<void> {
+export async function clearDeliveredNotifications({
+  untilReregistered = false,
+}: { untilReregistered?: boolean } = {}): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
+  setClearAfterNextRecord(untilReregistered);
 
   // The local-notifications plugin's removal, not the push plugin's: that one
   // rejects unless register() ran this launch. Both empty the app's whole

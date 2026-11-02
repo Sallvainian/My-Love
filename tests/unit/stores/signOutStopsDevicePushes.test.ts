@@ -9,8 +9,8 @@
  * in-place account switch or a fresh sign-in must not call it —
  * `startPushRegistration` is registering the same device for the incoming
  * account then, and an unregister would race it. Those two paths, when they
- * replace another account, call `clearDeliveredNotifications()` instead
- * (DW-408).
+ * replace another account, call `clearDeliveredNotifications({
+ * untilReregistered: true })` instead (DW-408, DW-413).
  *
  * Drives the composed store, as signOutClearsAccountState.test.ts does. The
  * on-disk deletes are stubbed to settle at once, so nothing this file starts
@@ -144,7 +144,8 @@ describe('device pushes and Notification Center on account transitions', () => {
 
     useAppStore.getState().setAuthUser('USER-C-ID', 'c@example.com');
 
-    expect(clearDelivered).toHaveBeenCalledTimes(1);
+    // Again once this device is recorded for the incoming account (DW-413).
+    expect(clearDelivered).toHaveBeenCalledExactlyOnceWith({ untilReregistered: true });
     expect(stop).not.toHaveBeenCalled();
   });
 
@@ -154,7 +155,7 @@ describe('device pushes and Notification Center on account transitions', () => {
     useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
     useAppStore.getState().setAuthUser('USER-A-ID', 'a@example.com');
 
-    expect(clearDelivered).toHaveBeenCalledTimes(1);
+    expect(clearDelivered).toHaveBeenCalledExactlyOnceWith({ untilReregistered: true });
     expect(stop).not.toHaveBeenCalled();
   });
 
