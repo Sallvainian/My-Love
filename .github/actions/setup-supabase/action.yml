@@ -13,7 +13,7 @@ inputs:
     # the image 2.117.0 pulls (public.ecr.aws/supabase/realtime:v2.124.4).
     # Keep this at or above the CLI the suite is developed against; a CI pin
     # behind it silently tests a different Realtime than the app ships for.
-    default: '2.118.0'
+    default: '2.122.0'
   needs-mail:
     description: >-
       Start the Mailpit catcher for jobs whose specs read a real auth email.

@@ -124,8 +124,10 @@ jobs:
 
           # db-tests is pgTAP against the schema: only SQL, the Supabase config
           # and the pgTAP files themselves can move it. Edge Function source
-          # cannot — pgTAP never invokes one.
-          DB='^supabase/(migrations|tests)/|^supabase/config\.toml$|^supabase/seed'
+          # cannot — pgTAP never invokes one. The job also regenerates
+          # src/types/database.types.ts and fails on a difference, so that file
+          # is in the set too: a hand edit to it must run the check.
+          DB='^supabase/(migrations|tests)/|^supabase/config\.toml$|^supabase/seed|^src/types/database\.types\.ts$'
           # backend-tests drives RPCs, Storage and the Edge Function over the
           # wire, so it takes the DB set plus function source plus its own specs
           # — plus `^src/`, which is not optional: six tests/api specs import
@@ -267,6 +269,14 @@ jobs:
 
       - name: Run pgTAP tests
         run: supabase test db
+
+      # The committed types must be exactly what `npm run db:types` writes
+      # from the migrations, so a hand edit or a migration without a
+      # regeneration fails here.
+      - name: Check generated database types
+        run: |
+          npm run db:types
+          git diff --exit-code -- src/types/database.types.ts
 
       - name: Stop Supabase
         if: always()

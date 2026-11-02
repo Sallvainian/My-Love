@@ -45,6 +45,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           client_key?: string
           created_at?: string
@@ -73,6 +74,7 @@ export type Database = {
           key: string
           value: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           key: string
@@ -93,6 +95,7 @@ export type Database = {
           user_b: string
           wedding_date: string | null
         }
+        ComputedFields: never
         Insert: {
           relationship_start?: string | null
           updated_at?: string
@@ -137,6 +140,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           category: string
@@ -172,6 +176,7 @@ export type Database = {
           sender_id: string
           subject: string
         }
+        ComputedFields: never
         Insert: {
           action: string
           created_at?: string
@@ -216,6 +221,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           description?: string | null
@@ -247,6 +253,7 @@ export type Database = {
           type: string
           viewed: boolean | null
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           from_user_id: string
@@ -286,6 +293,7 @@ export type Database = {
           removed_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           note_id: string
           removed_at?: string
@@ -319,6 +327,7 @@ export type Database = {
           user_id: string
           window_started_at: string
         }
+        ComputedFields: never
         Insert: {
           upload_count?: number
           user_id: string
@@ -342,6 +351,7 @@ export type Database = {
           to_user_id: string
           written_at: string | null
         }
+        ComputedFields: never
         Insert: {
           content: string
           created_at?: string
@@ -369,6 +379,7 @@ export type Database = {
           last_opened_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           last_opened_at?: string
           user_id: string
@@ -385,6 +396,7 @@ export type Database = {
           message_key: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           message_key: string
@@ -407,6 +419,7 @@ export type Database = {
           updated_at: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           id?: string
@@ -444,6 +457,7 @@ export type Database = {
           to_user_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           from_user_id: string
@@ -490,6 +504,7 @@ export type Database = {
           user_id: string
           width: number
         }
+        ComputedFields: never
         Insert: {
           caption?: string | null
           created_at?: string
@@ -525,6 +540,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           environment: string
@@ -554,6 +570,7 @@ export type Database = {
           pokes_and_kisses: boolean
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           dates?: boolean
@@ -592,6 +609,7 @@ export type Database = {
           photo_id: string | null
           token: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           date_change_id?: string | null
@@ -687,6 +705,7 @@ export type Database = {
           sender_url: string
           singleton: boolean
         }
+        ComputedFields: never
         Insert: {
           sender_secret: string
           sender_url: string
@@ -711,6 +730,7 @@ export type Database = {
           partner_name: string | null
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           birthday?: string | null
           created_at?: string | null
@@ -756,6 +776,7 @@ export type Database = {
           to_user_id: string
           written_at: string | null
         }
+        ComputedFields: never
         Insert: {
           content?: string | null
           created_at?: string | null
@@ -815,16 +836,16 @@ export type Database = {
           to_user_id: string
         }[]
       }
-      mark_love_notes_read: { Args: Record<PropertyKey, never>; Returns: string }
+      mark_love_notes_read: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       register_push_device: {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
       unread_love_note_count: { Args: { p_user_id: string }; Returns: number }
-      unregister_push_device: {
-        Args: { p_token: string }
-        Returns: undefined
-      }
+      unregister_push_device: { Args: { p_token: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
@@ -870,7 +891,8 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -894,7 +916,8 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -918,7 +941,8 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
