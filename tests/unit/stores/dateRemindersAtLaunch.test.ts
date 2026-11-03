@@ -100,9 +100,9 @@ import {
   ANNIVERSARIES_COPY_KIND,
   COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
-  PROFILE_COPY_KIND,
-  PUSH_PREFERENCES_COPY_KIND,
-} from '../../../src/stores/slices/settingsSlice';
+} from '../../../src/stores/slices/datesSlice';
+import { PUSH_PREFERENCES_COPY_KIND } from '../../../src/stores/slices/notificationsSlice';
+import { PROFILE_COPY_KIND } from '../../../src/stores/slices/profileSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { deferred, setOnline, type StoreState } from './accountDataFixtures';
 
@@ -158,7 +158,7 @@ function partnerInfo(birthday: string | null = '1995-11-09') {
     id: P,
     email: 'jessie@test.example.com',
     displayName: 'Jessie',
-    connectedAt: null,
+    linkedSince: null,
     birthday,
   };
 }
@@ -613,7 +613,7 @@ describe('the Date reminders switch', () => {
 
   it('keeps the other push switches out of it: only dateReminders decides', async () => {
     await seedCopies({
-      [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON, dates: false, loveNotes: false },
+      [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON, photos: false, loveNotes: false },
     });
 
     await replanDateReminders();

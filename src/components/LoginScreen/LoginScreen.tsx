@@ -124,7 +124,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, callba
   // notice is over either way.
   const [noticeDismissed, setNoticeDismissed] = useState(false);
 
-  // Handed over by Settings when "Sign out of all devices" reached only this
+  // Handed over by Settings when "Log out of all devices" reached only this
   // device. A subscription, not a mount-time read: Settings sets it after this
   // screen may already have mounted.
   const signOutNotice = useSyncExternalStore(subscribeSignOutNotice, getSignOutNotice);

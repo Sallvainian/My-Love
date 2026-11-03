@@ -13,6 +13,8 @@
  *   Settings" placeholder.
  * - Unlinked, or nothing known yet (no saved copy, no server answer): hidden —
  *   a placeholder there could be wrong.
+ *
+ * Both linked cards open the Together since page from Home (`dates/together-since`).
  */
 
 import { Heart } from 'lucide-react';
@@ -57,6 +59,8 @@ function calculateTimeDifference(from: Date, to: Date): TimeDifference {
 
 export function TimeTogether() {
   const coupleSettings = useAppStore((s) => s.coupleSettings);
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
+  const onOpen = () => openSettingsPage('dates/together-since', { fromHome: true });
 
   if (!coupleSettings || coupleSettings.status !== 'linked') return null;
 
@@ -69,15 +73,16 @@ export function TimeTogether() {
         value="Not set yet"
         valueMuted
         description="Set your start date in Settings"
+        onOpen={onOpen}
         testId={TEST_ID}
       />
     );
   }
 
-  return <TimeTogetherCounter start={coupleSettings.relationshipStart} />;
+  return <TimeTogetherCounter start={coupleSettings.relationshipStart} onOpen={onOpen} />;
 }
 
-function TimeTogetherCounter({ start }: { start: string }) {
+function TimeTogetherCounter({ start, onOpen }: { start: string; onOpen: () => void }) {
   const startDate = useMemo(() => new Date(start), [start]);
   const [now, setNow] = useState(() => new Date());
 
@@ -103,6 +108,7 @@ function TimeTogetherCounter({ start }: { start: string }) {
       label="Together for"
       value={value}
       trailing={`${pad(timeDiff.hours)}h ${pad(timeDiff.minutes)}m ${pad(timeDiff.seconds)}s`}
+      onOpen={onOpen}
       testId={TEST_ID}
     />
   );

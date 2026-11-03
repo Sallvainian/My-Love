@@ -2,8 +2,11 @@
  * `profileService` against a recording fake Supabase client.
  *
  * What it must hold whatever the UI does with it:
- * - a birthday save sends `birthday` and `updated_at` only (the column grant
- *   opens no other `users` column) and addresses the caller's own row;
+ * - a birthday save sends `birthday` and `updated_at` only, and a name save
+ *   `display_name` and `updated_at` only (the column grants open no other
+ *   `users` column), each addressing the caller's own row;
+ * - a name that the read side would call a seed (the email, `Unknown`) or that
+ *   is outside 3-30 characters is refused before any request;
  * - the read applies the seed rule, so an unchosen name is `null`;
  * - offline, and an unreadable date, fail before any request.
  */
@@ -38,6 +41,7 @@ vi.mock('../../../src/api/supabaseClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/api/supabaseClient')>();
   return {
     isSeedFallbackName: actual.isSeedFallbackName,
+    SEED_FALLBACK_NAME: actual.SEED_FALLBACK_NAME,
     supabase: {
       from: (table: string) => builder(table),
       auth: {
@@ -127,6 +131,67 @@ describe('saveBirthday', () => {
     setOnline(false);
     await expect(profileService.saveBirthday('2000-05-20')).rejects.toMatchObject({
       code: 'offline',
+    });
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('saveDisplayName', () => {
+  it('updates only display_name and updated_at on the own row, trimmed', async () => {
+    results.push({ data: { display_name: 'Casey', birthday: '2000-05-20' }, error: null });
+
+    const saved = await profileService.saveDisplayName('  Casey  ');
+
+    expect(saved).toEqual({ displayName: 'Casey', birthday: '2000-05-20' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].table).toBe('users');
+    const [[patch]] = argsOf('update') as [[Record<string, unknown>]];
+    expect(Object.keys(patch).sort()).toEqual(['display_name', 'updated_at']);
+    expect(patch.display_name).toBe('Casey');
+    expect(argsOf('eq')).toEqual([['id', 'SELF-ID']]);
+    expect(argsOf('select')).toEqual([['display_name, birthday']]);
+  });
+
+  it('throws when no row was updated', async () => {
+    results.push({ data: null, error: null });
+
+    await expect(profileService.saveDisplayName('Casey')).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'invalid-response',
+      message: 'Could not find your profile to save the name to',
+    });
+  });
+
+  it('throws a failed write with its mapped message', async () => {
+    results.push({ data: null, error: { message: 'boom', code: '500', details: '', hint: '' } });
+
+    await expect(profileService.saveDisplayName('Casey')).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'transport',
+    });
+  });
+
+  it.each([
+    ['the account email, in any case', 'SELF@Example.test', /different from your email address/],
+    ['Unknown', 'Unknown', /"Unknown" is not a name/],
+    ['two characters', 'ab', /between 3 and 30 characters/],
+    ['31 characters', 'a'.repeat(31), /between 3 and 30 characters/],
+    ['only spaces', '     ', /between 3 and 30 characters/],
+  ])('refuses %s before any request', async (_what, name, message) => {
+    await expect(profileService.saveDisplayName(name)).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'invalid-response',
+      message: expect.stringMatching(message),
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('refuses offline with the name wording, before any request', async () => {
+    setOnline(false);
+
+    await expect(profileService.saveDisplayName('Casey')).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. Name changes need a connection to save.',
     });
     expect(calls).toHaveLength(0);
   });

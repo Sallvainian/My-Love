@@ -1,13 +1,9 @@
 /**
  * Settings on the style kit: the page's own behaviour that the restyle added
- * or re-shaped — the About replay row, the Sign out row's in-flight and failed
- * states, the identity row and its avatar initial, the display-name row's
- * loading state and accessible name, and the section / group headings that
- * replaced the old inner titles.
- *
- * The real EventsSettings and AnniversarySettings are mounted on the real
- * store (signed out, so neither loads anything) because the headings under
- * test are theirs.
+ * or re-shaped — the About replay row, the Log out row's in-flight and failed
+ * states, the version line under the last card, and the group headings that
+ * replaced the old inner titles. (The identity row's avatar
+ * initial and the name row moved to the Profile page: `Settings.profile.test.tsx`.)
  */
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -15,21 +11,25 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import pkg from '../../../../package.json';
 import { clearSignOutNotice, getSignOutNotice } from '../../../services/signOutNotice';
+import { useAppStore } from '../../../stores/useAppStore';
 
 const backend = vi.hoisted(() => ({
-  lookupOwnDisplayName: vi.fn(),
-  getUser: vi.fn(),
+  fetchOwnProfile: vi.fn(),
   signOut: vi.fn(),
 }));
 
 vi.mock('../../../api/supabaseClient', () => ({
-  lookupOwnDisplayName: backend.lookupOwnDisplayName,
   SEED_FALLBACK_NAME: 'Unknown',
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
 }));
+// The store's own profile, which Settings fills with `loadOwnProfile`, is read
+// from here.
+vi.mock('../../../services/profileService', () => ({
+  profileService: { fetchOwnProfile: backend.fetchOwnProfile, saveBirthday: vi.fn() },
+}));
 vi.mock('../../../api/authService', () => ({
-  authService: { getUser: backend.getUser, signOut: backend.signOut },
+  authService: { signOut: backend.signOut },
 }));
 vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -49,19 +49,33 @@ vi.mock('motion/react', () => ({
 
 import { Settings } from '../Settings';
 
+let accountCounter = 0;
+
+/**
+ * Renders Settings and waits for the profile read to settle (an answer, or a
+ * failed read offline), so no later state change lands outside the case.
+ */
 async function renderSettings(props: { onShowWelcome?: () => void } = {}) {
   render(<Settings {...props} />);
-  await waitFor(() =>
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
-  );
+  await waitFor(() => {
+    const { ownProfile, ownProfileLoadFailed } = useAppStore.getState();
+    expect(ownProfile !== null || ownProfileLoadFailed).toBe(true);
+  });
 }
 
 describe('Settings on the kit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
+    backend.fetchOwnProfile.mockResolvedValue({ displayName: 'Jessie', birthday: null });
+    // A fresh account and session per case, so no earlier case's saved copy decides the profile.
+    accountCounter += 1;
+    useAppStore.setState({
+      userId: `user-${accountCounter}`,
+      authSessionVersion: accountCounter,
+      ownProfile: null,
+      ownProfileLoadFailed: false,
+    });
   });
 
   afterEach(() => {
@@ -69,17 +83,18 @@ describe('Settings on the kit', () => {
     clearSignOutNotice();
   });
 
-  it('renders the four section labels and one heading per countdown group', async () => {
-    await renderSettings();
+  it('renders the group labels in order, with no Countdowns section', async () => {
+    await renderSettings({ onShowWelcome: vi.fn() });
 
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    // No Preferences group: nothing in it exists without a connection type, and
+    // a group with no rows is not drawn. The last card has no label.
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
-    ).toEqual(['Account', 'Countdowns', 'Photos', 'About']);
-    expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
-    expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Event Countdowns/);
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Anniversary Countdowns/);
+    ).toEqual(['Account', 'Partner', 'About']);
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-countdowns-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Countdowns/);
   });
 
   it('replays the welcome message from About when a handler is passed', async () => {
@@ -93,22 +108,27 @@ describe('Settings on the kit', () => {
     expect(onShowWelcome).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the package.json version in the About row', async () => {
+  it('shows the package.json version in the line under the last card', async () => {
     await renderSettings();
 
-    expect(screen.getByTestId('settings-version').textContent).toBe(
-      `Version ${pkg.version} · made for the two of you`
-    );
+    const version = screen.getByTestId('settings-version');
+    expect(version.textContent).toBe(`Version ${pkg.version} · made for the two of you`);
+    // Directly under the sign-out card, not inside it.
+    expect(screen.getByTestId('settings-sign-out-card')).not.toContainElement(version);
+    expect(screen.getByTestId('settings-sign-out-card').nextElementSibling).toBe(version);
   });
 
-  it('renders no replay row without a handler', async () => {
+  it('renders no replay row, and no About group, without a handler', async () => {
     await renderSettings();
 
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'About' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-replay-welcome')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-view')).not.toHaveTextContent('Replay welcome message');
   });
 
-  it('disables the Sign out row and says so while the sign-out is in flight', async () => {
+  it('disables the Log out row and says so while the log-out is in flight', async () => {
     const user = userEvent.setup();
     let release: ((value: { otherDevicesSignedOut: boolean }) => void) | undefined;
     backend.signOut.mockImplementation(
@@ -117,11 +137,11 @@ describe('Settings on the kit', () => {
     await renderSettings();
 
     const signOut = screen.getByTestId('settings-sign-out');
-    expect(signOut).toHaveTextContent('Sign out');
+    expect(signOut).toHaveTextContent('Log out');
     await user.click(signOut);
 
     await waitFor(() => expect(signOut).toBeDisabled());
-    expect(signOut).toHaveTextContent('Signing out…');
+    expect(signOut).toHaveTextContent('Logging out…');
     // This device only: the everywhere row is the other scope.
     expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: false });
     expect(screen.getByTestId('settings-sign-out-everywhere')).toBeDisabled();
@@ -131,7 +151,7 @@ describe('Settings on the kit', () => {
     });
   });
 
-  it('shows a kit alert and re-enables the row when the sign-out fails', async () => {
+  it('shows a kit alert and re-enables the row when the log-out fails', async () => {
     const user = userEvent.setup();
     backend.signOut.mockRejectedValue(new Error('network down'));
     await renderSettings();
@@ -140,33 +160,33 @@ describe('Settings on the kit', () => {
     await user.click(signOut);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Failed to sign out. Please try again.');
+    expect(alert).toHaveTextContent('Failed to log out. Please try again.');
     expect(alert).toHaveClass('bg-dtint', 'text-danger');
     expect(signOut).toBeEnabled();
-    expect(signOut).toHaveTextContent('Sign out');
+    expect(signOut).toHaveTextContent('Log out');
   });
 
-  const CONFIRM_TEXT = "Sign out on every device? You'll need to sign in again on each one.";
+  const CONFIRM_TEXT = "Log out on every device? You'll need to sign in again on each one.";
   const PARTIAL_NOTICE =
-    "You're signed out on this device, but your other devices could not be signed out. Sign in again when you're online and try Sign out of all devices once more.";
+    "You're logged out on this device, but your other devices could not be logged out. Sign in again when you're online and try Log out of all devices once more.";
 
   async function openEverywhereDialog(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByTestId('settings-sign-out-everywhere'));
     return screen.findByRole('dialog');
   }
 
-  it('asks before signing out of all devices, and signs out nothing until confirmed', async () => {
+  it('asks before logging out of all devices, and logs out nothing until confirmed', async () => {
     const user = userEvent.setup();
     await renderSettings();
     expect(screen.getByTestId('settings-sign-out-everywhere')).toHaveTextContent(
-      'Sign out of all devices'
+      'Log out of all devices'
     );
 
     const dialog = await openEverywhereDialog(user);
 
     expect(dialog).toHaveTextContent(CONFIRM_TEXT);
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Sign out everywhere' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Log out everywhere' })).toBeInTheDocument();
     expect(backend.signOut).not.toHaveBeenCalled();
   });
 
@@ -184,19 +204,17 @@ describe('Settings on the kit', () => {
   it('keeps focus where the person moved it when Settings re-renders', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
-    );
+    await waitFor(() => expect(useAppStore.getState().ownProfile).not.toBeNull());
 
     const dialog = await openEverywhereDialog(user);
-    const confirm = within(dialog).getByRole('button', { name: 'Sign out everywhere' });
+    const confirm = within(dialog).getByRole('button', { name: 'Log out everywhere' });
     confirm.focus();
     rerender(<Settings />);
 
     expect(confirm).toHaveFocus();
   });
 
-  it('closes on Cancel, Escape and the backdrop without signing out', async () => {
+  it('closes on Cancel, Escape and the backdrop without logging out', async () => {
     const user = userEvent.setup();
     await renderSettings();
 
@@ -216,7 +234,7 @@ describe('Settings on the kit', () => {
     expect(screen.getByTestId('settings-sign-out-everywhere')).toBeEnabled();
   });
 
-  it('signs out of all devices on confirm, and says so while in flight', async () => {
+  it('logs out of all devices on confirm, and says so while in flight', async () => {
     const user = userEvent.setup();
     let release: ((value: { otherDevicesSignedOut: boolean }) => void) | undefined;
     backend.signOut.mockImplementation(
@@ -225,16 +243,16 @@ describe('Settings on the kit', () => {
     await renderSettings();
 
     const dialog = await openEverywhereDialog(user);
-    await user.click(within(dialog).getByRole('button', { name: 'Sign out everywhere' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Log out everywhere' }));
 
     const everywhere = screen.getByTestId('settings-sign-out-everywhere');
     await waitFor(() => expect(everywhere).toBeDisabled());
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(everywhere).toHaveTextContent('Signing out of all devices…');
+    expect(everywhere).toHaveTextContent('Logging out of all devices…');
     expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: true });
     const signOut = screen.getByTestId('settings-sign-out');
     expect(signOut).toBeDisabled();
-    expect(signOut).toHaveTextContent('Sign out');
+    expect(signOut).toHaveTextContent('Log out');
 
     await act(async () => {
       release?.({ otherDevicesSignedOut: true });
@@ -242,13 +260,13 @@ describe('Settings on the kit', () => {
     expect(getSignOutNotice()).toBeNull();
   });
 
-  it('signs out once when "Sign out everywhere" is pressed twice', async () => {
+  it('logs out once when "Log out everywhere" is pressed twice', async () => {
     const user = userEvent.setup();
     backend.signOut.mockReturnValue(new Promise(() => {}));
     await renderSettings();
 
     const dialog = await openEverywhereDialog(user);
-    const confirm = within(dialog).getByRole('button', { name: 'Sign out everywhere' });
+    const confirm = within(dialog).getByRole('button', { name: 'Log out everywhere' });
     // Both presses land before React re-renders, as a double tap on the
     // exiting dialog does: the second still holds the old handler.
     act(() => {
@@ -259,18 +277,18 @@ describe('Settings on the kit', () => {
     expect(backend.signOut).toHaveBeenCalledExactlyOnceWith({ everywhere: true });
   });
 
-  it('hands a partial sign-out to the login screen as a notice', async () => {
+  it('hands a partial log-out to the login screen as a notice', async () => {
     const user = userEvent.setup();
     backend.signOut.mockResolvedValue({ otherDevicesSignedOut: false });
     await renderSettings();
 
     const dialog = await openEverywhereDialog(user);
-    await user.click(within(dialog).getByRole('button', { name: 'Sign out everywhere' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Log out everywhere' }));
 
     await waitFor(() => expect(getSignOutNotice()).toBe(PARTIAL_NOTICE));
   });
 
-  it('leaves the plain Sign out row asking nothing and showing no notice', async () => {
+  it('leaves the plain Log out row asking nothing and showing no notice', async () => {
     const user = userEvent.setup();
     backend.signOut.mockResolvedValue({ otherDevicesSignedOut: true });
     await renderSettings();
@@ -282,7 +300,7 @@ describe('Settings on the kit', () => {
     expect(getSignOutNotice()).toBeNull();
   });
 
-  it('refuses to sign out of all devices offline, before any dialog or request', async () => {
+  it('refuses to log out of all devices offline, before any dialog or request', async () => {
     const user = userEvent.setup();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     await renderSettings();
@@ -291,80 +309,10 @@ describe('Settings on the kit', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
-      'You are offline. Signing out of all devices needs a connection to go through.'
+      'You are offline. Logging out of all devices needs a connection to go through.'
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(backend.signOut).not.toHaveBeenCalled();
     expect(screen.getByTestId('settings-sign-out-everywhere')).toBeEnabled();
-  });
-
-  it('disables the display-name row and says Loading... while the first read is in flight', async () => {
-    backend.lookupOwnDisplayName.mockReturnValue(new Promise(() => {}));
-    render(<Settings />);
-
-    expect(screen.getByTestId('settings-display-name-edit')).toBeDisabled();
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Loading...');
-  });
-
-  it('renders no identity row when the user has no email', async () => {
-    backend.getUser.mockResolvedValue({ id: 'user-a' });
-    await renderSettings();
-    // Let the user read settle, so the absence below is its answer.
-    await act(async () => {
-      await backend.getUser.mock.results[0]?.value;
-    });
-
-    expect(screen.queryByTestId('settings-identity')).not.toBeInTheDocument();
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('Signed in');
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('person@example.com');
-  });
-
-  it('renders the identity row with the display name initial when there is an email', async () => {
-    await renderSettings();
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-identity')).toHaveTextContent('Signed in');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('J');
-  });
-
-  it('takes the avatar initial from the email when no display name is set', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
-    render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('Not set yet')
-    );
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('P');
-  });
-
-  it('shows a whole emoji, not half a surrogate pair, for an emoji-led name', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '💖 Jessie' });
-    render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('💖 Jessie')
-    );
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('💖');
-  });
-
-  it('shows a whole multi-code-point emoji for a name led by a skin-tone emoji', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '👍🏽 Jessie' });
-    render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('👍🏽 Jessie')
-    );
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('👍🏽');
-  });
-
-  it('keeps the "Change" verb in the display-name row\'s accessible name', async () => {
-    await renderSettings();
-
-    expect(screen.getByRole('button', { name: /^Change Display name/ })).toBe(
-      screen.getByTestId('settings-display-name-edit')
-    );
   });
 });

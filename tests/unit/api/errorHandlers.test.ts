@@ -10,7 +10,7 @@
  *
  *   new row for relation "events" violates check constraint "events_label_check"
  *
- * `EventsSettings.tsx` displays a failed save's `saveFailure.error`, so
+ * The New event form (`NewDatePages.tsx`) displays a failed add's error, so
  * mapping on `code` keeps the raw CHECK message out of that error text.
  * The map is keyed on `error.code`, covering SQLSTATE and PostgREST codes.
  * `src/api/moodApi.ts`,

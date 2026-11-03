@@ -13,6 +13,7 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { clockAnchor } from '../../support/helpers/events';
+import { openNewDateForm } from '../../support/helpers/new-date-forms';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
@@ -216,19 +217,21 @@ test.describe('Account data follows the account, not the browser', () => {
     // ---- First context: add through the UI ----
     // The list the new row joins is read on mount; it settles before the write.
     const anniversariesListed = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
-    await page.goto('/settings');
+    await page.goto('/settings/dates');
     expect((await anniversariesListed).status).toBe(200);
-    await page.getByRole('button', { name: 'Add Anniversary' }).click();
-    const anniversaryForm = page.getByRole('dialog', { name: 'Add Anniversary' });
-    await anniversaryForm.getByLabel('Label').fill(anniversaryLabel);
-    await anniversaryForm.getByLabel('Date').fill('2024-02-14');
+    await openNewDateForm(page, 'anniversary');
+    await page.getByTestId('settings-new-anniversary-name-field').fill(anniversaryLabel);
+    await page.getByTestId('settings-new-anniversary-date-field').fill('2024-02-14');
     const anniversarySaved = interceptNetworkCall({
       method: 'POST',
       url: '**/rest/v1/anniversaries*',
     });
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByTestId('settings-form-add').click();
     expect((await anniversarySaved).status).toBe(201);
-    await expect(page.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
+    await expect(page).toHaveURL(/\/settings\/dates$/);
+    await expect(
+      page.getByTestId('settings-dates-anniversaries').getByText(anniversaryLabel)
+    ).toBeVisible();
 
     const fresh = await signInFresh(second, email);
 
@@ -238,12 +241,16 @@ test.describe('Account data follows the account, not the browser', () => {
       url: ANNIVERSARIES_READ,
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
-    await fresh.goto('/settings');
+    await fresh.goto('/settings/dates');
     const anniversaryRows = await anniversaryRead;
     expect(anniversaryRows.status).toBe(200);
     expect(anniversaryRows.responseJson).toEqual([
       expect.objectContaining({ label: anniversaryLabel }),
     ]);
-    await expect(fresh.getByRole('heading', { level: 4, name: anniversaryLabel })).toBeVisible();
+    await expect(
+      fresh
+        .locator('[data-testid^="settings-dates-anniversary-"]')
+        .filter({ hasText: anniversaryLabel })
+    ).toBeVisible();
   });
 });

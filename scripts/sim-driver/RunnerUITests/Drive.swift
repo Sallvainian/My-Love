@@ -7,6 +7,9 @@ import XCTest
 //                           origin (never the app frame, which XCUITest
 //                           reports as portrait on the unfolded display)
 //   scroll up|down          swipe the web view to show what is above or below
+//   swipe back              pan from the web view's left edge to past its
+//                           middle, the iOS back gesture, repeated until the
+//                           page changes; fails after 8 tries with no change
 //   dump                    print the web view's elements as one JSON line,
 //                           frames in the same page points `tap` takes
 //   signin EMAIL PASSWORD [decline-push]
@@ -14,7 +17,7 @@ import XCTest
 //                           decline-push, answer the notification permission
 //                           alert Don't Allow (XCUITest's own handling taps
 //                           Allow on the first interaction after sign-in)
-//   signout                 tap Settings, then Sign out, and wait for the
+//   signout                 tap Settings, then Log out, and wait for the
 //                           login form
 // Every step brings the shell to the front first. Backgrounding is not a
 // step: XCUIDevice's Home press leaves the shell in front on the Duo
@@ -53,6 +56,29 @@ final class Drive: XCTestCase {
             }
             sleep(1)
             say("scrolled \(words[1])")
+        case ("swipe", 2) where words[1] == "back":
+            // An edge pan from the web view's left edge to past its middle, at
+            // mid-height, in web-view points as `tap` uses. Only a fast pan
+            // registered in spike 5.2 (2 pt in, 0.01 s press, 1500 pt/s), and
+            // even then about one in four, so it repeats until the page
+            // changes, up to 8 tries, and fails when it never does: no pan
+            // registered, or the page is the first entry, with nothing to go
+            // back to. Two entries that read the same cannot be told apart, so
+            // a pan onto one is missed and the next pan goes a level further.
+            let web = webView()
+            let origin = web.coordinate(withNormalizedOffset: .zero)
+            let midY = web.frame.height / 2
+            let from = origin.withOffset(CGVector(dx: 2, dy: midY))
+            let to = origin.withOffset(CGVector(dx: web.frame.width * 0.6, dy: midY))
+            let before = pageSignature(web)
+            for attempt in 1...8 {
+                from.press(forDuration: 0.01, thenDragTo: to, withVelocity: XCUIGestureVelocity(1500), thenHoldForDuration: 0)
+                sleep(1)
+                if pageSignature(web) != before {
+                    return say("swiped back on try \(attempt) webView=\(rect(web.frame))")
+                }
+            }
+            XCTFail("page unchanged after 8 pans: no pan registered, or nothing to go back to")
         case ("dump", 1):
             say(try dump(webView()))
         case ("signin", 3):
@@ -140,19 +166,30 @@ final class Drive: XCTestCase {
             return XCTFail("no Settings button: signed out already, or the page did not load")
         }
         settings.tap()
-        let signOut = app.webViews.buttons["Sign out"].firstMatch
-        // The button sits at the end of Settings; swipe until it shows.
+        let signOut = app.webViews.buttons["Log out"].firstMatch
+        // The button sits below the fold on Settings' top page; swipe until it shows.
         for _ in 0..<8 where !signOut.isHittable {
             if !signOut.exists { _ = signOut.waitForExistence(timeout: 2) }
             if signOut.isHittable { break }
             app.webViews.firstMatch.swipeUp()
         }
-        guard signOut.isHittable else { return XCTFail("no Sign out button in Settings") }
+        guard signOut.isHittable else { return XCTFail("no Log out button in Settings") }
         signOut.tap()
         if !app.webViews.textFields.firstMatch.waitForExistence(timeout: 20) {
-            return XCTFail("tapped Sign out, but the login form never showed")
+            return XCTFail("tapped Log out, but the login form never showed")
         }
         say("signed out")
+    }
+
+    // What tells one page from another for `swipe back`: its first three
+    // texts, which hold the page's title. Texts with digits are left out,
+    // since they change by themselves (Home's ticking countdown), and so are
+    // buttons, whose labels change without navigation (a badge, a row's value
+    // filling in).
+    func pageSignature(_ web: XCUIElement) -> [String] {
+        let texts = web.staticTexts.allElementsBoundByIndex.map(\.label)
+            .filter { $0.rangeOfCharacter(from: .decimalDigits) == nil }
+        return Array(texts.prefix(3))
     }
 
     // An empty web field may report its placeholder as its value.

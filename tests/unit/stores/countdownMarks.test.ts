@@ -35,7 +35,7 @@ import { Capacitor } from '@capacitor/core';
 import { AccountDataError, offlineMessage } from '../../../src/services/accountDataError';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, refreshLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { COUNTDOWN_MARKS_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
+import { COUNTDOWN_MARKS_COPY_KIND } from '../../../src/stores/slices/datesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { deferred, setOnline } from './accountDataFixtures';
 

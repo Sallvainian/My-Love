@@ -30,6 +30,15 @@
  * gives way to a spacer of its size that keeps the wordmark centred; the
  * bottom form keeps the gear and five dock buttons.
  *
+ * Settings has no header at all: its own bar (`SettingsStack`) replaces it on
+ * the top page and every subpage, so the gear is only ever shown where it can
+ * be tapped and carries no active state.
+ *
+ * A Settings page opened from Home (a date card, Add) keeps Home lit: while
+ * `settingsFromHome` is set, the active destination is `home` in both forms,
+ * and the column's Settings button is not active. The header stays hidden,
+ * because it follows the view, not the highlight.
+ *
  * Every colour is a style-kit token from index.css (`bg-glass`, `text-ink`,
  * `text-muted`, `bg-tint`/`text-accent`, `bg-fill`, `ring-line`,
  * `shadow-float`), matching the approved style kit. Each token switches with the
@@ -40,6 +49,7 @@
 import {
   Camera,
   Heart,
+  House,
   MessageCircle,
   Settings as SettingsIcon,
   FaceSlightlySmiling,
@@ -56,8 +66,9 @@ interface Destination {
   label: string;
   Icon: LucideIcon;
   /**
-   * Fill the icon while active. Only the heart reads well solid -- FaceSlightlySmiling,
-   * MessageCircle, Camera and Users lose their inner strokes to the fill.
+   * Fill the icon while active. No destination sets it now: House,
+   * FaceSlightlySmiling, MessageCircle, Camera and Users lose their inner
+   * strokes to the fill.
    */
   fillWhenActive?: boolean;
 }
@@ -67,7 +78,7 @@ interface Destination {
  * column capsule's sixth button.
  */
 const DESTINATIONS: readonly Destination[] = [
-  { view: 'home', label: 'Home', Icon: Heart, fillWhenActive: true },
+  { view: 'home', label: 'Home', Icon: House },
   { view: 'mood', label: 'Mood', Icon: FaceSlightlySmiling },
   { view: 'notes', label: 'Love Notes', Icon: MessageCircle },
   { view: 'photos', label: 'Photos', Icon: Camera },
@@ -86,6 +97,11 @@ export interface AppNavigationProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
   /**
+   * The open Settings page was opened from Home (`navigationSlice.settingsFromHome`):
+   * Home is the active destination instead of Settings.
+   */
+  settingsFromHome?: boolean;
+  /**
    * Unseen counts per dock destination. Missing, zero or negative entries
    * render no badge, and `settings` is ignored in both forms: neither the gear
    * nor the column's Settings button carries a badge.
@@ -97,8 +113,14 @@ function pluralisedBadgeLabel(count: number): string {
   return `${count} new item${count === 1 ? '' : 's'}`;
 }
 
-export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNavigationProps) {
+export function AppNavigation({
+  currentView,
+  onViewChange,
+  settingsFromHome = false,
+  badgeCounts,
+}: AppNavigationProps) {
   const isSettings = currentView === 'settings';
+  const activeView: ViewType = isSettings && settingsFromHome ? 'home' : currentView;
   const column = useSideColumn();
   // The column holds every destination; the bottom dock leaves Settings to the gear.
   const buttons = column ? [...DESTINATIONS, SETTINGS] : DESTINATIONS;
@@ -113,51 +135,50 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
 
   return (
     <>
-      <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
-        <div className="flex h-16 items-center gap-2 px-3">
-          {/* Balances the gear so the wordmark stays optically centred; also
-              the slot a future notifications button takes. */}
-          <span aria-hidden="true" className="min-h-11 min-w-11" />
-
-          {/* The app name rather than the active destination, and a span rather
-              than a heading: Mood, Notes, Partner and Settings each render
-              their own level-1 heading naming themselves, so a chrome heading
-              would duplicate that title on screen and make a level-1-heading
-              query ambiguous -- which is exactly what broke
-              notes/love-notes.spec.ts:27 when this was an h1. */}
-          <span
-            className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
-            data-testid="app-wordmark"
-          >
-            <Heart className="h-3.5 w-3.5 shrink-0 fill-current text-accent" strokeWidth={0} />
-            <span
-              className="truncate font-lora text-[19px] font-semibold text-ink italic"
-              data-testid="app-wordmark-text"
-            >
-              My Love
-            </span>
-          </span>
-
-          {column ? (
-            // Settings is in the column capsule; this keeps the gear's space so
-            // the wordmark stays centred.
+      {!isSettings && (
+        <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
+          <div className="flex h-16 items-center gap-2 px-3">
+            {/* Balances the gear so the wordmark stays optically centred; also
+                the slot a future notifications button takes. */}
             <span aria-hidden="true" className="min-h-11 min-w-11" />
-          ) : (
-            <button
-              type="button"
-              onClick={() => onViewChange('settings')}
-              className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors ${
-                isSettings ? 'bg-tint text-accent' : 'text-muted hover:text-ink'
-              }`}
-              data-testid="nav-settings"
-              aria-label="Settings"
-              aria-current={isSettings ? 'page' : undefined}
+
+            {/* The app name rather than the active destination, and a span rather
+                than a heading: Mood, Notes, Partner and Settings each render
+                their own level-1 heading naming themselves, so a chrome heading
+                would duplicate that title on screen and make a level-1-heading
+                query ambiguous -- which is exactly what broke
+                notes/love-notes.spec.ts:27 when this was an h1. */}
+            <span
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
+              data-testid="app-wordmark"
             >
-              <SettingsIcon className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </header>
+              <Heart className="h-3.5 w-3.5 shrink-0 fill-current text-accent" strokeWidth={0} />
+              <span
+                className="truncate font-lora text-[19px] font-semibold text-ink italic"
+                data-testid="app-wordmark-text"
+              >
+                My Love
+              </span>
+            </span>
+
+            {column ? (
+              // Settings is in the column capsule; this keeps the gear's space so
+              // the wordmark stays centred.
+              <span aria-hidden="true" className="min-h-11 min-w-11" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => onViewChange('settings')}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-ink"
+                data-testid="nav-settings"
+                aria-label="Settings"
+              >
+                <SettingsIcon className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       <nav
         className={
@@ -178,7 +199,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
         data-form={column ? 'column' : 'bottom'}
       >
         {buttons.map(({ view, label, Icon, fillWhenActive }) => {
-          const isActive = currentView === view;
+          const isActive = activeView === view;
           const count = view === 'settings' ? 0 : (badgeCounts?.[view] ?? 0);
           // The column is too narrow for the active label: icons only there.
           const showLabel = isActive && !column;

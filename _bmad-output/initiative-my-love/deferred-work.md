@@ -3454,7 +3454,8 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/stores/slices/settingsSlice.ts
 severity: low
 reason: It grew from 930 lines at 58da06ce as stories 4.2, 4.3 and 4.6 added the countdown-marks and push-preferences copies, readers, refreshers and setters. A split candidate (copy kinds and readers by domain), not broken; a refactor story if ever, not a sweep bundle.
-status: open
+status: done 2026-11-03
+resolution: story 5.3: settingsSlice.ts split into datesSlice, profileSlice and notificationsSlice; settingsSlice keeps start-up, device settings and onboarding; the anniversaries mirror's residue is DW-426.
 decision: 2026-11-02 hold-for-settings-rework — owner, 2026-11-02: not a sweep bundle. Keep it open as an input to the owner's planned Settings page rework, which will decide how the slice splits; a sweep should leave it untouched until that work is planned.
 
 ### DW-400: The launch re-plan of date reminders waits for the slowest copy refresher, and the partner lookup has no request timeout.
@@ -3617,6 +3618,7 @@ severity: medium
 reason: The owner wants no notification when an event, the wedding date, together-since or a birthday is added or changed; the only date notifications should be epic-date-reminders' upcoming-date reminders. This reverses the date part of epic-push-notifications R1 (owner request 2026-10-29, story 3.5). The rework's Notifications page drops the Dates switch, and with tap-a-row-to-edit each field save would otherwise send its own push. Needs a new migration that drops the triggers and function (and decides whether date_changes and the push_preferences.dates column go), the send-push date kind removed, and the pgTAP pins updated in the same change. Not a sweep bundle: it belongs with the Settings rework's tickets.
 status: open
 decision: 2026-11-02 remove — owner, 2026-11-02: "I don't want a notification at all to be pushed when something is added or changed. The only notifications that come from dates should be from like when the date is upcoming."
+progress: 2026-11-03 story 5.4 removed the triggers, `notify_date_change()`, `date_changes`, `push_requests.date_change_id`, send-push's `date` kind and the client's use of `dates` (migration `20261103000000_remove_date_change_push.sql`). `push_preferences.dates` and its `36_push_preferences.sql` pins remain for story 18, because installed shells still select and upsert it.
 
 ### DW-417: `npm run test:ci-local` skips the send-push Edge Function tests that CI runs.
 origin: bmad-project-context refresh, 2026-11-02
@@ -3630,4 +3632,157 @@ origin: bmad-project-context refresh, 2026-11-02
 location: eslint.config.js; package.json (devDependencies); AGENTS.md (Known pitfalls, eslint-disable line)
 severity: low
 reason: AGENTS.md requires every `eslint-disable` directive to carry its reason after ` -- ` and says no lint rule enforces it; `eslint.config.js` sets only `reportUnusedDisableDirectives`. `@eslint-community/eslint-plugin-eslint-comments`' `require-description` would fail a directive without one (all 18 current directives comply). Needs the owner's yes for the new devDependency; once the rule is live, the AGENTS.md line goes.
+status: open
+
+### DW-419: The Settings page stack's column-dock form has no end-to-end check.
+origin: story 5.1 review (epic-settings-rework), 2026-11-02
+location: tests/e2e/settings/settings-stack.spec.ts; src/components/Settings/stack/SettingsStack.tsx (top-page back arrow); src/hooks/useSideColumn.ts
+severity: low
+reason: The column form (iPhone Duo capsule) is chosen from `env(safe-area-inset-left/right)`, which a desktop Playwright browser cannot set, so the stack's column-form behaviour (no top-page back arrow, a subpage arrow, bar and cards ending at the column's edge) is proven only by unit tests that mock `useSideColumn`. The same holds for every column-form feature. Close it with a sim-driver check on the Duo simulator, or by the ship story's hand run of the Key Flows on the owner's Duo.
+status: open
+
+### DW-420: No test pins that sign-out keeps the device's photo-download choice.
+origin: story 5.1 review (epic-settings-rework), 2026-11-02
+location: src/stores/slices/authSlice.ts (deleteAccountData); src/services/photoDownloadPreference.ts (PHOTOS_OVER_MOBILE_DATA_KEY)
+severity: low
+reason: Epic-settings-rework R12 says the Photos choice survives sign-out, and AGENTS.md says sign-out must not reset it, but no unit or E2E test signs out and then reads `my-love-photos-over-mobile-data`. A future addition to `deleteAccountData()` that clears localStorage wholesale would pass every suite. Add an assertion to the sign-out clearing tests (`signOutClearsAccountState.test.ts`) that the key keeps its value.
+status: open
+
+### DW-421: The Settings page stack's column-dock form has no end-to-end check (ledger DW-419).
+origin: spec-deferred b9cb78c93e32
+location: tests/e2e/settings/settings-stack.spec.ts
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
+severity: low
+reason: The column form is chosen from env(safe-area-inset-*), which desktop Playwright cannot set; settings-stack.spec.ts runs the bottom dock only and SettingsStack.test.tsx mocks useSideColumn. Pre-existing limitation shared by every column-form feature.
+status: done 2026-11-03
+resolution: duplicate of DW-419 (the same gap, filed twice by story 5.1); tracked there.
+
+### DW-422: No test pins that sign-out keeps the device's photo-download choice (ledger DW-420).
+origin: spec-deferred ab598e369099
+location: src/stores/slices/authSlice.ts (deleteAccountData)
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
+severity: low
+reason: grep finds my-love-photos-over-mobile-data only in photoDownloadPreference.test.ts and this story's tests; none signs out first. Behaviour unchanged by this story.
+status: done 2026-11-03
+resolution: duplicate of DW-420 (the same gap, filed twice by story 5.1); tracked there.
+
+### DW-423: Nothing ties a subpage row's visibility to its page's `available`, and the AGENTS.md subpage rule does not say to gate the row.
+origin: spec-deferred 445948d64bee
+location: AGENTS.md (Where things are, Settings subpage rule); src/components/Settings/Settings.tsx (SUBPAGES)
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
+severity: low
+reason: The Photos row checks canTellMobileData() by hand (Settings.tsx, Preferences group) while its page is gated by `available: canTellMobileData` in SUBPAGES. A later subpage with `available` whose row is not gated shows a row that pushes /settings/<page>, then the stack's redirect replaces that entry with /settings, leaving two top-page entries and one extra Back. The fix is a sentence in the AGENTS.md "Settings subpage" rule (gate the row on the same check), or deriving row visibility from the spec.
+status: open
+
+### DW-424: After a live update, the native edge swipe on the first page may reload the app instead of doing nothing.
+origin: investigation (spike 5.2, 2026-11-02)
+location: ios/App/App/NativeAuth.swift (MainViewController); src/services/nativeUpdates.ts
+source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
+severity: medium (unverified)
+reason: Spike 5.2 chose WKWebView's back-forward gesture, which follows the web view's whole back list, not only this document's pushState entries. The live updater loads each new bundle as a new document, so the old document's entries may stay in that list, and a swipe on the first page after an update would then navigate to the old bundle's URL. The trial never applied an update. Story 15 settles it with `sim build --update-port` and `sim serve-update`: apply an update, then `sim swipe back` on the first page; if the page reloads, cancel cross-document back navigations in the shell.
+status: done 2026-11-03
+resolution: confirmed, then fixed in story 5.15. On the Duo simulator with the gesture alone, Settings → Profile, Refresh in the update toast, then a swipe on the new Home opened the old bundle's Profile. The updater's swap is `webView.load` of the server URL (`CapacitorUpdater.applyCurrentBundleToBridge`), which keeps the old document's entries. `MainViewController` (ios/App/App/NativeAuth.swift) now records the entry that was current when each main-frame `.other` load of an app URL starts (the launch load and every bundle swap, seen through `.capacitorDecidePolicyForNavigationAction`). It turns the gesture off while the back item is that entry or a load is still running, and re-decides on `url`, `canGoBack` and `isLoading`. A reload records nothing, so back across one still works. Rather than cancelling cross-document back navigations, it does not offer the swipe there: cancelling would also block the in-app back arrow after a reload. Checked on the simulator: after an update, 16 pans on the new Home did nothing, and pages pushed in the new bundle swiped back one level each.
+
+### DW-425: Three native edge-swipe cases no device has checked: the first entry, the column on the left edge, and Home's message card.
+origin: review (spike 5.2, 2026-11-02)
+location: ios/App/App/NativeAuth.swift (MainViewController); src/components/DailyMessage/DailyMessage.tsx (drag="x"); src/hooks/useSideColumn.ts
+source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
+severity: medium (unverified)
+reason: The Duo trial covered Settings pushes and dock views in the bottom dock and folded with the column, side not recorded. The simulator's first-entry result rests on synthesized pans that register about one time in four. Unchecked: (1) a real swipe on the session's first entry stays on the page; (2) with the column on the left edge (one folded landscape, the left pane side by side) the swipe still goes back and the capsule still taps; (3) an edge swipe that starts over Home's message card, which turns to the next message on a right drag, goes back without also turning the card. Story 15 checks all three by hand on the Duo once the Swift line is in.
+status: open
+
+### DW-426: The anniversaries mirror still sits inside the persisted `settings` object that `settingsSlice` owns, though `datesSlice` now writes it.
+origin: spec-deferred (story 5.3, 2026-11-03)
+location: src/stores/slices/datesSlice.ts (withAnniversaries and the anniversary actions); src/stores/slices/settingsSlice.ts (`settings`); src/stores/useAppStore.ts (`partialize`, `getItem` blanking); src/stores/slices/authSlice.ts (`discardAccountState`)
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-state-splits-into-dates-profile-and-notifications-s-plan.md`
+severity: low
+reason: Story 5.3 moved the anniversaries kind, reader, refresher and actions into `datesSlice` but left the in-memory list at `settings.relationship.anniversaries`. Giving it a field of its own would change `partialize`, the `getItem` blanking, `discardAccountState` and every test that reads the mirror, which a code-moving refactor that changes only import paths rules out. Until then one slice writes a field inside another slice's persisted object.
+status: open
+
+### DW-427: `DisplayNameSetup`'s `edit` mode, `onCancel` and `initialName` are unused, and its name rules duplicate `profileService.saveDisplayName`.
+origin: spec-deferred (story 5.7, 2026-11-03)
+location: src/components/DisplayNameSetup/DisplayNameSetup.tsx; src/services/profileService.ts (`saveDisplayName`); src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx
+source_spec: `tickets/epic-settings-rework/tickets/story-profile-edits-name-and-birthday-on-one-field-pages-plan.md`
+severity: low
+reason: Story 5.7 moved the Settings name edit onto the Name page, which writes through `profileSlice.setDisplayName` and `profileService.saveDisplayName`. The signup gate in `App.tsx` is the only caller left, and it passes neither `initialName` nor `onCancel` and stays in `setup` mode, so the `edit` copy, the Cancel control, the Escape handler and the `initialName` prop are dead code. The gate also still holds its own copy of the 3-30 length rule, the account-email and `Unknown` refusals and the `users` update, now the same as `saveDisplayName`'s. The story's "Never" list kept `DisplayNameSetup` and the gate unchanged. The sweep (story 16) removes the dead props and mode, then either points the gate at `setDisplayName` or leaves it with a comment naming `saveDisplayName` as the twin.
+status: open
+
+### DW-428: `PartnerMoodView` shows the Connect UI for one render before `loadPartner` raises `isLoadingPartner`, because it cannot tell "unanswered" from "unlinked".
+origin: spec-deferred (story 5.8, 2026-11-03)
+location: src/components/PartnerMoodView/PartnerMoodView.tsx (the `!partner && !isLoadingPartner && !partnerLoadError` branch); src/stores/slices/partnerSlice.ts (`loadPartner`, `partnerKnown`)
+source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
+severity: low
+reason: The view renders the Connect UI whenever `partner` is null, no load is running and no error is set; on first open that holds for the render before `loadPartner` sets `isLoadingPartner`. Story 5.8 added `partnerKnown` to `partnerSlice` (true only once a saved copy or a server answer is applied), which separates the two states, but its "Never" list left the Partner view's behaviour unchanged. Gating the Connect UI on `partnerKnown` (and showing the loading state until then) removes the flash; check `PartnerMoodView.*.test.tsx`, which mock the store wholesale and would need the field.
+status: done 2026-11-03
+resolution: false premise: PartnerMoodView.tsx:123-125 calls loadPartner from a useLayoutEffect, and partnerSlice.ts:168 sets isLoadingPartner before its first await, so the first render is replaced before the browser paints and the Connect UI never shows over a linked user (771a93b7). Closed at the owner's request.
+
+### DW-429: `partnerService.getPartner` still selects `users.updated_at`, now unused.
+origin: spec-deferred (story 5.8, 2026-11-03)
+location: src/api/partnerService.ts (`getPartner`, first read `select('partner_id, updated_at')`); tests/e2e/offline/needs-a-connection.spec.ts and other E2E routes pinning `users?select=partner_id*`
+source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
+severity: low
+reason: The link date moved to the accepted `partner_requests` row (`PartnerInfo.linkedSince`), so nothing reads `updated_at` from the first `users` read any more. It stays in the select because E2E routes match the URL `select=partner_id%2Cupdated_at`, and the story's "Never" list forbade changing the `users` read columns. A later change drops the column from the select together with those routes and the fixtures that fulfil `updated_at`.
+status: open
+
+### DW-430: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker.
+origin: story 5.11 build (epic-settings-rework), 2026-11-03
+location: src/components/Settings/EventPages.tsx (EventPage Icon row, EventFieldPage `icon`)
+severity: low
+reason: DESIGN.md (Components, List row) says "An Icon field row shows the event's glyph in accent in place of a text value", and (One-field edit page) "The icon field is the three-option picker used on the Form page": three equal 48px tiles, glyph and name, the selected one tint-filled with an accent label and 2px accent ring. Story 5.11's plan specified the text value (`Calendar`/`Ring`/`Plane`) and check rows instead, so R18 is not met for the Icon row and page. Story 5.13 builds the Form page's picker; reuse it on the Icon page there and give `SettingsRow` a glyph value for the Icon row.
+status: open
+
+### DW-431: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker (ledger DW-430).
+origin: spec-deferred 6be699f2d039
+location: src/components/Settings/EventPages.tsx
+source_spec: `tickets/epic-settings-rework/tickets/story-every-event-has-its-own-page-plan.md`
+severity: low
+reason: DESIGN.md Components: "An Icon field row shows the event's glyph in accent in place of a text value" and "The icon field is the three-option picker used on the Form page". This plan's matrix specified text values and check rows; the implementer flagged the mismatch. Story 5.13 builds the picker.
+status: open
+
+### DW-432: No E2E axe coverage of the new Settings pages since `events-accessibility` was deleted.
+origin: story 5.13 build (epic-settings-rework), 2026-11-03
+location: tests/e2e/settings/ (deleted `events-accessibility.spec.ts`); tests/unit/a11y/whiteOnColorContrast.test.ts (header)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: `@axe-core/playwright` ran in exactly one spec, which scanned the events modal and form that the Countdowns section drew. That section is gone, so the spec was deleted, and nothing scans the Settings stack pages (the top page, the Dates list, the date and event pages, the Form pages and the Kind chooser). The plan forbids new axe scans in this story (the owner and partner use no screen reader or keyboard), so the gap is recorded rather than filled; whether a scan is wanted at all is a decision for the owner. The `@axe-core/playwright` dependency (and its `axe-core`) was removed with the spec, since nothing else used it; it comes back if a scan is wanted.
+status: open
+
+### DW-433: `reminderDateEntries` has no production caller now that `CountdownMarks` is gone.
+origin: story 5.13 build (epic-settings-rework), 2026-11-03
+location: src/services/dateReminders.ts (`reminderDateEntries`), src/services/__tests__/dateReminders.test.ts (`describe('reminderDateEntries')`)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: `CountdownMarks` was the only production caller of `reminderDateEntries`, which listed the dates a person could mark for the per-date reminder list. Each date's own page now holds its Remind me switch (`RemindMe`), so the function and its unit tests are dead code. A later change deletes it with its tests, after a check that `planReminders` and its doc comments no longer lean on it.
+status: open
+
+### DW-434: Returning to the Dates list reloads its first window, so rows reached through `Load more`, or a date just added beyond that window, drop out of the list.
+origin: story 5.13 build (epic-settings-rework), 2026-11-03
+location: src/components/Settings/DatesPage.tsx (the mount effect calling `loadEvents()`); src/components/Settings/stack/SettingsStack.tsx (one page in the DOM, keyed by path, so a pop remounts the page)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: The Dates list loads events on every mount, and a back from an event page or a Form page remounts it, so the store's paged window is replaced by the server's first page. Since story 5.9 this drops every row reached through `Load more`. Since story 5.13 it also drops a past date added beyond the first window: it shows on the list after Add and vanishes when the reload answers. `events-history-pagination.spec.ts` waits for that reload and pages to the row. A fix keeps the loaded window across a return (for example, load only on a push or a fresh mount, not on a pop), as `EventPage` already skips its load when it holds its event.
+status: open
+
+### DW-435: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh.
+origin: story 5.14 build (epic-settings-rework), 2026-11-03
+location: src/components/Settings/stack/SettingsStack.tsx (`trail`'s initial `direction: null`; the commit effect returns early while `shownPath` is null)
+source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
+severity: low
+reason: EXPERIENCE.md Flow 1 step 2 says the event page "slides in from the right" when Casey taps the Home card. Settings is not mounted while Home shows, so a Home card or Add mounts `SettingsStack` on the date page. Its first render has no direction, so it gets no slide class, and its commit effect skips the scroll-to-top and title focus that a push within the stack gets. The page appears at once, at Home's scroll position until the shorter page clamps it. Opening Settings from the gear has always behaved the same way. A fix starts `trail` as `push`, and runs the push branch on the first commit, when `settingsPushedPath` equals the mounted path, as story 5.14 already does for the reload check.
+status: open
+
+### DW-436: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh (DW-435).
+origin: spec-deferred 70fea21d81f5
+location: src/components/Settings/stack/SettingsStack.tsx
+source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
+severity: low
+reason: SettingsStack's trail starts with direction null and its commit effect returns early while shownPath is null, so a first mount gets no slide class, scroll reset or title focus; EXPERIENCE.md Flow 1 step 2 says the event page slides in.
+status: open
+
+### DW-437: DW-425 still names story 15 as the one that checks its three cases by hand on the Duo, and it does not hold this story's simulator results; the ledger reserves that entry's text for the orchestrator.
+origin: spec-deferred f577620c7c17
+location: _bmad-output/initiative-my-love/deferred-work.md DW-425
+source_spec: `tickets/epic-settings-rework/tickets/story-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
+severity: low
+reason: Story 15 ran the three cases on the Duo simulator: the first entry (exit 1), the column on the left edge (one level, after 17 failed synthesized pans), and Home's message card (one level). It cannot run them under a real finger, and the shell with the Swift line is not on the Duo yet. The hand checks are this plan's operator_actions. The deferred-work.md header leaves another entry's reason to the orchestrator.
 status: open

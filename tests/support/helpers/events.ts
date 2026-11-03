@@ -32,6 +32,9 @@ import { getWorkerPairEmails } from '../auth/worker-pool';
 import type { TypedSupabaseClient } from '../factories';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 
+/** Rows read per window and per load-more page. */
+export const EVENTS_PAGE_SIZE = 50; // src/services/eventsService.ts DEFAULT_EVENTS_PAGE_SIZE (module-private)
+
 /** The icon set `events.icon`'s CHECK constraint admits
  * (`supabase/migrations/20260818000002_create_events_table.sql:22`). */
 export type EventIcon = 'ring' | 'plane' | 'calendar';
@@ -177,8 +180,7 @@ export async function seedEvent(
  * implementation of a date rule is exactly where an off-by-one gets in. Never
  * `toISOString().split('T')[0]`: that is UTC-based and names the next day east
  * of UTC and the previous one west of it, which is the off-by-one this whole
- * feature exists to avoid (`src/utils/dateUtils.ts:126-128`,
- * `AnniversarySettings.tsx:103`).
+ * feature exists to avoid (`src/utils/dateUtils.ts:126-128`).
  */
 export function isoDateDaysFromNow(dayOffset: number, anchor: Date): string {
   // Carry only calendar components: the anchor's time can fall in a DST gap

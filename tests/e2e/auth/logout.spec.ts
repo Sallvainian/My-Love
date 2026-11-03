@@ -64,15 +64,17 @@ test.describe('Logout Flow', () => {
     // GIVEN: User is authenticated (via auth fixture)
     await page.goto('/');
 
-    // WHEN: User taps the gear, enters Settings and signs out there
+    // WHEN: User taps the gear, enters Settings and logs out there
     await navigateTo(page, 'settings');
     await expect(page.getByTestId('settings-view')).toBeVisible();
+    await expect(page.getByTestId('settings-sign-out')).toHaveText('Log out');
     await page.getByTestId('settings-sign-out').click();
 
     await signOutCall;
 
-    // THEN: Login screen is displayed
+    // THEN: Login screen is displayed; only "Sign out" became "Log out"
     await expect(page.getByTestId('login-screen')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('submit-button')).toHaveText('Sign in');
   });
 
   test('[P0] should clear session data on logout', async ({ page, interceptNetworkCall }) => {

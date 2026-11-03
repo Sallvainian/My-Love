@@ -7,7 +7,9 @@
  * are untypechecked (AGENTS.md:28) — the two App route ternaries, the render
  * chain and the gear itself — so a missed one still compiles, renders nothing
  * and resets to Home on reload. The reload case below is the only thing that
- * catches that.
+ * catches that. Settings has its own bar instead of the app header, so while it
+ * is open there is no gear to carry aria-current: the dock's five buttons are
+ * all not-current and `settings-view` is the witness.
  */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
@@ -77,7 +79,15 @@ test.describe('Bottom Dock', () => {
       await page.getByTestId(`nav-${view}`).click();
 
       await expect(page).toHaveURL(PATHS[view]);
-      await expect(page.getByTestId(`nav-${view}`)).toHaveAttribute('aria-current', 'page');
+      if (view === 'settings') {
+        // Settings' own bar replaces the header, gear included: nothing in the
+        // chrome is current, and the view itself is the witness.
+        await expect(page.getByTestId('settings-view')).toBeVisible();
+        await expect(page.getByTestId('app-header')).toHaveCount(0);
+        await expect(page.getByTestId('nav-settings')).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId(`nav-${view}`)).toHaveAttribute('aria-current', 'page');
+      }
       for (const other of ALL_DESTINATIONS.filter((v) => v !== view)) {
         await expect(page.getByTestId(`nav-${other}`)).not.toHaveAttribute('aria-current', 'page');
       }
@@ -177,7 +187,9 @@ test.describe('Bottom Dock', () => {
     // route ternary is untypechecked, so only this catches a missed entry.
     await expect(page.getByTestId('settings-view')).toBeVisible();
     await expect(page).toHaveURL(/\/settings$/);
-    await expect(page.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
+    // Settings' own bar stands in for the header, so there is no gear to be current.
+    await expect(page.getByTestId('settings-bar')).toBeVisible();
+    await expect(page.getByTestId('nav-settings')).toHaveCount(0);
   });
 
   // The dock's form changes with the screen (a side-column capsule on the Duo),
@@ -208,7 +220,7 @@ test.describe('Bottom Dock', () => {
     });
   }
 
-  test('[P0] should go back to the previous view from Settings', async ({ page }) => {
+  test('[P0] should go back to Home, not the previous view, from Settings', async ({ page }) => {
     await page.goto('/');
     await navigateTo(page, 'mood');
     await page.waitForURL('**/mood');
@@ -220,8 +232,8 @@ test.describe('Bottom Dock', () => {
     // WHEN: Browser back
     await page.goBack();
 
-    // THEN: The previous view is restored
-    await page.waitForURL('**/mood');
-    await expect(page.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
+    // THEN: Home, the bottom of the history: a dock view sits on Home alone
+    await page.waitForURL((url) => url.pathname === '/');
+    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
   });
 });

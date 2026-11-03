@@ -158,7 +158,6 @@ const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
   partner_request: 'partner',
   partner_accept: 'partner',
   photo: 'photos',
-  date: 'home',
 };
 
 /** `aps.thread-id` of a love note; a push sent before `kind` existed is told apart by it alone. */
@@ -418,7 +417,7 @@ export async function removePushRegistration(): Promise<void> {
 
 /**
  * Deletes every push registration the account owns, on every device, for
- * "Sign out of all devices" (DW-353). Called after the global
+ * "Log out of all devices" (DW-353). Called after the global
  * `supabase.auth.signOut()` with the access token read before it (DW-412):
  * the sign-out removes the session from the client, but the token stays valid
  * until it expires, and the RPC reads only `auth.uid()`. With no token there

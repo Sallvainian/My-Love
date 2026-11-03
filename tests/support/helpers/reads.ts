@@ -31,6 +31,9 @@ export const UPCOMING_EVENTS_READ = '**/rest/v1/events*event_date=gte.*';
 /** The past window of the same load. */
 export const PAST_EVENTS_READ = '**/rest/v1/events*event_date=lt.*';
 
+/** A load-more read: only it carries the `or=` cursor filter (`eventsService.getEventsPage`). */
+export const HISTORY_PAGE_READ = '**/rest/v1/events?*&or=*';
+
 /** The gallery list (`photoService.listAllPhotos`); the `select=file_size`
  * quota read has no `order=`. */
 export const PHOTOS_LIST_READ = '**/rest/v1/photos?*order=created_at.desc*';
@@ -74,6 +77,9 @@ export const FAVORITES_READ = '**/rest/v1/message_favorites?select=message_key*'
 /** The signed-in user's own profile (`profileService`). */
 export const OWN_PROFILE_READ = '**/rest/v1/users?select=display_name%2Cbirthday*';
 
+/** A write to the signed-in user's own profile row (`profileService.saveDisplayName` / `saveBirthday`). */
+export const OWN_PROFILE_WRITE = '**/rest/v1/users?id=eq.*';
+
 /** The linked partner's record (`partnerService.getPartner`). */
 export const PARTNER_RECORD_READ = '**/rest/v1/users?select=id%2Cemail%2Cdisplay_name%2Cbirthday*';
 
@@ -81,6 +87,11 @@ export const PARTNER_RECORD_READ = '**/rest/v1/users?select=id%2Cemail%2Cdisplay
 export function partnerRecordRead(partnerId: string): string {
   return `**/rest/v1/users?select=id%2Cemail%2Cdisplay_name%2Cbirthday&id=eq.${partnerId}*`;
 }
+
+/** The accepted partner request that dates the link (`partnerService.getPartner`),
+ * the source of the Partner page's Linked since. Pool couples are linked without
+ * a request, so a real read answers no row; a spec that needs a date fulfils it. */
+export const LINKED_SINCE_READ = '**/rest/v1/partner_requests?select=updated_at*';
 
 /** The display-name gate's read of the signed-in user's own name
  * (`supabaseClient`), which decides whether the setup screen shows. */

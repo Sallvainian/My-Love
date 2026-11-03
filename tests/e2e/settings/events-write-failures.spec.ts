@@ -1,39 +1,36 @@
 /**
  * tests/e2e/settings/events-write-failures.spec.ts
  *
- * Active ATDD write-failure coverage for story 5 (`spec-dynamic-events`,
- * "manage events in Settings"), activated under the configured runner by DW-30.
+ * Write-failure coverage for story 5 (`spec-dynamic-events`, "manage events in
+ * Settings"), activated under the configured runner by DW-30 and moved onto the
+ * Dates list's pages by the story that deleted the Countdowns section.
  *
  * Test design:
  *   - **DE.5-E2E-002** ×2, [P2] — "a rejected edit and a rejected delete carry
- *     the service's own message to the dialog"
+ *     the service's own message to the page's Error box"
  *     (`_bmad-output/test-artifacts/test-design-epic-5.md:357`). It closes the
- *     only seam where the real message is never observed reaching a dialog: the
- *     component tests mock the store and assert a synthetic string.
- *   - **DE.5-E2E-003** ×1, [P3] — "an offline save surfaces the service's
- *     offline message inside the form" (:369).
+ *     only seam where the real message is never observed reaching the screen:
+ *     the component tests mock the store and assert a synthetic string. A
+ *     rejected edit lands in the field page's Error box, a rejected delete in
+ *     the event page's.
+ *   - **DE.5-E2E-003** ×1, [P3] — "an offline add surfaces the service's
+ *     offline message inside the form" (:369), keeping every field.
  *
- * Shape mirrors `tests/e2e/settings/events-crud.spec.ts:392-446`, the existing
- * rejected-create test.
+ * The old form's Refresh and Retry controls are gone with it, so nothing here
+ * asserts them: a stale row is fixed by leaving the page, which loads again.
  *
  * Run:
  *   supabase start
  *   npx playwright test tests/e2e/settings/events-write-failures.spec.ts --project=chromium
- *
- * ── MEASURED first run: GREEN, all three ───────────────────────────────────
- *
- * Executed during the story-5 ATDD run (2026-08-19) against the local stack,
- * `npx playwright test tests/e2e/settings/events-write-failures.spec.ts
- * --project=chromium --workers=1`. Result: **3 passed, 0 failed.**
  *
  * These tests close an observation gap the test design named at
  * `test-design-epic-5.md:355`: the real service messages —
  * `'Event not found or not yours to edit'` (src/services/eventsService.ts:413),
  * `'Event not found or not yours to delete'` (:466) and
  * `'You are offline. Events need a connection to save.'` (:305-308) — reach
- * their dialogs correctly today, but until this file nothing anywhere observed
- * them doing it. The component suites assert a synthetic string against a mocked
- * store; the concatenation from service through slice
+ * their Error boxes correctly today, but until this file nothing anywhere
+ * observed them doing it. The component suites assert a synthetic string against
+ * a mocked store; the concatenation from service through slice
  * (src/stores/slices/eventsSlice.ts:203-205, 233) to the rendered `role="alert"`
  * was unwitnessed. It is witnessed now, and a regression in any link of that
  * chain fails here.
@@ -51,9 +48,9 @@ import {
   resolveOwnPair,
   seedEvent,
 } from '../../support/helpers/events';
-import { openSettingsFromHome } from '../../support/helpers/settings-screen';
+import { eventRowFor, fillNewEventForm, openNewEventForm } from '../../support/helpers/new-date-forms';
+import { openDatesList, openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { log } from '@seontechnologies/playwright-utils';
-import type { Page } from '@playwright/test';
 
 // FILE-LEVEL, not per-describe: Playwright refuses `test.use({ video })` inside
 // a describe group ("because it forces a new worker") — measured with
@@ -77,10 +74,7 @@ const EDIT_ATTEMPT_LABEL = 'Settings Reject Edit Attempt E2E';
 const DELETE_LABEL = 'Settings Reject Delete E2E';
 const OFFLINE_LABEL = 'Settings Offline Save E2E';
 
-/** The list row carrying a given label. Row testids key on the event's uuid. */
-function rowFor(page: Page, label: string) {
-  return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
-}
+const rowFor = eventRowFor;
 
 test.beforeEach(async ({ page }) => {
   await dismissWelcomeSplash(page);
@@ -99,9 +93,9 @@ test.afterEach(async ({ supabaseAdmin }) => {
  * (`tests/support/merged-fixtures.ts:31-41`), so there is nothing here to opt
  * out of, and leaving it armed keeps a genuine backend error visible.
  */
-test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', () => {
+test.describe('A rejected events write shows its message (DE.5-E2E-002)', () => {
   test(
-    '[P2] DE.5-E2E-002a a rejected edit carries the service message into the form',
+    '[P2] DE.5-E2E-002a a rejected edit carries the service message into the field page',
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -114,13 +108,14 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
         icon: 'calendar',
       });
 
-      await log.step('Open Settings on a row this account owns');
+      await log.step('Open the Dates list on a row this account owns');
       await openSettingsFromHome(page, interceptNetworkCall);
+      await openDatesList(page, interceptNetworkCall);
 
       const row = rowFor(page, EDIT_LABEL);
       await expect(row).toBeVisible();
 
-      // Declared before the form is even opened, so the route is in place long
+      // Declared before the Save is tapped, so the route is in place long
       // before the PATCH leaves the page (network-first). `body: []` is the
       // zero-row shape a partner's UPDATE gets back through RLS, which
       // eventsService turns into EventWriteError at :412-414.
@@ -130,36 +125,37 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
         fulfillResponse: { status: 200, body: [] },
       });
 
-      await row.locator('[data-testid^="event-edit-"]').click();
-      await expect(page.getByTestId('events-form')).toBeVisible();
-      await expect(page.getByTestId('events-form-label')).toHaveValue(EDIT_LABEL);
+      await row.click();
+      await page.getByTestId('settings-event-name').click();
+      await expect(page.getByTestId('settings-event-name-field')).toHaveValue(EDIT_LABEL);
 
-      await log.step('Submit an edit the server answers with zero rows');
-      await page.getByTestId('events-form-label').fill(EDIT_ATTEMPT_LABEL);
-      await page.getByTestId('events-form-submit').click();
+      await log.step('Save an edit the server answers with zero rows');
+      await page.getByTestId('settings-event-name-field').fill(EDIT_ATTEMPT_LABEL);
+      await page.getByTestId('settings-field-save').click();
 
       await rejectedEdit;
 
       // The message the write itself returned, not a generic one.
-      await expect(page.getByTestId('events-form-error')).toContainText(
+      await expect(page.getByTestId('settings-field-error')).toContainText(
         'Event not found or not yours to edit'
       );
-      // The form stays open, but a not-found result means the row snapshot may
-      // be stale. The safe next action is Refresh events, not repeating the
-      // same write against the same stale id.
-      await expect(page.getByTestId('events-form')).toBeVisible();
-      await expect(page.getByTestId('events-form-refresh')).toBeEnabled();
-      await expect(page.getByTestId('events-form-submit')).toHaveCount(0);
+      // The field page stays, holding what was typed, with Save usable again.
+      await expect(page.getByTestId('settings-event-name-page')).toBeVisible();
+      await expect(page.getByTestId('settings-event-name-field')).toHaveValue(EDIT_ATTEMPT_LABEL);
+      await expect(page.getByTestId('settings-field-save')).toBeEnabled();
 
-      // And the list behind it still carries the ORIGINAL label: a rejected
-      // write must not be reflected optimistically.
+      // And the event page behind it still carries the ORIGINAL label: a
+      // rejected write must not be reflected optimistically.
+      await page.getByRole('button', { name: 'Back' }).click();
+      await expect(page.getByTestId('settings-event-name')).toHaveAccessibleName(`Name, ${EDIT_LABEL}`);
+      await page.getByRole('button', { name: 'Back' }).click();
       await expect(rowFor(page, EDIT_LABEL)).toBeVisible();
       await expect(rowFor(page, EDIT_ATTEMPT_LABEL)).toHaveCount(0);
     }
   );
 
   test(
-    '[P2] DE.5-E2E-002b a rejected delete carries the service message into the confirmation',
+    '[P2] DE.5-E2E-002b a rejected delete carries the service message into the event page',
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -172,8 +168,9 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
         icon: 'calendar',
       });
 
-      await log.step('Open Settings on a row this account owns');
+      await log.step('Open the Dates list on a row this account owns');
       await openSettingsFromHome(page, interceptNetworkCall);
+      await openDatesList(page, interceptNetworkCall);
 
       const row = rowFor(page, DELETE_LABEL);
       await expect(row).toBeVisible();
@@ -185,81 +182,85 @@ test.describe('A rejected events write keeps its dialog open (DE.5-E2E-002)', ()
         fulfillResponse: { status: 200, body: [] },
       });
 
-      await row.locator('[data-testid^="event-delete-"]').click();
-      await expect(page.getByTestId('events-delete-confirmation')).toBeVisible();
+      await row.click();
+      await page.getByTestId('settings-event-delete').click();
+      await expect(page.getByTestId('settings-event-delete-confirmation')).toBeVisible();
 
       await log.step('Confirm a delete the server answers with zero rows');
-      await page.getByTestId('events-delete-confirm').click();
+      await page.getByTestId('settings-event-delete-confirmation-confirm').click();
 
       await rejectedDelete;
 
-      await expect(page.getByTestId('events-delete-error')).toContainText(
+      await expect(page.getByTestId('settings-date-error')).toContainText(
         'Event not found or not yours to delete'
       );
-      // The confirmation stays open, with Cancel and the stale-row Refresh
-      // action usable again. Repeating the same delete is intentionally not
-      // offered for a not-found result.
-      await expect(page.getByTestId('events-delete-confirmation')).toBeVisible();
-      await expect(page.getByTestId('events-delete-refresh')).toBeEnabled();
-      await expect(page.getByTestId('events-delete-confirm')).toHaveCount(0);
-      await expect(page.getByTestId('events-delete-cancel')).toBeEnabled();
+      // The confirmation has closed and the event page stays, with Delete
+      // usable again.
+      await expect(page.getByTestId('settings-event-delete-confirmation')).toHaveCount(0);
+      await expect(page.getByTestId('settings-event-page')).toBeVisible();
+      await expect(page.getByTestId('settings-event-delete')).toBeEnabled();
 
       // The row survives the rejection.
+      await page.getByRole('button', { name: 'Back' }).click();
       await expect(rowFor(page, DELETE_LABEL)).toBeVisible();
     }
   );
 });
 
-test.describe('Saving an event while offline (DE.5-E2E-003)', () => {
+test.describe('Adding an event while offline (DE.5-E2E-003)', () => {
   // No `skipNetworkMonitoring` here either: nothing is stubbed and no HTTP call
-  // is made at all. `createEvent` refuses before it reaches the network
-  // (eventsService.ts:305-308), and requests that fail while the context is
-  // offline are aborted rather than answered, so the monitor — which fails only
-  // on a 4xx/5xx response — has nothing to react to. If it does fire, that is
-  // signal about the app during the offline window, not about this test.
+  // is made at all. The form refuses before it reaches the network, and
+  // requests that fail while the context is offline are aborted rather than
+  // answered, so the monitor — which fails only on a 4xx/5xx response — has
+  // nothing to react to. If it does fire, that is signal about the app during
+  // the offline window, not about this test.
   test(
-    '[P3] DE.5-E2E-003 an offline save surfaces the service offline message in the form',
+    '[P3] DE.5-E2E-003 an offline add surfaces the offline message in the form and keeps its fields',
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
-      await log.step('Open the add form while still online');
+      await log.step('Open the New event form while still online');
       await openSettingsFromHome(page, interceptNetworkCall);
-      await expect(page.getByTestId('events-settings-empty')).toBeVisible();
+      await openDatesList(page, interceptNetworkCall);
 
-      await page.getByTestId('events-settings-empty-add').click();
-      await expect(page.getByTestId('events-form')).toBeVisible();
-      await page.getByTestId('events-form-label').fill(OFFLINE_LABEL);
+      await openNewEventForm(page);
       const anchor = new Date();
-      await page.getByTestId('events-form-date').fill(isoDateDaysFromNow(12, anchor));
+      const date = isoDateDaysFromNow(12, anchor);
+      await fillNewEventForm(page, { label: OFFLINE_LABEL, date, description: 'Keep me' });
 
-      await log.step('Drop the connection, then save');
+      await log.step('Drop the connection, then add');
       // `isOnline()` reads `navigator.onLine` (src/api/errorHandlers.ts:44), and
-      // `createEvent` guards on it before any request (eventsService.ts:305-308).
-      // The `offline` event is dispatched alongside for parity with
-      // network-status.spec.ts:28-29 — it is what App.tsx:365-366 listens on to
-      // update `syncStatus.isOnline`; the service itself does not need it.
+      // the form checks it before any request. The `offline` event is dispatched
+      // alongside for parity with network-status.spec.ts:28-29 — it is what
+      // App.tsx:365-366 listens on to update `syncStatus.isOnline`; the form
+      // itself does not need it.
       //
       // Measured in the activated runner: `context.setOffline(true)` flips
-      // `navigator.onLine` to false here, so the service guard trips before a
-      // request leaves the page. The assertion below keeps that fact visible
-      // outside the frozen archive that originally carried the only probe.
+      // `navigator.onLine` to false here, so the form's guard trips before a
+      // request leaves the page.
       await page.context().setOffline(true);
       await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 
-      await page.getByTestId('events-form-submit').click();
+      await page.getByTestId('settings-form-add').click();
 
-      await expect(page.getByTestId('events-form-error')).toContainText(
+      await expect(page.getByTestId('settings-form-error')).toContainText(
         'You are offline. Events need a connection to save.'
       );
       // The typed-in event is still there to retry, and nothing was added.
-      await expect(page.getByTestId('events-form')).toBeVisible();
-      await expect(page.getByTestId('events-form-label')).toHaveValue(OFFLINE_LABEL);
-      await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(0);
+      await expect(page.getByTestId('settings-new-event-page')).toBeVisible();
+      await expect(page.getByTestId('settings-new-event-name-field')).toHaveValue(OFFLINE_LABEL);
+      await expect(page.getByTestId('settings-new-event-date-field')).toHaveValue(date);
+      await expect(page.getByTestId('settings-new-event-note-field')).toHaveValue('Keep me');
+      await expect(page.getByTestId('settings-form-add')).toBeEnabled();
 
       await log.step('Restore the connection');
       await page.context().setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
+
+      await page.getByTestId('settings-cancel').click();
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      await expect(page.locator('[data-testid^="settings-dates-event-"]')).toHaveCount(0);
     }
   );
 });

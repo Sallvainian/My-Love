@@ -5,7 +5,7 @@
  * countdown cards share one kit card and one value style, the two birthdays
  * (yours, then your partner's) sit two-up, the dateless wedding reads
  * "Date TBD" in `muted`, the Upcoming row's
- * Add button leads to Settings, and the daily message is Lora italic with no
+ * Add button opens the New event form, and the daily message is Lora italic with no
  * emoji left in Home's own chrome. The kit colours are `--kit-*` variables that
  * switch under `prefers-color-scheme`, so `emulateMedia` alone flips them.
  */
@@ -248,7 +248,7 @@ test.describe('Home on the style kit', () => {
     });
   }
 
-  test('[P1] should show Upcoming with an Add event button that opens Settings', async ({
+  test('[P1] should show Upcoming with an Add event button that opens the New event form', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -262,7 +262,9 @@ test.describe('Home on the style kit', () => {
     await expect(addButton).toHaveAttribute('data-testid', 'home-add-event');
 
     await addButton.click();
-    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page).toHaveURL(/\/settings\/dates\/new-event$/);
+    await expect(page.getByTestId('settings-new-event-page')).toBeVisible();
+    await expect(page.getByTestId('settings-kind-chooser')).toHaveCount(0);
   });
 
   test('[P1] should not render the welcome button on Home', async ({

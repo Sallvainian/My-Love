@@ -4,7 +4,6 @@ import type { ApnsClient } from './apns.ts';
 import {
   handleSendPush,
   secretsMatch,
-  type DateChangeRow,
   type DeviceRow,
   type InteractionRow,
   type MoodRow,
@@ -22,7 +21,8 @@ const NOTE_ID = '11111111-1111-4111-8111-111111111111';
 const MOOD_ID = '22222222-2222-4222-8222-222222222222';
 const PHOTO_ID = '33333333-3333-4333-8333-333333333333';
 const INTERACTION_ID = '44444444-4444-4444-8444-444444444444';
-const DATE_CHANGE_ID = '55555555-5555-4555-8555-555555555555';
+/** The id story 3.5's trigger posted under the `date` kind, which is gone. */
+const OLD_DATE_CHANGE_ID = '55555555-5555-4555-8555-555555555555';
 const PARTNER_REQUEST_ID = '66666666-6666-4666-8666-666666666666';
 const SECRET = 'a-shared-secret-for-tests';
 
@@ -41,13 +41,6 @@ const happyGrateful: MoodRow = {
   mood_types: ['happy', 'grateful'],
 };
 const photo: PhotoRow = { id: PHOTO_ID, user_id: 'sender' };
-const eventAdded: DateChangeRow = {
-  id: DATE_CHANGE_ID,
-  sender_id: 'sender',
-  subject: 'event',
-  action: 'added',
-  event_label: 'Paris trip',
-};
 /** Asked by `sender` (Casey) of `recipient`; the fake lists devices only for `recipient`. */
 const pendingRequest: PartnerRequestRow = {
   id: PARTNER_REQUEST_ID,
@@ -69,7 +62,6 @@ function fakeDb(options: {
   mood?: MoodRow | null;
   photo?: PhotoRow | null;
   interaction?: InteractionRow | null;
-  dateChange?: DateChangeRow | null;
   partnerRequest?: PartnerRequestRow | null;
   /** The display name of every account; defaults to Casey for `sender` and Jessie for the rest. */
   displayName?: string | null;
@@ -102,7 +94,6 @@ function fakeDb(options: {
     getMood: () => Promise.resolve(options.mood === undefined ? null : options.mood),
     getPhoto: () => Promise.resolve(options.photo === undefined ? null : options.photo),
     getInteraction: () => Promise.resolve(options.interaction === undefined ? null : options.interaction),
-    getDateChange: () => Promise.resolve(options.dateChange === undefined ? null : options.dateChange),
     getPartnerRequest: () =>
       Promise.resolve(options.partnerRequest === undefined ? null : options.partnerRequest),
     getPartnerId: (userId) => {
@@ -690,7 +681,7 @@ Deno.test('an unknown kind or a non-uuid id is a 400', async () => {
 });
 
 Deno.test('a valid kind with a missing row is a 404', async () => {
-  for (const kind of ['mood', 'photo', 'interaction', 'date', 'partner_request', 'partner_accept']) {
+  for (const kind of ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept']) {
     const response = await handleSendPush(request({ kind, id: MOOD_ID }), { db: fakeDb({}), apns: null });
     assertEquals(response.status, 404, kind);
     await response.body?.cancel();
@@ -706,117 +697,21 @@ Deno.test('the love-note body still works beside the new kinds', async () => {
   assertEquals(claimed.map((c) => [c.kind, c.source_id]), [['love_note', NOTE_ID]]);
 });
 
-// ---- Story 3.5: date changes ----
+// ---- Story 5.4: date changes no longer push ----
 
-Deno.test('a date change records the R7 body for every partner device, on the partner thread', async () => {
+Deno.test('a date post from an older trigger is a 400 and claims nothing', async () => {
   const claimed: PushRequestRow[] = [];
-  const response = await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), {
-    db: fakeDb({ dateChange: eventAdded, devices: TWO_DEVICES, claimed }),
-    apns: null,
-  });
-  assertEquals(response.status, 200);
-  assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 });
-  assertEquals(claimed.map((c) => [c.kind, c.source_id, c.token]), [
-    ['date', DATE_CHANGE_ID, 'tok-a'],
-    ['date', DATE_CHANGE_ID, 'tok-b'],
-  ]);
-  assertEquals(claimed[0].payload, {
-    kind: 'date',
-    aps: { alert: { title: 'Casey', body: 'Added an event: Paris trip' }, 'thread-id': PARTNER_THREAD, badge: 0 },
-  });
-});
-
-Deno.test('every date subject and action reaches the device with its own body', async () => {
-  const cases: [Pick<DateChangeRow, 'subject' | 'action'>, string][] = [
-    [{ subject: 'wedding_date', action: 'added' }, 'Set the wedding date'],
-    [{ subject: 'wedding_date', action: 'changed' }, 'Changed the wedding date'],
-    [{ subject: 'relationship_start', action: 'added' }, 'Set the date you got together'],
-    [{ subject: 'relationship_start', action: 'changed' }, 'Changed the date you got together'],
-    [{ subject: 'birthday', action: 'added' }, 'Added their birthday'],
-    [{ subject: 'birthday', action: 'changed' }, 'Changed their birthday'],
-    [{ subject: 'event', action: 'changed' }, 'Changed an event: Paris trip'],
-  ];
-  for (const [change, body] of cases) {
-    const claimed: PushRequestRow[] = [];
-    await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), {
-      db: fakeDb({
-        dateChange: { ...eventAdded, ...change, event_label: change.subject === 'event' ? 'Paris trip' : null },
-        devices: [TWO_DEVICES[0]],
-        claimed,
-      }),
-      apns: null,
-    });
-    assertEquals(claimed[0].payload.aps.alert.body, body);
-  }
-});
-
-Deno.test('a date change goes to the sender\'s partner, and not to the sender', async () => {
-  const lookups: string[] = [];
-  const claimed: PushRequestRow[] = [];
-  await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), {
-    db: fakeDb({ dateChange: eventAdded, devices: [TWO_DEVICES[0]], claimed, partnerLookups: lookups }),
-    apns: null,
-  });
-  assertEquals(lookups, ['sender']);
-  assertEquals(claimed.length, 1);
-});
-
-Deno.test('a replayed date change is skipped for every device', async () => {
-  const claimed: PushRequestRow[] = [];
-  const deps = { db: fakeDb({ dateChange: eventAdded, devices: TWO_DEVICES, claimed }), apns: null };
-  await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), deps);
-  const second = await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), deps);
-  assertEquals(await second.json(), { sent: 0, recorded: 0, skipped: 2, failed: 0, gone: 0 });
-  assertEquals(claimed.length, 2);
-});
-
-Deno.test('a date change from an unlinked sender, or addressed to itself, claims nothing', async () => {
-  for (const partnerId of [null, 'sender']) {
-    const claimed: PushRequestRow[] = [];
-    const response = await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), {
-      db: fakeDb({ dateChange: eventAdded, partnerId, devices: TWO_DEVICES, claimed }),
-      apns: null,
-    });
-    assertEquals(response.status, 200);
-    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
-    assertEquals(claimed.length, 0);
-  }
-});
-
-Deno.test('a missing date change, or an event change whose event is gone, is a 404', async () => {
-  for (const dateChange of [null, { ...eventAdded, event_label: null }]) {
-    const response = await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), {
-      db: fakeDb({ dateChange, devices: TWO_DEVICES }),
-      apns: null,
-    });
-    assertEquals(response.status, 404);
-    await response.body?.cancel();
-  }
-});
-
-Deno.test('a failed APNs send for a date change releases its claim by kind', async () => {
-  const kinds: string[] = [];
-  const db = fakeDb({ dateChange: eventAdded, devices: [TWO_DEVICES[0]] });
-  const release = db.releaseRequest;
-  db.releaseRequest = (kind, sourceId, token) => {
-    kinds.push(`${kind}:${sourceId}`);
-    return release(kind, sourceId, token);
-  };
-  const apns: ApnsClient = {
-    send: () => Promise.resolve({ ok: false, status: 500, reason: 'InternalServerError', timestamp: null }),
-  };
-  const response = await handleSendPush(request({ kind: 'date', id: DATE_CHANGE_ID }), { db, apns });
-  assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 1, gone: 0 });
-  assertEquals(kinds, [`date:${DATE_CHANGE_ID}`]);
-});
-
-Deno.test('a date change with a non-uuid id is a 400', async () => {
-  const response = await handleSendPush(request({ kind: 'date', id: 'nope' }), {
-    db: fakeDb({ dateChange: eventAdded }),
+  const listed: string[] = [];
+  const response = await handleSendPush(request({ kind: 'date', id: OLD_DATE_CHANGE_ID }), {
+    db: fakeDb({ devices: TWO_DEVICES, claimed, listed }),
     apns: null,
   });
   assertEquals(response.status, 400);
-  await response.body?.cancel();
+  assertEquals(await response.json(), {
+    error: 'kind must be mood, photo, interaction, partner_request or partner_accept',
+  });
+  assertEquals(claimed.length, 0);
+  assertEquals(listed, []);
 });
 
 // ---- Story 3.6: partner requests ----
@@ -1012,7 +907,6 @@ const KIND_CASES: { kind: PushKind; body: Record<string, string>; rows: Paramete
   { kind: 'mood', body: { kind: 'mood', id: MOOD_ID }, rows: { mood: happyGrateful } },
   { kind: 'photo', body: { kind: 'photo', id: PHOTO_ID }, rows: { photo } },
   { kind: 'interaction', body: { kind: 'interaction', id: INTERACTION_ID }, rows: { interaction: poke } },
-  { kind: 'date', body: { kind: 'date', id: DATE_CHANGE_ID }, rows: { dateChange: eventAdded } },
   {
     kind: 'partner_request',
     body: { kind: 'partner_request', id: PARTNER_REQUEST_ID },
@@ -1030,7 +924,6 @@ const ALL_PREFERENCES: PushPreference[] = [
   'moods',
   'photos',
   'pokes_and_kisses',
-  'dates',
   'partner_requests',
 ];
 
@@ -1042,7 +935,6 @@ Deno.test('every kind answers to one switch, and both partner kinds share one', 
       ['mood', 'moods'],
       ['photo', 'photos'],
       ['interaction', 'pokes_and_kisses'],
-      ['date', 'dates'],
       ['partner_request', 'partner_requests'],
       ['partner_accept', 'partner_requests'],
     ]

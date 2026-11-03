@@ -75,8 +75,7 @@ Accounts (local stack only):
                          both birthdays), delete both people's countdown marks
                          and turn both people's date reminders back on. kinds
                          and many clear first, so only the listed dates remain,
-                         none marked, reminders on. The event and birthday
-                         writes send the other person date-change pushes.
+                         none marked, reminders on.
                          sim provision restores only the seeded events, not
                          anniversaries, couple settings or birthdays: run
                          sim dates clear, then sim provision, to get back the
@@ -88,7 +87,7 @@ Accounts (local stack only):
                          answers a notification permission alert Allow when it
                          next touches the app; --decline-push answers it Don't
                          Allow instead (after sim permission reset).
-  signout                Sign out through Settings and wait for the login form.
+  signout                Log out through Settings and wait for the login form.
 
 Device:
   pose closed|partial|open   Fold or unfold (ax pose).
@@ -106,6 +105,11 @@ Device:
 Page (points from the web view's top-left):
   tap X Y                Tap a page point.
   scroll up|down         Swipe the web view.
+  swipe back             Pan from the web view's left edge to past its middle
+                         (the iOS back gesture), repeated until the page
+                         changes, up to 8 tries (one pan in about four
+                         registers); prints the try that worked, and fails
+                         when the page never changes.
   dump                   One JSON line: the web view's frame and its elements.
   readout                The readout's lines.
 
@@ -1189,6 +1193,9 @@ case $cmd in
   scroll)
     [[ ${1:-} == (up|down) ]] || die 2 "scroll takes up or down"
     drive scroll $1 ;;
+  swipe)
+    [[ $# == 1 && $1 == back ]] || die 2 "swipe takes back"
+    drive swipe $1 ;;
   dump) drive dump ;;
   readout) cmd_readout ;;
   background) require_window; ax control Home --device $UDID >/dev/null; say "pressed Home" ;;

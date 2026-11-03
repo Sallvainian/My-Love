@@ -30,7 +30,13 @@ import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { deleteSentNote } from '../../support/helpers/love-notes';
 import { navigateTo } from '../../support/helpers/navigation';
-import { LOVE_NOTES_READ, LOVE_NOTE_SEND, gateNameRead } from '../../support/helpers/reads';
+import {
+  LOVE_NOTES_READ,
+  LOVE_NOTE_SEND,
+  OWN_PROFILE_READ,
+  OWN_PROFILE_WRITE,
+  gateNameRead,
+} from '../../support/helpers/reads';
 
 type Dedicated = { email: string; userId: string; cleanup: () => Promise<void> };
 
@@ -313,33 +319,47 @@ test.describe('Display Name Edit', () => {
     await page.goto('/');
 
     // WHEN: The user opens Settings and changes the name. Settings' mount
-    // reads the name; the app's own gate read of the same URL may answer
-    // first, with the same name.
-    const nameRead = interceptNetworkCall({ method: 'GET', url: gateNameRead(userId) });
+    // reads the profile (`loadOwnProfile`); the signed-in start's profile
+    // refresh of the same URL may answer first, with the same name.
+    const nameRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
     await navigateTo(page, 'settings');
     expect((await nameRead).status).toBe(200);
 
-    const nameRow = page.getByTestId('settings-display-name');
-    await expect(nameRow).toBeVisible();
-    // Premise: the row has finished its read, so the Change control is live
-    // and the form will open pre-filled from a real answer. The seeded name is
-    // the only text a finished read can show; an error or a stale name cannot.
-    await expect(nameRow).toHaveText(seededName);
+    // Premise: the top page's Profile row has the seeded name, the only text a
+    // finished read can show; an error or a stale name cannot.
+    const profileRow = page.getByTestId('settings-profile-row');
+    await expect(profileRow).toBeVisible();
+    await expect(profileRow).toHaveAccessibleName(`Profile, ${seededName}`);
 
-    await page.getByTestId('settings-display-name-edit').click();
-    await expect(page.getByTestId('display-name-setup')).toBeVisible();
+    await profileRow.click();
+    const nameRow = page.getByTestId('settings-profile-name');
+    await expect(nameRow).toBeVisible();
+    await expect(nameRow).toHaveAccessibleName(`Name, ${seededName}`);
+    await nameRow.click();
 
     // The field carries the current name, not an empty box — the whole point of
-    // an edit route rather than a second setup screen.
-    const field = page.getByLabel('Display Name');
+    // a one-field edit page rather than a second setup screen. Save waits for a
+    // change.
+    const field = page.getByTestId('settings-name-field');
     await expect(field).toHaveValue(seededName);
+    await expect(page.getByTestId('settings-field-save')).toBeDisabled();
 
     await field.fill(newName);
-    await page.getByTestId('display-name-submit').click();
+    const nameWrite = interceptNetworkCall({ method: 'PATCH', url: OWN_PROFILE_WRITE });
+    await page.getByTestId('settings-field-save').click();
+    expect((await nameWrite).status).toBe(200);
 
-    // THEN: The form closes and the row shows the new name, with no reload.
-    await expect(page.getByTestId('display-name-setup')).toHaveCount(0);
-    await expect(nameRow).toHaveText(newName);
+    // THEN: The page returns to Profile, whose Name row and header show the new
+    // name with no reload, and so does the top page's Profile row after back.
+    const header = page.getByTestId('settings-profile-header');
+    await expect(header).toBeVisible();
+    await expect(page.getByTestId('settings-name-page')).toHaveCount(0);
+    await expect(nameRow).toBeVisible();
+    await expect(nameRow).toHaveAccessibleName(`Name, ${newName}`);
+    await expect(header).toContainText(newName);
+    await page.getByTestId('settings-back').click();
+    await expect(profileRow).toBeVisible();
+    await expect(profileRow).toHaveAccessibleName(`Profile, ${newName}`);
 
     // AND the profile row itself holds it — the column is what every other
     // surface reads, so a green UI over an unwritten row is the failure this

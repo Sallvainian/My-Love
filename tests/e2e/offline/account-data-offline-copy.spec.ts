@@ -17,7 +17,6 @@ import { test, expect } from '../../support/merged-fixtures';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { readStore } from '../../support/helpers/indexed-db';
-import { navigateTo } from '../../support/helpers/navigation';
 import { ANNIVERSARIES_READ, FAVORITES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
@@ -38,6 +37,11 @@ async function signedInUserId(page: Page): Promise<string> {
 async function savedAnniversaryLabels(page: Page): Promise<string[]> {
   const anniversaries = await savedLocalCopy<Array<{ label: string }>>(page, 'anniversaries');
   return anniversaries ? anniversaries.map((a) => a.label) : [];
+}
+
+/** The Dates list row of the anniversary with this label. */
+function anniversaryRow(page: Page, label: string) {
+  return page.locator('[data-testid^="settings-dates-anniversary-"]').filter({ hasText: label });
 }
 
 /** Custom texts and bundled favorites in the signed-in account's message-data copy. */
@@ -68,7 +72,7 @@ test.describe('Account data from the local copy', () => {
     cleanup,
   }, testInfo) => {
     // Awaited here so the cold start's own anniversaries read, sent before the
-    // row exists, cannot be the one the Settings visit below waits on.
+    // row exists, cannot be the one the Dates list visit below waits on.
     const startRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
     await page.goto('/');
     expect((await startRead).status).toBe(200);
@@ -88,11 +92,11 @@ test.describe('Account data from the local copy', () => {
 
     // GIVEN: one online session loads the anniversary, which saves the copy.
     const settingsRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
-    await page.goto('/settings');
+    await page.goto('/settings/dates');
     const loaded = await settingsRead;
     expect(loaded.status).toBe(200);
     expect(loaded.responseJson).toEqual([expect.objectContaining({ label })]);
-    await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
+    await expect(anniversaryRow(page, label)).toBeVisible();
     await recurseUntil(
       () => savedAnniversaryLabels(page),
       (v) => {
@@ -106,13 +110,13 @@ test.describe('Account data from the local copy', () => {
     await page.reload();
     // Settings is a lazy view: going offline before its module has loaded
     // fails the import and shows the offline error screen instead.
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
     await goOffline(page, true);
 
     // THEN: the anniversary is still listed — from the copy, since the
-    // device-global blob no longer holds any.
-    await navigateTo(page, 'settings');
-    await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
+    // device-global blob no longer holds any. The page is already the Dates
+    // list, and Settings has no gear to tap.
+    await expect(anniversaryRow(page, label)).toBeVisible();
     const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
     expect(blob).not.toContain(label);
   });

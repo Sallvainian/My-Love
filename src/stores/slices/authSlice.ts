@@ -171,6 +171,7 @@ export function signedOutState() {
     partner: null,
     isLoadingPartner: false,
     partnerLoadError: false,
+    partnerKnown: false,
     sentRequests: [],
     receivedRequests: [],
     isLoadingRequests: false,
@@ -231,16 +232,20 @@ export function signedOutState() {
     eventsIsLoadingMore: false,
     eventsHistoryError: null,
 
-    // settingsSlice — the couple's shared start date names this couple's
+    // datesSlice — the couple's shared start date names this couple's
     // relationship; the incoming account's refresher reads its own copy.
     coupleSettings: null,
-    // The outgoing account's own name and birthday.
-    ownProfile: null,
-    // The outgoing account's push switches.
-    pushPreferences: null,
-    pushPreferencesLoadFailed: false,
     // The outgoing account's marked dates ("not loaded" for the next account).
     countdownMarks: null,
+
+    // profileSlice — the outgoing account's own name and birthday, and whether
+    // its last read found no server answer.
+    ownProfile: null,
+    ownProfileLoadFailed: false,
+
+    // notificationsSlice — the outgoing account's push switches.
+    pushPreferences: null,
+    pushPreferencesLoadFailed: false,
   } satisfies Partial<AppState>;
 }
 

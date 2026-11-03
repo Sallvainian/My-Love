@@ -1,7 +1,9 @@
 /**
  * DW-57: the API precondition behind stale edit/delete Refresh events controls.
  * A creator's row is really deleted before the stale write reaches PostgREST.
- * Component lifetime itself is asserted in EventsSettings.lifetime.test.tsx.
+ * The stale edit/delete controls it served were removed with the Countdowns
+ * section; an event page whose event is gone goes back to the Dates list
+ * instead (`Settings.eventPages.test.tsx`).
  *
  * Existing events-write-wire-shape tests cover partner RLS filtering instead.
  * All requests below use the owning worker's auth token; coupleEvents provides

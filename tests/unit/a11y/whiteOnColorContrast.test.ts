@@ -4,10 +4,10 @@
  * The entry named two destructive buttons still pairing `text-white` with
  * `bg-red-500`. Fixing two class strings is a one-line job per file; keeping
  * them fixed is not, because nothing measures this. There is no axe coverage
- * for either surface -- `@axe-core/playwright` runs in exactly one spec
- * (`tests/e2e/settings/events-accessibility.spec.ts`), scoped to the events
- * subtree, and its own header records that a wider scan was avoided precisely
- * because it would land red on AnniversarySettings.
+ * for either surface -- `@axe-core/playwright` ran in exactly one spec
+ * (`events-accessibility.spec.ts`, scoped to the events subtree), which was
+ * deleted with the modal it scanned; no E2E axe coverage of the Settings pages
+ * replaces it (deferred-work.md).
  *
  * So the guard is here instead, and it generalises the entry rather than
  * restating it: every `text-white` pairing in `src/` with a `bg-<colour>-<shade>`

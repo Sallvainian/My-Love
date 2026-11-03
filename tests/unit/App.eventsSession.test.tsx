@@ -371,6 +371,30 @@ describe('Auth bootstrap notification ownership', () => {
     expect(screen.getByRole('heading', { name: 'Cached current trip' })).toBeInTheDocument();
   });
 
+  it('opens an event card\'s page, and New event from Add, marked as from Home', async () => {
+    const user = userEvent.setup();
+    await settleStaleLookupAfterListener(null);
+
+    await user.click(screen.getByTestId('event-countdown-cached-current-trip-open'));
+    expect(useAppStore.getState()).toMatchObject({
+      currentView: 'settings',
+      settingsPath: 'dates/event/Cached current trip',
+      settingsFromHome: true,
+    });
+    expect(window.history.state).toMatchObject({ from: 'home', inApp: true });
+
+    act(() => useAppStore.getState().setView('home'));
+    expect(useAppStore.getState().settingsFromHome).toBe(false);
+
+    await user.click(screen.getByTestId('home-add-event'));
+    expect(useAppStore.getState()).toMatchObject({
+      currentView: 'settings',
+      settingsPath: 'dates/new-event',
+      settingsFromHome: true,
+    });
+    expect(window.location.pathname).toBe('/settings/dates/new-event');
+  });
+
   it.each(STALE_LOOKUPS)('neither reloads events nor re-runs the bootstrap after a stale %s lookup', async (_name, snapshot) => {
     const { syncPendingMoods } = await settleStaleLookupAfterListener(snapshot);
 

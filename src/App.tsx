@@ -40,7 +40,8 @@ import {
 import { clearSignOutNotice } from './services/signOutNotice';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
-import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
+import { PROFILE_COPY_KIND } from './stores/slices/profileSlice';
+import { isSettingsRoute, settingsPathFromRoute } from './stores/slices/navigationSlice';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
@@ -108,11 +109,12 @@ const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
   const {
-    isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
+    isLoading, currentView, settingsFromHome, isOnline, events, authUserId, authSessionVersion,
   } = useAppStore(
     useShallow((s) => ({
       isLoading: s.isLoading,
       currentView: s.currentView,
+      settingsFromHome: s.settingsFromHome,
       isOnline: s.syncStatus.isOnline,
       events: s.events,
       authUserId: s.userId,
@@ -121,6 +123,8 @@ function App() {
   );
   const initializeApp = useAppStore((s) => s.initializeApp);
   const setView = useAppStore((s) => s.setView);
+  const showSettingsPage = useAppStore((s) => s.showSettingsPage);
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
   const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
@@ -207,10 +211,12 @@ function App() {
             ? 'partner'
             : routePath === '/notes'
               ? 'notes'
-              : routePath === '/settings'
+              : isSettingsRoute(routePath)
                 ? 'settings'
                 : 'home';
     setView(initialView, true); // Skip history update on initial load
+    // A reload on /settings/photos reopens the subpage; any other route clears it.
+    showSettingsPage(settingsPathFromRoute(routePath));
 
     // AC-4.5.6: Browser back/forward button support
     const handlePopState = () => {
@@ -224,10 +230,11 @@ function App() {
               ? 'partner'
               : routePath === '/notes'
                 ? 'notes'
-                : routePath === '/settings'
+                : isSettingsRoute(routePath)
                   ? 'settings'
                   : 'home';
       setView(view, true); // Skip history update to prevent loop
+      showSettingsPage(settingsPathFromRoute(routePath));
       logger.debug(`[App] Popstate: navigated to ${view}`);
     };
 
@@ -236,7 +243,7 @@ function App() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [setView]);
+  }, [setView, showSettingsPage]);
 
   // Story 6.7: Check authentication status on mount
   useEffect(() => {
@@ -829,16 +836,23 @@ function App() {
         data-testid="app-container"
       >
         {/* App chrome: a sticky top bar in normal flow above <main>, so no view
-            needs a compensating top pad, and a fixed bottom dock, which layout
-            cannot see -- hence <main>'s `--dock-clearance` bottom pad, or on
+            needs a compensating top pad (Settings draws no app header; its own
+            bar, inside <main>, takes the status bar's inset), and a fixed
+            bottom dock, which layout cannot see -- hence <main>'s `--dock-clearance` bottom pad, or on
             Love Notes `--dock-top`, which ends the view at the dock itself.
             Where the dock is a capsule in a side column, those shrink to the
             home-indicator band and `--dock-left`/`--dock-right` end <main> at
             the column's edge instead (index.css). */}
-        <AppNavigation currentView={currentView} onViewChange={setView} />
+        <AppNavigation
+          currentView={currentView}
+          onViewChange={setView}
+          settingsFromHome={settingsFromHome}
+        />
 
-        {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1) */}
-        <NetworkStatusIndicator showOnlyWhenOffline />
+        {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1).
+            Settings renders it under its own bar instead: with no header above
+            it here, the banner would sit under the status bar. */}
+        {currentView !== 'settings' && <NetworkStatusIndicator showOnlyWhenOffline />}
 
         {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
         <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
@@ -861,15 +875,15 @@ function App() {
               <BirthdayWeddingCards />
 
               {/* Upcoming: always shown, even while the slot below is still
-                  hidden. Add goes to Settings, where events are created;
-                  opening the editor directly would need new cross-view state. */}
+                  hidden. Add opens the New event form directly, marked as
+                  from Home so the dock keeps Home lit and back returns here. */}
               <div className="flex items-center justify-between px-1">
                 <h2 className="text-xs font-semibold tracking-[.08em] text-muted uppercase">
                   Upcoming
                 </h2>
                 <button
                   type="button"
-                  onClick={() => setView('settings')}
+                  onClick={() => openSettingsPage('dates/new-event', { fromHome: true })}
                   className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent"
                   aria-label="Add event"
                   data-testid="home-add-event"
@@ -919,6 +933,7 @@ function App() {
                       date={event.date}
                       description={event.description ?? undefined}
                       onRetire={handleEventRetired}
+                      onOpen={() => openSettingsPage(`dates/event/${event.id}`, { fromHome: true })}
                     />
                   ))}
                 </div>

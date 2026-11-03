@@ -1,11 +1,12 @@
 /**
  * E2E: Settings on the style kit
  *
- * Settings at 390x844 in both OS themes, read at the rendered surface: one
- * "Events" and one "Anniversaries" group heading with none of the old inner
- * titles, the countdown and Sign out cards on the kit card colour, a quiet
- * Sign out (no gradient, kit danger text), no horizontal overflow, and the
- * About row that replays the welcome splash and returns to Settings. The kit
+ * Settings at 390x844 in both OS themes, read at the rendered surface: the
+ * Account, Partner and About group headings with no Countdowns section or
+ * Events / Anniversaries heading (dates live on the Dates list), the Log out
+ * card on the kit card colour, a quiet Log out (no gradient, kit danger text),
+ * no horizontal overflow, and the About row that replays the welcome splash and
+ * returns to Settings. The kit
  * colours are `--kit-*` variables that switch under `prefers-color-scheme`, so
  * `emulateMedia` alone flips them.
  */
@@ -41,56 +42,50 @@ test.describe('Settings on the style kit', () => {
   });
 
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`[P1] should head the countdowns with one Events and one Anniversaries group in ${colorScheme}`, async ({
+    test(`[P1] should show the group labels and no Countdowns section in ${colorScheme}`, async ({
       page,
       interceptNetworkCall,
     }) => {
       await openSettings(page, interceptNetworkCall, colorScheme);
       const view = page.getByTestId('settings-view');
 
-      // One heading per countdown group; the old inner titles are gone.
-      await expect(view.getByRole('heading', { name: 'Events', exact: true })).toHaveCount(1);
-      await expect(
-        view.getByRole('heading', { name: 'Anniversaries', exact: true })
-      ).toHaveCount(1);
-      await expect(view).not.toContainText(/Event Countdowns/i);
-      await expect(view).not.toContainText(/Anniversary Countdowns/i);
-
       // Section labels.
-      for (const label of ['Account', 'Countdowns', 'About']) {
+      for (const label of ['Account', 'Partner', 'About']) {
         await expect(view.getByRole('heading', { level: 2, name: label, exact: true })).toBeVisible();
       }
+
+      // The old Countdowns section, its inner titles and its card are gone.
+      await expect(view.getByRole('heading', { name: 'Countdowns', exact: true })).toHaveCount(0);
+      await expect(view.getByRole('heading', { name: 'Events', exact: true })).toHaveCount(0);
+      await expect(view.getByRole('heading', { name: 'Anniversaries', exact: true })).toHaveCount(0);
+      await expect(view.getByTestId('settings-countdowns-card')).toHaveCount(0);
+      await expect(view).not.toContainText(/Countdowns/i);
     });
 
-    test(`[P1] should draw the Countdowns and Sign out cards on the kit card in ${colorScheme}`, async ({
+    test(`[P1] should draw the Log out card on the kit card in ${colorScheme}`, async ({
       page,
       interceptNetworkCall,
     }) => {
       await openSettings(page, interceptNetworkCall, colorScheme);
 
-      // Cards on the kit card colour: Countdowns (the events group's card) and
-      // the Sign out card.
-      await expect(page.getByTestId('settings-countdowns-card')).toHaveCSS(
-        'background-color',
-        KIT_CARD[colorScheme]
-      );
+      // The Log out card on the kit card colour.
       await expect(page.getByTestId('settings-sign-out-card')).toHaveCSS(
         'background-color',
         KIT_CARD[colorScheme]
       );
     });
 
-    test(`[P1] should draw a quiet Sign out in ${colorScheme}`, async ({
+    test(`[P1] should draw a quiet Log out in ${colorScheme}`, async ({
       page,
       interceptNetworkCall,
     }) => {
       await openSettings(page, interceptNetworkCall, colorScheme);
 
-      // Quiet Sign out: no gradient, kit danger text.
+      // Quiet Log out: no gradient, kit danger text.
       const signOut = page.getByTestId('settings-sign-out');
       await expect(signOut).toHaveCSS('background-image', 'none');
       await expect(signOut).toHaveCSS('color', KIT_DANGER[colorScheme]);
-      await expect(signOut).toHaveText('Sign out');
+      await expect(signOut).toHaveText('Log out');
     });
 
     test(`[P1] should not scroll sideways at phone width in ${colorScheme}`, async ({
@@ -99,14 +94,9 @@ test.describe('Settings on the style kit', () => {
     }) => {
       await openSettings(page, interceptNetworkCall, colorScheme);
 
-      // No horizontal page scroll at phone width, measured once the events
-      // list has settled so its final rows are what is measured. The loading
-      // slot is also gone on the error state, so only a loaded state passes,
-      // and the load-error banner a failed load shows above rows is absent.
-      await expect(
-        page.getByTestId('events-settings-list').or(page.getByTestId('events-settings-empty'))
-      ).toBeVisible();
-      await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
+      // No horizontal page scroll at phone width. The top page reads nothing
+      // that changes its size, so it is measured as soon as it is on screen.
+      await expect(page.getByTestId('settings-version')).toBeVisible();
       const widths = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,
         client: document.documentElement.clientWidth,

@@ -38,7 +38,7 @@ const SAVED = {
   id: 'P1',
   email: 'p@example.test',
   displayName: 'SAVED-NAME',
-  connectedAt: null,
+  linkedSince: null,
   birthday: null,
 };
 const FRESH = { ...SAVED, displayName: 'FRESH-NAME' };
@@ -258,6 +258,88 @@ describe('partner profile on the local copy', () => {
     await state().loadPartner();
 
     expect(state().partner).toEqual({ ...oldPartner, birthday: null });
+  });
+
+  it('a copy saved with the profile date as connectedAt parses with linkedSince null', async () => {
+    // Before the link date came from the accepted request, `connectedAt` held
+    // the profile row's updated_at, which any edit changes.
+    const { linkedSince: _linkedSince, ...oldPartner } = SAVED;
+    await writeLocalCopy(A, PARTNER_COPY_KIND, linked({ ...oldPartner, connectedAt: '2026-01-01T00:00:00Z' }));
+    setOnline(false);
+
+    await state().loadPartner();
+
+    expect(state().partner).toEqual({ ...oldPartner, linkedSince: null });
+    expect(state().partner).not.toHaveProperty('connectedAt');
+  });
+
+  describe('partnerKnown', () => {
+    it('starts false', () => {
+      expect(state().partnerKnown).toBe(false);
+    });
+
+    it('is true once a saved linked copy is applied', async () => {
+      await writeLocalCopy(A, PARTNER_COPY_KIND, linked(SAVED));
+      setOnline(false);
+
+      await state().loadPartner();
+
+      expect(state().partnerKnown).toBe(true);
+    });
+
+    it('is true once a saved unlinked copy is applied', async () => {
+      await writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'unlinked' });
+      setOnline(false);
+
+      await state().loadPartner();
+
+      expect(state().partnerKnown).toBe(true);
+    });
+
+    it('is true after the server answers linked', async () => {
+      getPartner.mockResolvedValue(linked(FRESH));
+
+      await state().loadPartner();
+
+      expect(state().partnerKnown).toBe(true);
+    });
+
+    it('is true after the server answers unlinked', async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+
+      await state().loadPartner();
+
+      expect(state().partner).toBeNull();
+      expect(state().partnerKnown).toBe(true);
+    });
+
+    it('stays false when the read fails with nothing saved', async () => {
+      getPartner.mockResolvedValue(READ_FAILED);
+
+      await state().loadPartner();
+
+      expect(state().partnerLoadError).toBe(true);
+      expect(state().partnerKnown).toBe(false);
+    });
+
+    it('stays false offline with nothing saved', async () => {
+      setOnline(false);
+
+      await state().loadPartner();
+
+      expect(state().partnerLoadError).toBe(true);
+      expect(state().partnerKnown).toBe(false);
+    });
+
+    it('is false again after sign-out', async () => {
+      getPartner.mockResolvedValue(linked(FRESH));
+      await state().loadPartner();
+      expect(state().partnerKnown).toBe(true);
+
+      state().clearAuth();
+
+      expect(state().partnerKnown).toBe(false);
+    });
   });
 
   it('a saved copy never replaces a partner already on screen', async () => {

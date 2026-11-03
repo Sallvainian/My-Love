@@ -3,7 +3,7 @@
  * (`public.anniversaries`)
  *
  * Supabase is the source of truth; `settings.relationship.anniversaries` is a
- * read mirror that `settingsSlice` keeps in step after every successful write
+ * read mirror that `datesSlice` keeps in step after every successful write
  * and replaces wholesale from `fetchAnniversaries` on every signed-in start.
  *
  * Private to the author: the table's RLS admits the owner only, so nothing here

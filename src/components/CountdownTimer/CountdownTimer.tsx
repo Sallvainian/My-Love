@@ -7,7 +7,8 @@
  * - Celebration animations using Motion when countdown reaches zero
  * - Support for multiple anniversaries (displays next 3)
  * - Responsive mobile-first design
- * - Each anniversary renders the shared CountdownCard (CAP-3)
+ * - Each anniversary renders the shared CountdownCard (CAP-3), a button that
+ *   opens the anniversary's page from Home (`dates/anniversary/<key>`)
  */
 
 import { AnimatePresence, m as motion } from 'motion/react';
@@ -15,6 +16,7 @@ import { Calendar, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import type { Anniversary } from '../../types';
+import { useAppStore } from '../../stores/useAppStore';
 import { CountdownCard } from '../RelationshipTimers/CountdownCard';
 import {
   formatCountdownClock,
@@ -163,6 +165,9 @@ interface AnniversaryCardProps {
 function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
   const { anniversary, remaining } = countdown;
   const celebrating = !remaining;
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
+  // The key DatesPage and the anniversary page use: the server id, or the local id until it has one.
+  const key = anniversary.serverId ?? String(anniversary.id);
 
   return (
     <>
@@ -173,6 +178,7 @@ function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
         value={celebrating ? 'Today!' : formatDayCount(remaining.days)}
         trailing={celebrating ? undefined : formatCountdownClock(remaining)}
         description={anniversary.description}
+        onOpen={() => openSettingsPage(`dates/anniversary/${key}`, { fromHome: true })}
         testId={`anniversary-countdown-${anniversary.id}`}
       />
 

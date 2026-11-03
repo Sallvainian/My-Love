@@ -2,14 +2,15 @@ import {
   ANNIVERSARIES_COPY_KIND,
   COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
-  PROFILE_COPY_KIND,
-  PUSH_PREFERENCES_COPY_KIND,
   readSavedAnniversaries,
   readSavedCountdownMarks,
   readSavedCoupleSettings,
-  readSavedOwnProfile,
+} from '../stores/slices/datesSlice';
+import {
+  PUSH_PREFERENCES_COPY_KIND,
   readSavedPushPreferences,
-} from '../stores/slices/settingsSlice';
+} from '../stores/slices/notificationsSlice';
+import { PROFILE_COPY_KIND, readSavedOwnProfile } from '../stores/slices/profileSlice';
 import { EVENTS_COPY_KIND, readSavedEvents } from '../stores/slices/eventsSlice';
 import { PARTNER_COPY_KIND, readSavedPartner } from '../stores/slices/partnerSlice';
 import { useAppStore } from '../stores/useAppStore';

@@ -43,6 +43,11 @@ export function setPhotosOverMobileData(value: boolean): void {
   for (const listener of Array.from(listeners)) listener();
 }
 
+/** The choice as Settings' Photos row and page name it. */
+export function photoDownloadLabel(allowed: boolean): string {
+  return allowed ? 'Any connection' : 'Wi-Fi only';
+}
+
 /** Called after every change; returns the unsubscribe. */
 export function subscribePhotosOverMobileData(listener: () => void): () => void {
   listeners.add(listener);
@@ -65,7 +70,8 @@ export function getConnection(): ConnectionInfo | null {
 /**
  * Whether this browser tells the app enough to keep the fill off mobile data:
  * it reports the connection type (Chrome on Android does). Where it is false
- * the fill runs on any connection, and Settings says so.
+ * the fill runs on any connection, and Settings hides the Photos row and page,
+ * which have nothing to choose.
  */
 export function canTellMobileData(): boolean {
   const type = getConnection()?.type;

@@ -23,6 +23,37 @@
   --color-google-red: #ea4335;
   --color-google-yellow: #fbbc05;
   --color-google-green: #34a853;
+  /* Settings pages (SettingsStack): a pushed page enters from the right, a page
+     returned to drifts in from the left, and Reduce Motion swaps both for a
+     fade. Enter-only and with no fill mode: a page left holding a transform
+     would become the containing block of Settings' fixed dialogs. */
+  --animate-settings-push: settings-push 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-settings-pop: settings-pop 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-settings-fade: settings-fade 250ms ease-out;
+  @keyframes settings-push {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes settings-pop {
+    from {
+      transform: translateX(-30%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes settings-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 /* Style kit (the approved style kit) -- the one source for every kit

@@ -4,14 +4,17 @@ import { logger } from '../utils/logger';
 import { SettingsSchema } from '../validation/schemas';
 import { createAppSlice } from './slices/appSlice';
 import { ACCOUNT_OWNER_STORAGE_KEY, createAuthSlice } from './slices/authSlice';
+import { createDatesSlice } from './slices/datesSlice';
 import { createEventsSlice } from './slices/eventsSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createMessagesSlice } from './slices/messagesSlice';
 import { createMoodSlice } from './slices/moodSlice';
 import { createNavigationSlice } from './slices/navigationSlice';
 import { createNotesSlice } from './slices/notesSlice';
+import { createNotificationsSlice } from './slices/notificationsSlice';
 import { createPartnerSlice } from './slices/partnerSlice';
 import { createPhotosSlice } from './slices/photosSlice';
+import { createProfileSlice } from './slices/profileSlice';
 import { createSettingsSlice } from './slices/settingsSlice';
 import type { AppState } from './types';
 
@@ -137,6 +140,9 @@ export const useAppStore = create<AppState>()(
       ...createMessagesSlice(set, get, api),
       ...createPhotosSlice(set, get, api),
       ...createSettingsSlice(set, get, api),
+      ...createDatesSlice(set, get, api),
+      ...createProfileSlice(set, get, api),
+      ...createNotificationsSlice(set, get, api),
       ...createNavigationSlice(set, get, api),
       ...createMoodSlice(set, get, api),
       ...createInteractionsSlice(set, get, api),
@@ -264,7 +270,7 @@ export const useAppStore = create<AppState>()(
         // Only persist small, critical state to LocalStorage
         // Large data (messages, photos, custom messages) is stored in IndexedDB
         // Anniversaries are written as `[]`: they are account data, kept in the
-        // per-account local copy (settingsSlice), not in this device-global blob.
+        // per-account local copy (datesSlice), not in this device-global blob.
         settings: state.settings
           ? {
               ...state.settings,

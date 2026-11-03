@@ -386,7 +386,7 @@ describe("Home's birthday and wedding cards", () => {
     id: 'partner',
     email: 'partner@example.test',
     displayName: 'Pat',
-    connectedAt: null,
+    linkedSince: null,
     birthday: '2000-03-18',
   };
   /** Your own profile: a chosen name and a birthday. */

@@ -11,6 +11,15 @@
  * swaps the tile to the solid fill. The card itself is always the plain kit
  * card.
  *
+ * With `onOpen` the whole card is a tap target: a `<button>` laid over it
+ * (`absolute inset-0`) with the content kept as its sibling, because a button's
+ * children are presentational and wrapping the label would remove its heading
+ * role. The button is named by the label and has the kit's focus ring; the
+ * pressed state (`active:opacity-90`, plus `hover:`) sits on the card itself,
+ * because the transparent button's own opacity changes nothing on screen. Its
+ * test id is `<testId>-open`. Without `onOpen` the card renders exactly as
+ * before, no button.
+ *
  * Tests find the label as the card's level-3 heading, and the label, the value,
  * the trailing figure and the description by their test ids
  * (`countdown-label`, `countdown-value`, `countdown-clock`,
@@ -42,6 +51,8 @@ interface CountdownCardProps {
   /** Fill the icon's shape (the Together heart). */
   iconFilled?: boolean;
   testId?: string;
+  /** Makes the whole card a button that calls this (opens the date's page). */
+  onOpen?: () => void;
 }
 
 const TONE_TILE: Record<CountdownTone, string> = {
@@ -60,12 +71,24 @@ export function CountdownCard({
   description,
   iconFilled = false,
   testId,
+  onOpen,
 }: CountdownCardProps) {
   return (
     <div
-      className="@container flex flex-col gap-2.5 rounded-[20px] border border-line bg-card p-3.5 shadow-card"
+      className={`@container flex flex-col gap-2.5 rounded-[20px] border border-line bg-card p-3.5 shadow-card${
+        onOpen ? ' relative transition-opacity hover:opacity-90 active:opacity-90' : ''
+      }`}
       data-testid={testId}
     >
+      {onOpen && (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={label}
+          className="absolute inset-0 rounded-[20px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+          data-testid={testId ? `${testId}-open` : undefined}
+        />
+      )}
       <div
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
           highlight ? 'bg-fill text-white' : TONE_TILE[tone]

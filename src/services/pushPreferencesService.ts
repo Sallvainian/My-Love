@@ -3,8 +3,12 @@
  * push, and the date reminders' switch (`public.push_preferences`, one row per
  * account).
  *
+ * `push_preferences.dates` remains in the table, unread and unwritten, until
+ * story 18 drops it: no date change sends a push since story 5.4, but a shell
+ * installed before it still selects and upserts the column.
+ *
  * Supabase is the source of truth. This service caches nothing: Settings loads
- * the switches when its push section opens (`settingsSlice.pushPreferences`),
+ * the switches when its push section opens (`notificationsSlice.pushPreferences`),
  * and the slice keeps the answer as the `push-preferences` local copy, which is
  * how the shell's date reminders know the date reminders' switch offline
  * (story 4.3). A missing row means every switch is on,
@@ -29,7 +33,6 @@ export interface PushPreferences {
   moods: boolean;
   photos: boolean;
   pokesAndKisses: boolean;
-  dates: boolean;
   partnerRequests: boolean;
   /** The iOS shell's date reminders (local notifications, story 4.3); no push is behind it. */
   dateReminders: boolean;
@@ -43,7 +46,6 @@ export const ALL_PUSH_PREFERENCES_ON: PushPreferences = {
   moods: true,
   photos: true,
   pokesAndKisses: true,
-  dates: true,
   partnerRequests: true,
   dateReminders: true,
 };
@@ -54,7 +56,6 @@ interface PreferencesRow {
   moods: boolean;
   photos: boolean;
   pokes_and_kisses: boolean;
-  dates: boolean;
   partner_requests: boolean;
   date_reminders: boolean;
 }
@@ -66,7 +67,6 @@ const COLUMN: Record<PushPreferenceKey, PreferenceColumn> = {
   moods: 'moods',
   photos: 'photos',
   pokesAndKisses: 'pokes_and_kisses',
-  dates: 'dates',
   partnerRequests: 'partner_requests',
   dateReminders: 'date_reminders',
 };
@@ -81,7 +81,6 @@ function toPushPreferences(row: PreferencesRow): PushPreferences {
     moods: row.moods,
     photos: row.photos,
     pokesAndKisses: row.pokes_and_kisses,
-    dates: row.dates,
     partnerRequests: row.partner_requests,
     dateReminders: row.date_reminders,
   };

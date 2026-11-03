@@ -75,7 +75,7 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
 import type { ServerAnniversary } from '../../../src/services/anniversariesService';
 import { readLocalCopy, refreshLocalCopies, writeLocalCopy } from '../../../src/services/localCopy';
 import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
-import { ANNIVERSARIES_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
+import { ANNIVERSARIES_COPY_KIND } from '../../../src/stores/slices/datesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { Anniversary } from '../../../src/types';
 import { deferred, offline, setAnniversaries, setOnline, type StoreState } from './accountDataFixtures';
@@ -286,6 +286,63 @@ describe('loadAnniversariesFromServer', () => {
     await inFlight;
 
     expect(anniversaries()).toEqual([anniversary(1, 'C only', { date: '2021-01-01' })]);
+  });
+});
+
+describe('loadAnniversariesFromServer answer', () => {
+  it('resolves true when the server\'s rows were applied, even an empty list', async () => {
+    server.fetchAnniversaries.mockResolvedValue([]);
+
+    await expect(useAppStore.getState().loadAnniversariesFromServer()).resolves.toBe(true);
+  });
+
+  it('resolves true offline when a saved copy was applied', async () => {
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, [anniversary(2, 'Saved', { serverId: 'ann-s' })]);
+    setOnline(false);
+
+    await expect(useAppStore.getState().loadAnniversariesFromServer()).resolves.toBe(true);
+  });
+
+  it('resolves true offline when the session already has an answer', async () => {
+    server.fetchAnniversaries.mockResolvedValue([serverAnniversary('ann-1', 'From server')]);
+    await useAppStore.getState().loadAnniversariesFromServer();
+    setOnline(false);
+
+    await expect(useAppStore.getState().loadAnniversariesFromServer()).resolves.toBe(true);
+  });
+
+  it('resolves false offline with no copy', async () => {
+    setOnline(false);
+
+    await expect(useAppStore.getState().loadAnniversariesFromServer()).resolves.toBe(false);
+    expect(server.fetchAnniversaries).not.toHaveBeenCalled();
+  });
+
+  it('resolves false when the read fails, even with a saved copy shown', async () => {
+    await writeLocalCopy(A, ANNIVERSARIES_COPY_KIND, [anniversary(1, 'Saved', { serverId: 'ann-1' })]);
+    server.fetchAnniversaries.mockRejectedValue(new Error('500'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(useAppStore.getState().loadAnniversariesFromServer()).resolves.toBe(false);
+  });
+
+  it('resolves false with no signed-in user', async () => {
+    useAppStore.setState({ userId: null } as StoreState);
+
+    await expect(useAppStore.getState().loadAnniversariesFromServer()).resolves.toBe(false);
+    expect(server.fetchAnniversaries).not.toHaveBeenCalled();
+  });
+
+  it('resolves false when the account changed during the read', async () => {
+    const pending = deferred<ServerAnniversary[]>();
+    server.fetchAnniversaries.mockReturnValue(pending.promise);
+
+    const inFlight = useAppStore.getState().loadAnniversariesFromServer();
+    await vi.waitFor(() => expect(server.fetchAnniversaries).toHaveBeenCalled());
+    useAppStore.setState({ userId: 'USER-C' } as StoreState);
+    pending.settle([serverAnniversary('ann-a', 'A private')]);
+
+    await expect(inFlight).resolves.toBe(false);
   });
 });
 

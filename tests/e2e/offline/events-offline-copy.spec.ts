@@ -2,7 +2,7 @@
  * E2E: the couple's events on the shared local-copy mechanism
  * (spec-unified-data-storage story 5).
  *
- * After one online session, Home and Settings list the saved events offline,
+ * After one online session, Home and the Dates list show the saved events offline,
  * with no load-error card: first from this session's own server answer, then,
  * after a reload that cannot reach the events table, from the `events` local
  * copy alone.
@@ -39,8 +39,15 @@ async function savedEventLabels(page: Page): Promise<string[] | null> {
   return (await savedLocalCopy<{ label: string }[]>(page, 'events'))?.map((e) => e.label) ?? null;
 }
 
+/** The Dates list row for the seeded event. */
 function settingsRow(page: Page) {
-  return page.locator('[data-testid^="event-row-"]').filter({ hasText: LABEL });
+  return page.locator('[data-testid^="settings-dates-event-"]').filter({ hasText: LABEL });
+}
+
+/** Opens the Dates list from the top page of Settings, which a dock tap lands on. */
+async function openDatesList(page: Page) {
+  await page.getByTestId('settings-dates-row').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
 }
 
 async function expectListedOffline(page: Page) {
@@ -50,8 +57,8 @@ async function expectListedOffline(page: Page) {
 
   await navigateTo(page, 'settings');
   await expect(page.getByTestId('settings-view')).toBeVisible();
+  await openDatesList(page);
   await expect(settingsRow(page)).toBeVisible();
-  await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -59,7 +66,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Events from the local copy', () => {
-  test('[P1] events loaded once online are listed offline on Home and in Settings', async ({
+  test('[P1] events loaded once online are listed offline on Home and on the Dates list', async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -86,6 +93,7 @@ test.describe('Events from the local copy', () => {
     await expect(page.getByTestId(HOME_CARD)).toBeVisible();
     await recurseUntil(() => savedEventLabels(page), (v) => { expect(v).toEqual([LABEL]); });
     await navigateTo(page, 'settings');
+    await openDatesList(page);
     await expect(settingsRow(page)).toBeVisible();
     await navigateTo(page, 'mood');
     await expect(page.getByTestId('mood-tracker')).toBeVisible();
@@ -100,9 +108,9 @@ test.describe('Events from the local copy', () => {
     await goOffline(page, false);
     // playwright-utils deviation: the route must be installed before the next navigation and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
     await page.route('**/rest/v1/events*', (route) => route.abort());
-    // The reload stays on /settings, whose list comes from the copy.
-    await page.reload();
-    await expect(page.getByTestId('settings-view')).toBeVisible();
+    // The reload stays on /settings/dates, whose list comes from the copy.
+    await page.goto('/settings/dates');
+    await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
     await expect(settingsRow(page)).toBeVisible();
     await navigateTo(page, 'mood');
     await expect(page.getByTestId('mood-tracker')).toBeVisible();

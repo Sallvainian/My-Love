@@ -67,6 +67,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   partner: null,
   isLoadingPartner: false,
   partnerLoadError: false,
+  partnerKnown: false,
   sentRequests: [],
   receivedRequests: [],
   isLoadingRequests: false,
@@ -97,6 +98,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   eventsHistoryError: null,
   coupleSettings: null,
   ownProfile: null,
+  ownProfileLoadFailed: false,
   pushPreferences: null,
   pushPreferencesLoadFailed: false,
   countdownMarks: null,
@@ -185,6 +187,7 @@ function seedSignedInSession(): void {
       email: 'b@example.com',
     },
     partnerLoadError: true,
+    partnerKnown: true,
     sentRequests: [{ id: 'req-1', toEmail: SECRETS.requestedEmail }],
     receivedRequests: [{ id: 'req-2', fromEmail: SECRETS.requestedEmail }],
     searchResult: {
@@ -522,12 +525,12 @@ describe('clearAuth on sign-out', () => {
         weddingDate: '2021-06-12',
       },
       ownProfile: { displayName: 'PREVIOUS-NAME', birthday: '1990-01-02' },
+      ownProfileLoadFailed: true,
       pushPreferences: {
         loveNotes: false,
         moods: true,
         photos: true,
         pokesAndKisses: true,
-        dates: true,
         partnerRequests: true,
         dateReminders: true,
       },
@@ -546,6 +549,7 @@ describe('clearAuth on sign-out', () => {
     expect(state.coupleSettings).toBeNull();
     // The previous account's own name and birthday go too.
     expect(state.ownProfile).toBeNull();
+    expect(state.ownProfileLoadFailed).toBe(false);
     // So do the previous account's push switches: the next account must not see them.
     expect(state.pushPreferences).toBeNull();
     expect(state.pushPreferencesLoadFailed).toBe(false);

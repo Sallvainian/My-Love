@@ -389,7 +389,7 @@ class EventsService {
    * pages, one on each side of today. A single page cannot be bounded safely
    * here, because one array serves two screens: Home wants the soonest
    * upcoming events, Settings wants the whole list *including* past ones so a
-   * mistyped date stays editable (`EventsSettings.tsx`).
+   * mistyped date stays editable (`DatesPage.tsx`).
    *
    * - One ascending page keeps the OLDEST rows. Every event eventually becomes
    *   a past event, so given enough history that page holds nothing but past

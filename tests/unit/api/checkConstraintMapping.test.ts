@@ -318,8 +318,9 @@ describe('a 23514 reaching the caller that issued the write', () => {
       // withholds `Failing row contains (…)` from that role. It is injected
       // here anyway because `details` is the only field that quotes the user's
       // own input back, and the mapping must keep it out of `.message`
-      // regardless of which role produced it. `EventsSettings.tsx:789-797`
-      // renders `.message` alone, so that is the boundary that matters.
+      // regardless of which role produced it. The New event form
+      // (`NewDatePages.tsx`) renders the failed add's message alone, so that is
+      // the boundary that matters.
       backend.nextError = { ...SERVICE_ROLE_EVENTS_ICON_CHECK };
 
       const error = await rejection(write() as Promise<unknown>);

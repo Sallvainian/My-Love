@@ -77,7 +77,7 @@ export type {
 
 /**
  * Device-persisted settings. Couple data does not live here: the relationship
- * start date is `coupleSettings` (settingsSlice, `public.couple_settings`), and
+ * start date is `coupleSettings` (datesSlice, `public.couple_settings`), and
  * the partner's name is `partner.displayName`.
  */
 export interface Settings {

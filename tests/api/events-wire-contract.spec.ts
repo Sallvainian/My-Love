@@ -76,8 +76,8 @@
  *   `get_my_partner_id()` returns NULL for an unlinked caller, `user_id = NULL`
  *   evaluates to NULL, and RLS admits a row only on TRUE — so NULL denies.
  * DE.5-API-006 [P1] — the response the client-side mirrors at
- *   `src/components/Settings/EventsSettings.tsx:73-75` (`LABEL_MAX_LENGTH`,
- *   `DESCRIPTION_MAX_LENGTH`, `ISO_DATE_PATTERN`) exist to keep a user from ever
+ *   `src/components/Settings/EventPages.tsx` (`LABEL_MAX_LENGTH`,
+ *   `DESCRIPTION_MAX_LENGTH`) and the New event form's Add rule exist to keep a user from ever
  *   seeing. A 100-character label is posted first as a positive control, so a
  *   401/permission failure cannot masquerade as the CHECK firing.
  *
@@ -717,7 +717,7 @@ test.describe('Events wire contract over PostgREST — story 5', () => {
 
   // ==========================================================================
   // DE.5-API-006 [P1]
-  // The raw Postgres refusal that EventsSettings.tsx:73-75 exists to pre-empt.
+  // The raw Postgres refusal that the New event form's limits exist to pre-empt.
   // ==========================================================================
   test('[P1] DE.5-API-006 a 101-character label is refused with the CHECK violation the client mirrors', async ({
     apiRequest,

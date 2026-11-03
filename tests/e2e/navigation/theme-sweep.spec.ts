@@ -130,11 +130,10 @@ const SIGNED_IN_SCREENS: Screen[] = [
   {
     view: 'settings',
     ready: async (page) => {
+      // The top page holds only its rows and the version line: it reads no
+      // events, so there is no load to wait for.
       await expect(page.getByTestId('settings-view')).toBeVisible();
-      await expect(
-        page.getByTestId('events-settings-list').or(page.getByTestId('events-settings-empty'))
-      ).toBeVisible();
-      await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
+      await expect(page.getByTestId('settings-version')).toBeVisible();
     },
   },
 ];

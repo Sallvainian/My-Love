@@ -65,7 +65,7 @@ export default defineConfig({
         'src/vite-env.d.ts',
         'src/**/*.test.ts',
         'src/**/*.test.tsx',
-        // Test harnesses beside the suites (fakePhotoStore, eventsSettingsKit, ...).
+        // Test harnesses beside the suites (fakePhotoStore, settingsStackKit, ...).
         'src/**/__tests__/**',
       ],
       thresholds: {

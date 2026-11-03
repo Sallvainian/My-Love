@@ -13,9 +13,9 @@ import { registerLocalCopy } from '../../../src/services/localCopy';
 import {
   COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
-  PROFILE_COPY_KIND,
-  PUSH_PREFERENCES_COPY_KIND,
-} from '../../../src/stores/slices/settingsSlice';
+} from '../../../src/stores/slices/datesSlice';
+import { PUSH_PREFERENCES_COPY_KIND } from '../../../src/stores/slices/notificationsSlice';
+import { PROFILE_COPY_KIND } from '../../../src/stores/slices/profileSlice';
 import { MOOD_HISTORY_KIND } from '../../../src/stores/slices/moodSlice';
 import { INTERACTIONS_COPY_KIND } from '../../../src/stores/slices/interactionsSlice';
 import { LOVE_NOTES_COPY_KIND } from '../../../src/stores/slices/notesSlice';

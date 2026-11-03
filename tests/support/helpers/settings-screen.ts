@@ -1,5 +1,5 @@
 /**
- * UI helpers for waiting on the events data Home and Settings load.
+ * UI helpers for opening Settings and the Dates list, and for waiting on the events data Home and the Dates list load.
  *
  * Import by this deep path: `tests/support/helpers` has no barrel. Kept apart
  * from `events.ts`, whose pure functions over `supabaseAdmin` are also used by
@@ -14,30 +14,13 @@ import { UPCOMING_EVENTS_READ } from './reads';
 import { recurseUntil } from './recurse';
 
 /**
- * Wait until Settings' events load, whose upcoming read is `settingsRead`, has
- * settled successfully.
- *
- * `aria-busy` starts `false` before the mount load begins and goes `false` on
- * failure too, so it is read only after the read has answered, and the load
- * error banner — which a failed load shows above rows already on screen — must
- * be absent.
- */
-export async function settingsEventsLoaded(
-  page: Page,
-  settingsRead: ReturnType<InterceptNetworkCallFn>
-): Promise<void> {
-  expect((await settingsRead).status).toBe(200);
-  await expect(page.getByTestId('events-settings-load-region')).toHaveAttribute('aria-busy', 'false');
-  await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
-}
-
-/**
  * Open Settings the way a user does — Home first, then the gear — and return
- * once Settings' own events load has settled.
+ * once Settings is on screen.
  *
- * Home and Settings send identical GETs, so only ordering tells them apart:
- * Home's load is awaited and allowed to settle in the store before the second
- * arm is registered, which makes the second one Settings' mount read.
+ * Settings itself sends no events read: only the Dates list (`DatesPage`) and
+ * an event's page load events, on their own mount. So this waits for Home's
+ * load only, and a spec that needs the Dates list's read arms it before the
+ * tap that opens the list (`openDatesList`).
  */
 export async function openSettingsFromHome(
   page: Page,
@@ -46,23 +29,18 @@ export async function openSettingsFromHome(
   const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await page.goto('/');
   expect((await homeRead).status).toBe(200);
-  await returnToSettings(page, interceptNetworkCall);
+  await returnToSettings(page);
 }
 
 /**
- * Leave Home for Settings by the gear and return once Settings' own events
- * load has settled, so a row control clicked next acts on the rows that load
- * settled on rather than racing its mount GET.
+ * Leave Home for Settings by the gear and return once Settings is on screen.
  *
- * Call it only after Home's own events read has answered — await an arm set
- * before the navigation to Home. The store settle below then follows that
- * read, and only after it is the Settings arm registered: Home and Settings
- * send identical GETs, so an arm registered earlier can latch onto Home's.
+ * Home's own events load is allowed to settle in the store first, so a read
+ * armed afterwards (the Dates list's mount read) cannot latch onto Home's:
+ * Home and the Dates list send identical GETs, and only ordering tells them
+ * apart.
  */
-export async function returnToSettings(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn
-): Promise<void> {
+export async function returnToSettings(page: Page): Promise<void> {
   await recurseUntil(
     () =>
       page.evaluate(() => {
@@ -74,26 +52,48 @@ export async function returnToSettings(
     }
   );
 
-  const settingsRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await navigateTo(page, 'settings');
   await expect(page.getByTestId('settings-view')).toBeVisible();
-  await settingsEventsLoaded(page, settingsRead);
+}
+
+/** Reload /settings and return once Settings is on screen. */
+export async function reloadSettings(page: Page): Promise<void> {
+  await page.reload();
+  await expect(page.getByTestId('settings-view')).toBeVisible();
 }
 
 /**
- * Reload /settings and return once the reload's own events load has settled.
+ * Open the Dates list from the Settings top page and return once the list's
+ * own mount read has answered successfully. The saved copy renders before the
+ * server answers, so rows seen before this returns may be the copy's.
  *
- * The saved copy renders before the server answers, so rows seen before this
- * returns may be the copy's rather than the server's.
+ * Call it only after Home's events read has settled in the store
+ * (`returnToSettings` / `openSettingsFromHome` wait for that): Home and the
+ * Dates list send identical GETs, so an arm registered earlier can latch onto
+ * Home's.
  */
-export async function reloadSettings(
+export async function openDatesList(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn
 ): Promise<void> {
-  const settingsRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+  const datesRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+  await page.getByTestId('settings-dates-row').click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+  expect((await datesRead).status).toBe(200);
+}
+
+/**
+ * Reload on /settings/dates and return once the reload's own events read has
+ * answered successfully, with the Dates list on screen.
+ */
+export async function reloadDatesList(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn
+): Promise<void> {
+  const datesRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
   await page.reload();
-  await expect(page.getByTestId('settings-view')).toBeVisible();
-  await settingsEventsLoaded(page, settingsRead);
+  await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+  expect((await datesRead).status).toBe(200);
 }
 
 /**

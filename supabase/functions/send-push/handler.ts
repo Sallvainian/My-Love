@@ -8,9 +8,6 @@
  * - `moods`, `photos` and `interactions` AFTER INSERT (`notify_push`,
  *   20261031020000_push_moods_photos_interactions.sql) post
  *   `{ "kind": "mood" | "photo" | "interaction", "id": "<uuid>" }`;
- * - `events`, `couple_settings` and `users` (`notify_date_change`,
- *   20261031030000_push_date_changes.sql) log each push-worthy change in
- *   `date_changes` and post `{ "kind": "date", "id": "<date_changes id>" }`;
  * - `partner_requests` (`notify_push`, 20261031040000_push_partner_requests.sql)
  *   posts `{ "kind": "partner_request", "id": "<request id>" }` for an INSERT
  *   of a pending request and `{ "kind": "partner_accept", "id": ... }` for a
@@ -32,16 +29,15 @@
  * The sender reads the row itself with the service role and derives the
  * sender's name and the recipient from it, so a forged call can name no target
  * beyond an existing row. The recipient of a note is its `to_user_id`, of an
- * interaction its `to_user_id`, and of a mood, photo or date change the
- * sender's `users.partner_id` (a date change names its sender in
- * `date_changes.sender_id`; an event change whose event is gone is a 404). A
- * partner request goes to its `to_user_id` (the asker is the sender) and its
- * acceptance to its `from_user_id` (the accepter, `to_user_id`, is the sender);
- * neither looks up a partner, since the asker is not linked yet. An owner with
- * no partner, or a recipient equal to the sender, answers 200 with every count
- * 0 and claims nothing. An interaction whose type is not `poke` or `kiss` does
- * the same, and so does a `partner_accept` whose request is not `accepted` now:
- * the post is a claim that it was, so a forged or replayed one announces nothing.
+ * interaction its `to_user_id`, and of a mood or photo the sender's
+ * `users.partner_id`. A partner request goes to its `to_user_id` (the asker is
+ * the sender) and its acceptance to its `from_user_id` (the accepter,
+ * `to_user_id`, is the sender); neither looks up a partner, since the asker is
+ * not linked yet. An owner with no partner, or a recipient equal to the sender,
+ * answers 200 with every count 0 and claims nothing. An interaction whose type
+ * is not `poke` or `kiss` does the same, and so does a `partner_accept` whose
+ * request is not `accepted` now: the post is a claim that it was, so a forged or
+ * replayed one announces nothing.
  *
  * ## The receiver's switches
  *
@@ -70,7 +66,7 @@
  *
  * Every payload also carries a top-level `kind` (`withKind`), the `PushKind`
  * handled: `love_note`, `mood`, `photo`, `interaction` (poke and kiss alike),
- * `date`, `partner_request` or `partner_accept`. It is the web code's tap
+ * `partner_request` or `partner_accept`. It is the web code's tap
  * routing key (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is
  * not touched.
  *
@@ -107,7 +103,6 @@
 
 import type { ApnsClient, ApnsResult } from './apns.ts';
 import {
-  buildDatePayload,
   buildInteractionPayload,
   buildLoveNotePayload,
   buildMoodPayload,
@@ -115,7 +110,6 @@ import {
   buildPartnerRequestPayload,
   buildPhotoPayload,
   type ApnsPayload,
-  type PushDateChange,
   type PushMood,
   withBadge,
   withKind,
@@ -127,7 +121,6 @@ export type PushKind =
   | 'mood'
   | 'photo'
   | 'interaction'
-  | 'date'
   | 'partner_request'
   | 'partner_accept';
 
@@ -137,7 +130,6 @@ export type PushPreference =
   | 'moods'
   | 'photos'
   | 'pokes_and_kisses'
-  | 'dates'
   | 'partner_requests';
 
 /** The switch each kind answers to; both partner kinds share one. */
@@ -146,13 +138,12 @@ export const PREFERENCE_FOR_KIND: Record<PushKind, PushPreference> = {
   mood: 'moods',
   photo: 'photos',
   interaction: 'pokes_and_kisses',
-  date: 'dates',
   partner_request: 'partner_requests',
   partner_accept: 'partner_requests',
 };
 
 /** The kinds the triggers post as `{kind, id}`; a love note posts `{note_id}`. */
-const POSTED_KINDS = ['mood', 'photo', 'interaction', 'date', 'partner_request', 'partner_accept'] as const;
+const POSTED_KINDS = ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept'] as const;
 
 export interface NoteRow {
   id: string;
@@ -179,12 +170,6 @@ export interface InteractionRow {
   type: string;
 }
 
-/** A `date_changes` row, with the event's label as it is when read. */
-export interface DateChangeRow extends PushDateChange {
-  id: string;
-  sender_id: string;
-}
-
 /** A `partner_requests` row. */
 export interface PartnerRequestRow {
   id: string;
@@ -202,7 +187,7 @@ export interface DeviceRow {
 
 export interface PushRequestRow {
   kind: PushKind;
-  /** The id of the note, mood, photo, interaction, date change or partner request. */
+  /** The id of the note, mood, photo, interaction or partner request. */
   source_id: string;
   token: string;
   environment: string;
@@ -217,8 +202,6 @@ export interface PushDb {
   getMood(moodId: string): Promise<MoodRow | null>;
   getPhoto(photoId: string): Promise<PhotoRow | null>;
   getInteraction(interactionId: string): Promise<InteractionRow | null>;
-  /** The change with its event's label when it is about an event; null when the change is gone. */
-  getDateChange(changeId: string): Promise<DateChangeRow | null>;
   getPartnerRequest(requestId: string): Promise<PartnerRequestRow | null>;
   /** The account's linked partner, or null when it has none. */
   getPartnerId(userId: string): Promise<string | null>;
@@ -267,13 +250,13 @@ type Parsed =
   | { ok: true; kind: PushKind; id: string }
   | { ok: false; message: string };
 
-/** `{kind, id}` from a `notify_push` or `notify_date_change` trigger, else `{note_id}` from the love-note trigger. */
+/** `{kind, id}` from a `notify_push` trigger, else `{note_id}` from the love-note trigger. */
 function parseBody(body: { note_id?: unknown; kind?: unknown; id?: unknown }): Parsed {
   if (body.kind !== undefined) {
     if (typeof body.kind !== 'string' || !(POSTED_KINDS as readonly string[]).includes(body.kind)) {
       return {
         ok: false,
-        message: 'kind must be mood, photo, interaction, date, partner_request or partner_accept',
+        message: 'kind must be mood, photo, interaction, partner_request or partner_accept',
       };
     }
     if (typeof body.id !== 'string' || !UUID.test(body.id)) {
@@ -339,18 +322,6 @@ async function resolveSource(db: PushDb, kind: PushKind, id: string): Promise<Pu
         buildPayload: isPushInteraction(interaction.type)
           ? (name) => buildInteractionPayload(interaction.type, name) as ApnsPayload
           : null,
-      };
-    }
-    case 'date': {
-      const change = await db.getDateChange(id);
-      // An event change whose event is gone has no label to push.
-      if (!change || (change.subject === 'event' && change.event_label === null)) return null;
-      return {
-        kind,
-        id,
-        senderId: change.sender_id,
-        recipientId: await db.getPartnerId(change.sender_id),
-        buildPayload: (name) => buildDatePayload(change, name),
       };
     }
     case 'partner_request': {

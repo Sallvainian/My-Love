@@ -1,9 +1,10 @@
 /**
  * P1 E2E: what a CHECK-constraint rejection puts on the screen
  *
- * This is the surface the story was about. `EventsSettings.tsx:789-797` renders
- * `saveError` and nothing else, `eventsSlice.addEvent` sets it from
- * `error.message` verbatim (`src/stores/slices/eventsSlice.ts:73-75, 167`), and
+ * This is the surface the story was about. The New event form (`NewDatePages.tsx`)
+ * renders the failed add's message in its Error box and nothing else,
+ * `eventsSlice.addEvent` returns it from `error.message` verbatim
+ * (`src/stores/slices/eventsSlice.ts:73-75, 167`), and
  * before `src/api/errorHandlers.ts:66` existed that message was
  * `Database error: new row for relation "events" violates check constraint
  * "events_label_check"` — a Postgres sentence, in a couples app, in the box
@@ -11,10 +12,10 @@
  *
  * ## Why this test stubs, and why that is not a cop-out
  *
- * The rejection is not reachable by typing. `EventsSettings.tsx:511-529` mirrors
- * all three of the table's CHECK constraints client-side — blank label,
- * `LABEL_MAX_LENGTH`, `DESCRIPTION_MAX_LENGTH`, `ICON_VALUES` — and nothing is
- * requested until that mirror passes. The same holds for the other two adopters:
+ * The rejection is not reachable by typing. The New event form mirrors the
+ * table's CHECK constraints client-side — blank label, `LABEL_MAX_LENGTH`,
+ * `DESCRIPTION_MAX_LENGTH`, and a fixed three-icon picker — by keeping Add
+ * disabled, so nothing is requested until that mirror passes. The same holds for the other two adopters:
  * `MoodTracker.tsx:523` caps the note at `maxLength={200}` against a database
  * check of 500, and `interactions.type` is a `'poke' | 'kiss'` union with only
  * two call sites. Measured across the whole schema, no CHECK constraint behind
@@ -39,9 +40,8 @@
  * here the 4xx is the subject.
  *
  * The client-side mirror itself is not re-asserted here: it is owned by
- * `src/components/Settings/__tests__/EventsSettings.validation.test.tsx`
- * ('rejects a 101-character label, naming the 100-character limit'), at
- * component level. Re-testing it through a browser would be the same claim,
+ * `src/components/Settings/__tests__/Settings.newDatePages.test.tsx` (the Add
+ * rules at 100 and 101 code points), at component level. Re-testing it through a browser would be the same claim,
  * slower and more brittle.
  *
  * User-id resolution and event clearing stay self-contained because this
@@ -49,7 +49,8 @@
  * the broader seed/date surface used by the activated event suites.
  */
 import { test, expect } from '../../support/merged-fixtures';
-import { openSettingsFromHome } from '../../support/helpers/settings-screen';
+import { fillNewEventForm, openNewEventForm } from '../../support/helpers/new-date-forms';
+import { openDatesList, openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import type { TypedSupabaseClient } from '../../support/factories';
 import {
@@ -142,7 +143,7 @@ test.describe(
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
       await openSettingsFromHome(page, interceptNetworkCall);
-      await expect(page.getByTestId('events-settings-empty')).toBeVisible();
+      await openDatesList(page, interceptNetworkCall);
 
       // Registered before the form is opened, so the route is in place long
       // before the create leaves the page.
@@ -155,14 +156,13 @@ test.describe(
         },
       });
 
-      await page.getByTestId('events-settings-empty-add').click();
-      await page.getByTestId('events-form-label').fill(VALID_LABEL);
-      await page.getByTestId('events-form-date').fill(futureDate(10));
-      await page.getByTestId('events-form-submit').click();
+      await openNewEventForm(page);
+      await fillNewEventForm(page, { label: VALID_LABEL, date: futureDate(10) });
+      await page.getByTestId('settings-form-add').click();
 
       await rejectedCreate;
 
-      const saveError = page.getByTestId('events-form-error');
+      const saveError = page.getByTestId('settings-form-error');
       await expect(saveError).toBeVisible();
       await expect(saveError).toHaveText(EXPECTED_SAVE_ERROR);
 
@@ -174,9 +174,11 @@ test.describe(
       await expect(saveError).not.toContainText('events_label_check');
 
       // The form stays open carrying the message, and nothing was added behind it.
-      await expect(page.getByTestId('events-form')).toBeVisible();
-      await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(0);
-      await expect(page.getByTestId('events-form-submit')).toBeEnabled();
+      await expect(page.getByTestId('settings-new-event-page')).toBeVisible();
+      await expect(page.getByTestId('settings-form-add')).toBeEnabled();
+      await page.getByTestId('settings-cancel').click();
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      await expect(page.locator('[data-testid^="settings-dates-event-"]')).toHaveCount(0);
     });
   }
 );
