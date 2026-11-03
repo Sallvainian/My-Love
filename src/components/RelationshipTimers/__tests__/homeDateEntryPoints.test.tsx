@@ -48,6 +48,15 @@ function resetStore() {
   });
 }
 
+/**
+ * Back on Home's first entry, as a person is before tapping the next card:
+ * the cards stay mounted here, so without this each tap would stack on the
+ * page the last one opened.
+ */
+function backOnHome() {
+  window.history.replaceState(null, '', '/');
+}
+
 /** The page the last tap opened, as the store and the history entry say it. */
 function expectOpened(path: string) {
   expect(useAppStore.getState()).toMatchObject({
@@ -60,6 +69,8 @@ function expectOpened(path: string) {
     view: 'settings',
     settingsPath: path,
     inApp: true,
+    // One entry above Home, the first entry.
+    depth: 1,
     from: 'home',
   });
 }
@@ -124,9 +135,11 @@ describe("Home's date cards open the date pages", () => {
     fireEvent.click(screen.getByTestId('birthday-countdown-self-open'));
     expectOpened('dates/birthday');
 
+    backOnHome();
     fireEvent.click(screen.getByTestId('birthday-countdown-partner-open'));
     expectOpened('dates/partner-birthday');
 
+    backOnHome();
     fireEvent.click(screen.getByTestId('event-countdown-wedding-open'));
     expectOpened('dates/wedding');
   });
@@ -158,6 +171,7 @@ describe("Home's date cards open the date pages", () => {
     fireEvent.click(screen.getByTestId('anniversary-countdown-1-open'));
     expectOpened('dates/anniversary/srv-1');
 
+    backOnHome();
     fireEvent.click(screen.getByTestId('anniversary-countdown-2-open'));
     expectOpened('dates/anniversary/2');
   });
