@@ -3,7 +3,7 @@ title: 'The edge swipe returns one level in the shell'
 type: 'feature'
 ticket: '15'
 created: '2026-11-03'
-status: blocked
+status: done
 baseline_revision: '9f15bce4442222d4071a1fc7d4790d98569a0c5f'
 route: 'oneshot'
 route_source: 'auto'
@@ -30,8 +30,6 @@ operator_actions:
   - "On the Duo with the column on the screen's left edge (folded landscape with the capsule on the left, or the left pane side by side), open Settings > Profile and swipe from the left edge. Confirm it returns to Settings, and that each capsule button still opens its view (DW-425 case 2)."
   - "On the Duo, open Settings, tap Home in the dock, and swipe from the left edge starting over Home's message card. Confirm it returns to Settings in one level and the card does not also turn to the next message (DW-425 case 3)."
   - "On the Duo, open Settings > Profile, tap Refresh when an update toast appears (or wait for a background swap), then swipe from the left edge on the new first page. Confirm it stays put (DW-424)."
-blocked_at: "2026-11-03"
-blocked_reason: "awaiting operator: Install a shell built from this branch on the owner's iPhone Duo without uninstalling. Use story 17's reinstall, or a trial build with CURRENT_PROJECT_VERSION=2 and then main put back at build number 1, as in the AGENTS.md procedure.; On the Duo, swipe from the left edge on the first page after a launch (Home) and confirm the page stays put (DW-425 case 1).; On the Duo with the column on the screen's left edge (folded landscape with the capsule on the left, or the left pane side by side), open Settings > Profile and swipe from the left edge. Confirm it returns to Settings, and that each capsule button still opens its view (DW-425 case 2).; On the Duo, open Settings, tap Home in the dock, and swipe from the left edge starting over Home's message card. Confirm it returns to Settings in one level and the card does not also turn to the next message (DW-425 case 3).; On the Duo, open Settings > Profile, tap Refresh when an update toast appears (or wait for a background swap), then swipe from the left edge on the new first page. Confirm it stays put (DW-424)."
 ---
 
 <intent-contract>
@@ -131,3 +129,15 @@ Status: awaiting-operator
 - **Synthesized pans are unreliable:** between 1 and 18 pans registered a swipe, so the simulator proves where a registered swipe lands, not how a finger feels.
 - **Real-finger checks are owed:** DW-425's cases need a person on the Duo (`operator_actions`).
 - **Untested path:** a hard `location.href` navigation inside the app would also count as a new document. None exists today.
+
+## Operator Confirmation
+
+Confirmed 2026-11-03: the external actions this story owed were carried out.
+
+- Install a shell built from this branch on the owner's iPhone Duo without uninstalling. Use story 17's reinstall, or a trial build with CURRENT_PROJECT_VERSION=2 and then main put back at build number 1, as in the AGENTS.md procedure.
+- On the Duo, swipe from the left edge on the first page after a launch (Home) and confirm the page stays put (DW-425 case 1).
+- On the Duo with the column on the screen's left edge (folded landscape with the capsule on the left, or the left pane side by side), open Settings > Profile and swipe from the left edge. Confirm it returns to Settings, and that each capsule button still opens its view (DW-425 case 2).
+- On the Duo, open Settings, tap Home in the dock, and swipe from the left edge starting over Home's message card. Confirm it returns to Settings in one level and the card does not also turn to the next message (DW-425 case 3).
+- On the Duo, open Settings > Profile, tap Refresh when an update toast appears (or wait for a background swap), then swipe from the left edge on the new first page. Confirm it stays put (DW-424).
+
+_Appended by the bmad-loop orchestrator (`bmad-loop confirm`, #335): a human confirmed these external actions out of band, and the story was advanced from `awaiting-operator` to `done`._
