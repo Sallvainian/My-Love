@@ -1,0 +1,16 @@
+{
+  "actions": [
+    "Install a shell built from this branch on the owner's iPhone Duo without uninstalling. Use story 17's reinstall, or a trial build with CURRENT_PROJECT_VERSION=2 and then main put back at build number 1, as in the AGENTS.md procedure.",
+    "On the Duo, swipe from the left edge on the first page after a launch (Home) and confirm the page stays put (DW-425 case 1).",
+    "On the Duo with the column on the screen's left edge (folded landscape with the capsule on the left, or the left pane side by side), open Settings > Profile and swipe from the left edge. Confirm it returns to Settings, and that each capsule button still opens its view (DW-425 case 2).",
+    "On the Duo, open Settings, tap Home in the dock, and swipe from the left edge starting over Home's message card. Confirm it returns to Settings in one level and the card does not also turn to the next message (DW-425 case 3).",
+    "On the Duo, open Settings > Profile, tap Refresh when an update toast appears (or wait for a background swap), then swipe from the left edge on the new first page. Confirm it stays put (DW-424)."
+  ],
+  "followup_review_recommended": false,
+  "parked_at": "2026-11-03",
+  "ref": "5.15",
+  "run_id": "20261102-215408-6a69",
+  "source": "tickets",
+  "spec_file": "_bmad-output/initiative-my-love/tickets/epic-settings-rework/tickets/story-the-edge-swipe-returns-one-level-in-the-shell-plan.md",
+  "story_key": "5.15"
+}

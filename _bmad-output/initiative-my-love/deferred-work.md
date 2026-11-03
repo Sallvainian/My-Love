@@ -3680,7 +3680,8 @@ location: ios/App/App/NativeAuth.swift (MainViewController); src/services/native
 source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: medium (unverified)
 reason: Spike 5.2 chose WKWebView's back-forward gesture, which follows the web view's whole back list, not only this document's pushState entries. The live updater loads each new bundle as a new document, so the old document's entries may stay in that list, and a swipe on the first page after an update would then navigate to the old bundle's URL. The trial never applied an update. Story 15 settles it with `sim build --update-port` and `sim serve-update`: apply an update, then `sim swipe back` on the first page; if the page reloads, cancel cross-document back navigations in the shell.
-status: open
+status: done 2026-11-03
+resolution: confirmed, then fixed in story 5.15. On the Duo simulator with the gesture alone, Settings → Profile, Refresh in the update toast, then a swipe on the new Home opened the old bundle's Profile. The updater's swap is `webView.load` of the server URL (`CapacitorUpdater.applyCurrentBundleToBridge`), which keeps the old document's entries. `MainViewController` (ios/App/App/NativeAuth.swift) now records the entry that was current when each main-frame `.other` load of an app URL starts (the launch load and every bundle swap, seen through `.capacitorDecidePolicyForNavigationAction`). It turns the gesture off while the back item is that entry or a load is still running, and re-decides on `url`, `canGoBack` and `isLoading`. A reload records nothing, so back across one still works. Rather than cancelling cross-document back navigations, it does not offer the swipe there: cancelling would also block the in-app back arrow after a reload. Checked on the simulator: after an update, 16 pans on the new Home did nothing, and pages pushed in the new bundle swiped back one level each.
 
 ### DW-425: Three native edge-swipe cases no device has checked: the first entry, the column on the left edge, and Home's message card.
 origin: review (spike 5.2, 2026-11-02)
@@ -3776,4 +3777,12 @@ location: src/components/Settings/stack/SettingsStack.tsx
 source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
 severity: low
 reason: SettingsStack's trail starts with direction null and its commit effect returns early while shownPath is null, so a first mount gets no slide class, scroll reset or title focus; EXPERIENCE.md Flow 1 step 2 says the event page slides in.
+status: open
+
+### DW-437: DW-425 still names story 15 as the one that checks its three cases by hand on the Duo, and it does not hold this story's simulator results; the ledger reserves that entry's text for the orchestrator.
+origin: spec-deferred f577620c7c17
+location: _bmad-output/initiative-my-love/deferred-work.md DW-425
+source_spec: `tickets/epic-settings-rework/tickets/story-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
+severity: low
+reason: Story 15 ran the three cases on the Duo simulator: the first entry (exit 1), the column on the left edge (one level, after 17 failed synthesized pans), and Home's message card (one level). It cannot run them under a real finger, and the shell with the Swift line is not on the Duo yet. The hand checks are this plan's operator_actions. The deferred-work.md header leaves another entry's reason to the orchestrator.
 status: open
