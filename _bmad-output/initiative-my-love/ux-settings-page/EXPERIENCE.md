@@ -191,11 +191,11 @@ Behavioral. Visual specs live in `DESIGN.md` → Components.
 - **Switches save instantly.** No Save button for a switch anywhere.
 - **The one form.** Creating an event or anniversary uses the Form page (Cancel / Add). It is the only page that shows several fields at once.
 - **Collapsing title.** List pages start with the large title. Scrolling it away collapses the bar to a small centered title; scrolling back to the top expands it.
-- **Push and back.** A page slides in from the right (iOS push). An edge swipe from the left (in the iOS app), the browser's back gesture or button (on the website), and the back arrow each return exactly one level. Each push is one browser history entry, so browser back and the back arrow agree.
+- **Push and back.** A page slides in from the right (iOS push). Home is the bottom layer. A dock button (or the header gear) opens its view directly on Home, whatever was open before, so back from any view returns to Home and back on Home does nothing. Inside a view each page goes one layer deeper, and back returns one layer: Settings › Account › Name goes back to Account, then Settings, then Home. Back is the edge swipe from the left (in the iOS app), the browser's back gesture or button (on the website), and the back arrow; each push is one browser history entry, so all three agree.
 - **Reduced motion.** With Reduce Motion on, pages fade in and out instead of sliding.
 - **Back arrow rule.**
   - Subpages always show the back arrow.
-  - The top Settings page shows the back arrow only when the page was opened from the header gear (bottom-dock form). The arrow returns to the view the gear was tapped from, as browser back does today.
+  - The top Settings page shows the back arrow only when the page was opened from the header gear (bottom-dock form). The arrow returns to Home, as browser back does, because Home is the bottom layer.
   - In the Duo column form, Settings is the capsule's sixth button and the header has no gear, so the top page has no back arrow ([v2 frame 2](mockups/key-settings-v2.html)).
 - **Banned.** Switches, fields or descriptions on the top page. A two-pane layout. A new dock destination. A second partner connect flow. An unlink action.
 
