@@ -3654,7 +3654,8 @@ location: tests/e2e/settings/settings-stack.spec.ts
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
 severity: low
 reason: The column form is chosen from env(safe-area-inset-*), which desktop Playwright cannot set; settings-stack.spec.ts runs the bottom dock only and SettingsStack.test.tsx mocks useSideColumn. Pre-existing limitation shared by every column-form feature.
-status: open
+status: done 2026-11-03
+resolution: duplicate of DW-419 (the same gap, filed twice by story 5.1); tracked there.
 
 ### DW-422: No test pins that sign-out keeps the device's photo-download choice (ledger DW-420).
 origin: spec-deferred ab598e369099
@@ -3662,7 +3663,8 @@ location: src/stores/slices/authSlice.ts (deleteAccountData)
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
 severity: low
 reason: grep finds my-love-photos-over-mobile-data only in photoDownloadPreference.test.ts and this story's tests; none signs out first. Behaviour unchanged by this story.
-status: open
+status: done 2026-11-03
+resolution: duplicate of DW-420 (the same gap, filed twice by story 5.1); tracked there.
 
 ### DW-423: Nothing ties a subpage row's visibility to its page's `available`, and the AGENTS.md subpage rule does not say to gate the row.
 origin: spec-deferred 445948d64bee
