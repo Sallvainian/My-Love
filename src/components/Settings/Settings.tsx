@@ -2,17 +2,18 @@
  * Settings Component
  *
  * Application settings on the style kit, as a stack of pages (`SettingsStack`).
- * The top page holds the Account group (the Profile row), the preferences and
- * about groups, the sign-out card and the version line, then the sections not
- * yet replaced by pages of their own: the couple's shared "Together since"
- * start and wedding date (the `Together` section), the couple's countdowns
- * (events and anniversaries) and the per-date reminder list (`CountdownMarks`;
- * the native shell with the local-notifications plugin only). Profile (the
- * display name and your own birthday, each on a one-field page, see
- * `ProfilePage`), Photos (this device's mobile-data choice for the offline
- * album) and Notifications (a switch for each kind of push and the Date
- * reminders switch; the native shell with the push plugins only, see
- * `NotificationsPage`) are the subpages.
+ * The top page holds the Account group (the Profile row), the Partner group
+ * (the Partner row), the preferences and about groups, the sign-out card and
+ * the version line, then the sections not yet replaced by pages of their own:
+ * the couple's shared "Together since" start and wedding date (the `Together`
+ * section), the couple's countdowns (events and anniversaries) and the
+ * per-date reminder list (`CountdownMarks`; the native shell with the
+ * local-notifications plugin only). Profile (the display name and your own
+ * birthday, each on a one-field page, see `ProfilePage`), Partner (who the
+ * account is linked to, see `PartnerPage`), Photos (this device's mobile-data
+ * choice for the offline album) and Notifications (a switch for each kind of
+ * push and the Date reminders switch; the native shell with the push plugins
+ * only, see `NotificationsPage`) are the subpages.
  *
  * @component
  */
@@ -70,6 +71,7 @@ import { AnniversarySettings } from './AnniversarySettings';
 import { CountdownMarks } from './CountdownMarks';
 import { EventsSettings } from './EventsSettings';
 import { NotificationsPage, NotificationsRow } from './NotificationsPage';
+import { PartnerPage, PartnerRow } from './PartnerPage';
 import { PhotosPage } from './PhotosPage';
 import { BirthdayPage, NamePage, ProfilePage, ProfileRow } from './ProfilePage';
 import { formatDateOnly } from './settingsFields';
@@ -438,6 +440,14 @@ const SUBPAGES = new Map<string, SettingsPageSpec>([
     },
   ],
   [
+    'partner',
+    {
+      title: 'Partner',
+      titleStyle: 'large',
+      render: () => <PartnerPage />,
+    },
+  ],
+  [
     'notifications',
     {
       title: 'Notifications',
@@ -561,6 +571,11 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         {/* Account: the Profile row opens the display name and birthday. */}
         <SettingsGroup label="Account">
           <ProfileRow key="profile" />
+        </SettingsGroup>
+
+        {/* Partner: who the account is linked to; the row opens the page. */}
+        <SettingsGroup label="Partner">
+          <PartnerRow key="partner" />
         </SettingsGroup>
 
         {/* Preferences: the rows whose pages exist; nothing renders where none does. */}

@@ -158,7 +158,7 @@ function partnerInfo(birthday: string | null = '1995-11-09') {
     id: P,
     email: 'jessie@test.example.com',
     displayName: 'Jessie',
-    connectedAt: null,
+    linkedSince: null,
     birthday,
   };
 }

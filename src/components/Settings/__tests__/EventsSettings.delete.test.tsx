@@ -303,7 +303,7 @@ describe('EventsSettings accessible names and modal semantics', () => {
         id: 'p1',
         email: 'partner@example.test',
         displayName: 'Pat',
-        connectedAt: null,
+        linkedSince: null,
         birthday: null,
       },
     });

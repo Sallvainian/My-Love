@@ -1,10 +1,11 @@
 /**
- * SettingsRows -- the two pieces every Settings list page is built from.
+ * SettingsRows -- the pieces every Settings list page is built from.
  *
  * `SettingsGroup` is an optional uppercase label above one kit card whose rows
  * are separated by a hairline, and an optional footnote under it;
  * `SettingsRow` is one list row (tile, label, value, chevron) that either
- * opens a subpage (`target`) or runs a handler.
+ * opens a subpage (`target`) or runs a handler; `ReadOnlyRow` is a label and a
+ * value that do nothing.
  *
  * @component
  */
@@ -12,7 +13,7 @@
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { Children, Fragment, isValidElement, useId, type ReactNode } from 'react';
 import { useAppStore } from '../../../stores/useAppStore';
-import { CARD, DIVIDER, GROUP_TILE, SECTION_LABEL } from '../../shared/kitClasses';
+import { CARD, DIVIDER, GROUP_ROW, GROUP_TILE, SECTION_LABEL } from '../../shared/kitClasses';
 import { ROW_BUTTON } from '../SwitchRow';
 
 interface SettingsGroupProps {
@@ -106,5 +107,25 @@ export function SettingsRow({
       )}
       <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
     </button>
+  );
+}
+
+interface ReadOnlyRowProps {
+  label: string;
+  value: string;
+  testId?: string;
+}
+
+/**
+ * A fact the page only shows: not a button, no chevron, no pressed state. The
+ * value keeps the muted ink of any other value (never reduced opacity) and
+ * wraps, so a long email breaks instead of widening the card.
+ */
+export function ReadOnlyRow({ label, value, testId }: ReadOnlyRowProps) {
+  return (
+    <div className={`${GROUP_ROW} px-0.5`} data-testid={testId}>
+      <span className="shrink-0 text-[15px] font-medium text-ink">{label}</span>
+      <span className="min-w-0 flex-1 text-right text-[15px] wrap-break-word text-muted">{value}</span>
+    </div>
   );
 }

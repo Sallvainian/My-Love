@@ -44,6 +44,29 @@ let sessionUserId: string | null;
 let sessionError: { message: string } | null;
 /** Runs as each users read is answered, so a test can sign out mid-read. */
 let onRead: ((call: number) => void) | null;
+/** The accepted-request read's answer; no row by default. */
+let requestResult: { data: unknown; error: unknown };
+/** Runs as the accepted-request read is answered, so a test can sign out mid-read. */
+let onRequestRead: (() => void) | null;
+/** Every call the request read's query chain received, in order. */
+let requestQuery: Array<[string, ...unknown[]]>;
+
+/** The `partner_requests` chain: records each call, answers like a `.maybeSingle()`. */
+function requestChain() {
+  const chain = {
+    select: (...args: unknown[]) => (requestQuery.push(['select', ...args]), chain),
+    eq: (...args: unknown[]) => (requestQuery.push(['eq', ...args]), chain),
+    or: (...args: unknown[]) => (requestQuery.push(['or', ...args]), chain),
+    order: (...args: unknown[]) => (requestQuery.push(['order', ...args]), chain),
+    limit: (...args: unknown[]) => (requestQuery.push(['limit', ...args]), chain),
+    maybeSingle: async () => {
+      onRequestRead?.();
+      // Signed out, RLS hides every row: an empty answer, not an error.
+      return sessionUserId === null ? { data: null, error: null } : requestResult;
+    },
+  };
+  return chain;
+}
 
 /**
  * One users read. RLS hides every users row from a request sent without a
@@ -78,14 +101,17 @@ vi.mock('@supabase/supabase-js', () => ({
       // `supabaseClient` installs listeners at import time.
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
     },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () => answerRead('single'),
-          maybeSingle: () => answerRead('maybeSingle'),
-        }),
-      }),
-    }),
+    from: (table: string) =>
+      table === 'partner_requests'
+        ? requestChain()
+        : {
+            select: () => ({
+              eq: () => ({
+                single: () => answerRead('single'),
+                maybeSingle: () => answerRead('maybeSingle'),
+              }),
+            }),
+          },
     channel: () => ({ on: () => ({ subscribe: () => {} }) }),
     removeChannel: () => {},
     realtime: { setAuth: async () => {} },
@@ -115,6 +141,9 @@ function resetHarness(): void {
   sessionUserId = USER_ID;
   sessionError = null;
   onRead = null;
+  requestResult = { data: null, error: null };
+  onRequestRead = null;
+  requestQuery = [];
 }
 
 describe('partnerService.getPartner display name', () => {
@@ -276,5 +305,81 @@ describe('partnerService.getPartner classification', () => {
     };
 
     await expect(status()).resolves.toBe('error');
+  });
+});
+
+describe('partnerService.getPartner link date', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    resetHarness();
+    partnerRow('Alex');
+  });
+
+  async function getPartner() {
+    const { partnerService } = await import('@/api/partnerService');
+    return partnerService.getPartner(USER_ID);
+  }
+
+  it('reads the newest accepted request between the two, in either direction', async () => {
+    requestResult = { data: { updated_at: '2022-02-03T12:00:00Z' }, error: null };
+
+    await getPartner();
+
+    expect(requestQuery).toEqual([
+      ['select', 'updated_at'],
+      ['eq', 'status', 'accepted'],
+      [
+        'or',
+        `and(from_user_id.eq.${USER_ID},to_user_id.eq.${PARTNER_ID}),and(from_user_id.eq.${PARTNER_ID},to_user_id.eq.${USER_ID})`,
+      ],
+      ['order', 'updated_at', { ascending: false }],
+      ['limit', 1],
+    ]);
+  });
+
+  it('returns the accepted request\'s updated_at as linkedSince', async () => {
+    requestResult = { data: { updated_at: '2022-02-03T12:00:00Z' }, error: null };
+
+    const result = await getPartner();
+
+    expect(result.status === 'linked' && result.partner.linkedSince).toBe('2022-02-03T12:00:00Z');
+  });
+
+  it('returns linkedSince null, still linked, when the pair has no accepted request', async () => {
+    const result = await getPartner();
+
+    expect(result.status).toBe('linked');
+    expect(result.status === 'linked' && result.partner.linkedSince).toBeNull();
+  });
+
+  it('never takes the link date from the profile row\'s updated_at', async () => {
+    const result = await getPartner();
+
+    expect(result.status === 'linked' && result.partner.linkedSince).not.toBe('2026-01-01T00:00:00Z');
+  });
+
+  it('answers error, and logs it, when the request read fails', async () => {
+    requestResult = { data: null, error: { code: '500', message: 'requests down' } };
+
+    const result = await getPartner();
+
+    expect(result).toEqual({ status: 'error', reason: 'requests down' });
+    expect(console.error).toHaveBeenCalledWith(
+      '[PartnerService] Error fetching link date:',
+      expect.objectContaining({ message: 'requests down' })
+    );
+  });
+
+  it('answers error, not a null link date, when the session ends during the request read', async () => {
+    requestResult = { data: { updated_at: '2022-02-03T12:00:00Z' }, error: null };
+    onRequestRead = () => {
+      sessionUserId = null;
+    };
+
+    const result = await getPartner();
+
+    expect(result.status).toBe('error');
   });
 });

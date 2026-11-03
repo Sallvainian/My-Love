@@ -22,6 +22,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import { logger } from '../../utils/logger';
 import { PokeKissInterface } from '../PokeKissInterface';
+import { PartnerLoadError } from './PartnerLoadError';
 import { SECTION_LABEL } from '../shared/kitClasses';
 
 /**
@@ -406,29 +407,7 @@ export function PartnerMoodView() {
             saved copy). Never the Connect UI: that is for a server-confirmed
             "unlinked" only. */}
         {!partner && !isLoadingPartner && partnerLoadError && (
-          <div
-            className={`${CARD} flex flex-col items-center gap-3 px-5 py-8 text-center`}
-            data-testid="partner-load-error"
-          >
-            <WifiOff className="h-8 w-8 text-muted" aria-hidden="true" />
-            <p className="text-[15px] font-semibold text-ink">Couldn't load your partner</p>
-            <p className="text-sm text-muted">
-              {syncStatus.isOnline
-                ? 'Something went wrong. Please try again.'
-                : "You're offline. Connect to load your partner."}
-            </p>
-            {syncStatus.isOnline && (
-              <button
-                type="button"
-                onClick={() => void loadPartner()}
-                className={`${PILL} bg-fill text-white focus-visible:ring-accent`}
-                data-testid="partner-load-retry"
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                <span>Try again</span>
-              </button>
-            )}
-          </div>
+          <PartnerLoadError isOnline={syncStatus.isOnline} onRetry={() => void loadPartner()} />
         )}
 
         {/* Show partner connection UI only when the server says there is no partner */}

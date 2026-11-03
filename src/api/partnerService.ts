@@ -54,7 +54,12 @@ export interface PartnerInfo {
   id: string;
   email: string;
   displayName: string;
-  connectedAt: string | null;
+  /**
+   * When the two were linked: the accepted partner request's `updated_at`, an
+   * ISO instant. `null` when the pair has no accepted request (an account pair
+   * linked some other way).
+   */
+  linkedSince: string | null;
   /** The partner's own birthday, `YYYY-MM-DD`, or `null` when not set. */
   birthday: string | null;
 }
@@ -141,6 +146,27 @@ class PartnerService {
         return { status: 'error', reason: partnerError?.message ?? 'Partner record missing' };
       }
 
+      // When the pair was linked: the accepted request between the two, either
+      // direction, newest if more than one. No row is a pair with no request.
+      const { data: acceptedRequest, error: requestError } = await supabase
+        .from('partner_requests')
+        .select('updated_at')
+        .eq('status', 'accepted')
+        .or(
+          `and(from_user_id.eq.${userId},to_user_id.eq.${partnerRecord.id}),and(from_user_id.eq.${partnerRecord.id},to_user_id.eq.${userId})`
+        )
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const afterRequest = await sessionMismatch(userId);
+      if (afterRequest) return { status: 'error', reason: afterRequest };
+
+      if (requestError) {
+        console.error('[PartnerService] Error fetching link date:', requestError);
+        return { status: 'error', reason: requestError.message };
+      }
+
       // The seed rule, not a raw `||` chain. `sync_user_profile()` seeds a new
       // profile with COALESCE(metadata name, email, 'Unknown'), and the stored
       // value is a non-empty string in every one of those cases -- so a plain
@@ -163,7 +189,7 @@ class PartnerService {
           id: partnerRecord.id,
           email: partnerRecord.email || '',
           displayName: partnerName,
-          connectedAt: userRecord.updated_at,
+          linkedSince: acceptedRequest?.updated_at ?? null,
           birthday: toDateOnlyOrNull(partnerRecord.birthday),
         },
       };

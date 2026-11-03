@@ -85,6 +85,11 @@ export function partnerRecordRead(partnerId: string): string {
   return `**/rest/v1/users?select=id%2Cemail%2Cdisplay_name%2Cbirthday&id=eq.${partnerId}*`;
 }
 
+/** The accepted partner request that dates the link (`partnerService.getPartner`),
+ * the source of the Partner page's Linked since. Pool couples are linked without
+ * a request, so a real read answers no row; a spec that needs a date fulfils it. */
+export const LINKED_SINCE_READ = '**/rest/v1/partner_requests?select=updated_at*';
+
 /** The display-name gate's read of the signed-in user's own name
  * (`supabaseClient`), which decides whether the setup screen shows. */
 export function gateNameRead(userId: string): string {

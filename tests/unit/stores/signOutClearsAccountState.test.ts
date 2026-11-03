@@ -67,6 +67,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   partner: null,
   isLoadingPartner: false,
   partnerLoadError: false,
+  partnerKnown: false,
   sentRequests: [],
   receivedRequests: [],
   isLoadingRequests: false,
@@ -186,6 +187,7 @@ function seedSignedInSession(): void {
       email: 'b@example.com',
     },
     partnerLoadError: true,
+    partnerKnown: true,
     sentRequests: [{ id: 'req-1', toEmail: SECRETS.requestedEmail }],
     receivedRequests: [{ id: 'req-2', fromEmail: SECRETS.requestedEmail }],
     searchResult: {

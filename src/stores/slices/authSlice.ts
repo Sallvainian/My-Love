@@ -171,6 +171,7 @@ export function signedOutState() {
     partner: null,
     isLoadingPartner: false,
     partnerLoadError: false,
+    partnerKnown: false,
     sentRequests: [],
     receivedRequests: [],
     isLoadingRequests: false,

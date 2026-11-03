@@ -105,7 +105,7 @@ function seedAllDates(): void {
       id: 'partner-id',
       email: 'jessie@test.example.com',
       displayName: 'Jessie',
-      connectedAt: null,
+      linkedSince: null,
       birthday: '1995-12-26',
     },
   });

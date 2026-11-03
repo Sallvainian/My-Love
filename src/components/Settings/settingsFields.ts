@@ -12,6 +12,16 @@ export function formatDateOnly(value: string): string {
   return date ? date.toLocaleDateString(undefined, { dateStyle: 'long' }) : value;
 }
 
+/**
+ * An ISO instant (a full timestamp, such as a row's `updated_at`) as a long
+ * local date ("February 3, 2022"), or `null` when it does not parse. Not for a
+ * `YYYY-MM-DD` string: use `formatDateOnly`, since `new Date` reads that as UTC.
+ */
+export function formatInstantDate(iso: string): string | null {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { dateStyle: 'long' });
+}
+
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** The earliest birthday the field accepts: catches a mistyped year such as 0198. */

@@ -3705,3 +3705,19 @@ source_spec: `tickets/epic-settings-rework/tickets/story-profile-edits-name-and-
 severity: low
 reason: Story 5.7 moved the Settings name edit onto the Name page, which writes through `profileSlice.setDisplayName` and `profileService.saveDisplayName`. The signup gate in `App.tsx` is the only caller left, and it passes neither `initialName` nor `onCancel` and stays in `setup` mode, so the `edit` copy, the Cancel control, the Escape handler and the `initialName` prop are dead code. The gate also still holds its own copy of the 3-30 length rule, the account-email and `Unknown` refusals and the `users` update, now the same as `saveDisplayName`'s. The story's "Never" list kept `DisplayNameSetup` and the gate unchanged. The sweep (story 16) removes the dead props and mode, then either points the gate at `setDisplayName` or leaves it with a comment naming `saveDisplayName` as the twin.
 status: open
+
+### DW-428: `PartnerMoodView` shows the Connect UI for one render before `loadPartner` raises `isLoadingPartner`, because it cannot tell "unanswered" from "unlinked".
+origin: spec-deferred (story 5.8, 2026-11-03)
+location: src/components/PartnerMoodView/PartnerMoodView.tsx (the `!partner && !isLoadingPartner && !partnerLoadError` branch); src/stores/slices/partnerSlice.ts (`loadPartner`, `partnerKnown`)
+source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
+severity: low
+reason: The view renders the Connect UI whenever `partner` is null, no load is running and no error is set; on first open that holds for the render before `loadPartner` sets `isLoadingPartner`. Story 5.8 added `partnerKnown` to `partnerSlice` (true only once a saved copy or a server answer is applied), which separates the two states, but its "Never" list left the Partner view's behaviour unchanged. Gating the Connect UI on `partnerKnown` (and showing the loading state until then) removes the flash; check `PartnerMoodView.*.test.tsx`, which mock the store wholesale and would need the field.
+status: open
+
+### DW-429: `partnerService.getPartner` still selects `users.updated_at`, now unused.
+origin: spec-deferred (story 5.8, 2026-11-03)
+location: src/api/partnerService.ts (`getPartner`, first read `select('partner_id, updated_at')`); tests/e2e/offline/needs-a-connection.spec.ts and other E2E routes pinning `users?select=partner_id*`
+source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
+severity: low
+reason: The link date moved to the accepted `partner_requests` row (`PartnerInfo.linkedSince`), so nothing reads `updated_at` from the first `users` read any more. It stays in the select because E2E routes match the URL `select=partner_id%2Cupdated_at`, and the story's "Never" list forbade changing the `users` read columns. A later change drops the column from the select together with those routes and the fixtures that fulfil `updated_at`.
+status: open

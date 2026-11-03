@@ -349,7 +349,7 @@ describe('couple settings on the local copy', () => {
     partner.acceptPartnerRequest.mockResolvedValue(undefined);
     partner.getPartner.mockResolvedValue({
       status: 'linked',
-      partner: { id: P, email: 'p@example.test', displayName: 'P', connectedAt: null, birthday: null },
+      partner: { id: P, email: 'p@example.test', displayName: 'P', linkedSince: null, birthday: null },
     });
     partner.getPendingRequests.mockResolvedValue({ sent: [], received: [] });
     lookupPartnerId.mockResolvedValue(LINKED_LOOKUP);

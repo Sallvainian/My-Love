@@ -42,16 +42,24 @@ export type PartnerCopy = { status: 'linked'; partner: PartnerInfo } | { status:
 /**
  * A saved copy in today's shape. A copy saved before birthdays moved to the
  * server has no `birthday` field; it still parses, and reads it as not set
- * until the next refresh replaces it.
+ * until the next refresh replaces it. A copy saved before the link date moved
+ * to the accepted request carries `connectedAt` (the profile row's
+ * `updated_at`, which any edit changes) and no `linkedSince`: that value is
+ * dropped, never shown as a link date, and the date reads as unknown until the
+ * next refresh.
  */
 function normalizePartnerCopy(copy: PartnerCopy | null): PartnerCopy | null {
   if (!copy || copy.status !== 'linked') return copy;
-  const birthday = (copy.partner as Partial<PartnerInfo>).birthday;
+  const { id, email, displayName, birthday, linkedSince } = copy.partner as PartnerInfo;
+  // Field by field, so the legacy `connectedAt` is left behind.
   return {
     status: 'linked',
     partner: {
-      ...copy.partner,
+      id,
+      email,
+      displayName,
       birthday: typeof birthday === 'string' ? toDateOnlyOrNull(birthday) : null,
+      linkedSince: typeof linkedSince === 'string' ? linkedSince : null,
     },
   };
 }
@@ -100,6 +108,13 @@ export interface PartnerSlice {
    * server-confirmed "unlinked" only.
    */
   partnerLoadError: boolean;
+  /**
+   * True once `partner` is an answer: a saved copy or the server's, linked or
+   * unlinked. While false, `partner === null` means "nothing has answered
+   * yet", not "unlinked" -- a failed read or an offline start leaves it false,
+   * so "Not linked" is shown only after a loaded answer. Reset on sign-out.
+   */
+  partnerKnown: boolean;
   sentRequests: PartnerRequest[];
   receivedRequests: PartnerRequest[];
   isLoadingRequests: boolean;
@@ -128,6 +143,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
     partner: null,
     isLoadingPartner: false,
     partnerLoadError: false,
+    partnerKnown: false,
     sentRequests: [],
     receivedRequests: [],
     isLoadingRequests: false,
@@ -180,6 +196,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
         set({
           partner: copy.status === 'linked' ? copy.partner : null,
           partnerLoadError: false,
+          partnerKnown: true,
           isLoadingPartner: false,
         });
       }
@@ -213,6 +230,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       set({
         partner: next.status === 'linked' ? next.partner : null,
         partnerLoadError: false,
+        partnerKnown: true,
         isLoadingPartner: false,
       });
       // A link this device did not make (the partner accepted our request)
