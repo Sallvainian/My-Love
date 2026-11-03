@@ -13,6 +13,8 @@
  * pages its Together since, Wedding and birthday rows open (see `DatePages`),
  * an event's own page and its four one-field pages (`dates/event/<id>…`, see
  * `EventPages`; matched in `resolveSettingsPage` since the path carries an id),
+ * an anniversary's own page and its three one-field pages
+ * (`dates/anniversary/<key>…`, see `AnniversaryPages`; matched the same way),
  * Photos (this device's mobile-data choice for the offline album)
  * and Notifications (a switch for each kind of
  * push and the Date reminders switch; the native shell with the push plugins
@@ -61,6 +63,7 @@ import {
   SECTION_LABEL,
   SECONDARY_BUTTON,
 } from '../shared/kitClasses';
+import { AnniversaryFieldPage, AnniversaryPage, type AnniversaryField } from './AnniversaryPages';
 import { AnniversarySettings } from './AnniversarySettings';
 import { CountdownMarks } from './CountdownMarks';
 import {
@@ -296,6 +299,15 @@ const EVENT_FIELD_TITLES: Record<EventField, string> = {
   icon: 'Icon',
 };
 
+/** `dates/anniversary/<key>` and its field pages; the key is any one path segment. */
+const ANNIVERSARY_PATH = /^dates\/anniversary\/([^/]+)(?:\/(name|date|note))?$/;
+
+const ANNIVERSARY_FIELD_TITLES: Record<AnniversaryField, string> = {
+  name: 'Name',
+  date: 'Date',
+  note: 'Note',
+};
+
 interface SettingsProps {
   /** Replays the welcome splash; the About row is not rendered without it. */
   onShowWelcome?: () => void;
@@ -315,6 +327,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const partnerName = useAppStore((s) => s.partner?.displayName);
   // An event's page is titled with its name, which `SUBPAGES` cannot know either.
   const events = useAppStore((s) => s.events);
+  // An anniversary's page is titled with its label, which `SUBPAGES` cannot know either.
+  const anniversaries = useAppStore((s) => s.settings?.relationship.anniversaries);
   // The Photos row's value; the choice itself is made on the Photos page.
   const photosOverMobileData = useSyncExternalStore(
     subscribePhotosOverMobileData,
@@ -521,7 +535,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   // The top page is built above; every subpage is registered in `SUBPAGES`
   // (its path under /settings, title, title style, and `available` where a
   // device may not have it), except the event pages, whose path carries an id
-  // and which are matched here. Its row on the parent page is a `SettingsRow`
+  // and which are matched here (the anniversary pages, whose path carries a key,
+  // are matched here too). Its row on the parent page is a `SettingsRow`
   // with `target`.
   const resolveSettingsPage = (path: string): SettingsPageSpec | null => {
     if (path === '') return topPage;
@@ -541,6 +556,27 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         title: events.find((event) => event.id === eventId)?.label ?? 'Event',
         titleStyle: 'small',
         render: () => <EventPage eventId={eventId} />,
+      };
+    }
+    const anniversaryMatch = ANNIVERSARY_PATH.exec(path);
+    if (anniversaryMatch) {
+      const anniversaryKey = anniversaryMatch[1];
+      const field = anniversaryMatch[2] as AnniversaryField | undefined;
+      if (field) {
+        return {
+          title: ANNIVERSARY_FIELD_TITLES[field],
+          titleStyle: 'small',
+          reloadsToParent: true,
+          render: () => <AnniversaryFieldPage anniversaryKey={anniversaryKey} field={field} />,
+        };
+      }
+      const anniversary = anniversaries?.find(
+        (candidate) => (candidate.serverId ?? String(candidate.id)) === anniversaryKey
+      );
+      return {
+        title: anniversary?.label ?? 'Anniversary',
+        titleStyle: 'small',
+        render: () => <AnniversaryPage anniversaryKey={anniversaryKey} />,
       };
     }
     const spec = SUBPAGES.get(path) ?? null;

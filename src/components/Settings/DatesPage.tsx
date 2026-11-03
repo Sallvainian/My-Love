@@ -26,8 +26,8 @@
  * until the page is left.
  *
  * The rows' targets are the date pages (`DatePages`), an event's own page
- * (`dates/event/<id>`, `EventPages`), and, until story 12 builds it, the
- * anniversary page, for which the stack shows the top page.
+ * (`dates/event/<id>`, `EventPages`) and an anniversary's own page
+ * (`dates/anniversary/<key>`, `AnniversaryPages`).
  *
  * @component
  */

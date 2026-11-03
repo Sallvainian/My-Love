@@ -86,9 +86,13 @@ export interface DatesSlice {
   removeAnniversary: (id: number) => Promise<void>;
   /**
    * The anniversaries local-copy refresher: show the saved copy, then replace
-   * the mirror and the copy with the server's rows. Never throws.
+   * the mirror and the copy with the server's rows. Never throws. Resolves
+   * `true` when the mirror now holds an answer: the server's rows, or, offline,
+   * a session that is already fresh or a saved copy that was applied. `false`
+   * for no user, an account change, offline with no copy, or a failed read, so
+   * a page can tell an anniversary that is absent from one not loaded yet.
    */
-  loadAnniversariesFromServer: () => Promise<void>;
+  loadAnniversariesFromServer: () => Promise<boolean>;
 
   /**
    * The couple-settings local-copy refresher: show the saved copy, then — when
@@ -282,7 +286,9 @@ function notSynced(): AccountDataError {
 export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) => {
   // The kinds' refreshers for signed-in start, reconnect and on-demand
   // refreshes. Re-registering (a second store in tests) replaces it.
-  registerLocalCopy(ANNIVERSARIES_COPY_KIND, () => get().loadAnniversariesFromServer());
+  registerLocalCopy(ANNIVERSARIES_COPY_KIND, async () => {
+    await get().loadAnniversariesFromServer();
+  });
   registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => get().loadCoupleSettings());
   registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, () => get().loadCountdownMarks());
 
@@ -423,30 +429,36 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
 
     loadAnniversariesFromServer: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      if (!requestedBy) return;
+      if (!requestedBy) return false;
       const isCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
       // 1. The saved copy, at once — online or offline. Outside the account-data
       // queue, so a queued write cannot hold the countdowns back; skipped once
       // this session has a server answer or a confirmed write, which is newer.
-      if (!isFresh(requestedBy, requestedInSession)) {
+      // Either one is an answer for the offline return below.
+      let hasAnswer = isFresh(requestedBy, requestedInSession);
+      if (!hasAnswer) {
         const saved = parseSavedAnniversaries(
           await readLocalCopy<unknown>(requestedBy, ANNIVERSARIES_COPY_KIND)
         );
-        if (!isCurrent()) return;
+        if (!isCurrent()) return false;
         if (saved && !isFresh(requestedBy, requestedInSession)) {
           set((state) =>
             state.settings ? { settings: withAnniversaries(state.settings, saved) } : {}
           );
+          hasAnswer = true;
+        } else if (isFresh(requestedBy, requestedInSession)) {
+          hasAnswer = true;
         }
       }
 
       // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
-      if (!isOnline()) return;
+      if (!isOnline()) return hasAnswer;
 
       // 3. The server's rows replace the mirror and the copy — only on success.
       try {
+        let applied = false;
         await serializeAccountDataWrite(async () => {
           const rows = await anniversariesService.fetchAnniversaries(requestedBy);
           if (!isCurrent()) return;
@@ -459,11 +471,14 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
               ),
             };
           });
+          applied = true;
           await saveAnniversariesCopy(requestedBy, requestedInSession);
         });
+        return applied;
       } catch (error) {
         // The mirror and the copy stay as they were, so Home keeps its countdowns.
         console.error('[Settings] Failed to load anniversaries from the server:', error);
+        return false;
       }
     },
 
