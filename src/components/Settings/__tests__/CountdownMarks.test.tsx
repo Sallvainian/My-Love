@@ -349,7 +349,8 @@ describe('CountdownMarks: toggling', () => {
     const user = userEvent.setup();
     seedAllDates();
     await renderLoaded();
-    service.setCountdownMark.mockRejectedValue(new AccountDataError('transport', 'Server said no'));
+    const failure = new AccountDataError('transport', 'Server said no');
+    service.setCountdownMark.mockRejectedValue(failure);
 
     await user.click(screen.getByTestId(rowId('wedding')));
 
@@ -357,7 +358,7 @@ describe('CountdownMarks: toggling', () => {
     expect(screen.getByTestId(rowId('wedding'))).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId(rowId('wedding'))).toBeEnabled();
     expect(useAppStore.getState().countdownMarks).toEqual([]);
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith('[CountdownMarks] Could not save the reminder:', failure);
   });
 
   it('clears an earlier error on the next toggle', async () => {
@@ -497,7 +498,8 @@ describe('CountdownMarks: the Date reminders switch', () => {
     const user = userEvent.setup();
     seedAllDates();
     await renderLoaded();
-    preferences.savePushPreference.mockRejectedValue(new AccountDataError('transport', 'Server said no'));
+    const failure = new AccountDataError('transport', 'Server said no');
+    preferences.savePushPreference.mockRejectedValue(failure);
 
     await user.click(screen.getByTestId(SWITCH));
 
@@ -505,7 +507,10 @@ describe('CountdownMarks: the Date reminders switch', () => {
     expect(screen.getByTestId(SWITCH)).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId(SWITCH)).toBeEnabled();
     expect(useAppStore.getState().pushPreferences).toEqual(ALL_PUSH_PREFERENCES_ON);
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[CountdownMarks] Could not save the date reminders switch:',
+      failure
+    );
   });
 
   it('renders nothing off the native platform', () => {

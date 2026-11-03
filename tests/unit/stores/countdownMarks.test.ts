@@ -116,13 +116,17 @@ describe('loadCountdownMarks', () => {
 
   it('keeps state and copy when the read fails, and logs it', async () => {
     await writeLocalCopy(A, COUNTDOWN_MARKS_COPY_KIND, ['wedding']);
-    fetchCountdownMarks.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    const failure = new AccountDataError('transport', 'boom');
+    fetchCountdownMarks.mockRejectedValue(failure);
 
     await expect(state().loadCountdownMarks()).resolves.toBeUndefined();
 
     expect(state().countdownMarks).toEqual(['wedding']);
     expect(await savedCopy()).toEqual(['wedding']);
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[Settings] Failed to load the countdown marks from the server:',
+      failure
+    );
   });
 
   it('writes no copy when the first read fails: state stays "not loaded"', async () => {

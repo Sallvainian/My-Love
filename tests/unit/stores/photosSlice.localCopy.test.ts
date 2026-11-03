@@ -247,7 +247,8 @@ describe('photosSlice local copy', () => {
       writeLocalCopy.mockClear();
       requestPhotoImageFill.mockClear();
 
-      listAllPhotos.mockRejectedValueOnce(new Error('500'));
+      const failure = new Error('500');
+      listAllPhotos.mockRejectedValueOnce(failure);
       await store.getState().loadPhotos();
 
       expect(store.getState().photos).toEqual([shown(row(0)), shown(row(1))]);
@@ -255,7 +256,7 @@ describe('photosSlice local copy', () => {
       expect(writeLocalCopy).not.toHaveBeenCalled();
       expect(deletePhotoImages).not.toHaveBeenCalled();
       expect(requestPhotoImageFill).not.toHaveBeenCalled();
-      expect(console.error).toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith('[PhotosSlice] Failed to load photos:', failure);
     });
 
     it('an empty answer replaces the list and is saved as []', async () => {

@@ -869,10 +869,16 @@ describe('startDateReminderTriggers', () => {
 
   it('a throwing plugin call is logged and the next trigger still runs', async () => {
     setOnline(false);
-    localNotifications.getPending.mockRejectedValueOnce(new Error('bridge gone'));
+    const failure = new Error('bridge gone');
+    localNotifications.getPending.mockRejectedValueOnce(failure);
 
     setVisibility('visible');
-    await vi.waitFor(() => expect(console.error).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith(
+        '[DateReminders] Could not schedule the date reminders:',
+        failure
+      )
+    );
     setVisibility('visible');
     await scheduledTimes(1);
   });

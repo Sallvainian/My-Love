@@ -522,7 +522,10 @@ describe('interactionService', () => {
 
       await rejection(interactionService.sendPoke(USER_ID));
 
-      expect(console.error).toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        '[Supabase] InteractionService.sendInteraction:',
+        'fetch failed'
+      );
     });
   });
 

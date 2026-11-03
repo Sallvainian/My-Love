@@ -755,14 +755,15 @@ describe('the cached notice', () => {
   });
 
   it('a failing listener does not fail the write', async () => {
+    const failure = new Error('listener bug');
     const stop = onPhotoImageCached(() => {
-      throw new Error('listener bug');
+      throw failure;
     });
 
     const result = await cachePhotoImage(session(() => list(1)), 'owner/p0.jpg', new Blob(['x']));
     stop();
 
     expect(result).toBe('cached');
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith('[photoImageCache] A cached-image listener failed:', failure);
   });
 });

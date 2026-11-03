@@ -1041,11 +1041,15 @@ describe('scheduleDateReminders', () => {
   });
 
   it('logs a rejecting plugin call instead of throwing', async () => {
-    localNotifications.getPending.mockRejectedValue(new Error('boom'));
+    const failure = new Error('boom');
+    localNotifications.getPending.mockRejectedValue(failure);
 
     await expect(scheduleDateReminders(reminders, () => true)).resolves.toBeUndefined();
 
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[DateReminders] Could not schedule the date reminders:',
+      failure
+    );
     // Unlike cancelDateReminders, a re-plan that cannot read the pending list
     // stops before cancelling anything.
     expect(localNotifications.cancel).not.toHaveBeenCalled();
@@ -1053,11 +1057,15 @@ describe('scheduleDateReminders', () => {
   });
 
   it('logs a rejecting schedule instead of throwing', async () => {
-    localNotifications.schedule.mockRejectedValue(new Error('boom'));
+    const failure = new Error('boom');
+    localNotifications.schedule.mockRejectedValue(failure);
 
     await expect(scheduleDateReminders(reminders, () => true)).resolves.toBeUndefined();
 
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[DateReminders] Could not schedule the date reminders:',
+      failure
+    );
   });
 
   it('asks for the default notification sound on every scheduled reminder', async () => {
@@ -1155,12 +1163,16 @@ describe('cancelDateReminders', () => {
   });
 
   it('still cancels ids 1..64 when the pending list cannot be read, and logs it', async () => {
-    localNotifications.getPending.mockRejectedValue(new Error('boom'));
+    const failure = new Error('boom');
+    localNotifications.getPending.mockRejectedValue(failure);
 
     await expect(cancelDateReminders()).resolves.toBeUndefined();
 
     expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: allIds });
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[DateReminders] Could not list the pending date reminders:',
+      failure
+    );
   });
 
   it('logs a rejected cancel instead of throwing', async () => {
@@ -1294,10 +1306,14 @@ describe('listenForReminderTaps', () => {
 
   it('retries after a failed add, and logs the failure', async () => {
     const { listenForReminderTaps } = await load();
-    localNotifications.addListener.mockRejectedValueOnce(new Error('bridge gone'));
+    const failure = new Error('bridge gone');
+    localNotifications.addListener.mockRejectedValueOnce(failure);
 
     await expect(listenForReminderTaps()).resolves.toBeUndefined();
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[DateReminders] Could not listen for reminder taps:',
+      failure
+    );
     await listenForReminderTaps();
 
     expect(localNotifications.addListener).toHaveBeenCalledTimes(2);

@@ -100,13 +100,14 @@ describe('loadPushPreferences', () => {
   });
 
   it('never throws: a failed read sets the failed flag and logs', async () => {
-    fetchPushPreferences.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    const failure = new AccountDataError('transport', 'boom');
+    fetchPushPreferences.mockRejectedValue(failure);
 
     await expect(state().loadPushPreferences()).resolves.toBeUndefined();
 
     expect(state().pushPreferences).toBeNull();
     expect(state().pushPreferencesLoadFailed).toBe(true);
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith('[Settings] Failed to load the push settings:', failure);
   });
 
   it('a later successful read clears the failed flag', async () => {

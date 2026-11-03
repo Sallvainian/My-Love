@@ -181,7 +181,10 @@ describe('couple settings on the local copy', () => {
     expect(state().coupleSettings).toEqual(SAVED);
     expect(fetchCoupleSettings).not.toHaveBeenCalled();
     expect(await readLocalCopy(A, COUPLE_SETTINGS_COPY_KIND)).toEqual(SAVED);
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith(
+      '[Settings] Partner lookup failed; keeping couple settings:',
+      'network'
+    );
   });
 
   // Matrix: "Lookup fails — … or read fails".
