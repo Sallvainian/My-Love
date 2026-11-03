@@ -3669,3 +3669,19 @@ source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-sta
 severity: low
 reason: The Photos row checks canTellMobileData() by hand (Settings.tsx, Preferences group) while its page is gated by `available: canTellMobileData` in SUBPAGES. A later subpage with `available` whose row is not gated shows a row that pushes /settings/<page>, then the stack's redirect replaces that entry with /settings, leaving two top-page entries and one extra Back. The fix is a sentence in the AGENTS.md "Settings subpage" rule (gate the row on the same check), or deriving row visibility from the spec.
 status: open
+
+### DW-424: After a live update, the native edge swipe on the first page may reload the app instead of doing nothing.
+origin: investigation (spike 5.2, 2026-11-02)
+location: ios/App/App/NativeAuth.swift (MainViewController); src/services/nativeUpdates.ts
+source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
+severity: medium (unverified)
+reason: Spike 5.2 chose WKWebView's back-forward gesture, which follows the web view's whole back list, not only this document's pushState entries. The live updater loads each new bundle as a new document, so the old document's entries may stay in that list, and a swipe on the first page after an update would then navigate to the old bundle's URL. The trial never applied an update. Story 15 settles it with `sim build --update-port` and `sim serve-update`: apply an update, then `sim swipe back` on the first page; if the page reloads, cancel cross-document back navigations in the shell.
+status: open
+
+### DW-425: Three native edge-swipe cases no device has checked: the first entry, the column on the left edge, and Home's message card.
+origin: review (spike 5.2, 2026-11-02)
+location: ios/App/App/NativeAuth.swift (MainViewController); src/components/DailyMessage/DailyMessage.tsx (drag="x"); src/hooks/useSideColumn.ts
+source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
+severity: medium (unverified)
+reason: The Duo trial covered Settings pushes and dock views in the bottom dock and folded with the column, side not recorded. The simulator's first-entry result rests on synthesized pans that register about one time in four. Unchecked: (1) a real swipe on the session's first entry stays on the page; (2) with the column on the left edge (one folded landscape, the left pane side by side) the swipe still goes back and the capsule still taps; (3) an edge swipe that starts over Home's message card, which turns to the next message on a right drag, goes back without also turning the card. Story 15 checks all three by hand on the Duo once the Swift line is in.
+status: open
