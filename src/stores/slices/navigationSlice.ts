@@ -7,7 +7,12 @@
  * - Whether that page was opened from Home (`settingsFromHome`), a date card or
  *   Home's Add button: the entry carries `from: 'home'` in `history.state`, which
  *   survives a reload, and the flag mirrors it so the dock keeps Home lit
- * - Browser history integration
+ * - Browser history integration: Home is the bottom of the history. A view
+ *   picked in the dock goes back down to the first entry, makes it Home and
+ *   stacks the view on it, so back (the shell's edge swipe, the browser's
+ *   button) from any view returns to Home, and back on Home leaves nothing
+ *   behind. Each entry the app creates carries `depth`, its height above that
+ *   first entry; a fresh load has no state and is depth 0.
  *
  * Cross-slice dependencies:
  * - None (self-contained)
@@ -49,6 +54,23 @@ export function settingsPathFromRoute(routePath: string): string {
   if (!isSettingsRoute(routePath)) return '';
   return routePath.slice(SETTINGS_ROUTE.length).replace(/^\/+|\/+$/g, '');
 }
+
+/**
+ * How many entries the app has stacked above the first entry of this visit.
+ * A fresh load carries no state, so it reads 0.
+ */
+export function historyDepth(): number {
+  const depth: unknown = window.history.state?.depth;
+  return typeof depth === 'number' && depth > 0 ? depth : 0;
+}
+
+/**
+ * A dock pick waiting for `history.go` to reach the first entry, and whether
+ * that walk is under way, so a second tap before it lands changes the target
+ * rather than walking again.
+ */
+let pendingView: ViewType | null = null;
+let walkingDown = false;
 
 export interface NavigationSlice {
   // State
@@ -123,15 +145,50 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
       // Shared with `App`'s inverse so the round trip can be asserted at the
       // production base, which neither call site could express alone (DW-125).
       const fullPath = withBasePath(basePath);
+      const depth = historyDepth();
       // Tapping the already-active tab must not stack an identical history entry —
       // it would cost one Back press per tap before the user can leave the view.
-      if (window.location.pathname === fullPath) {
+      if (window.location.pathname === fullPath && !walkingDown) {
         // The entry keeps whether the app created it: Settings' back arrow
         // reads `inApp` to tell "back returns one level" from "back leaves".
         const inApp = window.history.state?.inApp === true;
-        window.history.replaceState(inApp ? { view, inApp } : { view }, '', fullPath);
+        window.history.replaceState(
+          { view, ...(inApp ? { inApp } : {}), ...(depth > 0 ? { depth } : {}) },
+          '',
+          fullPath
+        );
+      } else if (depth > 0 || walkingDown) {
+        // Above the first entry: walk back down to it, then stack the view on
+        // Home there once the walk lands (App's popstate handler runs first).
+        pendingView = view;
+        if (!walkingDown) {
+          walkingDown = true;
+          window.addEventListener(
+            'popstate',
+            () => {
+              walkingDown = false;
+              const target = pendingView;
+              pendingView = null;
+              if (target) get().setView(target);
+            },
+            { once: true }
+          );
+          window.history.go(-depth);
+        }
       } else {
-        window.history.pushState({ view, inApp: true }, '', fullPath);
+        // The first entry: it becomes Home, and any other view goes on top.
+        const homePath = withBasePath(pathMap.home);
+        if (window.location.pathname !== homePath) {
+          const inApp = window.history.state?.inApp === true;
+          window.history.replaceState(
+            { view: 'home', ...(inApp ? { inApp } : {}) },
+            '',
+            homePath
+          );
+        }
+        if (view !== 'home') {
+          window.history.pushState({ view, inApp: true, depth: 1 }, '', fullPath);
+        }
       }
       logger.info(`[AppStore] View changed to '${view}', URL: ${fullPath}`);
     }
@@ -148,7 +205,13 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
     });
     const fullPath = withBasePath(settingsRoute(path));
     window.history.pushState(
-      { view: 'settings', settingsPath: path, inApp: true, ...(fromHome ? { from: 'home' } : {}) },
+      {
+        view: 'settings',
+        settingsPath: path,
+        inApp: true,
+        depth: historyDepth() + 1,
+        ...(fromHome ? { from: 'home' } : {}),
+      },
       '',
       fullPath
     );

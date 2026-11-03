@@ -220,7 +220,7 @@ test.describe('Bottom Dock', () => {
     });
   }
 
-  test('[P0] should go back to the previous view from Settings', async ({ page }) => {
+  test('[P0] should go back to Home, not the previous view, from Settings', async ({ page }) => {
     await page.goto('/');
     await navigateTo(page, 'mood');
     await page.waitForURL('**/mood');
@@ -232,8 +232,8 @@ test.describe('Bottom Dock', () => {
     // WHEN: Browser back
     await page.goBack();
 
-    // THEN: The previous view is restored
-    await page.waitForURL('**/mood');
-    await expect(page.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
+    // THEN: Home, the bottom of the history: a dock view sits on Home alone
+    await page.waitForURL((url) => url.pathname === '/');
+    await expect(page.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
   });
 });

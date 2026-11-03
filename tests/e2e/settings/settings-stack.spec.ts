@@ -213,7 +213,7 @@ test.describe('Settings page stack', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Photos' })).toBeVisible();
   });
 
-  test('[P1] should come back to Photos on browser back after leaving through the dock', async ({
+  test('[P1] should go back to Home, not Photos, on browser back after leaving through the dock', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -227,9 +227,10 @@ test.describe('Settings page stack', () => {
     await expect(page).toHaveURL(/\/mood$/);
     await page.goBack();
 
-    // THEN: Photos, not the top page
-    await expect(page).toHaveURL(/\/settings\/photos$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Photos' })).toBeVisible();
+    // THEN: Home, the bottom of the history: a dock view sits on Home alone
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('app-header')).toBeVisible();
+    await expect(page.getByTestId('settings-view')).toHaveCount(0);
   });
 
   test('[P0] should replace the entry with /settings, not leave the app, when a fresh load at Photos goes back', async ({

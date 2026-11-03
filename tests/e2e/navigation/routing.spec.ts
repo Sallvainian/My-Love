@@ -41,7 +41,7 @@ test.describe('URL Routing', () => {
     await expect(page.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
   });
 
-  test('[P0] should support browser back button', async ({ page }) => {
+  test('[P0] should go back to Home, not the previous view, with the browser back button', async ({ page }) => {
     // GIVEN: User navigated from home to photos to mood
     await page.goto('/');
     await expect(page.getByTestId('nav-dock')).toBeVisible();
@@ -57,9 +57,9 @@ test.describe('URL Routing', () => {
     // WHEN: User clicks browser back button
     await page.goBack();
 
-    // THEN: Previous view is displayed (URL goes back to /photos)
-    await page.waitForURL('**/photos');
-    await expect(page.getByTestId('nav-dock')).toBeVisible();
+    // THEN: Home, the bottom of the history, not Photos: a dock view sits on Home alone
+    await page.waitForURL((url) => url.pathname === '/');
+    await expectHome(page);
   });
 
   test('[P0] should fallback to home view for unknown routes', async ({ page }) => {
@@ -82,7 +82,8 @@ test.describe('URL Routing', () => {
     await expect(page.getByTestId('nav-scripture')).toHaveCount(0);
   });
 
-  test('[P0] should show home and no scripture view on popstate to /scripture', async ({
+  // A dock pick turns the fresh /scripture entry into Home, so back lands on `/`.
+  test('[P0] should show home and no scripture view on back from a view picked at /scripture', async ({
     page,
   }) => {
     await page.goto('/scripture');

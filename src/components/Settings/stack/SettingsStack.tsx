@@ -49,7 +49,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useSideColumn } from '../../../hooks/useSideColumn';
-import { settingsRoute } from '../../../stores/slices/navigationSlice';
+import { historyDepth, settingsRoute } from '../../../stores/slices/navigationSlice';
 import { useAppStore } from '../../../stores/useAppStore';
 import { withBasePath } from '../../../utils/basePath';
 import { NetworkStatusIndicator } from '../../shared/NetworkStatusIndicator';
@@ -94,17 +94,20 @@ function pageAbove(path: string, resolvePage: (path: string) => SettingsPageSpec
 
 /**
  * Rewrites the current entry to a Settings route, keeping whether the app
- * created it and whether the flow began on Home. A redirect to the top page
+ * created it, its height above the first entry, and whether the flow began
+ * on Home. A redirect to the top page
  * drops the second: it is no longer a date flow.
  */
 function replaceSettingsRoute(path: string) {
   const inApp = window.history.state?.inApp === true;
   const fromHome = path !== '' && window.history.state?.from === 'home';
+  const depth = historyDepth();
   window.history.replaceState(
     {
       view: 'settings',
       settingsPath: path,
       ...(inApp ? { inApp } : {}),
+      ...(depth > 0 ? { depth } : {}),
       ...(fromHome ? { from: 'home' } : {}),
     },
     '',

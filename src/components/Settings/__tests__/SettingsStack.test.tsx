@@ -610,7 +610,7 @@ describe('SettingsStack', () => {
   });
 
   describe('leave and return', () => {
-    it('shows Photos again on browser back from another view', async () => {
+    it('leaves no Settings page under another view: browser back from it reaches Home', async () => {
       const user = userEvent.setup();
       openedInApp();
       const first = renderStack();
@@ -618,13 +618,11 @@ describe('SettingsStack', () => {
       // A dock tap: another view, then the stack unmounts with Settings.
       act(() => useAppStore.getState().setView('mood'));
       first.unmount();
+      await vi.waitFor(() => expect(window.location.pathname).toBe('/mood'));
 
       act(() => window.history.back());
-      await vi.waitFor(() => expect(useAppStore.getState().settingsPath).toBe('photos'));
-      renderStack();
 
-      expect(window.location.pathname).toBe('/settings/photos');
-      expect(screen.getByTestId('photos-body')).toBeInTheDocument();
+      await vi.waitFor(() => expect(window.location.pathname).toBe('/'));
     });
   });
 
