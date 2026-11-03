@@ -229,6 +229,7 @@ export function signedOutState() {
     eventsIsLoading: false,
     eventsError: null,
     eventsPagination: null,
+    eventsStale: false,
     eventsIsLoadingMore: false,
     eventsHistoryError: null,
 
@@ -246,6 +247,11 @@ export function signedOutState() {
     // notificationsSlice — the outgoing account's push switches.
     pushPreferences: null,
     pushPreferencesLoadFailed: false,
+
+    // navigationSlice — not account state, but a page pushed in the outgoing
+    // session is not one the next sign-in just opened: left set, that page
+    // would mount after sign-in as a fresh push, with the slide and focus move.
+    settingsPushedPath: null,
   } satisfies Partial<AppState>;
 }
 

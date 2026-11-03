@@ -340,8 +340,8 @@ test.describe('Managing events from Settings', () => {
       }
 
       const slot = reservedSnapshotCount++;
-      // Only the Dates list's mount reads are held; a read after them (the
-      // list mounting again on the way back) goes straight through.
+      // Only the Dates list's mount reads are held; any later read goes
+      // straight through.
       if (slot >= DATES_MOUNT_SNAPSHOT_COUNT) {
         await route.continue();
         return;

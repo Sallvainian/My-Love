@@ -95,6 +95,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   eventsIsLoading: false,
   eventsError: null,
   eventsPagination: null,
+  eventsStale: false,
   eventsIsLoadingMore: false,
   eventsHistoryError: null,
   coupleSettings: null,
@@ -102,6 +103,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   ownProfileLoadFailed: false,
   pushPreferences: null,
   pushPreferencesLoadFailed: false,
+  settingsPushedPath: null,
   countdownMarks: null,
 };
 

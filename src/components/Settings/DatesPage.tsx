@@ -21,6 +21,10 @@
  * Settings does not refresh events (the `events` refresher skips this view), so
  * the page loads them on mount and on each connectivity change, as Home does;
  * rows show from the store at once, and an initial-load failure is not shown.
+ * A return to the list (back from a date's page or a form) keeps the store's
+ * window when it holds a server page and no refresh was skipped meanwhile
+ * (`eventsStale`), so rows reached through `Load more` and a date just added
+ * stay listed.
  * `Load more` appends in place; its failure (or the offline refusal) keeps the
  * rows and shows its message in the Error box until the next `Load more` or
  * until the page is left.
@@ -58,6 +62,7 @@ import { KindChooser, type NewDateKind } from './NewDatePages';
 import { coupleValue, formatListDate, parseInstant, yearlyValue } from './settingsFields';
 import { SettingsBarAction } from './stack/SettingsBarAction';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
+import { useSettingsPage } from './stack/settingsPageContext';
 import { ROW_BUTTON } from './SwitchRow';
 
 /** An event's tile, the same three icons as `EventCountdown`. */
@@ -78,6 +83,7 @@ export function DatesPage() {
   const isOnline = useAppStore((s) => s.syncStatus.isOnline);
   const events = useAppStore((s) => s.events);
   const eventsPagination = useAppStore((s) => s.eventsPagination);
+  const eventsStale = useAppStore((s) => s.eventsStale);
   const eventsIsLoading = useAppStore((s) => s.eventsIsLoading);
   const eventsIsLoadingMore = useAppStore((s) => s.eventsIsLoadingMore);
   const loadEvents = useAppStore((s) => s.loadEvents);
@@ -104,10 +110,45 @@ export function DatesPage() {
   // Events are not refreshed while Settings is open, so the page asks, as Home
   // does. Either connectivity change re-asks: offline settles on the saved copy,
   // reconnecting fetches. The outcome is not shown: it is not an action just tried.
+  // Coming back to the list (from a date's page or a form) does not ask when the
+  // store already holds a server page: a load replaces the list with the
+  // server's first page, which would drop the rows `Load more` reached and a
+  // date just added beyond that window. A refresh skipped while the list was
+  // away (`eventsStale`) or a failed load (`eventsError`) still asks. The skip
+  // holds only for the arrival's own account, session and connectivity, so
+  // StrictMode's replay skips too and any later change asks as before.
+  const { arrivedBack } = useSettingsPage();
+  const eventsError = useAppStore((s) => s.eventsError);
+  const keptOnArrival = useRef(
+    arrivedBack && eventsPagination !== null && !eventsStale && eventsError === null
+      ? `${userId}:${authSessionVersion}:${isOnline}`
+      : null
+  );
+  // Whether a load has answered the current stale mark (below).
+  const staleAnswered = useRef(false);
   useEffect(() => {
     if (!userId) return;
+    if (keptOnArrival.current === `${userId}:${authSessionVersion}:${isOnline}`) return;
+    keptOnArrival.current = null;
+    staleAnswered.current = true;
     void loadEvents();
   }, [userId, authSessionVersion, isOnline, loadEvents]);
+
+  // A refresh skipped while the list shows (the iPhone shell's return to the
+  // foreground or a token renewal marks the list stale) asks now, so the list
+  // is fresh before a date is opened from it. Asked once per mark: not again
+  // when the load fails, not while a load is on its way (it clears the mark),
+  // and not while the store still reads offline, as a reconnect's own
+  // connectivity change asks just after, through the effect above.
+  useEffect(() => {
+    if (!eventsStale) {
+      staleAnswered.current = false;
+      return;
+    }
+    if (staleAnswered.current || !userId || eventsIsLoading || !isOnline) return;
+    staleAnswered.current = true;
+    void loadEvents();
+  }, [eventsStale, eventsIsLoading, isOnline, userId, loadEvents]);
 
   const handleLoadMore = async () => {
     setLoadMoreError(null);

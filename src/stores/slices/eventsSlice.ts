@@ -167,6 +167,14 @@ export interface EventsSlice {
   eventsPagination: EventsPagination | null;
   eventsIsLoadingMore: boolean;
   eventsHistoryError: string | null;
+  /**
+   * A refresh was skipped while Settings showed (a reconnect, a signed-in
+   * start, the iPhone shell's return to the foreground) and no server page has
+   * replaced the list since. The Dates list asks when this turns true while it
+   * shows, and keeps the window it holds when the person comes back to it only
+   * while this is false.
+   */
+  eventsStale: boolean;
 
   // Actions
   loadEvents: () => Promise<EventLoadResult>;
@@ -290,9 +298,17 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   // The kind's refresher for signed-in start, reconnect and on-demand refreshes.
   // Re-registering (a second store in tests) replaces it.
   registerLocalCopy(EVENTS_COPY_KIND, async () => {
-    // Home and Settings load on their own at start and on `online`; a second load here would only be superseded.
+    // Home and the Dates list load on their own at start and on `online`; a
+    // second load here would only be superseded. Settings' other pages do not
+    // load, and a load here would replace the list under an event page reached
+    // through `Load more`, so the list is marked stale: the Dates list asks at
+    // once if it is showing, else when the person comes back to it.
     const view = get().currentView;
-    if (view === 'home' || view === 'settings') return;
+    if (view === 'home') return;
+    if (view === 'settings') {
+      set({ eventsStale: true });
+      return;
+    }
     await get().loadEvents();
   });
 
@@ -423,6 +439,8 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
         eventsPagination: page.pagination,
         eventsIsLoading: false,
         eventsIsLoadingMore: false,
+        // A first page from the server is the refresh the stale mark waited for.
+        ...(append ? {} : { eventsStale: false }),
       });
       await saveEventsCopy(requestedBy, requestedInSession);
       return { status: 'success' };
@@ -450,6 +468,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   eventsPagination: null,
   eventsIsLoadingMore: false,
   eventsHistoryError: null,
+  eventsStale: false,
 
   // A refresh resets the traversal to the nearest windows only after success.
   loadEvents: () => loadPage(false),

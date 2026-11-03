@@ -6,7 +6,9 @@
  * until the store holds it).
  *
  * An own event's page lists Name, Date, Note and Icon (each opens its field
- * page), then Remind me while the event is upcoming (today counts as upcoming,
+ * page; the Icon row shows the event's glyph in accent, as a partner's
+ * read-only Icon row does, and its page is
+ * `IconPicker`, the New event form's three tiles), then Remind me while the event is upcoming (today counts as upcoming,
  * as on the Dates list), then `Delete event` centered and danger, alone in its
  * own card. It asks first (`ConfirmDialog`); offline it refuses before the
  * dialog, with `offlineMessage('Events', 'delete')` in the page's Error box,
@@ -36,9 +38,9 @@
  * @component
  */
 
-import { Calendar, Check, Gem, Plane, type LucideIcon } from 'lucide-react';
+import { Calendar, Gem, Plane, type LucideIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { offlineMessage } from '../../services/accountDataError';
 import { MARK_KEYS } from '../../services/dateReminders';
@@ -51,7 +53,7 @@ import {
 import type { EventWriteResult } from '../../stores/slices/eventsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
-import { DIVIDER, GROUP_ROW, fieldClass } from '../shared/kitClasses';
+import { fieldClass } from '../shared/kitClasses';
 import { getCalendarDaysDiff } from '../RelationshipTimers/eventCountdownHelpers';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DatePage } from './DatePages';
@@ -77,6 +79,76 @@ export const ICON_OPTIONS: ReadonlyArray<{ value: EventIcon; label: string; Icon
 
 const iconLabel = (icon: EventIcon) =>
   ICON_OPTIONS.find((option) => option.value === icon)?.label ?? icon;
+
+const iconGlyph = (icon: EventIcon) =>
+  ICON_OPTIONS.find((option) => option.value === icon)?.Icon ?? Calendar;
+
+interface IconPickerProps {
+  value: EventIcon;
+  onChange: (icon: EventIcon) => void;
+  disabled?: boolean;
+  /** The tiles' test ids are `<testIdPrefix>-<value>`. */
+  testIdPrefix?: string;
+  /**
+   * The group's id, for a page that focuses the field when it opens
+   * (`OneFieldPage`); the group then takes focus from code, not from a tap.
+   */
+  id?: string;
+}
+
+/**
+ * The event icon as three equal 48px tiles (Calendar, Ring, Plane): the
+ * selected one a tint fill, accent label and 2px accent ring, the others a 1px
+ * line-strong ring. The radios are sr-only and precede their label, so the
+ * label can show the focus ring (`peer`) and carries the test id a tap goes to.
+ */
+export function IconPicker({
+  value,
+  onChange,
+  disabled = false,
+  testIdPrefix = 'settings-new-event-icon',
+  id,
+}: IconPickerProps) {
+  const name = useId();
+  return (
+    <div
+      id={id}
+      tabIndex={id === undefined ? undefined : -1}
+      className="flex gap-2 focus:outline-hidden"
+      role="radiogroup"
+      aria-label="Icon"
+      data-testid={`${testIdPrefix}-options`}
+    >
+      {ICON_OPTIONS.map(({ value: option, label, Icon }) => (
+        <div key={option} className="flex-1">
+          <input
+            id={`${name}-${option}`}
+            type="radio"
+            name={name}
+            value={option}
+            checked={value === option}
+            disabled={disabled}
+            onChange={() => onChange(option)}
+            className="peer sr-only"
+          />
+          <label
+            htmlFor={`${name}-${option}`}
+            data-testid={`${testIdPrefix}-${option}`}
+            data-selected={value === option ? 'true' : 'false'}
+            className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition-colors duration-200 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
+              value === option
+                ? 'bg-tint text-accent ring-2 ring-accent'
+                : 'text-muted ring-1 ring-line-strong'
+            }`}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            {label}
+          </label>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
 const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
@@ -211,6 +283,7 @@ export function EventPage({ eventId }: EventPageProps) {
             key="icon"
             label="Icon"
             value={iconLabel(event.icon)}
+            valueIcon={iconGlyph(event.icon)}
             target={target('icon')}
             testId="settings-event-icon"
           />
@@ -233,6 +306,7 @@ export function EventPage({ eventId }: EventPageProps) {
             key="icon"
             label="Icon"
             value={iconLabel(event.icon)}
+            valueIcon={iconGlyph(event.icon)}
             testId="settings-event-icon-readonly"
           />
         </SettingsGroup>
@@ -375,40 +449,13 @@ export function EventFieldPage({ eventId, field }: EventFieldPageProps) {
           offlineRefusal={offlineRefusal}
           testId="settings-event-icon-page"
           renderField={({ id, value, onChange, disabled }) => (
-            <div
+            <IconPicker
               id={id}
-              tabIndex={-1}
-              role="radiogroup"
-              aria-label="Icon"
-              className="flex flex-col gap-1.5 focus:outline-hidden"
-              data-testid="settings-event-icon-options"
-            >
-              {ICON_OPTIONS.map(({ value: option, label, Icon }, index) => (
-                <div key={option} className="contents">
-                  {index > 0 && <div className={DIVIDER} aria-hidden="true" />}
-                  <label
-                    className={`${GROUP_ROW} cursor-pointer rounded-[14px] has-focus-visible:ring-2 has-focus-visible:ring-accent`}
-                    data-testid={`settings-event-icon-${option}`}
-                  >
-                    <input
-                      type="radio"
-                      name="settings-event-icon"
-                      className="sr-only"
-                      checked={value === option}
-                      disabled={disabled}
-                      onChange={() => onChange(option)}
-                    />
-                    <Icon className="h-4.5 w-4.5 shrink-0 text-accent" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink">
-                      {label}
-                    </span>
-                    {value === option && (
-                      <Check className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
-                    )}
-                  </label>
-                </div>
-              ))}
-            </div>
+              value={value as EventIcon}
+              onChange={onChange}
+              disabled={disabled}
+              testIdPrefix="settings-event-icon"
+            />
           )}
         />
       );

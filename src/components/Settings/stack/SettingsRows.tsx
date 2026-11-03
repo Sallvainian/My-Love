@@ -68,6 +68,11 @@ interface SettingsRowProps {
    * capped width instead of spilling past the card. Other values stay whole.
    */
   truncateValue?: boolean;
+  /**
+   * Shown in accent in place of the value's text (an event's Icon row); the
+   * value still names the row.
+   */
+  valueIcon?: LucideIcon;
   icon?: LucideIcon;
   /** The subpage this row opens (a path relative to `/settings`). */
   target?: string;
@@ -82,6 +87,7 @@ export function SettingsRow({
   label,
   value,
   truncateValue,
+  valueIcon: ValueIcon,
   icon: Icon,
   target,
   onClick,
@@ -108,16 +114,20 @@ export function SettingsRow({
         </span>
       )}
       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink">{label}</span>
-      {value && (
-        <span
-          className={
-            truncateValue
-              ? 'max-w-[60%] min-w-0 truncate text-[15px] text-muted'
-              : 'shrink-0 text-[15px] whitespace-nowrap text-muted'
-          }
-        >
-          {value}
-        </span>
+      {ValueIcon ? (
+        <ValueIcon className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+      ) : (
+        value && (
+          <span
+            className={
+              truncateValue
+                ? 'max-w-[60%] min-w-0 truncate text-[15px] text-muted'
+                : 'shrink-0 text-[15px] whitespace-nowrap text-muted'
+            }
+          >
+            {value}
+          </span>
+        )
       )}
       <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
     </button>
@@ -127,6 +137,11 @@ export function SettingsRow({
 interface ReadOnlyRowProps {
   label: string;
   value: string;
+  /**
+   * Shown in accent in place of the value's text (an event's Icon row); the
+   * value stays in the row as hidden text, so the row still says what it is.
+   */
+  valueIcon?: LucideIcon;
   testId?: string;
 }
 
@@ -135,11 +150,18 @@ interface ReadOnlyRowProps {
  * value keeps the muted ink of any other value (never reduced opacity) and
  * wraps, so a long email breaks instead of widening the card.
  */
-export function ReadOnlyRow({ label, value, testId }: ReadOnlyRowProps) {
+export function ReadOnlyRow({ label, value, valueIcon: ValueIcon, testId }: ReadOnlyRowProps) {
   return (
     <div className={`${GROUP_ROW} px-0.5`} data-testid={testId}>
       <span className="shrink-0 text-[15px] font-medium text-ink">{label}</span>
-      <span className="min-w-0 flex-1 text-right text-[15px] wrap-break-word text-muted">{value}</span>
+      {ValueIcon ? (
+        <span className="flex min-w-0 flex-1 justify-end">
+          <ValueIcon className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+          <span className="sr-only">{value}</span>
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1 text-right text-[15px] wrap-break-word text-muted">{value}</span>
+      )}
     </div>
   );
 }

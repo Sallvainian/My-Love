@@ -3732,7 +3732,8 @@ origin: story 5.11 build (epic-settings-rework), 2026-11-03
 location: src/components/Settings/EventPages.tsx (EventPage Icon row, EventFieldPage `icon`)
 severity: low
 reason: DESIGN.md (Components, List row) says "An Icon field row shows the event's glyph in accent in place of a text value", and (One-field edit page) "The icon field is the three-option picker used on the Form page": three equal 48px tiles, glyph and name, the selected one tint-filled with an accent label and 2px accent ring. Story 5.11's plan specified the text value (`Calendar`/`Ring`/`Plane`) and check rows instead, so R18 is not met for the Icon row and page. Story 5.13 builds the Form page's picker; reuse it on the Icon page there and give `SettingsRow` a glyph value for the Icon row.
-status: open
+status: done 2026-11-03
+resolution: fixed at the owner's request: the event's Icon row shows its glyph in accent in place of the text value (`SettingsRow` `valueIcon`), as a partner's read-only Icon row does (`ReadOnlyRow` `valueIcon`, the name kept as hidden text), and the Icon page is `IconPicker`, the New event form's three tiles, moved into EventPages.tsx beside `ICON_OPTIONS`.
 
 ### DW-431: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker (ledger DW-430).
 origin: spec-deferred 6be699f2d039
@@ -3740,7 +3741,8 @@ location: src/components/Settings/EventPages.tsx
 source_spec: `tickets/epic-settings-rework/tickets/story-every-event-has-its-own-page-plan.md`
 severity: low
 reason: DESIGN.md Components: "An Icon field row shows the event's glyph in accent in place of a text value" and "The icon field is the three-option picker used on the Form page". This plan's matrix specified text values and check rows; the implementer flagged the mismatch. Story 5.13 builds the picker.
-status: open
+status: done 2026-11-03
+resolution: duplicate of DW-430 (the same finding, filed twice by story 5.11); fixed with it.
 
 ### DW-432: No E2E axe coverage of the new Settings pages since `events-accessibility` was deleted.
 origin: story 5.13 build (epic-settings-rework), 2026-11-03
@@ -3765,7 +3767,8 @@ location: src/components/Settings/DatesPage.tsx (the mount effect calling `loadE
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
 reason: The Dates list loads events on every mount, and a back from an event page or a Form page remounts it, so the store's paged window is replaced by the server's first page. Since story 5.9 this drops every row reached through `Load more`. Since story 5.13 it also drops a past date added beyond the first window: it shows on the list after Add and vanishes when the reload answers. `events-history-pagination.spec.ts` waits for that reload and pages to the row. A fix keeps the loaded window across a return (for example, load only on a push or a fresh mount, not on a pop), as `EventPage` already skips its load when it holds its event.
-status: open
+status: done 2026-11-03
+resolution: fixed at the owner's request: coming back to the Dates list (`arrivedBack`, a pop, from `SettingsPageContext`) no longer reloads its first window while the store holds a server page (`eventsPagination`), so rows reached through `Load more` and a date just added stay listed; a fresh mount, a push and any later connectivity change still load. A refresh skipped while Settings showed (a reconnect on an event page) marks the list stale (`eventsStale`, cleared by the next first page from the server), and a return then loads; a mark set while the list itself shows (the iPhone shell's return to the foreground) loads at once, and a return after the list's own failed load (`eventsError`) loads too. `events-history-pagination.spec.ts` now checks that the return starts no load. A refresh while the list shows still drops `Load more` rows (DW-440).
 
 ### DW-435: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh.
 origin: story 5.14 build (epic-settings-rework), 2026-11-03
@@ -3773,7 +3776,8 @@ location: src/components/Settings/stack/SettingsStack.tsx (`trail`'s initial `di
 source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
 severity: low
 reason: EXPERIENCE.md Flow 1 step 2 says the event page "slides in from the right" when Casey taps the Home card. Settings is not mounted while Home shows, so a Home card or Add mounts `SettingsStack` on the date page. Its first render has no direction, so it gets no slide class, and its commit effect skips the scroll-to-top and title focus that a push within the stack gets. The page appears at once, at Home's scroll position until the shorter page clamps it. Opening Settings from the gear has always behaved the same way. A fix starts `trail` as `push`, and runs the push branch on the first commit, when `settingsPushedPath` equals the mounted path, as story 5.14 already does for the reload check.
-status: open
+status: done 2026-11-03
+resolution: fixed at the owner's request: a push that mounts the Settings stack on a subpage (`settingsPushedPath` equals the mounted path) starts as a push, so a date page or New event opened from Home slides in, scrolls to the top and focuses its title. The top page opened from the gear or the dock still appears without a slide, as a view switch does.
 
 ### DW-436: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh (DW-435).
 origin: spec-deferred 70fea21d81f5
@@ -3781,7 +3785,8 @@ location: src/components/Settings/stack/SettingsStack.tsx
 source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
 severity: low
 reason: SettingsStack's trail starts with direction null and its commit effect returns early while shownPath is null, so a first mount gets no slide class, scroll reset or title focus; EXPERIENCE.md Flow 1 step 2 says the event page slides in.
-status: open
+status: done 2026-11-03
+resolution: duplicate of DW-435 (the same finding, filed twice by story 5.14); fixed with it.
 
 ### DW-437: DW-425 still names story 15 as the one that checks its three cases by hand on the Duo, and it does not hold this story's simulator results; the ledger reserves that entry's text for the orchestrator.
 origin: spec-deferred f577620c7c17
@@ -3805,4 +3810,12 @@ location: AGENTS.md (Where things are, Settings subpage rule)
 source_spec: `tickets/epic-settings-rework/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: `subpageAvailable` is a non-exported function in src/components/Settings/Settings.tsx; parent pages other than the top page live in their own files, so a row there cannot call it. A path missing from SUBPAGES counts as available. Today only top-page rows have pages with `available`. The fix edits AGENTS.md, which review routes to the orchestrator.
+status: open
+
+### DW-440: A refresh while the Dates list shows replaces it with the server's first window, so rows reached through `Load more` drop out until it is tapped again.
+origin: settings follow-up fixes on PR #449 (epic-settings-rework), 2026-11-03
+location: src/components/Settings/DatesPage.tsx (the connectivity load and the `eventsStale` load); src/stores/slices/eventsSlice.ts (`loadEvents` replaces the list with the first page)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: The list asks the server again on a reconnect, and on the iPhone shell when the app comes back to the foreground (the events refresher marks it `eventsStale`). `loadEvents` answers with the first window only and replaces the list, so the older past dates `Load more` added are hidden until it is tapped again. Nothing is lost on the server. The owner chose an up-to-date list over keeping those rows (2026-11-03). It shows only with more than one window of past dates. A fix re-reads as many windows as were loaded, keeping the cursors' depth.
 status: open

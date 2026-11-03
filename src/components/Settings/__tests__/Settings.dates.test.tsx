@@ -113,6 +113,8 @@ function setDates(state: {
     useAppStore.setState({
       events: [],
       eventsPagination: pagination(false),
+      eventsStale: false,
+      eventsError: null,
       coupleSettings: LINKED,
       partner: PARTNER,
       partnerKnown: true,
@@ -535,6 +537,122 @@ describe('Settings > Dates', () => {
 
       expect(screen.getByTestId('settings-dates-event-kept')).toBeInTheDocument();
       expect(screen.queryByTestId('settings-dates-error')).not.toBeInTheDocument();
+    });
+
+    describe('a refresh skipped while the list shows', () => {
+      it('asks once, at once (the iPhone shell coming back to the foreground)', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept')] });
+        await renderSettings();
+        await openDates(user);
+        const opened = loadEvents.mock.calls.length;
+
+        // What the events refresher does while Settings shows.
+        act(() => useAppStore.setState({ eventsStale: true }));
+
+        expect(loadEvents.mock.calls.length).toBe(opened + 1);
+      });
+
+      it('leaves a reconnect to its own connectivity change, asking once', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept')] });
+        await renderSettings();
+        await openDates(user);
+        act(() => {
+          useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: false } });
+        });
+        const offline = loadEvents.mock.calls.length;
+
+        // The refresher runs on `online` before the store reads online again.
+        act(() => useAppStore.setState({ eventsStale: true }));
+        expect(loadEvents.mock.calls.length).toBe(offline);
+        act(() => {
+          useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: true } });
+        });
+
+        expect(loadEvents.mock.calls.length).toBe(offline + 1);
+      });
+    });
+
+    describe('coming back to the list from a date\'s page', () => {
+      /** Opens the Dates list, then an event's page from its row, and comes back with the arrow. */
+      async function openEventAndComeBack(user: ReturnType<typeof userEvent.setup>) {
+        await renderSettings();
+        await openDates(user);
+        const opened = loadEvents.mock.calls.length;
+        await user.click(rowAt('event-kept'));
+        await waitFor(() => expect(window.location.pathname).toBe('/settings/dates/event/kept'));
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await waitFor(() => expect(window.location.pathname).toBe('/settings/dates'));
+        expect(await screen.findByRole('heading', { level: 1, name: 'Dates' })).toBeInTheDocument();
+        return opened;
+      }
+
+      it('keeps the loaded rows and asks nothing when the store holds a server page', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept'), makeEvent('reached-by-load-more', { date: dayFromToday(-400) })] });
+
+        const opened = await openEventAndComeBack(user);
+
+        expect(loadEvents.mock.calls.length).toBe(opened);
+        expect(rowAt('event-kept')).toBeInTheDocument();
+        expect(rowAt('event-reached-by-load-more')).toBeInTheDocument();
+      });
+
+      it('still asks on the next connectivity change', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept')] });
+        const opened = await openEventAndComeBack(user);
+
+        act(() => {
+          useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: false } });
+        });
+
+        expect(loadEvents.mock.calls.length).toBeGreaterThan(opened);
+      });
+
+      it('asks when a refresh was skipped while the list was away (a reconnect on the event page)', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept')] });
+        await renderSettings();
+        await openDates(user);
+        const opened = loadEvents.mock.calls.length;
+        await user.click(rowAt('event-kept'));
+        await waitFor(() => expect(window.location.pathname).toBe('/settings/dates/event/kept'));
+        // What the events refresher does on a reconnect while Settings shows.
+        act(() => useAppStore.setState({ eventsStale: true }));
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await waitFor(() => expect(window.location.pathname).toBe('/settings/dates'));
+
+        expect(loadEvents.mock.calls.length).toBeGreaterThan(opened);
+      });
+
+      it('asks on the way back when the list\'s own load failed', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept')] });
+        await renderSettings();
+        await openDates(user);
+        // The list's load failed (Home's server page is still in the store).
+        act(() => useAppStore.setState({ eventsError: 'Failed to load events' }));
+        const opened = loadEvents.mock.calls.length;
+        await user.click(rowAt('event-kept'));
+        await waitFor(() => expect(window.location.pathname).toBe('/settings/dates/event/kept'));
+
+        await user.click(screen.getByRole('button', { name: 'Back' }));
+        await waitFor(() => expect(window.location.pathname).toBe('/settings/dates'));
+
+        expect(loadEvents.mock.calls.length).toBeGreaterThan(opened);
+      });
+
+      it('asks when the store holds no server page yet', async () => {
+        const user = userEvent.setup();
+        setDates({ events: [makeEvent('kept')], eventsPagination: null });
+
+        const opened = await openEventAndComeBack(user);
+
+        expect(loadEvents.mock.calls.length).toBeGreaterThan(opened);
+      });
     });
 
     it('renders the rows from the store at once on a reload, before the load answers', async () => {

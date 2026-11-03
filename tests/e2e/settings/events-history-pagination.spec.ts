@@ -236,13 +236,19 @@ test.describe('Dates list events history pagination', () => {
     // Every seeded row plus the one this test adds.
     const allRows = seeded.length + 1;
     await openDates(page, interceptNetworkCall);
-    // Add returns to the Dates list, which mounts again and reloads its first
-    // window; that window ends before a date this deep, so the new row is
-    // reached through Load more once the reload has answered (the list may
-    // show it until then, so `addEventFromDatesList`'s row check would race).
-    // Armed before the add: opening the form sends no events read, so this is
-    // the return's.
-    const returnRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+    // Add returns to the Dates list, which keeps the window it holds rather than
+    // reloading the first one, so the new row stays listed although it is older
+    // than that window's last row. Every events load raises `eventsIsLoading` in
+    // the same tick it starts, so a count of those rises from here on proves the
+    // return started none.
+    await page.evaluate(() => {
+      const store = window.__APP_STORE__!;
+      const counter = window as unknown as { __eventsLoads: number; __stopCounting: () => void };
+      counter.__eventsLoads = 0;
+      counter.__stopCounting = store.subscribe((state, previous) => {
+        if (state.eventsIsLoading && !previous.eventsIsLoading) counter.__eventsLoads += 1;
+      });
+    });
     await openNewEventForm(page);
     await fillNewEventForm(page, {
       label: 'New deep-past event',
@@ -253,12 +259,17 @@ test.describe('Dates list events history pagination', () => {
     await page.getByTestId('settings-form-add').click();
     expect((await created).status).toBe(201);
     await expect(page).toHaveURL(/\/settings\/dates$/);
-    expect((await returnRead).status).toBe(200);
-    await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);
-    await loadHistory(page, interceptNetworkCall, allRows);
     const id = (await idOf(page, 'New deep-past event'))!;
     expect(id).toBeTruthy();
     await expect(page.getByTestId(rowTestId(id))).toContainText('New deep-past event');
+    await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE + 1);
+    const loadsOnReturn = await page.evaluate(() => {
+      const counter = window as unknown as { __eventsLoads: number; __stopCounting: () => void };
+      counter.__stopCounting();
+      return counter.__eventsLoads;
+    });
+    expect(loadsOnReturn).toBe(0);
+    await loadHistory(page, interceptNetworkCall, allRows);
 
     await reloadDatesList(page, interceptNetworkCall);
     await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);

@@ -71,9 +71,9 @@ export async function fillNewEventForm(page: Page, event: NewEventInput): Promis
  * tap (network-first), so the create is confirmed at the wire before any DOM
  * assertion runs. `now` is the page clock the Dates list formats against.
  *
- * Only for a date inside the Dates list's first window: the list mounts again
- * on the return and reloads that window, so a deeper date shows only until the
- * reload answers (`events-history-pagination.spec.ts` adds one by hand).
+ * The list keeps the window it holds on the return, so the new row shows
+ * wherever its date falls (`events-history-pagination.spec.ts` adds one older
+ * than the first window by hand, to check that no read is sent).
  */
 export async function addEventFromDatesList(
   page: Page,

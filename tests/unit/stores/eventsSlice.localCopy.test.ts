@@ -181,8 +181,30 @@ describe('eventsSlice local copy', () => {
       expect(getEventsPage).not.toHaveBeenCalled();
       expect(readLocalCopy).not.toHaveBeenCalled();
       expect(store.getState().events).toEqual([]);
+      // Only Settings is left marked stale: Home loads on its own, and
+      // Settings' pages other than the Dates list do not.
+      expect(store.getState().eventsStale).toBe(view === 'settings');
     }
   );
+
+  it('clears the stale mark once a first page arrives from the server, and not on Load more', async () => {
+    const store = createTestStore();
+    store.setState({ currentView: 'settings' });
+    const call = registerLocalCopy.mock.calls.find(([kind]) => kind === EVENTS_COPY_KIND);
+    await call![1]();
+    expect(store.getState().eventsStale).toBe(true);
+    getEventsPage.mockResolvedValue({
+      ...page([event('e1', '2026-10-01')]),
+      pagination: { ...page([]).pagination, past: { hasMore: true, cursor: null } },
+    });
+
+    await store.getState().loadEvents();
+    expect(store.getState().eventsStale).toBe(false);
+
+    store.setState({ eventsStale: true });
+    await store.getState().loadMoreEvents();
+    expect(store.getState().eventsStale).toBe(true);
+  });
 
   describe('offline', () => {
     it('with a copy: lists the saved events, succeeds, and raises no error', async () => {

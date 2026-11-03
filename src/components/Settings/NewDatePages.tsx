@@ -31,8 +31,8 @@
  * anniversary add sends `useSubmitKey().keyFor(payload)` as its `clientKey`, so
  * a retry of the same payload resolves to the row the first attempt stored.
  *
- * `IconPicker` is the event form's three equal tiles; it is exported so the
- * Icon field page can use it later.
+ * The event form's Icon field is `IconPicker` (`EventPages`), the same three
+ * tiles as the event's Icon page.
  *
  * @component
  */
@@ -64,12 +64,7 @@ import {
   SECONDARY_BUTTON,
   fieldClass,
 } from '../shared/kitClasses';
-import {
-  DESCRIPTION_MAX_LENGTH,
-  ICON_OPTIONS,
-  LABEL_MAX_LENGTH,
-  codePoints,
-} from './EventPages';
+import { DESCRIPTION_MAX_LENGTH, IconPicker, LABEL_MAX_LENGTH, codePoints } from './EventPages';
 import { SettingsBarAction } from './stack/SettingsBarAction';
 import { useSettingsPage } from './stack/settingsPageContext';
 
@@ -159,60 +154,6 @@ export function KindChooser({ onChoose, onCancel }: KindChooserProps) {
         </button>
       </motion.div>
     </motion.div>
-  );
-}
-
-interface IconPickerProps {
-  value: EventIcon;
-  onChange: (icon: EventIcon) => void;
-  disabled?: boolean;
-  /** The tiles' test ids are `<testIdPrefix>-<value>`. */
-  testIdPrefix?: string;
-}
-
-/**
- * The event icon as three equal 48px tiles (Calendar, Ring, Plane): the
- * selected one a tint fill, accent label and 2px accent ring, the others a 1px
- * line-strong ring. The radios are sr-only and precede their label, so the
- * label can show the focus ring (`peer`) and carries the test id a tap goes to.
- */
-export function IconPicker({
-  value,
-  onChange,
-  disabled = false,
-  testIdPrefix = 'settings-new-event-icon',
-}: IconPickerProps) {
-  const name = useId();
-  return (
-    <div className="flex gap-2" role="radiogroup" aria-label="Icon">
-      {ICON_OPTIONS.map(({ value: option, label, Icon }) => (
-        <div key={option} className="flex-1">
-          <input
-            id={`${name}-${option}`}
-            type="radio"
-            name={name}
-            value={option}
-            checked={value === option}
-            disabled={disabled}
-            onChange={() => onChange(option)}
-            className="peer sr-only"
-          />
-          <label
-            htmlFor={`${name}-${option}`}
-            data-testid={`${testIdPrefix}-${option}`}
-            data-selected={value === option ? 'true' : 'false'}
-            className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition-colors duration-200 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${
-              value === option
-                ? 'bg-tint text-accent ring-2 ring-accent'
-                : 'text-muted ring-1 ring-line-strong'
-            }`}
-          >
-            <Icon className="h-4 w-4" aria-hidden="true" />
-            {label}
-          </label>
-        </div>
-      ))}
-    </div>
   );
 }
 
