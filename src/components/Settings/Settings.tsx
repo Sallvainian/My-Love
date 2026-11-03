@@ -3,15 +3,16 @@
  *
  * Application settings on the style kit, as a stack of pages (`SettingsStack`).
  * The top page holds the Account group (the Profile row), the Partner group
- * (the Partner row), the preferences and about groups, the sign-out card and
- * the version line, then the sections not yet replaced by pages of their own:
+ * (the Partner and Dates rows), the preferences and about groups, the sign-out
+ * card and the version line, then the sections not yet replaced by pages of their own:
  * the couple's shared "Together since" start and wedding date (the `Together`
  * section), the couple's countdowns (events and anniversaries) and the
  * per-date reminder list (`CountdownMarks`; the native shell with the
  * local-notifications plugin only). Profile (the display name and your own
  * birthday, each on a one-field page, see `ProfilePage`), Partner (who the
- * account is linked to, see `PartnerPage`), Photos (this device's mobile-data
- * choice for the offline album) and Notifications (a switch for each kind of
+ * account is linked to, see `PartnerPage`), Dates (every date in one list, see
+ * `DatesPage`), Photos (this device's mobile-data choice for the offline album)
+ * and Notifications (a switch for each kind of
  * push and the Date reminders switch; the native shell with the push plugins
  * only, see `NotificationsPage`) are the subpages.
  *
@@ -69,6 +70,7 @@ import {
 } from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
 import { CountdownMarks } from './CountdownMarks';
+import { DatesPage, DatesRow } from './DatesPage';
 import { EventsSettings } from './EventsSettings';
 import { NotificationsPage, NotificationsRow } from './NotificationsPage';
 import { PartnerPage, PartnerRow } from './PartnerPage';
@@ -448,6 +450,14 @@ const SUBPAGES = new Map<string, SettingsPageSpec>([
     },
   ],
   [
+    'dates',
+    {
+      title: 'Dates',
+      titleStyle: 'large',
+      render: () => <DatesPage />,
+    },
+  ],
+  [
     'notifications',
     {
       title: 'Notifications',
@@ -573,9 +583,10 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           <ProfileRow key="profile" />
         </SettingsGroup>
 
-        {/* Partner: who the account is linked to; the row opens the page. */}
+        {/* Partner: who the account is linked to, then every date in one list. */}
         <SettingsGroup label="Partner">
           <PartnerRow key="partner" />
+          <DatesRow key="dates" />
         </SettingsGroup>
 
         {/* Preferences: the rows whose pages exist; nothing renders where none does. */}

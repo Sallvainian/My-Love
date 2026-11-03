@@ -5,16 +5,14 @@ import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { eventDateFrom, type SeededEvent } from '../../support/factories/events';
 import { navigateTo } from '../../support/helpers/navigation';
-import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { EVENTS_PAGE_SIZE } from '../../support/helpers/events';
+import { EVENTS_WRITE, HISTORY_PAGE_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { reloadSettings, settingsEventsLoaded } from '../../support/helpers/settings-screen';
 
-/** Rows read per window and per load-more page. */
-const PAGE_SIZE = 50; // src/services/eventsService.ts DEFAULT_EVENTS_PAGE_SIZE (module-private)
-
 /**
  * Day offsets older than every seeded history row (the oldest sits
- * PAGE_SIZE + 1 days back), so a row saved there always sorts beyond the first
+ * EVENTS_PAGE_SIZE + 1 days back), so a row saved there always sorts beyond the first
  * page and is reached only through load-more.
  */
 const DEEP_PAST_EDIT_DAYS = -500;
@@ -40,9 +38,6 @@ async function openSettings(page: Page, interceptNetworkCall: InterceptNetworkCa
   await expect(page.getByTestId('settings-view')).toBeVisible();
   await settingsEventsLoaded(page, settingsRead);
 }
-
-/** A load-more read: only it carries the `or=` cursor filter (`eventsService.getEventsPage`). */
-const HISTORY_PAGE_READ = '**/rest/v1/events?*&or=*';
 
 async function loadHistory(
   page: Page,
@@ -93,12 +88,12 @@ async function submitEvent(
 /**
  * Two windows (past and upcoming) of tied rows, each spanning three pages.
  * Most timestamps form tied pairs; singleton ends put pairs across both
- * PAGE_SIZE-row boundaries. Every instant is in the same millisecond, so Date
+ * EVENTS_PAGE_SIZE-row boundaries. Every instant is in the same millisecond, so Date
  * conversion alone cannot preserve this order.
  */
 function tiedSpecs() {
   // Rows per window: two full pages and four more on a third.
-  const windowRows = 2 * PAGE_SIZE + 4;
+  const windowRows = 2 * EVENTS_PAGE_SIZE + 4;
   const specs = Array.from({ length: 2 * windowRows }, (_, index) => ({
     dayOffset: index < windowRows ? -10 : 10,
     label: `Tied paging ${index}`,
@@ -123,8 +118,8 @@ async function pageThroughTiedHistory(
 ) {
   await openSettings(page, interceptNetworkCall);
   // One page per window on open, a second per window after one load-more.
-  await expect(page.locator(ALL_ROWS)).toHaveCount(2 * PAGE_SIZE);
-  await loadHistory(page, interceptNetworkCall, 4 * PAGE_SIZE);
+  await expect(page.locator(ALL_ROWS)).toHaveCount(2 * EVENTS_PAGE_SIZE);
+  await loadHistory(page, interceptNetworkCall, 4 * EVENTS_PAGE_SIZE);
   await expect(page.getByTestId('events-settings-load-more')).toBeEnabled();
   await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
   await loadHistory(page, interceptNetworkCall, total);
@@ -142,7 +137,7 @@ test.describe('Settings events history pagination', () => {
     interceptNetworkCall,
   }) => {
     // One past row more than the first page holds, plus one upcoming row.
-    const pastRows = history(PAGE_SIZE + 1);
+    const pastRows = history(EVENTS_PAGE_SIZE + 1);
     const seeded = await coupleEvents.seed([
       ...pastRows,
       { dayOffset: 7, label: 'Paging upcoming survivor' },
@@ -150,7 +145,7 @@ test.describe('Settings events history pagination', () => {
     const oldest = seeded[pastRows.length - 1];
     const correctedDate = eventDateFrom(coupleEvents.anchor, DEEP_PAST_EDIT_DAYS);
     // The first page of history plus the upcoming survivor.
-    const firstLoad = PAGE_SIZE + 1;
+    const firstLoad = EVENTS_PAGE_SIZE + 1;
     await openSettings(page, interceptNetworkCall);
     await expect(page.locator(ALL_ROWS)).toHaveCount(firstLoad);
     await expect(page.getByTestId(rowTestId(oldest.id))).toHaveCount(0);
@@ -184,7 +179,7 @@ test.describe('Settings events history pagination', () => {
     coupleEvents,
     interceptNetworkCall,
   }) => {
-    const seeded = await coupleEvents.seed(history(PAGE_SIZE + 1));
+    const seeded = await coupleEvents.seed(history(EVENTS_PAGE_SIZE + 1));
     const savedDate = eventDateFrom(coupleEvents.anchor, DEEP_PAST_ADD_DAYS);
     // Every seeded row plus the one this test adds.
     const allRows = seeded.length + 1;
@@ -196,7 +191,7 @@ test.describe('Settings events history pagination', () => {
     const id = await submitEvent(page, interceptNetworkCall, 'POST', 'New deep-past event');
 
     await reloadSettings(page, interceptNetworkCall);
-    await expect(page.locator(ALL_ROWS)).toHaveCount(PAGE_SIZE);
+    await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);
     await expect(page.getByTestId(rowTestId(id))).toHaveCount(0);
     await loadHistory(page, interceptNetworkCall, allRows);
     await page.getByTestId(`event-edit-${id}`).click();
@@ -207,7 +202,7 @@ test.describe('Settings events history pagination', () => {
     await submitEvent(page, interceptNetworkCall, 'PATCH', 'Deep-past event edited');
 
     await reloadSettings(page, interceptNetworkCall);
-    await expect(page.locator(ALL_ROWS)).toHaveCount(PAGE_SIZE);
+    await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);
     await loadHistory(page, interceptNetworkCall, allRows);
     await page.getByTestId(`event-edit-${id}`).click();
     await expect(page.getByTestId('events-form-label')).toHaveValue('Deep-past event edited');
@@ -216,7 +211,7 @@ test.describe('Settings events history pagination', () => {
 
   for (const { size, rows, empty } of [
     { size: 0, rows: 0, empty: 1 },
-    { size: PAGE_SIZE, rows: PAGE_SIZE, empty: 0 },
+    { size: EVENTS_PAGE_SIZE, rows: EVENTS_PAGE_SIZE, empty: 0 },
   ]) {
     test(`[P1] ${size} past rows do not advertise another page`, async ({
       page,
@@ -290,7 +285,7 @@ test.describe('Settings events history pagination', () => {
         count: window.__APP_STORE__!.getState().events.length,
       })),
       (v) => {
-        expect(v).toEqual({ loading: false, count: 2 * PAGE_SIZE });
+        expect(v).toEqual({ loading: false, count: 2 * EVENTS_PAGE_SIZE });
       }
     );
     const cards = page.getByTestId(/^event-countdown-tied-paging-\d+$/);
@@ -305,7 +300,7 @@ test.describe('Settings events history pagination', () => {
     coupleEvents,
     interceptNetworkCall,
   }) => {
-    const seeded = await coupleEvents.seed(history(PAGE_SIZE + 1));
+    const seeded = await coupleEvents.seed(history(EVENTS_PAGE_SIZE + 1));
     await openSettings(page, interceptNetworkCall);
     let releaseFailure!: () => void;
     const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
@@ -339,7 +334,7 @@ test.describe('Settings events history pagination', () => {
         count: window.__APP_STORE__!.getState().events.length,
       })),
       (v) => {
-        expect(v).toEqual({ loading: false, failed: true, count: PAGE_SIZE });
+        expect(v).toEqual({ loading: false, failed: true, count: EVENTS_PAGE_SIZE });
       }
     );
     await expect(button).toHaveText('Retry loading history');

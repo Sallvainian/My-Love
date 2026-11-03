@@ -32,6 +32,9 @@ import { getWorkerPairEmails } from '../auth/worker-pool';
 import type { TypedSupabaseClient } from '../factories';
 import { formatDateISO } from '../../../src/utils/dateUtils';
 
+/** Rows read per window and per load-more page. */
+export const EVENTS_PAGE_SIZE = 50; // src/services/eventsService.ts DEFAULT_EVENTS_PAGE_SIZE (module-private)
+
 /** The icon set `events.icon`'s CHECK constraint admits
  * (`supabase/migrations/20260818000002_create_events_table.sql:22`). */
 export type EventIcon = 'ring' | 'plane' | 'calendar';

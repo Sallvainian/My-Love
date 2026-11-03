@@ -1,7 +1,8 @@
 /**
  * Settings fields -- the values and rules the Profile pages share with the
- * rows that show them: how a date reads, the earliest and latest birthday, and
- * what makes a birthday or a display name worth saving.
+ * rows that show them: how a date reads (long on a page, short on the Dates
+ * list), the earliest and latest birthday, and what makes a birthday or a
+ * display name worth saving.
  */
 
 import { parseEventDate } from '../../services/eventsService';
@@ -20,6 +21,42 @@ export function formatDateOnly(value: string): string {
 export function formatInstantDate(iso: string): string | null {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { dateStyle: 'long' });
+}
+
+/** `en-US` date parts by type; `en-US` because `en-GB` prints `Sept`. */
+function dateParts(date: Date, options: Intl.DateTimeFormatOptions): Record<string, string> {
+  const parts: Record<string, string> = {};
+  for (const part of new Intl.DateTimeFormat('en-US', options).formatToParts(date)) {
+    parts[part.type] = part.value;
+  }
+  return parts;
+}
+
+/**
+ * A yearly date (a birthday, an anniversary) as the Dates list shows it, day
+ * first and no year: "4 Apr".
+ */
+export function formatDayMonth(date: Date): string {
+  const { day, month } = dateParts(date, { day: 'numeric', month: 'short' });
+  return `${day} ${month}`;
+}
+
+/**
+ * A one-time date (an event, Together since, the wedding) as the Dates list
+ * shows it: "Sat 14 Nov" in the current calendar year, "3 Feb 2022" in any
+ * other, so a mistyped year shows. `now` is the caller's one clock reading.
+ */
+export function formatListDate(date: Date, now: Date = new Date()): string {
+  if (date.getFullYear() === now.getFullYear()) {
+    const { weekday, day, month } = dateParts(date, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    return `${weekday} ${day} ${month}`;
+  }
+  const { day, month, year } = dateParts(date, { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${day} ${month} ${year}`;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
