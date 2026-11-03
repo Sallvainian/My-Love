@@ -3,10 +3,10 @@ type: epic
 title: "Settings Rework"
 parent: initiative-my-love
 covers: []
-sources: [_bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md, _bmad-output/initiative-my-love/ux-settings-page/DESIGN.md, _bmad-output/initiative-my-love/deferred-work.md]
+sources: [_bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md, _bmad-output/initiative-my-love/ux-settings-page/DESIGN.md, _bmad-output/initiative-my-love/deferred-work.md, AGENTS.md]
 companions: [_bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md, _bmad-output/initiative-my-love/ux-settings-page/DESIGN.md]
 after: []
-refined: false
+refined: true
 risk: medium
 ---
 
@@ -20,14 +20,62 @@ Today's Settings page is long and disorganized: dates live in three places (Acco
 
 The owner and the partner find every setting and every date in one short Settings that looks like a production app. The signal is the four Key Flows in EXPERIENCE.md running end to end on the owner's iPhone Duo and the partner's iPhone.
 
+## Requirements
+
+R1 (EXPERIENCE.md Information Architecture, Top page rows): The top Settings page holds only the IA's one-line rows, in its groups and order, each with the right-hand value and shown-when rule of the Top page rows table; a group with no visible row is hidden with its label. Met when each row's value and visibility match the table on the website, in a shell with the push and local-notification plugins, and in a shell without them.
+
+R2 (EXPERIENCE.md Interaction Primitives; Component Patterns, Settings bar): Settings is a stack of pages. A row pushes its page from the right (a fade under Reduce Motion); Settings' own bar replaces the app header, with a large title that collapses on scroll on list pages and a small title on single-item pages; each push is one history entry, so the back arrow, browser back and the shell's edge swipe each return one level; the top page's back arrow follows the Back arrow rule. Met when, in both dock forms, every push and every back moves exactly one level.
+
+R3 (EXPERIENCE.md Interaction Primitives, Tap a row to edit; Component Patterns, One-field edit page): Every editable field is a row that opens a one-field page whose Save writes that field alone, is disabled until the value differs and is valid, and returns one level to show the new value; leaving without Save discards the edit without asking. Met when each field row on Profile and on every own date page edits this way and no page shows an open editor or a per-field Save button.
+
+R4 (EXPERIENCE.md Subpages, Profile): Profile shows the header (initial avatar, name, email) and the Name and Birthday rows; a birthday must be in the past. The name shown on the top page, the header and the row comes from the same store the Name page writes. Met when saving a new name updates all three without a reload and a future birthday cannot be saved.
+
+R5 (EXPERIENCE.md Subpages, Partner; State Patterns, Not linked and Partner unknown): The Partner page has three states. Linked: read-only Name, Email and Linked since, the date the pair was linked, with the row hidden when that date is unknown. Not linked, only on a loaded unlinked answer: the lead line and a Go to Partner row that opens the Partner view. Unknown, after a failed read with nothing saved: the Partner view's load-error wording, never the not-linked page. Met when each state appears only for its answer.
+
+R6 (EXPERIENCE.md Subpages, Dates list; State Patterns, Unset date, Empty Dates group, More past events): The Dates list shows Together, Birthdays, Events (both partners' upcoming, soonest first), Anniversaries (the reader's own) and Past (both partners' past events, newest first, with Load more while more remain), each row with its date on the right in the app's formatters; unset Together since and Wedding read `Not set` in place; empty Events, Anniversaries and Past groups are hidden; Together and the partner's birthday are hidden unless linked. Met when a linked and an unlinked account each see exactly these rows, and Load more appends in place.
+
+R7 (EXPERIENCE.md Subpages, date pages; Ownership rules): Each date has one page with the rows, actions and title style its Subpages line gives: own event, past event, partner's event, anniversary, Together since, Wedding (with Clear while set), your birthday, and the partner's birthday (read-only, with its Footnote). Only an event's creator edits or deletes it; anniversaries are private; either linked partner edits Together since and Wedding; each person sets their own birthday. Delete event and Delete anniversary ask in a Confirmation dialog; the wedding's Clear acts at once. Met when each kind of page shows its rows and only the owner rules above allow an edit or delete.
+
+R8 (EXPERIENCE.md Subpages and State Patterns, Remind me, Date reminders off, Reminder unavailable): Every date page except a past event's has a Remind me switch, the reader's own setting, with the Footnote `A month and a week before.`; it appears only in a shell with the local-notifications plugin. While Date reminders is off it is disabled at 60% opacity with the Footnote `Date reminders are off. Turn them on in Notifications.`, and its setting is kept. Met when turning Remind me on schedules the month and week reminders, and turning Date reminders back on restores a kept setting.
+
+R9 (EXPERIENCE.md Component Patterns, Form page and Kind chooser): The Dates list's `+` opens the Kind chooser, which opens the New event or New anniversary form: every field at once, Add disabled until Name and Date are filled, the event form starting on the Calendar icon. After Add the new date sits in its place on the Dates list and on Home, and the app returns to the page that opened the form. Met when both forms create their date and return as described.
+
+R10 (EXPERIENCE.md Subpages, Entry points beyond Settings): Tapping a date card on Home opens that date's page with Home highlighted in the dock, and back returns to Home; Home's Add event button opens the New event form directly, without the Kind chooser. Met when both entry points behave so in both dock forms.
+
+R11 (EXPERIENCE.md Subpages, Notifications; State Patterns, Loading, Load failed, Permission off): Notifications shows the permission Notice while iOS denies the permission, re-read on open and on each return to the foreground; the `Notify me about` group with five switches (Love notes, Moods, Photos, Pokes and kisses, Partner requests); and the `Reminders` group with Date reminders and its Footnote. Switches stay usable with the permission off, save server first and are disabled while saving. Met when each switch saves on tap and a failed or offline load shows today's strings.
+
+R12 (EXPERIENCE.md Subpages, Photos; Top page rows): Photos offers `Wi-Fi only` and `Any connection` with a check on the current one, saved on tap as this device's preference, with no connection needed and kept across sign-out; its row appears only where the device reports its connection type. Met when the choice saves offline and survives sign-out, and the row is hidden on iPhone.
+
+R13 (EXPERIENCE.md Voice and Tone; Component Patterns, Danger action row): "Log out" replaces "Sign out" in every UI string listed under Voice and Tone, the login screen's partial notice included; "Sign in" stays. Log out acts at once; Log out of all devices refuses offline before any dialog and otherwise asks in the Confirmation dialog; while either runs both rows are disabled and the running one shows its in-progress label. Met when no UI string reads "Sign out" and both rows behave so.
+
+R14 (deferred-work.md DW-416): Adding or changing any date (an event, the wedding date, Together since, a birthday) sends the partner no push. The server keeps no record of date changes and no Dates push preference, and send-push has no date kind. Met when each such change on a linked couple creates no push request, and the schema has no `date_changes` table and no `push_preferences.dates` column.
+
+R15 (deferred-work.md DW-399): Settings state is split by domain, so no slice owns local-copy kinds of unrelated domains. Met when the split in Notes is in place, every kind keeps its refresher and saved copy, and sign-out still clears every moved account field.
+
+R16 (EXPERIENCE.md Accessibility Floor): Every page meets the Accessibility Floor: one native button per row named by label and value, switch semantics kept, read-only rows as plain text, one heading per page, focus to the new title on a push and back to the opening row on back, announced errors, a focus-trapped Confirmation dialog starting on Cancel, 44pt targets, 16px fields. Met when a keyboard and VoiceOver pass over each page shows each point.
+
+R17 (EXPERIENCE.md State Patterns, Loading first open, Offline refusal, Save error; Component Patterns, Error box): Rows render at once from local copies, and a value not known yet is left empty, never `Loading...`. Every write is refused offline before any request or local change and keeps what was typed; a refusal or save error shows in the Error box under the bar, announced, cleared on the next attempt or on leaving. Which writes need a connection does not change. Met when each write, tried offline and against a failing server, behaves so.
+
+R18 (DESIGN.md): Every Settings page and component matches DESIGN.md's tokens and component specs, light and dark, with no new palette and no `dark:` variant. Met when each page, compared against DESIGN.md and the mocks it names, shows no difference the spine does not override.
+
+## Constraints
+
+- Every write that needs a connection refuses with `requireOnline(what, action)` in services or `isOnline()` plus `offlineMessage(what, action)` in components; no refusal is typed by hand (AGENTS.md, Known pitfalls).
+- Navigation stays in `navigationSlice`; no router library is added (AGENTS.md, Conventions that differ from defaults).
+- Settings content and its bar reserve `--dock-clearance` and pad by `--dock-left` / `--dock-right`; no height or side offset is hard-coded (AGENTS.md, Maintained by hand, dock paragraph; DESIGN.md, Layout & Spacing).
+- A native plugin is called only after `Capacitor.isNativePlatform()` and then `Capacitor.isPluginAvailable()`, so an older shell hides what it lacks (AGENTS.md, Maintained by hand, iOS shell paragraph).
+- An account-scoped store field added or moved goes into `signedOutState()` in the same commit, and an async action that sets state after an await captures and re-checks `{ userId, authSessionVersion }` (AGENTS.md, Known pitfalls).
+- A migration that drops objects first reads the hosted catalog for them, read-only, and uses `drop … if exists`; the pgTAP pins change in the same commit; `src/types/database.types.ts` is regenerated with `npm run db:types`, never edited by hand (AGENTS.md, Policy and Known pitfalls).
+- A `YYYY-MM-DD` string is parsed with `parseEventDate`, never `new Date(string)` (AGENTS.md, Conventions that differ from defaults).
+
 ## Done when
 
 - On the deployed site and in the iOS shell, in the bottom-dock and Duo column forms, every page in EXPERIENCE.md's Information Architecture opens from its row and matches DESIGN.md and EXPERIENCE.md, and back returns exactly one level.
 - Every date is edited, deleted where its owner may, and reminded from its own page, reached from its Home card and from the Dates list; Home's Add opens New event; the old Account date fields, the Countdowns section and the reminder-switch list are gone.
-- Adding or changing a date sends no push: a migration removes the server-side date-change path, send-push has no date kind, the client has no `dates` push preference or Dates switch, the pgTAP pins match, and `database.types.ts` is regenerated (DW-416 closed; its full list of parts is in Notes).
-- `settingsSlice.ts` is split the way this epic's refinement decides (DW-399 closed).
+- Adding or changing a date sends no push: a migration removes the server-side date-change path with `date_changes` and `push_preferences.dates`, send-push has no date kind, the client has no `dates` push preference or Dates switch, the pgTAP pins match, and `database.types.ts` is regenerated (DW-416 closed; its full list of parts is in Notes).
+- `settingsSlice.ts` is split into the slices the Notes decision names, and AGENTS.md says how many slices the store composes and how to add a Settings subpage (DW-399 closed).
 - "Log out" replaces "Sign out" everywhere in the UI.
-- The rework is deployed through `deploy.yml` and reaches both installed shells, by live update, or by a reinstall on both phones if any part needs native code. A person runs the Key Flows on the owner's Duo (Flows 1, 3, 4) and on the partner's iPhone with the bottom dock (Flow 2).
+- The rework is deployed through `deploy.yml` and reaches both installed shells, by live update, or by a reinstall on both phones if the edge-swipe spike chooses native code. A person runs the Key Flows on the owner's Duo (Flows 1, 3, 4) and on the partner's iPhone with the bottom dock (Flow 2).
 
 ## Boundaries
 
@@ -44,14 +92,22 @@ The owner and the partner find every setting and every date in one short Setting
 - design — _bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md (how Settings works)
 - design — _bmad-output/initiative-my-love/ux-settings-page/mockups/key-settings-v2.html and key-settings-v1.html (composition; the spines win on conflict)
 - deferred work — _bmad-output/initiative-my-love/deferred-work.md, DW-399 (split settingsSlice.ts) and DW-416 (remove the date-change push)
+- project-context — AGENTS.md, sections Policy, Conventions that differ from defaults, Known pitfalls, Maintained by hand
 
 ## Notes
 
 - Decision: 2026-11-02 one epic, not two (owner). The likely 12–14 stories run past the usual count; a split into "the Settings stack" and "every date has its own page" was declined because both halves need the same page stack and top page, and the first would ship an interim Settings with the old date editors.
 - Decision: 2026-11-02 DW-416 is a story in this epic, ordered early, before any date page, because tap-to-edit saves each field separately and every save would otherwise send a push (owner). It is ordered against the `settingsSlice.ts` split, since both change `PUSH_PREFERENCE_KEYS` (`src/stores/slices/settingsSlice.ts:355`).
-- Decision: 2026-11-02 no `bmad-architecture` run (owner). Refining this epic writes `Decision:` lines here for: the subpage URL scheme, what a reload restores, and where back goes from a date page opened from Home; and the `settingsSlice.ts` split boundaries, by domain (DW-399). The edge swipe back is a spike: the shell enables no WKWebView back-forward gesture today (no `allowsBackForwardNavigationGestures` in `ios/` or `capacitor.config.ts`), and turning it on natively needs a reinstall on both phones.
+- Decision: 2026-11-02 no `bmad-architecture` run (owner). Refining this epic writes the URL, reload, back and slice-split decisions below; the edge swipe is a spike.
 - Decision: 2026-11-02 the foundation story's Done when adds an AGENTS.md rule for adding a Settings subpage (owner).
-- Open question: whether DW-416's migration also drops the `date_changes` table and the `push_preferences.dates` column, or only the triggers and function. Settled at refinement.
-- Open question: "Linked since" on the Partner page has no data behind it. No column stores a link date; `partner_requests` has only `created_at` and `updated_at` (`src/types/database.types.ts:470-478`). EXPERIENCE.md hides the row when the date is unknown, so without new work it is always hidden. Settled at refinement: derive it, add it, or drop the row.
+- Decision: 2026-11-02 subpage URL scheme. `settings` stays the one `ViewType`; a subpage is not a view, so none of the five view-registration places changes. The stack lives under `/settings/`: `profile`, `profile/name`, `profile/birthday`, `partner`, `dates`, `dates/new-event`, `dates/new-anniversary`, `dates/event/<id>`, `dates/anniversary/<id>`, `dates/together-since`, `dates/wedding`, `dates/birthday`, `dates/partner-birthday`, a date's one-field pages one level below its page (as `dates/event/<id>/date`), `notifications`, `photos`. Each push is one `pushState` entry; the Kind chooser and the Confirmation dialogs have no URL.
+- Decision: 2026-11-02 what a reload restores. A list page or a date page reloads to itself, drawn from the local copies; a one-field page or a form page reloads to the page above it, because leaving one discards the edit anyway; a date page whose date is absent once its data has loaded falls back to the Dates list.
+- Decision: 2026-11-02 back from a date page opened from Home. The page keeps its `/settings/dates/…` URL and its history entry carries `from: 'home'`, which keeps Home highlighted in the dock (and survives a reload, since `history.state` does); back returns to Home in one step. A Settings page that is the session's first history entry, as after opening a pasted URL, gets a back arrow that replaces the entry with the page above it rather than leaving the app.
+- Decision: 2026-11-02 `settingsSlice.ts` splits by domain (DW-399). `settingsSlice` keeps `initializeApp`, the persisted device settings and onboarding. A new `datesSlice` takes anniversaries, couple settings (Together since, Wedding) and countdown marks (each date's Remind me). A new `profileSlice` takes the own profile, name and birthday; the name moves into it from `Settings.tsx`'s component-local lookup, so R4's rows read one store. A new `notificationsSlice` takes the push preferences, Date reminders included. Each moves with its copy kind, reader and refresher; events stay in `eventsSlice`.
+- Decision: 2026-11-02 DW-416's migration also drops `date_changes` and `push_preferences.dates`, dead schema once nothing sends the push (owner). A read-only check of the hosted catalog on 2026-11-02 found both present; the migration story reads it again before dropping.
+- Decision: 2026-11-02 DW-416 ships in two deploys (owner). `deploy.yml` applies migrations before the site deploys, and an installed shell runs its old web code until it downloads the update and is next backgrounded; that old code selects and upserts an explicit column list that names `dates` (`src/services/pushPreferencesService.ts:64-74,96-97,123-125`), so dropping the column in the same deploy would fail every push-settings load and save on a phone not yet updated. The first deploy drops the triggers, the function, `date_changes` and send-push's date kind, and stops the client reading or writing `dates`; a later story drops `push_preferences.dates` and its pgTAP pins once both shells run the new code. Dropping `date_changes` in the first deploy is safe: no client reads it, and the old send-push reads it only for a date request, which the dropped triggers no longer create.
+- Decision: 2026-11-02 Linked since is the accepted partner request's `updated_at`. Every version of `accept_partner_request` sets it at accept time (`20251203000001_create_base_schema.sql:244`, `20251206024345_remote_schema.sql:214`, `20260818000000_revoke_anon_execute_and_fix_partner_guards.sql:185`); `partner_requests` has no delete policy and later updates touch only pending rows; both partners can read the row (hosted policy "Users can view their requests"). A read-only hosted count on 2026-11-02 found the owner's couple has its accepted row, while the two test couples, linked without a request, have none, so their row stays hidden.
+- Decision: 2026-11-02 the Photos row is hidden on iPhone: the owner checked the iOS app on the Duo and Safari on an iPhone on 2026-11-02, and today's Settings shows "This phone doesn't tell the app whether it's on Wi-Fi" on both. Settled; the ship story does not repeat it.
+- Decision: 2026-11-02 the `settingsSlice.ts` split comes right after the foundation story and before any page story, sequenced with the first DW-416 story because both change `PUSH_PREFERENCE_KEYS` (owner).
+- Decision: 2026-11-02 the story that drops `push_preferences.dates` is owner-gated: it is not built until the owner confirms both phones run the update that stops using the column (owner).
 - Source conflict: DW-416 location — the ledger entry misses parts of the date push: the tap route `date: 'home'` (`src/services/pushNotifications.ts:161`), `date_change_id` in `push_requests_source_check` (`supabase/migrations/20261031040000_push_partner_requests.sql:65-71`), the `dates` pins in `supabase/tests/database/36_push_preferences.sql:109,129,139,161`, and the regenerated `src/types/database.types.ts`. This epic removes them with the entry's own list.
-- Open question: the Photos row is hidden on iPhone on the assumption that Safari and the shell never report the connection type; EXPERIENCE.md marks this UNVERIFIED on device. A story checks it on a device.
