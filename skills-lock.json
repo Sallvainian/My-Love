@@ -103,6 +103,18 @@
       "skillPath": "skills/bmad-forge-idea/SKILL.md",
       "computedHash": "131a644dab2b9d7756d0c9e0b511c433647901ce7ca83a980a0f1db0cfa9ef65"
     },
+    "bmad-issue-tracking-setup": {
+      "source": "Sallvainian/bmad-issue-tracking",
+      "sourceType": "github",
+      "skillPath": "skills/bmad-issue-tracking-setup/SKILL.md",
+      "computedHash": "f17c564177f6d8dac7822a1e21ce287ea65eb9cc989881ac295bb88f0a91f3e8"
+    },
+    "bmad-issue-tracking-sync": {
+      "source": "Sallvainian/bmad-issue-tracking",
+      "sourceType": "github",
+      "skillPath": "skills/bmad-issue-tracking-sync/SKILL.md",
+      "computedHash": "fbb6c82364f4f737c76fc92d58118e2165d40193d73252bbf6499fe6b9898c98"
+    },
     "bmad-loop-resolve": {
       "source": "bmad-code-org/bmad-loop",
       "sourceType": "github",

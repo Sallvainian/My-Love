@@ -1,0 +1,5 @@
+[workflow]
+
+on_complete = """
+If this review had a plan file, read `_bmad/_config/custom/bmad-workflow-lang.md` for the workflow language specification, then execute `_bmad/_config/custom/workflows/common/post-dev-complete-followup-review.yaml`, with plan_file set to {plan_file} and triage_file set to {triage_file}. With no plan file there is no ticket to track: skip it.
+"""

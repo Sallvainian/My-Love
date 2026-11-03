@@ -1,0 +1,9 @@
+[workflow]
+
+activation_steps_prepend = [
+  "Read `_bmad/_config/custom/bmad-workflow-lang.md` for the workflow language specification, then execute `_bmad/_config/custom/workflows/bmad-retrospective/activation.yaml`. If it switched the session into a worktree (it says \"Switched to\"), render this skill again from there and follow that output from its start instead of this one, so every path the skill uses points into the worktree: `uv run --no-cache \"<worktree>/_bmad/scripts/render_skill.py\" --project-root \"<worktree>\" --skill \"{skill-root}\"`. The re-rendered activation finds the session already there and does not switch again.",
+]
+
+on_complete = """
+Read `_bmad/_config/custom/bmad-workflow-lang.md` for the workflow language specification, then execute `_bmad/_config/custom/workflows/bmad-retrospective/complete.yaml`.
+"""
