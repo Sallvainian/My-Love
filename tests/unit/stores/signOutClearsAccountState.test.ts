@@ -46,6 +46,7 @@ import {
   writeLocalCopy,
 } from '../../../src/services/localCopy';
 import { MESSAGE_DATA_COPY_KIND, openMyLoveDB } from '../../../src/services/dbSchema';
+import { PHOTOS_OVER_MOBILE_DATA_KEY } from '../../../src/services/photoDownloadPreference';
 import { moodService } from '../../../src/services/moodService';
 import { moodSyncFingerprint } from '../../../src/services/moodSyncPayload';
 import { moodSyncService } from '../../../src/api/moodSyncService';
@@ -274,6 +275,7 @@ describe('clearAuth on sign-out', () => {
   afterEach(async () => {
     await Promise.allSettled(pendingReloads.splice(0));
     localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
+    localStorage.removeItem(PHOTOS_OVER_MOBILE_DATA_KEY);
     // happy-dom serves `onLine` from the Navigator prototype, so deleting the
     // own property a test defined restores the real value — even when that
     // test's assertions threw before it could restore it inline.
@@ -940,6 +942,36 @@ describe('clearAuth on sign-out', () => {
     expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
     expect(useAppStore.getState().settings!.relationship.anniversaries).toEqual([]);
     await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+  });
+
+  it("keeps the device's photo download choice across sign-out", async () => {
+    // A data plan belongs to the phone, not the account: the next person to sign
+    // in on this device finds the choice the last one made.
+    localStorage.setItem(PHOTOS_OVER_MOBILE_DATA_KEY, 'true');
+    const ids = await seedDevice(SECRETS.userId);
+
+    useAppStore.getState().clearAuth();
+
+    // The deletes are fire-and-forget; wait for them so none logs after the test.
+    await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+    expect(localStorage.getItem(PHOTOS_OVER_MOBILE_DATA_KEY)).toBe('true');
+  });
+
+  it("keeps the device's photo download choice when a no-session boot deletes the owner's data", async () => {
+    localStorage.setItem(PHOTOS_OVER_MOBILE_DATA_KEY, 'true');
+    localStorage.setItem(ACCOUNT_OWNER_STORAGE_KEY, SECRETS.userId);
+    useAppStore.setState({
+      userId: null,
+      userEmail: null,
+      isAuthenticated: false,
+    } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    const ids = await seedDevice(SECRETS.userId);
+
+    useAppStore.getState().clearAuth();
+
+    await expectOnlyOutgoingDataDeleted(SECRETS.userId, ids);
+    expect(localStorage.getItem(ACCOUNT_OWNER_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(PHOTOS_OVER_MOBILE_DATA_KEY)).toBe('true');
   });
 
   it('deletes a previous owner\'s leftover data when a different account signs in fresh', async () => {

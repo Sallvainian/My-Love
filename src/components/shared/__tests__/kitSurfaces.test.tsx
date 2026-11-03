@@ -393,21 +393,13 @@ describe('DisplayNameSetup on the kit', () => {
     expectOnKit(container.innerHTML);
   });
 
-  it('renders the edit route with a secondary Cancel and the kit failure box', async () => {
+  it('renders the signup gate failure box on the kit', async () => {
     const user = userEvent.setup();
     // Three characters, so native minLength={3} lets the click submit, but two
     // once trimmed, so the component's own length check refuses it.
-    const { container } = render(
-      <DisplayNameSetup
-        isOpen
-        mode="edit"
-        initialName="ab "
-        onComplete={vi.fn()}
-        onCancel={vi.fn()}
-      />
-    );
+    const { container } = render(<DisplayNameSetup isOpen onComplete={vi.fn()} />);
 
-    expect(screen.getByTestId('display-name-cancel')).toHaveClass('bg-tint', 'text-accent');
+    await user.type(screen.getByLabelText('Display Name'), 'ab ');
     expect(screen.getByTestId('display-name-submit')).toHaveClass('bg-fill');
     await user.click(screen.getByTestId('display-name-submit'));
 

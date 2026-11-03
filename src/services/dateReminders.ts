@@ -32,8 +32,7 @@ import { routeNotificationTap } from './pushNotifications';
  * countdown (`marks`, story 4.2) also gets "In a month: ..." (the same day of
  * the previous month, clamped to the last day of a shorter one) and "In a
  * week: ..." (7 days before), at 9:00 too, for the same occurrence as the
- * day-before reminder. `reminderDateEntries` lists the dates a person can mark
- * and the key each is marked under. Each is a dated calendar trigger
+ * day-before reminder. Each is a dated calendar trigger
  * (`schedule.on` with the year set): the plugin always makes it repeating, but
  * with the year pinned it matches only once. Each occurrence is its own
  * request because a birthday's text names an age and the wedding's text
@@ -222,8 +221,7 @@ export interface ReminderDateSources {
 /**
  * The one place the planner's date input is built from the sources: the couple's
  * start and wedding only while linked, each person's name and birthday as a
- * `ReminderBirthday`. Both the re-plan and the Settings marks list use it, so
- * they cannot read the same data differently.
+ * `ReminderBirthday`. The re-plan builds its input here.
  */
 export function reminderDatesFrom(
   sources: ReminderDateSources
@@ -242,21 +240,18 @@ export function reminderDatesFrom(
   };
 }
 
-/** One readable date, in the order the planner and the marks list both walk them. */
+/** One readable date, in the order the planner walks them. */
 interface ReminderDateItem {
   /** The key it is marked under, or `null` when it cannot be marked yet (an anniversary with no `serverId`). */
   key: string | null;
-  /** The name the marks list shows. */
-  name: string;
   /** Adds this date's reminders at `now`; `marked` adds the month and week ones. */
   plan: (planned: PlannedReminder[], marked: boolean, now: Date) => void;
 }
 
 /**
  * Every date that is set and readable: events in list order, the anniversaries,
- * `Our anniversary`, `Wedding`, `Your birthday`, `{partner}'s birthday`. A date
- * that cannot be read is skipped. `planDateReminders` plans from this walk and
- * `reminderDateEntries` lists from it, so the two cannot disagree on a date.
+ * the relationship start, the wedding, the own birthday, the partner's birthday.
+ * A date that cannot be read is skipped. `planDateReminders` plans from this walk.
  */
 function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>): ReminderDateItem[] {
   const items: ReminderDateItem[] = [];
@@ -265,7 +260,6 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
     if (Number.isNaN(event.date.getTime())) continue;
     items.push({
       key: MARK_KEYS.event(event.id),
-      name: event.label,
       // An event happens once, so it has no on-the-day reminder.
       plan: (planned, marked, now) => addDay(planned, event.date, event.label, false, marked, now),
     });
@@ -275,7 +269,6 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
     if (!parseEventDate(anniversary.date)) continue;
     items.push({
       key: anniversary.serverId ? MARK_KEYS.anniversary(anniversary.serverId) : null,
-      name: anniversary.label,
       plan: (planned, marked, now) =>
         addDay(
           planned,
@@ -296,7 +289,6 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
       const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
       items.push({
         key: MARK_KEYS.relationshipStart,
-        name: 'Our anniversary',
         plan: (planned, marked, now) => {
           const next = getNextAnniversaryDate(formatDateISO(startDay), occurrenceFrom(now));
           if (next.getTime() > startDay.getTime()) {
@@ -312,7 +304,6 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
   if (weddingDate && wedding) {
     items.push({
       key: MARK_KEYS.wedding,
-      name: 'Wedding',
       plan: (planned, marked, now) => {
         const from = occurrenceFrom(now);
         const startOfFrom = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -329,7 +320,6 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
     const own = dates.ownBirthday;
     items.push({
       key: MARK_KEYS.ownBirthday,
-      name: 'Your birthday',
       plan: (planned, marked, now) => addBirthday(planned, own, marked, now),
     });
   }
@@ -337,41 +327,11 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
     const partner = dates.partnerBirthday;
     items.push({
       key: MARK_KEYS.partnerBirthday,
-      name: `${partner.name ?? 'Your partner'}'s birthday`,
       plan: (planned, marked, now) => addBirthday(planned, partner, marked, now),
     });
   }
 
   return items;
-}
-
-/**
- * The dates a person can mark, each with its key and the name the marks list
- * shows, in the list's order: events in list order, the anniversaries,
- * `Our anniversary`, `Wedding`, `Your birthday`, `{partner}'s birthday`. A date
- * is listed only when marking it would plan at least one reminder at `now`,
- * computed by the same per-date code `planDateReminders` runs: an event dated
- * tomorrow after 9:00 and a relationship start dated later than today (or
- * today before 9:00) have nothing ahead and are not listed. A recurring date on
- * its own day after 9:00 stays listed: its next occurrence is next year's. An
- * unreadable date is not listed, nor is an anniversary with no `serverId` (it
- * has no key yet). The names are the Home cards' labels; the
- * relationship start is the exception, since its card ("Together for") does not
- * name a date.
- */
-export function reminderDateEntries(
-  dates: Omit<ReminderDates, 'marks' | 'remindersOn'>,
-  now: Date
-): { key: string; name: string }[] {
-  const entries: { key: string; name: string }[] = [];
-  for (const item of reminderDateItems(dates)) {
-    if (item.key === null) continue;
-    // Marked is the superset: the month and week reminders fall before the day-before one.
-    const planned: PlannedReminder[] = [];
-    item.plan(planned, true, now);
-    if (planned.length > 0) entries.push({ key: item.key, name: item.name });
-  }
-  return entries;
 }
 
 /**

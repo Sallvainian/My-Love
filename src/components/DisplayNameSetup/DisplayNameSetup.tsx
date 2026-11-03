@@ -6,7 +6,9 @@
  *
  * Features:
  * - Modal overlay with form
- * - Display name validation (3-30 characters)
+ * - Display name validation (3-30 characters); `profileService.saveDisplayName`
+ *   is the twin of these rules (length, not the account email, not
+ *   `SEED_FALLBACK_NAME`) for a name written outside this gate
  * - Writes the name to the user's own `public.users` row
  *
  * The name is profile data, not auth identity. It used to be written to
@@ -22,7 +24,7 @@
  */
 
 import { CircleAlert, LoaderCircle } from 'lucide-react';
-import { useEffect, useState, type SubmitEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { isOnline } from '../../api/errorHandlers';
 import { SEED_FALLBACK_NAME, supabase } from '../../api/supabaseClient';
@@ -35,7 +37,6 @@ import {
   FAILURE_BOX,
   FIELD_LABEL,
   PRIMARY_BUTTON,
-  SECONDARY_BUTTON,
   fieldClass,
 } from '../shared/kitClasses';
 
@@ -44,37 +45,10 @@ interface DisplayNameSetupProps {
   isOpen: boolean;
   /** Callback when display name is set successfully */
   onComplete: () => void;
-  /**
-   * Name to pre-fill the field with, for the Settings edit route.
-   *
-   * Read once, by `useState`'s initialiser -- so the caller has to mount this
-   * component freshly per open rather than keep it mounted behind
-   * `isOpen={false}`, or a later change to this prop is ignored. Settings does
-   * exactly that; App's signup gate passes nothing and gets today's empty field.
-   */
-  initialName?: string;
-  /**
-   * Supplied only by a surface the user can back out of. Its presence IS what
-   * renders the Cancel control: the signup gate deliberately has no way out,
-   * because an account with no name is the state this modal exists to end.
-   */
-  onCancel?: () => void;
-  /**
-   * Which copy to wear. 'setup' is the first-run welcome; 'edit' is the same
-   * form, with the same refusals, reached from Settings by someone who already
-   * has a name.
-   */
-  mode?: 'setup' | 'edit';
 }
 
-export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
-  isOpen,
-  onComplete,
-  initialName = '',
-  onCancel,
-  mode = 'setup',
-}) => {
-  const [displayName, setDisplayName] = useState(initialName);
+export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onComplete }) => {
+  const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -176,66 +150,16 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
     }
   };
 
-  // Escape closes, but ONLY where there is somewhere to close to. The signup
-  // gate supplies no `onCancel` and so gets no key handler at all: an account
-  // with no name is the state this modal exists to end, and a dismissable gate
-  // would drop the user into an app still showing their email.
-  //
-  // Bound to the document rather than the overlay because nothing here traps
-  // focus (deliberately — see the dialog role below), so the key event can be
-  // raised from outside this subtree.
-  //
-  // Carries the same `isLoading` guard the Cancel button does, because closing
-  // is what `onCancel` means and the button is `disabled={isLoading}` for a
-  // reason: the parent unmounts this form on cancel, but the in-flight write is
-  // not cancelled with it. Without the guard, Escape during a save lets the
-  // write land anyway while the UI backs out, and a FAILED write sets its error
-  // on an unmounted component, so the user is told nothing.
-  useEffect(() => {
-    if (!isOpen || !onCancel || isLoading) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onCancel, isLoading]);
-
   if (!isOpen) {
     return null;
   }
 
-  const isEdit = mode === 'edit';
-
-  const submitButton = (
-    <button
-      type="submit"
-      className={onCancel ? PRIMARY_BUTTON : `${PRIMARY_BUTTON} w-full`}
-      data-testid="display-name-submit"
-      disabled={isLoading || !displayName.trim()}
-    >
-      {isLoading ? (
-        <>
-          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-          {isEdit ? 'Saving...' : 'Setting up...'}
-        </>
-      ) : isEdit ? (
-        'Save name'
-      ) : (
-        'Continue'
-      )}
-    </button>
-  );
-
   return (
     <div className={DIALOG_BACKDROP} data-testid="display-name-setup">
-      {/* Opened by choice over a live Settings page, so it has to announce
-          itself as a dialog and name itself from the title already on screen.
-          `aria-modal` is what tells a screen reader to stop at the scrim rather
-          than read Change and Sign Out behind it. No focus trap: one would be a
-          larger change than this needs, and without it Escape is bound to the
-          document so the key still reaches us. */}
+      {/* The dialog role and its name from the title on screen stay: the gate
+          is a blocking surface, and `aria-modal` marks the scrim as the edge of
+          what can be reached. No focus trap and no way out -- an account with
+          no name is the state this modal exists to end. */}
       <div
         className={`${DIALOG_PANEL} max-w-md`}
         data-testid="display-name-modal"
@@ -245,12 +169,10 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
       >
         <div className="mb-5">
           <h2 className={DIALOG_TITLE} id="display-name-modal-title">
-            {isEdit ? 'Change your name' : 'Welcome!'}
+            Welcome!
           </h2>
           <p className="mt-1 text-sm text-muted" data-testid="display-name-subtitle">
-            {isEdit
-              ? 'This is the name your partner sees on your notes.'
-              : 'What would you like to be called?'}
+            What would you like to be called?
           </p>
         </div>
 
@@ -295,26 +217,21 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({
             </p>
           </div>
 
-          {/* Cancel first in the DOM so Tab reaches it before the primary
-              action, and rendered only when there is somewhere to cancel TO.
-              Without `onCancel` (the signup gate) the submit button renders
-              bare, full width, with no actions row. */}
-          {onCancel ? (
-            <div className="flex gap-3">
-              <button
-                type="button"
-                className={SECONDARY_BUTTON}
-                data-testid="display-name-cancel"
-                onClick={onCancel}
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              {submitButton}
-            </div>
-          ) : (
-            submitButton
-          )}
+          <button
+            type="submit"
+            className={`${PRIMARY_BUTTON} w-full`}
+            data-testid="display-name-submit"
+            disabled={isLoading || !displayName.trim()}
+          >
+            {isLoading ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Setting up...
+              </>
+            ) : (
+              'Continue'
+            )}
+          </button>
         </form>
       </div>
     </div>

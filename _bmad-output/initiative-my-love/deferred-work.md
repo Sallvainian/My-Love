@@ -3646,7 +3646,8 @@ origin: story 5.1 review (epic-settings-rework), 2026-11-02
 location: src/stores/slices/authSlice.ts (deleteAccountData); src/services/photoDownloadPreference.ts (PHOTOS_OVER_MOBILE_DATA_KEY)
 severity: low
 reason: Epic-settings-rework R12 says the Photos choice survives sign-out, and AGENTS.md says sign-out must not reset it, but no unit or E2E test signs out and then reads `my-love-photos-over-mobile-data`. A future addition to `deleteAccountData()` that clears localStorage wholesale would pass every suite. Add an assertion to the sign-out clearing tests (`signOutClearsAccountState.test.ts`) that the key keeps its value.
-status: open
+status: done 2026-11-03
+resolution: story 5.16 added two sign-out tests in signOutClearsAccountState.test.ts: with `my-love-photos-over-mobile-data` at `'true'`, `clearAuth()` and a no-session boot with the owner marker both delete the outgoing account's data and leave the key at `'true'`.
 
 ### DW-421: The Settings page stack's column-dock form has no end-to-end check (ledger DW-419).
 origin: spec-deferred b9cb78c93e32
@@ -3672,7 +3673,8 @@ location: AGENTS.md (Where things are, Settings subpage rule); src/components/Se
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
 severity: low
 reason: The Photos row checks canTellMobileData() by hand (Settings.tsx, Preferences group) while its page is gated by `available: canTellMobileData` in SUBPAGES. A later subpage with `available` whose row is not gated shows a row that pushes /settings/<page>, then the stack's redirect replaces that entry with /settings, leaving two top-page entries and one extra Back. The fix is a sentence in the AGENTS.md "Settings subpage" rule (gate the row on the same check), or deriving row visibility from the spec.
-status: open
+status: done 2026-11-03
+resolution: story 5.16 added `subpageAvailable(path)` in Settings.tsx, which reads `available` from `SUBPAGES`; the Notifications and Photos rows are gated with it, and the AGENTS.md subpage rule now says to gate such a row that way.
 
 ### DW-424: After a live update, the native edge swipe on the first page may reload the app instead of doing nothing.
 origin: investigation (spike 5.2, 2026-11-02)
@@ -3705,7 +3707,8 @@ location: src/components/DisplayNameSetup/DisplayNameSetup.tsx; src/services/pro
 source_spec: `tickets/epic-settings-rework/tickets/story-profile-edits-name-and-birthday-on-one-field-pages-plan.md`
 severity: low
 reason: Story 5.7 moved the Settings name edit onto the Name page, which writes through `profileSlice.setDisplayName` and `profileService.saveDisplayName`. The signup gate in `App.tsx` is the only caller left, and it passes neither `initialName` nor `onCancel` and stays in `setup` mode, so the `edit` copy, the Cancel control, the Escape handler and the `initialName` prop are dead code. The gate also still holds its own copy of the 3-30 length rule, the account-email and `Unknown` refusals and the `users` update, now the same as `saveDisplayName`'s. The story's "Never" list kept `DisplayNameSetup` and the gate unchanged. The sweep (story 16) removes the dead props and mode, then either points the gate at `setDisplayName` or leaves it with a comment naming `saveDisplayName` as the twin.
-status: open
+status: done 2026-11-03
+resolution: story 5.16 removed `initialName`, `onCancel`, `mode`, the Escape handler and the Cancel row from `DisplayNameSetup`, with their tests; the gate keeps its own name rules, and its header now names `profileService.saveDisplayName` as their twin.
 
 ### DW-428: `PartnerMoodView` shows the Connect UI for one render before `loadPartner` raises `isLoadingPartner`, because it cannot tell "unanswered" from "unlinked".
 origin: spec-deferred (story 5.8, 2026-11-03)
@@ -3753,7 +3756,8 @@ location: src/services/dateReminders.ts (`reminderDateEntries`), src/services/__
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
 reason: `CountdownMarks` was the only production caller of `reminderDateEntries`, which listed the dates a person could mark for the per-date reminder list. Each date's own page now holds its Remind me switch (`RemindMe`), so the function and its unit tests are dead code. A later change deletes it with its tests, after a check that `planReminders` and its doc comments no longer lean on it.
-status: open
+status: done 2026-11-03
+resolution: story 5.16 deleted `reminderDateEntries` and `ReminderDateItem.name` with their tests; the planner's all-marks check is kept as a `planDateReminders` case.
 
 ### DW-434: Returning to the Dates list reloads its first window, so rows reached through `Load more`, or a date just added beyond that window, drop out of the list.
 origin: story 5.13 build (epic-settings-rework), 2026-11-03
@@ -3785,4 +3789,20 @@ location: _bmad-output/initiative-my-love/deferred-work.md DW-425
 source_spec: `tickets/epic-settings-rework/tickets/story-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: low
 reason: Story 15 ran the three cases on the Duo simulator: the first entry (exit 1), the column on the left edge (one level, after 17 failed synthesized pans), and Home's message card (one level). It cannot run them under a real finger, and the shell with the Swift line is not on the Duo yet. The hand checks are this plan's operator_actions. The deferred-work.md header leaves another entry's reason to the orchestrator.
+status: open
+
+### DW-438: The AGENTS.md Settings subpage rule names `subpageAvailable(path)` for any parent page's row, but the helper is local to `Settings.tsx`, and it overclaims that the row and the page "cannot disagree".
+origin: spec-deferred (story 5.16 review, 2026-11-03)
+location: AGENTS.md (Where things are, Settings subpage rule); src/components/Settings/Settings.tsx (`subpageAvailable`)
+source_spec: `tickets/epic-settings-rework/tickets/story-refactor-sweep-plan.md`
+severity: low
+reason: Story 5.16 added `subpageAvailable(path)`, a non-exported function in `Settings.tsx`, and an AGENTS.md clause telling a subpage's row on its parent page to use it. Parent pages other than the top page live in their own files (`DatesPage.tsx`, `NotificationsPage.tsx` and others), so a row there cannot follow the rule without exporting the helper. Today only top-page rows have pages with `available`, so nothing is wrong yet. The clause also says the row and page "cannot disagree", but a path missing from `SUBPAGES` counts as available and the path string is separate from the row's `target`; the code comment was corrected in story 5.16, the AGENTS.md wording was not, because the review routes agent-context edits to the orchestrator. Fix: say "a top-page row" (or export the helper) and drop "cannot disagree".
+status: open
+
+### DW-439: The AGENTS.md Settings subpage rule names `subpageAvailable(path)` for any parent page's row, but the helper is local to `Settings.tsx`, and it overclaims that the row and the page "cannot disagree"
+origin: spec-deferred d7c5c24911d5
+location: AGENTS.md (Where things are, Settings subpage rule)
+source_spec: `tickets/epic-settings-rework/tickets/story-refactor-sweep-plan.md`
+severity: low
+reason: `subpageAvailable` is a non-exported function in src/components/Settings/Settings.tsx; parent pages other than the top page live in their own files, so a row there cannot call it. A path missing from SUBPAGES counts as available. Today only top-page rows have pages with `available`. The fix edits AGENTS.md, which review routes to the orchestrator.
 status: open
