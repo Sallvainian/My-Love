@@ -8,7 +8,8 @@
  * flips the today/retire state when local midnight passes.
  *
  * Rendered as the shared CountdownCard in the `you` tone: colour lives only in
- * the tile, which switches to the highlight fill on the day itself.
+ * the tile, which switches to the highlight fill on the day itself. `onOpen`
+ * makes the whole card a button (the date's page).
  */
 
 import { Calendar, Gem, Plane } from 'lucide-react';
@@ -38,6 +39,8 @@ interface EventCountdownProps {
    * so no dedicated midnight timer is introduced.
    */
   onRetire?: () => void;
+  /** Opens this date's page; the card is a button only when it is given. */
+  onOpen?: () => void;
 }
 
 const iconComponents: Record<IconType, typeof Gem> = {
@@ -84,6 +87,7 @@ export function EventCountdown({
   description,
   placeholderText = 'Date TBD',
   onRetire,
+  onOpen,
 }: EventCountdownProps) {
   // One state object from one clock sample. Three separate useState
   // initializers each ran computeEventCountdownState independently, so a mount
@@ -150,6 +154,7 @@ export function EventCountdown({
       valueMuted={!date}
       trailing={remaining && !isEventToday ? formatCountdownClock(remaining) : undefined}
       description={description}
+      onOpen={onOpen}
       testId={`event-countdown-${label.toLowerCase().replace(/\s+/g, '-')}`}
     />
   );

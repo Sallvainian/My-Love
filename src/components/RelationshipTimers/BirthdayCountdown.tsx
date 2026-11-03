@@ -16,6 +16,8 @@
  * - not set: "{name}'s birthday" ("Your birthday") over a muted "Not set yet",
  *   plus `unsetDescription` when the caller gives one.
  *
+ * `onOpen` makes the whole card a button (the birthday's page), set or not.
+ *
  * A 29 February birthday counts down to 1 March in non-leap years, because
  * `Date` rolls that date over.
  */
@@ -46,6 +48,8 @@ interface BirthdayCountdownProps {
   /** Shown under "Not set yet" when the birthday is not set. */
   unsetDescription?: string;
   testId: string;
+  /** Opens this birthday's page; the card is a button only when it is given. */
+  onOpen?: () => void;
 }
 
 function computeBirthdayCountdownState(birthday: BirthdayInfo): {
@@ -77,6 +81,7 @@ export function BirthdayCountdown({
   tone = 'you',
   unsetDescription,
   testId,
+  onOpen,
 }: BirthdayCountdownProps) {
   const info = useMemo(() => toBirthdayInfo(birthday), [birthday]);
 
@@ -89,6 +94,7 @@ export function BirthdayCountdown({
         value="Not set yet"
         valueMuted
         description={unsetDescription}
+        onOpen={onOpen}
         testId={testId}
       />
     );
@@ -96,7 +102,14 @@ export function BirthdayCountdown({
 
   // Keyed on the date, so a changed birthday remounts with fresh state.
   return (
-    <BirthdayCountdownCounter key={birthday} name={name} info={info} tone={tone} testId={testId} />
+    <BirthdayCountdownCounter
+      key={birthday}
+      name={name}
+      info={info}
+      tone={tone}
+      testId={testId}
+      onOpen={onOpen}
+    />
   );
 }
 
@@ -105,11 +118,13 @@ function BirthdayCountdownCounter({
   info,
   tone,
   testId,
+  onOpen,
 }: {
   name: string | null;
   info: BirthdayInfo;
   tone: CountdownTone;
   testId: string;
+  onOpen?: () => void;
 }) {
   const [state, setState] = useState(() => computeBirthdayCountdownState(info));
 
@@ -134,6 +149,7 @@ function BirthdayCountdownCounter({
       label={name === null ? `You turn ${upcomingAge}` : `${name} turns ${upcomingAge}`}
       value={value}
       trailing={remaining && !isBirthdayToday ? formatCountdownClock(remaining) : undefined}
+      onOpen={onOpen}
       testId={testId}
     />
   );

@@ -26,6 +26,7 @@ const ALL_DESTINATIONS: ViewType[] = [...DOCK_DESTINATIONS, 'settings'];
 function renderNavigation(
   overrides: {
     currentView?: ViewType;
+    settingsFromHome?: boolean;
     badgeCounts?: Partial<Record<ViewType, number>>;
   } = {}
 ) {
@@ -34,6 +35,7 @@ function renderNavigation(
     <AppNavigation
       currentView={overrides.currentView ?? 'home'}
       onViewChange={onViewChange}
+      settingsFromHome={overrides.settingsFromHome}
       badgeCounts={overrides.badgeCounts}
     />
   );
@@ -146,6 +148,48 @@ describe('AppNavigation', () => {
       for (const view of DOCK_DESTINATIONS.filter((v) => v !== 'notes')) {
         expect(screen.getByTestId(`nav-${view}`).textContent).toBe('');
       }
+    });
+  });
+
+  describe('Settings opened from Home', () => {
+    it('lights Home, not Settings, in the bottom form', () => {
+      renderNavigation({ currentView: 'settings', settingsFromHome: true });
+
+      expect(screen.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByTestId('nav-home')).toHaveTextContent('Home');
+      // The header follows the view, so Settings still draws none.
+      expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+    });
+
+    it('lights Home and leaves the column\'s Settings button inactive', () => {
+      sideColumn.current = 'right';
+      renderNavigation({ currentView: 'settings', settingsFromHome: true });
+
+      expect(screen.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByTestId('nav-settings')).not.toHaveAttribute('aria-current');
+    });
+
+    it('lights Settings in the column when it was not opened from Home', () => {
+      sideColumn.current = 'right';
+      renderNavigation({ currentView: 'settings', settingsFromHome: false });
+
+      expect(screen.getByTestId('nav-settings')).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByTestId('nav-home')).not.toHaveAttribute('aria-current');
+    });
+
+    it('lights nothing in the bottom form when Settings was not opened from Home', () => {
+      renderNavigation({ currentView: 'settings', settingsFromHome: false });
+
+      for (const view of DOCK_DESTINATIONS) {
+        expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
+      }
+    });
+
+    it('never lights Home through the flag on another view', () => {
+      renderNavigation({ currentView: 'mood', settingsFromHome: true });
+
+      expect(screen.getByTestId('nav-home')).not.toHaveAttribute('aria-current');
+      expect(screen.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
     });
   });
 

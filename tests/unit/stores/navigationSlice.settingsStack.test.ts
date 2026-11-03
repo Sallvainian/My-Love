@@ -62,13 +62,13 @@ describe('Settings routes', () => {
 describe('navigationSlice Settings stack', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
-    useAppStore.setState({ currentView: 'home', settingsPath: '' });
+    useAppStore.setState({ currentView: 'home', settingsPath: '', settingsFromHome: false, settingsPushedPath: null });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     window.history.replaceState(null, '', '/');
-    useAppStore.setState({ currentView: 'home', settingsPath: '' });
+    useAppStore.setState({ currentView: 'home', settingsPath: '', settingsFromHome: false, settingsPushedPath: null });
   });
 
   describe('openSettingsPage', () => {
@@ -98,6 +98,19 @@ describe('navigationSlice Settings stack', () => {
       expect(settingsPathFromRoute(stripBasePath(window.location.pathname))).toBe('photos');
     });
 
+    it('remembers the page it pushed, which a reload (a fresh store) does not', () => {
+      expect(useAppStore.getState().settingsPushedPath).toBeNull();
+
+      useAppStore.getState().openSettingsPage('dates/new-event', { fromHome: true });
+
+      expect(useAppStore.getState().settingsPushedPath).toBe('dates/new-event');
+
+      // A history restore (popstate, reload) shows what the URL names, pushed by nobody here.
+      useAppStore.getState().showSettingsPage('dates/new-event');
+
+      expect(useAppStore.getState().settingsPushedPath).toBeNull();
+    });
+
     it('goes back one level with the browser, restoring the entry it left', async () => {
       useAppStore.getState().setView('settings');
       useAppStore.getState().openSettingsPage('photos');
@@ -106,6 +119,108 @@ describe('navigationSlice Settings stack', () => {
       await vi.waitFor(() => expect(window.location.pathname).toBe('/settings'));
 
       expect(window.history.state).toMatchObject({ view: 'settings', inApp: true });
+    });
+  });
+
+  describe('from Home', () => {
+    it('marks the pushed entry and the flag when a Home flow opens a page', () => {
+      const before = window.history.length;
+
+      useAppStore.getState().openSettingsPage('dates/event/7', { fromHome: true });
+
+      expect(window.history.length).toBe(before + 1);
+      expect(window.location.pathname).toBe('/settings/dates/event/7');
+      expect(window.history.state).toEqual({
+        view: 'settings',
+        settingsPath: 'dates/event/7',
+        inApp: true,
+        from: 'home',
+      });
+      expect(useAppStore.getState().settingsFromHome).toBe(true);
+    });
+
+    it('leaves the mark off a push from the Dates list', () => {
+      useAppStore.getState().setView('settings');
+      useAppStore.getState().openSettingsPage('dates');
+      useAppStore.getState().openSettingsPage('dates/event/7');
+
+      expect(window.history.state).not.toHaveProperty('from');
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('inherits the mark on a push from a page that is from Home', () => {
+      useAppStore.getState().openSettingsPage('dates/event/7', { fromHome: true });
+
+      useAppStore.getState().openSettingsPage('dates/event/7/date');
+
+      expect(window.history.state).toMatchObject({ settingsPath: 'dates/event/7/date', from: 'home' });
+      expect(useAppStore.getState().settingsFromHome).toBe(true);
+    });
+
+    it('does not inherit the mark from another view', () => {
+      useAppStore.setState({ currentView: 'mood', settingsFromHome: true });
+
+      useAppStore.getState().openSettingsPage('photos');
+
+      expect(window.history.state).not.toHaveProperty('from');
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('lets an explicit fromHome: false drop the mark', () => {
+      useAppStore.getState().openSettingsPage('dates/event/7', { fromHome: true });
+
+      useAppStore.getState().openSettingsPage('photos', { fromHome: false });
+
+      expect(window.history.state).not.toHaveProperty('from');
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('reads the mark back from the entry on showSettingsPage, as a reload or popstate does', () => {
+      window.history.replaceState(
+        { view: 'settings', settingsPath: 'dates/wedding', inApp: true, from: 'home' },
+        '',
+        '/settings/dates/wedding'
+      );
+
+      useAppStore.getState().showSettingsPage('dates/wedding');
+
+      expect(useAppStore.getState().settingsFromHome).toBe(true);
+    });
+
+    it('reads no mark from an entry without one (a pasted URL)', () => {
+      useAppStore.setState({ settingsFromHome: true });
+      window.history.replaceState(null, '', '/settings/dates/wedding');
+
+      useAppStore.getState().showSettingsPage('dates/wedding');
+
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('returns to the Home entry with the flag cleared on browser back', async () => {
+      useAppStore.getState().openSettingsPage('dates/event/7', { fromHome: true });
+
+      window.history.back();
+      await vi.waitFor(() => expect(window.location.pathname).toBe('/'));
+      useAppStore.getState().showSettingsPage('');
+
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('clears the flag when the person picks a view', () => {
+      useAppStore.getState().openSettingsPage('dates/event/7', { fromHome: true });
+
+      useAppStore.getState().setView('mood');
+
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+      expect(window.history.state).toEqual({ view: 'mood', inApp: true });
+    });
+
+    it('keeps the flag through a history restore (skipHistory)', () => {
+      useAppStore.setState({ settingsFromHome: true });
+
+      useAppStore.getState().setView('settings', true);
+
+      expect(useAppStore.getState().settingsFromHome).toBe(true);
     });
   });
 

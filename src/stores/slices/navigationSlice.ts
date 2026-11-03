@@ -4,6 +4,9 @@
  * Manages all navigation-related state and actions including:
  * - View switching (home/photos/mood/partner/notes/settings)
  * - The open Settings subpage (`settingsPath`), mirrored in the URL under `/settings/`
+ * - Whether that page was opened from Home (`settingsFromHome`), a date card or
+ *   Home's Add button: the entry carries `from: 'home'` in `history.state`, which
+ *   survives a reload, and the flag mirrors it so the dock keeps Home lit
  * - Browser history integration
  *
  * Cross-slice dependencies:
@@ -52,12 +55,34 @@ export interface NavigationSlice {
   currentView: ViewType;
   /** The open Settings subpage, relative to `/settings` (`''` is the top page). */
   settingsPath: string;
+  /**
+   * The open Settings page belongs to a flow that began on Home. Mirrors
+   * `history.state.from === 'home'` (the truth, since it survives a reload):
+   * set by `openSettingsPage` and re-read by `showSettingsPage`, cleared by a
+   * view the person picks. The dock highlights Home while it is set.
+   */
+  settingsFromHome: boolean;
+  /**
+   * The page the last `openSettingsPage` pushed, or `null`: a reload starts the
+   * store afresh and every history restore (`showSettingsPage`) clears it. It
+   * tells a form or one-field page that the person opened it just now -- from
+   * Home's Add, with no stack mounted yet -- from one a reload or a history
+   * restore landed on, which shows the parent.
+   */
+  settingsPushedPath: string | null;
 
   // Actions
   setView: (view: ViewType, skipHistory?: boolean) => void;
-  /** Push a Settings subpage: one history entry, marked as created by the app. */
-  openSettingsPage: (path: string) => void;
-  /** Show a Settings page without touching history (popstate, reload, redirects). */
+  /**
+   * Push a Settings subpage: one history entry, marked as created by the app.
+   * `fromHome` marks the entry as part of a flow that began on Home; left out,
+   * a push from a page that is itself from Home inherits it.
+   */
+  openSettingsPage: (path: string, options?: { fromHome?: boolean }) => void;
+  /**
+   * Show a Settings page without touching history (popstate, reload,
+   * redirects), taking `settingsFromHome` from the current entry.
+   */
   showSettingsPage: (path: string) => void;
   navigateHome: () => void;
   navigatePhotos: () => void;
@@ -70,12 +95,18 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
   // Initial state
   currentView: 'home',
   settingsPath: '',
+  settingsFromHome: false,
+  settingsPushedPath: null,
 
   // Actions
   setView: (view: ViewType, skipHistory = false) => {
     // A view the person picks opens Settings at its top page; a history
     // restore (skipHistory) leaves the page to `showSettingsPage`.
-    set(skipHistory ? { currentView: view } : { currentView: view, settingsPath: '' });
+    set(
+      skipHistory
+        ? { currentView: view }
+        : { currentView: view, settingsPath: '', settingsFromHome: false }
+    );
 
     // Update browser URL if not skipping history (prevents loops during popstate)
     if (!skipHistory) {
@@ -106,15 +137,30 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
     }
   },
 
-  openSettingsPage: (path: string) => {
-    set({ currentView: 'settings', settingsPath: path });
+  openSettingsPage: (path: string, options?: { fromHome?: boolean }) => {
+    const { currentView, settingsFromHome } = get();
+    const fromHome = options?.fromHome ?? (currentView === 'settings' && settingsFromHome);
+    set({
+      currentView: 'settings',
+      settingsPath: path,
+      settingsFromHome: fromHome,
+      settingsPushedPath: path,
+    });
     const fullPath = withBasePath(settingsRoute(path));
-    window.history.pushState({ view: 'settings', settingsPath: path, inApp: true }, '', fullPath);
+    window.history.pushState(
+      { view: 'settings', settingsPath: path, inApp: true, ...(fromHome ? { from: 'home' } : {}) },
+      '',
+      fullPath
+    );
     logger.info(`[AppStore] Settings page opened: '${path}', URL: ${fullPath}`);
   },
 
   showSettingsPage: (path: string) => {
-    set({ settingsPath: path });
+    set({
+      settingsPath: path,
+      settingsFromHome: window.history.state?.from === 'home',
+      settingsPushedPath: null,
+    });
   },
 
   // Convenience actions

@@ -3761,3 +3761,19 @@ source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-annivers
 severity: low
 reason: The Dates list loads events on every mount, and a back from an event page or a Form page remounts it, so the store's paged window is replaced by the server's first page. Since story 5.9 this drops every row reached through `Load more`. Since story 5.13 it also drops a past date added beyond the first window: it shows on the list after Add and vanishes when the reload answers. `events-history-pagination.spec.ts` waits for that reload and pages to the row. A fix keeps the loaded window across a return (for example, load only on a push or a fresh mount, not on a pop), as `EventPage` already skips its load when it holds its event.
 status: open
+
+### DW-435: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh.
+origin: story 5.14 build (epic-settings-rework), 2026-11-03
+location: src/components/Settings/stack/SettingsStack.tsx (`trail`'s initial `direction: null`; the commit effect returns early while `shownPath` is null)
+source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
+severity: low
+reason: EXPERIENCE.md Flow 1 step 2 says the event page "slides in from the right" when Casey taps the Home card. Settings is not mounted while Home shows, so a Home card or Add mounts `SettingsStack` on the date page. Its first render has no direction, so it gets no slide class, and its commit effect skips the scroll-to-top and title focus that a push within the stack gets. The page appears at once, at Home's scroll position until the shorter page clamps it. Opening Settings from the gear has always behaved the same way. A fix starts `trail` as `push`, and runs the push branch on the first commit, when `settingsPushedPath` equals the mounted path, as story 5.14 already does for the reload check.
+status: open
+
+### DW-436: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh (DW-435).
+origin: spec-deferred 70fea21d81f5
+location: src/components/Settings/stack/SettingsStack.tsx
+source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
+severity: low
+reason: SettingsStack's trail starts with direction null and its commit effect returns early while shownPath is null, so a first mount gets no slide class, scroll reset or title focus; EXPERIENCE.md Flow 1 step 2 says the event page slides in.
+status: open

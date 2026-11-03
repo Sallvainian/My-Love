@@ -659,7 +659,7 @@ describe('Settings > Profile', () => {
       it('shows Profile, and one back arrow press returns to the top page', async () => {
         const user = userEvent.setup();
         window.history.replaceState(null, '', '/settings/profile/name');
-        useAppStore.setState({ settingsPath: 'profile/name' });
+        useAppStore.setState({ settingsPath: 'profile/name', settingsPushedPath: null });
         render(<Settings />);
 
         expect(await screen.findByTestId('settings-profile-header')).toBeInTheDocument();
@@ -805,7 +805,7 @@ describe('Settings > Profile', () => {
 
     it('shows Profile after a reload at /settings/profile/birthday', async () => {
       window.history.replaceState(null, '', '/settings/profile/birthday');
-      useAppStore.setState({ settingsPath: 'profile/birthday' });
+      useAppStore.setState({ settingsPath: 'profile/birthday', settingsPushedPath: null });
       render(<Settings />);
 
       expect(await screen.findByTestId('settings-profile-header')).toBeInTheDocument();

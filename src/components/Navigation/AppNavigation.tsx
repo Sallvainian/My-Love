@@ -34,6 +34,11 @@
  * the top page and every subpage, so the gear is only ever shown where it can
  * be tapped and carries no active state.
  *
+ * A Settings page opened from Home (a date card, Add) keeps Home lit: while
+ * `settingsFromHome` is set, the active destination is `home` in both forms,
+ * and the column's Settings button is not active. The header stays hidden,
+ * because it follows the view, not the highlight.
+ *
  * Every colour is a style-kit token from index.css (`bg-glass`, `text-ink`,
  * `text-muted`, `bg-tint`/`text-accent`, `bg-fill`, `ring-line`,
  * `shadow-float`), matching the approved style kit. Each token switches with the
@@ -90,6 +95,11 @@ export interface AppNavigationProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
   /**
+   * The open Settings page was opened from Home (`navigationSlice.settingsFromHome`):
+   * Home is the active destination instead of Settings.
+   */
+  settingsFromHome?: boolean;
+  /**
    * Unseen counts per dock destination. Missing, zero or negative entries
    * render no badge, and `settings` is ignored in both forms: neither the gear
    * nor the column's Settings button carries a badge.
@@ -101,8 +111,14 @@ function pluralisedBadgeLabel(count: number): string {
   return `${count} new item${count === 1 ? '' : 's'}`;
 }
 
-export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNavigationProps) {
+export function AppNavigation({
+  currentView,
+  onViewChange,
+  settingsFromHome = false,
+  badgeCounts,
+}: AppNavigationProps) {
   const isSettings = currentView === 'settings';
+  const activeView: ViewType = isSettings && settingsFromHome ? 'home' : currentView;
   const column = useSideColumn();
   // The column holds every destination; the bottom dock leaves Settings to the gear.
   const buttons = column ? [...DESTINATIONS, SETTINGS] : DESTINATIONS;
@@ -181,7 +197,7 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
         data-form={column ? 'column' : 'bottom'}
       >
         {buttons.map(({ view, label, Icon, fillWhenActive }) => {
-          const isActive = currentView === view;
+          const isActive = activeView === view;
           const count = view === 'settings' ? 0 : (badgeCounts?.[view] ?? 0);
           // The column is too narrow for the active label: icons only there.
           const showLabel = isActive && !column;

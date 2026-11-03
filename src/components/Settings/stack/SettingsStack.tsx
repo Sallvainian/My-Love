@@ -17,7 +17,9 @@
  * - `history.state.inApp` is what separates "back returns one level" from "back
  *   leaves the app": the app marks every entry it creates, and a fresh load
  *   has no state. A page opened by a fresh load goes up by replacing its entry
- *   with the parent's route instead of leaving.
+ *   with the parent's route instead of leaving. An entry pushed from Home (a
+ *   date card, Add) also carries `from: 'home'`, which a replace keeps except
+ *   to the top page; `navigationSlice` mirrors it as `settingsFromHome`.
  * - The top page has a back arrow only in the bottom dock form (where the
  *   header gear opened it) and only when the app created its entry; the column
  *   form's capsule is a destination, not a place to go back from.
@@ -34,7 +36,8 @@
  *   up with `history.back()` (replacing it with the parent would leave two
  *   identical entries, and the next back would seem to do nothing); a fresh
  *   load replaces its entry. A push to the page within the mounted stack shows
- *   it as usual.
+ *   it as usual, and so does a push that mounts the stack on it (Home's Add):
+ *   `settingsPushedPath` says this document pushed it, which a reload never has.
  * - A form page (New event, New anniversary) sets `leading: 'cancel'`: the bar's
  *   leading cell is a `Cancel` text button instead of the arrow, running the
  *   same `goBack`.
@@ -89,11 +92,21 @@ function pageAbove(path: string, resolvePage: (path: string) => SettingsPageSpec
   return ancestor;
 }
 
-/** Rewrites the current entry to a Settings route, keeping whether the app created it. */
+/**
+ * Rewrites the current entry to a Settings route, keeping whether the app
+ * created it and whether the flow began on Home. A redirect to the top page
+ * drops the second: it is no longer a date flow.
+ */
 function replaceSettingsRoute(path: string) {
   const inApp = window.history.state?.inApp === true;
+  const fromHome = path !== '' && window.history.state?.from === 'home';
   window.history.replaceState(
-    { view: 'settings', settingsPath: path, ...(inApp ? { inApp } : {}) },
+    {
+      view: 'settings',
+      settingsPath: path,
+      ...(inApp ? { inApp } : {}),
+      ...(fromHome ? { from: 'home' } : {}),
+    },
     '',
     withBasePath(settingsRoute(path))
   );
@@ -102,6 +115,7 @@ function replaceSettingsRoute(path: string) {
 export function SettingsStack({ resolvePage }: SettingsStackProps) {
   const requested = useAppStore((s) => s.settingsPath);
   const showSettingsPage = useAppStore((s) => s.showSettingsPage);
+  const pushedPath = useAppStore((s) => s.settingsPushedPath);
   const column = useSideColumn();
 
   const requestedPage = resolvePage(requested);
@@ -136,9 +150,12 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
   }, [redirect, showSettingsPage]);
 
   // A reload on a one-field page shows its parent. Once per mount: the ref
-  // keeps StrictMode's second run, and every later path change, out of it.
+  // keeps StrictMode's second run, and every later path change, out of it. A
+  // page this document pushed (Home's Add mounts the stack on New event) is not
+  // a reload: `pushedPath` is null after one.
   const reloadChecked = useRef(false);
-  const reloadsToParent = usable && requestedPage.reloadsToParent === true;
+  const reloadsToParent =
+    usable && requestedPage.reloadsToParent === true && pushedPath !== requested;
   useLayoutEffect(() => {
     if (reloadChecked.current) return;
     reloadChecked.current = true;

@@ -16,6 +16,9 @@
  *
  * A card whose birthday is not set stays in place with "Not set yet"; yours
  * adds "Set it in Settings".
+ *
+ * Each card opens its date's page from Home: `dates/birthday`,
+ * `dates/partner-birthday` and `dates/wedding`.
  */
 
 import { useMemo } from 'react';
@@ -28,6 +31,7 @@ export function BirthdayWeddingCards() {
   const ownProfile = useAppStore((s) => s.ownProfile);
   const partner = useAppStore((s) => s.partner);
   const coupleSettings = useAppStore((s) => s.coupleSettings);
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
 
   const weddingDateString = coupleSettings?.status === 'linked' ? coupleSettings.weddingDate : null;
   // One Date per stored string: EventCountdown restarts its clock whenever the
@@ -49,6 +53,7 @@ export function BirthdayWeddingCards() {
               name={ownProfile.displayName}
               birthday={ownProfile.birthday}
               unsetDescription="Set it in Settings"
+              onOpen={() => openSettingsPage('dates/birthday', { fromHome: true })}
               testId="birthday-countdown-self"
             />
           )}
@@ -57,6 +62,7 @@ export function BirthdayWeddingCards() {
               name={partner.displayName}
               birthday={partner.birthday}
               tone="partner"
+              onOpen={() => openSettingsPage('dates/partner-birthday', { fromHome: true })}
               testId="birthday-countdown-partner"
             />
           )}
@@ -71,6 +77,7 @@ export function BirthdayWeddingCards() {
           icon="ring"
           date={weddingDate}
           placeholderText="Date TBD"
+          onOpen={() => openSettingsPage('dates/wedding', { fromHome: true })}
         />
       )}
     </>

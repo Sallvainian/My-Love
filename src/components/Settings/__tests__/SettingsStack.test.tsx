@@ -132,7 +132,7 @@ describe('SettingsStack', () => {
     sideColumn.current = null;
     available.photos = true;
     window.history.replaceState(null, '', '/');
-    useAppStore.setState({ currentView: 'settings', settingsPath: '' });
+    useAppStore.setState({ currentView: 'settings', settingsPath: '', settingsFromHome: false, settingsPushedPath: null });
     window.addEventListener('popstate', onPopState);
   });
 
@@ -142,7 +142,7 @@ describe('SettingsStack', () => {
     // A test may stub `scrollY`; deleting it here keeps a failing test from leaking it.
     Reflect.deleteProperty(window, 'scrollY');
     window.history.replaceState(null, '', '/');
-    useAppStore.setState({ currentView: 'home', settingsPath: '' });
+    useAppStore.setState({ currentView: 'home', settingsPath: '', settingsFromHome: false, settingsPushedPath: null });
   });
 
   describe('push', () => {
@@ -297,6 +297,104 @@ describe('SettingsStack', () => {
       await user.click(screen.getByRole('button', { name: 'Back' }));
 
       expect(back).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('an entry from Home', () => {
+    /** An entry as a Home flow leaves it, reloaded: the state survives, the store starts afresh. */
+    function reloadedFromHome(path: string, extra: Record<string, unknown> = {}) {
+      window.history.replaceState(
+        { view: 'settings', settingsPath: path, inApp: true, from: 'home', ...extra },
+        '',
+        `/settings/${path}`
+      );
+      act(() => useAppStore.getState().setView('settings', true));
+      act(() => useAppStore.getState().showSettingsPage(path));
+    }
+
+    it('keeps the mark when a reload-to-parent page replaces its entry with the parent', () => {
+      reloadedFromHome('photos/edit', { inApp: undefined });
+
+      renderStack();
+
+      expect(window.location.pathname).toBe('/settings/photos');
+      expect(window.history.state).toMatchObject({ settingsPath: 'photos', from: 'home' });
+      expect(useAppStore.getState().settingsFromHome).toBe(true);
+    });
+
+    it('keeps the mark when the back arrow replaces the entry with its parent', async () => {
+      const user = userEvent.setup();
+      reloadedFromHome('photos/deeper', { inApp: undefined });
+      renderStack();
+
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+
+      expect(window.location.pathname).toBe('/settings/photos');
+      expect(window.history.state).toEqual({ view: 'settings', settingsPath: 'photos', from: 'home' });
+      expect(useAppStore.getState().settingsFromHome).toBe(true);
+    });
+
+    it('drops the mark when the back arrow replaces the entry with the top page', async () => {
+      const user = userEvent.setup();
+      reloadedFromHome('photos', { inApp: undefined });
+      renderStack();
+
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+
+      expect(window.location.pathname).toBe('/settings');
+      expect(window.history.state).toEqual({ view: 'settings', settingsPath: '' });
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('drops the mark, and keeps the app mark, on a redirect to the top page', () => {
+      reloadedFromHome('xyz');
+
+      renderStack();
+
+      expect(window.location.pathname).toBe('/settings');
+      expect(window.history.state).toEqual({ view: 'settings', settingsPath: '', inApp: true });
+      expect(useAppStore.getState().settingsFromHome).toBe(false);
+    });
+
+    it('goes back with history.back() on an app-created entry, leaving the Home mark to the entry it lands on', async () => {
+      const user = userEvent.setup();
+      reloadedFromHome('photos');
+      renderStack();
+      const back = vi.spyOn(window.history, 'back');
+
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+
+      expect(back).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('a form page pushed while the stack is not mounted (Home\'s Add)', () => {
+    it('shows the page instead of treating the first mount as a reload', () => {
+      window.history.replaceState(null, '', '/');
+      act(() => useAppStore.getState().openSettingsPage('photos/edit', { fromHome: true }));
+      const back = vi.spyOn(window.history, 'back');
+
+      renderStack();
+
+      expect(back).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/settings/photos/edit');
+      expect(screen.getByTestId('edit-body')).toBeInTheDocument();
+    });
+
+    it('still goes back one level after a reload, which leaves nothing pushed', () => {
+      window.history.replaceState(
+        { view: 'settings', settingsPath: 'photos/edit', inApp: true, from: 'home' },
+        '',
+        '/settings/photos/edit'
+      );
+      act(() => useAppStore.getState().setView('settings', true));
+      act(() => useAppStore.getState().showSettingsPage('photos/edit'));
+      const back = vi.spyOn(window.history, 'back');
+
+      renderStack();
+
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId('edit-body')).not.toBeInTheDocument();
     });
   });
 

@@ -114,7 +114,7 @@ const storedAnniversaries = () => useAppStore.getState().settings?.relationship.
 /** A fresh load at `/settings/<path>`: no history state, so a page goes up by replacing it. */
 function renderAt(path: string, strict = false) {
   window.history.replaceState(null, '', `/settings/${path}`);
-  useAppStore.setState({ settingsPath: path });
+  useAppStore.setState({ settingsPath: path, settingsPushedPath: null });
   render(strict ? <StrictMode><Settings /></StrictMode> : <Settings />);
 }
 

@@ -109,11 +109,12 @@ const HOME_MAX_EVENT_CARDS = 6;
 
 function App() {
   const {
-    isLoading, currentView, isOnline, events, authUserId, authSessionVersion,
+    isLoading, currentView, settingsFromHome, isOnline, events, authUserId, authSessionVersion,
   } = useAppStore(
     useShallow((s) => ({
       isLoading: s.isLoading,
       currentView: s.currentView,
+      settingsFromHome: s.settingsFromHome,
       isOnline: s.syncStatus.isOnline,
       events: s.events,
       authUserId: s.userId,
@@ -123,6 +124,7 @@ function App() {
   const initializeApp = useAppStore((s) => s.initializeApp);
   const setView = useAppStore((s) => s.setView);
   const showSettingsPage = useAppStore((s) => s.showSettingsPage);
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
   const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
@@ -841,7 +843,11 @@ function App() {
             Where the dock is a capsule in a side column, those shrink to the
             home-indicator band and `--dock-left`/`--dock-right` end <main> at
             the column's edge instead (index.css). */}
-        <AppNavigation currentView={currentView} onViewChange={setView} />
+        <AppNavigation
+          currentView={currentView}
+          onViewChange={setView}
+          settingsFromHome={settingsFromHome}
+        />
 
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1).
             Settings renders it under its own bar instead: with no header above
@@ -869,15 +875,15 @@ function App() {
               <BirthdayWeddingCards />
 
               {/* Upcoming: always shown, even while the slot below is still
-                  hidden. Add goes to Settings, where events are created;
-                  opening the editor directly would need new cross-view state. */}
+                  hidden. Add opens the New event form directly, marked as
+                  from Home so the dock keeps Home lit and back returns here. */}
               <div className="flex items-center justify-between px-1">
                 <h2 className="text-xs font-semibold tracking-[.08em] text-muted uppercase">
                   Upcoming
                 </h2>
                 <button
                   type="button"
-                  onClick={() => setView('settings')}
+                  onClick={() => openSettingsPage('dates/new-event', { fromHome: true })}
                   className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint px-3.5 text-[13px] font-semibold text-accent"
                   aria-label="Add event"
                   data-testid="home-add-event"
@@ -927,6 +933,7 @@ function App() {
                       date={event.date}
                       description={event.description ?? undefined}
                       onRetire={handleEventRetired}
+                      onOpen={() => openSettingsPage(`dates/event/${event.id}`, { fromHome: true })}
                     />
                   ))}
                 </div>
