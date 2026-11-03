@@ -3609,3 +3609,17 @@ severity: low
 reason: `sim signin` dismisses the welcome splash, but the shell shows it again when it opens an hour or more after it last showed (after a clock move, say), and `sim signout` then fails with "no Settings button: signed out already, or the page did not load" (Drive.swift:133), because the splash covers the dock. Tapping the splash's Continue (found with `sim dump`, tapped with `sim tap`) let `sim signout` pass. A check that restarts the simulator before signing out (any clock change does) fails at sign-out. Fix by having signout dismiss the splash the way signin does.
 status: done 2026-11-02
 resolution: `sim signout` now gets past the splash as `sim signin` does (Drive.swift pastWelcome, shared by both). The splash shows when the app opens an hour or more after it last showed (App.tsx WELCOME_DISPLAY_INTERVAL), not after every restart: the clock moves made that happen. Checked on the Duo simulator 2026-11-02 by setting the shell's lastWelcomeView to 0 while it was closed: the splash showed, and `sim signout` printed "dismissed the welcome splash" and "signed out" (18 s).
+
+### DW-417: `npm run test:ci-local` skips the send-push Edge Function tests that CI runs.
+origin: bmad-project-context refresh, 2026-11-02
+location: scripts/ci-local.sh:50; .github/workflows/test.yml:208-209
+severity: low
+reason: CI runs `deno test --no-lock` on both `supabase/functions/upload-love-note-image/` and `supabase/functions/send-push/` (the second added with 08e8b562), but `scripts/ci-local.sh` still runs only the first, so a local CI pass says nothing about send-push. AGENTS.md's Deno line states the gap until it is fixed; drop that clause in the same change.
+status: open
+
+### DW-418: Enforce the eslint-disable reason rule with a lint rule.
+origin: bmad-project-context refresh, 2026-11-02
+location: eslint.config.js; package.json (devDependencies); AGENTS.md (Known pitfalls, eslint-disable line)
+severity: low
+reason: AGENTS.md requires every `eslint-disable` directive to carry its reason after ` -- ` and says no lint rule enforces it; `eslint.config.js` sets only `reportUnusedDisableDirectives`. `@eslint-community/eslint-plugin-eslint-comments`' `require-description` would fail a directive without one (all 18 current directives comply). Needs the owner's yes for the new devDependency; once the rule is live, the AGENTS.md line goes.
+status: open
