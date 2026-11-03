@@ -613,7 +613,7 @@ describe('the Date reminders switch', () => {
 
   it('keeps the other push switches out of it: only dateReminders decides', async () => {
     await seedCopies({
-      [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON, dates: false, loveNotes: false },
+      [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON, photos: false, loveNotes: false },
     });
 
     await replanDateReminders();

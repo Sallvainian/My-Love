@@ -3618,6 +3618,7 @@ severity: medium
 reason: The owner wants no notification when an event, the wedding date, together-since or a birthday is added or changed; the only date notifications should be epic-date-reminders' upcoming-date reminders. This reverses the date part of epic-push-notifications R1 (owner request 2026-10-29, story 3.5). The rework's Notifications page drops the Dates switch, and with tap-a-row-to-edit each field save would otherwise send its own push. Needs a new migration that drops the triggers and function (and decides whether date_changes and the push_preferences.dates column go), the send-push date kind removed, and the pgTAP pins updated in the same change. Not a sweep bundle: it belongs with the Settings rework's tickets.
 status: open
 decision: 2026-11-02 remove — owner, 2026-11-02: "I don't want a notification at all to be pushed when something is added or changed. The only notifications that come from dates should be from like when the date is upcoming."
+progress: 2026-11-03 story 5.4 removed the triggers, `notify_date_change()`, `date_changes`, `push_requests.date_change_id`, send-push's `date` kind and the client's use of `dates` (migration `20261103000000_remove_date_change_push.sql`). `push_preferences.dates` and its `36_push_preferences.sql` pins remain for story 18, because installed shells still select and upsert it.
 
 ### DW-417: `npm run test:ci-local` skips the send-push Edge Function tests that CI runs.
 origin: bmad-project-context refresh, 2026-11-02

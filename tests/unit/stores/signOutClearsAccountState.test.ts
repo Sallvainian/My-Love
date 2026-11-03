@@ -529,7 +529,6 @@ describe('clearAuth on sign-out', () => {
         moods: true,
         photos: true,
         pokesAndKisses: true,
-        dates: true,
         partnerRequests: true,
         dateReminders: true,
       },

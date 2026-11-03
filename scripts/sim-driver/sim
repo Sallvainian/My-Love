@@ -75,8 +75,7 @@ Accounts (local stack only):
                          both birthdays), delete both people's countdown marks
                          and turn both people's date reminders back on. kinds
                          and many clear first, so only the listed dates remain,
-                         none marked, reminders on. The event and birthday
-                         writes send the other person date-change pushes.
+                         none marked, reminders on.
                          sim provision restores only the seeded events, not
                          anniversaries, couple settings or birthdays: run
                          sim dates clear, then sim provision, to get back the

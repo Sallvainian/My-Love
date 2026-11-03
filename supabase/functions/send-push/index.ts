@@ -1,14 +1,14 @@
 /**
  * Edge Function: send-push
  *
- * Sends the push a new love note, mood, photo, poke, kiss, date change,
- * partner request or accepted partner request becomes, to every device
- * registered to the recipient, unless the recipient switched that kind off in
+ * Sends the push a new love note, mood, photo, poke, kiss, partner request or
+ * accepted partner request becomes, to every device registered to the
+ * recipient, unless the recipient switched that kind off in
  * `push_preferences`. Every push carries the recipient's unread love-note
- * count as the icon badge. Called by the triggers on `love_notes`,
- * `moods`, `photos`, `interactions`, `events`, `couple_settings`, `users` and
- * `partner_requests`; see `handler.ts` for the contract. This file is only
- * the serve binding and the real database and APNs wiring.
+ * count as the icon badge. Called by the triggers on `love_notes`, `moods`,
+ * `photos`, `interactions` and `partner_requests`; see `handler.ts` for the
+ * contract. This file is only the serve binding and the real database and APNs
+ * wiring.
  *
  * Secrets (never in source): APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, and
  * optionally APNS_TOPIC (default dev.sallvain.mylove). With any of the first
@@ -19,7 +19,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0?deps=iceberg-js@0.8.1';
 
 import { apnsConfigFromEnv, createApnsClient } from './apns.ts';
-import { handleSendPush, type DateChangeRow, type PushDb, type PushKind } from './handler.ts';
+import { handleSendPush, type PushDb, type PushKind } from './handler.ts';
 
 /** The `push_requests` column that holds each kind's source row id. */
 const SOURCE_COLUMN: Record<PushKind, string> = {
@@ -27,7 +27,6 @@ const SOURCE_COLUMN: Record<PushKind, string> = {
   mood: 'mood_id',
   photo: 'photo_id',
   interaction: 'interaction_id',
-  date: 'date_change_id',
   partner_request: 'partner_request_id',
   partner_accept: 'partner_accept_id',
 };
@@ -73,28 +72,6 @@ const db: PushDb = {
       .maybeSingle();
     if (error) throw new Error(error.message);
     return data;
-  },
-  async getDateChange(changeId) {
-    const { data, error } = await admin
-      .from('date_changes')
-      .select('id, sender_id, subject, action, event_id')
-      .eq('id', changeId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!data) return null;
-    let eventLabel: string | null = null;
-    if (data.event_id) {
-      const event = await admin.from('events').select('label').eq('id', data.event_id).maybeSingle();
-      if (event.error) throw new Error(event.error.message);
-      eventLabel = event.data?.label ?? null;
-    }
-    return {
-      id: data.id,
-      sender_id: data.sender_id,
-      subject: data.subject as DateChangeRow['subject'],
-      action: data.action as DateChangeRow['action'],
-      event_label: eventLabel,
-    };
   },
   async getPartnerRequest(requestId) {
     const { data, error } = await admin

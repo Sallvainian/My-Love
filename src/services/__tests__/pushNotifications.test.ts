@@ -1029,11 +1029,16 @@ describe('viewForPush', () => {
       ['partner_request', 'partner'],
       ['partner_accept', 'partner'],
       ['photo', 'photos'],
-      ['date', 'home'],
     ];
     for (const [kind, view] of cases) {
       expect(viewForPush({ kind, aps: thread('partner-activity').aps }), kind).toBe(view);
     }
+  });
+
+  it('navigates nowhere for a date push from an older sender', async () => {
+    const { viewForPush } = await freshModule();
+
+    expect(viewForPush({ kind: 'date', ...thread('partner-activity') })).toBeNull();
   });
 
   it('lets a known kind win over the thread id', async () => {

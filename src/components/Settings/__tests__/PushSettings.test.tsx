@@ -1,6 +1,6 @@
 /**
  * PushSettings — "Push and reminders" (story 3.7): rendered only in the native
- * shell with both push plugins, six switches in a fixed order, a write per
+ * shell with both push plugins, five switches in a fixed order, a write per
  * toggle that goes through the store, and a notice when iOS has notifications
  * off. The preferences service and the Capacitor plugins are mocked; the store
  * is the real one.
@@ -71,7 +71,6 @@ const ROWS = [
     'When your partner sends a poke or a kiss.',
     'pokesAndKisses',
   ],
-  ['settings-push-dates', 'Dates', 'When your partner adds or changes a date.', 'dates'],
   [
     'settings-push-partner-requests',
     'Partner requests',
@@ -158,7 +157,7 @@ describe('PushSettings: the rows', () => {
     expect(within(section).getByRole('heading', { level: 3, name: 'Pushes' })).toBeInTheDocument();
   });
 
-  it('lists the six switches in order with their labels and helpers', async () => {
+  it('lists the five switches in order with their labels and helpers', async () => {
     await renderLoaded();
 
     // The Reminders group's "Date reminders" switch (story 4.3) follows them; it has its own tests.
@@ -185,11 +184,11 @@ describe('PushSettings: the rows', () => {
   });
 
   it('shows the loaded state of each switch', async () => {
-    await renderLoaded({ ...ALL_PUSH_PREFERENCES_ON, loveNotes: false, dates: false });
+    await renderLoaded({ ...ALL_PUSH_PREFERENCES_ON, loveNotes: false, photos: false });
 
     expect(screen.getByTestId('settings-push-love-notes')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('settings-push-moods')).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByTestId('settings-push-dates')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByTestId('settings-push-photos')).toHaveAttribute('aria-checked', 'false');
   });
 
   it('loads the switches once when the section opens', async () => {

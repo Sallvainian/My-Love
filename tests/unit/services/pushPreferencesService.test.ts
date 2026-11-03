@@ -47,7 +47,6 @@ const ROW = {
   moods: true,
   photos: true,
   pokes_and_kisses: true,
-  dates: true,
   partner_requests: true,
   date_reminders: true,
 };
@@ -76,12 +75,21 @@ describe('fetchPushPreferences', () => {
       moods: true,
       photos: true,
       pokesAndKisses: true,
-      dates: true,
       partnerRequests: true,
       dateReminders: true,
     });
     expect(calls[0].table).toBe('push_preferences');
     expect(argsOf('eq')).toEqual([['user_id', 'USER-A']]);
+  });
+
+  it('does not select the dates column, which stays in the table unread', async () => {
+    results.push({ data: ROW, error: null });
+
+    await pushPreferencesService.fetchPushPreferences('USER-A');
+
+    const [[columns]] = argsOf('select') as [[string]];
+    expect(columns.split(', ')).not.toContain('dates');
+    expect(columns).toContain('date_reminders');
   });
 
   it('reads a missing row as every switch on', async () => {
@@ -116,7 +124,6 @@ describe('savePushPreference', () => {
     ['moods', 'moods'],
     ['photos', 'photos'],
     ['pokesAndKisses', 'pokes_and_kisses'],
-    ['dates', 'dates'],
     ['partnerRequests', 'partner_requests'],
     ['dateReminders', 'date_reminders'],
   ];

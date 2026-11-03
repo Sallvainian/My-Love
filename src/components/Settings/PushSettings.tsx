@@ -20,7 +20,6 @@
  */
 
 import {
-  CalendarHeart,
   Hand,
   Image as ImageIcon,
   MessageCircleHeart,
@@ -83,13 +82,6 @@ const ROWS: readonly PushRow[] = [
     icon: Hand,
     label: 'Pokes and kisses',
     helper: 'When your partner sends a poke or a kiss.',
-  },
-  {
-    key: 'dates',
-    testId: 'dates',
-    icon: CalendarHeart,
-    label: 'Dates',
-    helper: 'When your partner adds or changes a date.',
   },
   {
     key: 'partnerRequests',

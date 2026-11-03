@@ -10,10 +10,8 @@
  * thread, `partner-activity`, so they stack apart from love notes; the title
  * is again the sender's display name; no image, no `sound`.
  *
- * Story 3.5 adds the date changes (an event added or changed, the wedding
- * date, the date the couple got together, a birthday) on the same
- * `partner-activity` thread. The text never carries a date value, because the
- * recipient's timezone is unknown; an event's label is the only data in it.
+ * Story 3.5 added a push for each date change; story 5.4 removed it, so a date
+ * is never a push.
  *
  * Story 3.6 adds a partner request and its acceptance, again on
  * `partner-activity`. The title is the other person's display name. A request
@@ -29,7 +27,7 @@
  *
  * Story 3.9 adds `kind`, a top-level key beside `aps` (an APNs custom key): the
  * `PushKind` the sender handled (`love_note`, `mood`, `photo`, `interaction`,
- * `date`, `partner_request`, `partner_accept`). `withKind` puts it on every
+ * `partner_request`, `partner_accept`). `withKind` puts it on every
  * payload. The web code reads it on a tap to choose the view to open
  * (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is unchanged.
  */
@@ -44,14 +42,6 @@ export const MOOD_BODY_PREFIX = 'Logged a mood';
 export const PHOTO_BODY = 'Added a photo';
 export const POKE_BODY = 'Poked you';
 export const KISS_BODY = 'Sent you a kiss';
-export const EVENT_ADDED_PREFIX = 'Added an event';
-export const EVENT_CHANGED_PREFIX = 'Changed an event';
-export const WEDDING_DATE_SET_BODY = 'Set the wedding date';
-export const WEDDING_DATE_CHANGED_BODY = 'Changed the wedding date';
-export const RELATIONSHIP_START_SET_BODY = 'Set the date you got together';
-export const RELATIONSHIP_START_CHANGED_BODY = 'Changed the date you got together';
-export const BIRTHDAY_ADDED_BODY = 'Added their birthday';
-export const BIRTHDAY_CHANGED_BODY = 'Changed their birthday';
 export const PARTNER_REQUEST_BODY = 'Sent you a partner request';
 export const PARTNER_ACCEPT_BODY = 'Accepted your partner request';
 /** Used when the asker has no display name: they are not a partner yet. */
@@ -171,35 +161,6 @@ export function buildInteractionPayload(type: string, senderName: string | null)
   if (type === 'poke') return partnerActivityPayload(POKE_BODY, senderName);
   if (type === 'kiss') return partnerActivityPayload(KISS_BODY, senderName);
   return null;
-}
-
-/** The columns of `date_changes` the payload is built from, plus the event's label as it is now. */
-export interface PushDateChange {
-  subject: 'event' | 'wedding_date' | 'relationship_start' | 'birthday';
-  action: 'added' | 'changed';
-  /** `events.label` when the subject is an event, else null. */
-  event_label: string | null;
-}
-
-/** `Added an event: Paris trip`, `Set the wedding date`, `Changed their birthday`, and so on. */
-export function buildDatePayload(change: PushDateChange, senderName: string | null): ApnsPayload {
-  const added = change.action === 'added';
-  switch (change.subject) {
-    case 'event':
-      return partnerActivityPayload(
-        `${added ? EVENT_ADDED_PREFIX : EVENT_CHANGED_PREFIX}: ${change.event_label ?? ''}`,
-        senderName
-      );
-    case 'wedding_date':
-      return partnerActivityPayload(added ? WEDDING_DATE_SET_BODY : WEDDING_DATE_CHANGED_BODY, senderName);
-    case 'relationship_start':
-      return partnerActivityPayload(
-        added ? RELATIONSHIP_START_SET_BODY : RELATIONSHIP_START_CHANGED_BODY,
-        senderName
-      );
-    case 'birthday':
-      return partnerActivityPayload(added ? BIRTHDAY_ADDED_BODY : BIRTHDAY_CHANGED_BODY, senderName);
-  }
 }
 
 /** `Sent you a partner request`, titled with the asker's name or `Someone`. */

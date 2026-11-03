@@ -66,12 +66,11 @@ const PUSH_PREFERENCE_KEYS: readonly (keyof PushPreferences)[] = [
   'moods',
   'photos',
   'pokesAndKisses',
-  'dates',
   'partnerRequests',
   'dateReminders',
 ];
 
-/** A saved push-preferences copy: an object whose seven switches are all booleans, otherwise `null`. */
+/** A saved push-preferences copy: an object whose six switches are all booleans, otherwise `null`. */
 function parseSavedPushPreferences(value: unknown): PushPreferences | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
