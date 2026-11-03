@@ -2,8 +2,9 @@
  * E2E: the couple's shared start date (`public.couple_settings`) on the shared
  * local-copy mechanism (spec-unified-data-storage story 3).
  *
- * - After one online session the start date is shown on Home and in Settings
- *   when the server cannot be reached, from the `couple-settings` local copy.
+ * - After one online session the start date is shown on Home and on the
+ *   Together since Date page when the server cannot be reached, from the
+ *   `couple-settings` local copy.
  * - Offline, an edit is refused with the "needs a connection" message, and
  *   neither the copy, the store nor the server row changes.
  *
@@ -62,13 +63,21 @@ async function storeStart(page: Page): Promise<string | null | undefined> {
   });
 }
 
-/** The instant as the browser's local `YYYY-MM-DD`, which the date input shows. */
-async function localDateOf(page: Page, iso: string): Promise<string> {
+/** The instant as the browser's local `YYYY-MM-DDTHH:MM`, which the datetime-local field shows. */
+async function localDateTimeOf(page: Page, iso: string): Promise<string> {
   return page.evaluate((value) => {
     const d = new Date(value);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }, iso);
+}
+
+/** From the Settings top page: Dates, Together since, then its Date row, which opens the field. */
+async function openTogetherSinceDate(page: Page): Promise<void> {
+  await page.getByTestId('settings-dates-row').click();
+  await page.getByTestId('settings-dates-together-since').click();
+  await page.getByTestId('settings-date-row').click();
+  await expect(page.getByTestId('settings-together-since-field')).toBeVisible();
 }
 
 test.describe('Couple start date from the local copy', () => {
@@ -119,9 +128,10 @@ test.describe('Couple start date from the local copy', () => {
     await expect(page.getByTestId('settings-view')).toBeVisible();
     await goOffline(page, true);
 
-    // THEN: Settings shows the saved date, and Home counts from it.
-    await expect(page.getByTestId('settings-together-since-date')).toHaveValue(
-      await localDateOf(page, startIso)
+    // THEN: the Together since Date page shows the saved date, and Home counts from it.
+    await openTogetherSinceDate(page);
+    await expect(page.getByTestId('settings-together-since-field')).toHaveValue(
+      await localDateTimeOf(page, startIso)
     );
 
     await navigateTo(page, 'home');
@@ -153,16 +163,17 @@ test.describe('Couple start date from the local copy', () => {
     await page.goto('/settings');
     expect((await coupleRead).status).toBe(200);
     await recurseUntil(() => storeStart(page), (v) => { expect(v).toBe(startIso); });
-    const dateInput = page.getByTestId('settings-together-since-date');
-    await expect(dateInput).toHaveValue(await localDateOf(page, startIso));
+    await openTogetherSinceDate(page);
+    const dateInput = page.getByTestId('settings-together-since-field');
+    await expect(dateInput).toHaveValue(await localDateTimeOf(page, startIso));
 
     await goOffline(page, true);
-    await dateInput.fill('2020-02-02');
-    await page.getByTestId('settings-together-since-save').click();
+    await dateInput.fill('2020-02-02T10:00');
+    await page.getByTestId('settings-field-save').click();
 
-    await expect(page.getByTestId('settings-together-since-error')).toContainText(
-      /need a connection/i
-    );
+    await expect(page.getByTestId('settings-field-error')).toContainText(/need a connection/i);
+    // The page stays, holding what was typed.
+    await expect(dateInput).toHaveValue('2020-02-02T10:00');
     // Store, copy and server all still hold the saved date.
     expect(await storeStart(page)).toBe(startIso);
     await recurseUntil(

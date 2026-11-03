@@ -95,7 +95,7 @@ describe('Settings on the kit', () => {
     // a group with no rows is not drawn. The last card has no label.
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
-    ).toEqual(['Account', 'Partner', 'About', 'Together', 'Countdowns']);
+    ).toEqual(['Account', 'Partner', 'About', 'Countdowns']);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
     expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Event Countdowns/);

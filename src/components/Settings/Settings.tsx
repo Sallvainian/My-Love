@@ -5,13 +5,13 @@
  * The top page holds the Account group (the Profile row), the Partner group
  * (the Partner and Dates rows), the preferences and about groups, the sign-out
  * card and the version line, then the sections not yet replaced by pages of their own:
- * the couple's shared "Together since" start and wedding date (the `Together`
- * section), the couple's countdowns (events and anniversaries) and the
- * per-date reminder list (`CountdownMarks`; the native shell with the
- * local-notifications plugin only). Profile (the display name and your own
- * birthday, each on a one-field page, see `ProfilePage`), Partner (who the
- * account is linked to, see `PartnerPage`), Dates (every date in one list, see
- * `DatesPage`), Photos (this device's mobile-data choice for the offline album)
+ * the couple's countdowns (events and anniversaries) and the per-date reminder
+ * list (`CountdownMarks`; the native shell with the local-notifications plugin
+ * only). Profile (the display name and your own birthday, each on a one-field
+ * page, see `ProfilePage`), Partner (who the account is linked to, see
+ * `PartnerPage`), Dates (every date in one list, see `DatesPage`) and the
+ * pages its Together since, Wedding and birthday rows open (see `DatePages`),
+ * Photos (this device's mobile-data choice for the offline album)
  * and Notifications (a switch for each kind of
  * push and the Date reminders switch; the native shell with the push plugins
  * only, see `NotificationsPage`) are the subpages.
@@ -21,8 +21,6 @@
 
 import {
   CircleAlert,
-  Gem,
-  Heart,
   Image as ImageIcon,
   LoaderCircle,
   LogOut,
@@ -36,12 +34,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type SubmitEvent,
 } from 'react';
 import { authService } from '../../api/authService';
 import { isOnline } from '../../api/errorHandlers';
 import { offlineMessage } from '../../services/accountDataError';
-import { parseEventDate } from '../../services/eventsService';
 import { hasNativePush } from '../../services/pushNotifications';
 import { showSignOutNotice } from '../../services/signOutNotice';
 import {
@@ -60,278 +56,28 @@ import {
   DIALOG_PANEL,
   DIALOG_TITLE,
   DIVIDER,
-  FIELD_ERROR,
-  GROUP_ROW as ROW,
-  GROUP_TILE as TILE,
   SECTION_LABEL,
   SECONDARY_BUTTON,
-  SMALL_SECONDARY,
-  fieldClass,
 } from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
 import { CountdownMarks } from './CountdownMarks';
+import {
+  PartnerBirthdayPage,
+  TogetherSinceDatePage,
+  TogetherSincePage,
+  WeddingDatePage,
+  WeddingPage,
+  YourBirthdayPage,
+} from './DatePages';
 import { DatesPage, DatesRow } from './DatesPage';
 import { EventsSettings } from './EventsSettings';
 import { NotificationsPage, NotificationsRow } from './NotificationsPage';
 import { PartnerPage, PartnerRow } from './PartnerPage';
 import { PhotosPage } from './PhotosPage';
 import { BirthdayPage, NamePage, ProfilePage, ProfileRow } from './ProfilePage';
-import { formatDateOnly } from './settingsFields';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { SettingsStack, type SettingsPageSpec } from './stack/SettingsStack';
 import { ROW_BUTTON } from './SwitchRow';
-
-const pad2 = (n: number) => String(n).padStart(2, '0');
-
-/** An ISO instant as the local `YYYY-MM-DD` and `HH:MM` a date and time input take. */
-function toLocalInputs(iso: string | null): { date: string; time: string } {
-  if (!iso) return { date: '', time: '' };
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { date: '', time: '' };
-  return {
-    date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
-    time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`,
-  };
-}
-
-/**
- * The inputs' local date and time as an ISO instant, or `null` when the date
- * is missing or impossible. Built from components, never `new Date(string)`:
- * a bare date string parses as UTC midnight. An empty time means midnight.
- */
-function fromLocalInputs(date: string, time: string): string | null {
-  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!dm) return null;
-  const tm = /^(\d{2}):(\d{2})$/.exec(time || '00:00');
-  if (!tm) return null;
-  const [y, mo, d] = [Number(dm[1]), Number(dm[2]), Number(dm[3])];
-  const local = new Date(y, mo - 1, d, Number(tm[1]), Number(tm[2]));
-  if (local.getFullYear() !== y || local.getMonth() !== mo - 1 || local.getDate() !== d) return null;
-  return local.toISOString();
-}
-
-/**
- * "Together since": the couple's shared start, a date and a time either
- * partner can set. The value is server-held (`coupleSettings`); a save needs a
- * connection, and a refused or failed one leaves the value unchanged and says
- * why here.
- */
-function TogetherSinceRow() {
-  const coupleSettings = useAppStore((s) => s.coupleSettings);
-
-  const subtitle = (() => {
-    if (!coupleSettings) return 'Loading...';
-    if (coupleSettings.status === 'unlinked') return 'Link a partner first to set your start date';
-    if (!coupleSettings.relationshipStart) return 'Not set yet';
-    return new Date(coupleSettings.relationshipStart).toLocaleString(undefined, {
-      dateStyle: 'long',
-      timeStyle: 'short',
-    });
-  })();
-
-  const start = coupleSettings?.status === 'linked' ? coupleSettings.relationshipStart : null;
-
-  return (
-    <div className="flex flex-col gap-2 py-1" data-testid="settings-together-since">
-      <div className={ROW}>
-        <span className={TILE} aria-hidden="true">
-          <Heart className="h-4.25 w-4.25" />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-[15px] font-medium text-ink">Together since</p>
-          <p
-            className="text-[13px] wrap-break-word text-muted"
-            data-testid="settings-together-since-value"
-          >
-            {subtitle}
-          </p>
-        </div>
-      </div>
-      {/* Remounted when the saved value changes, so the inputs pick it up. */}
-      {coupleSettings?.status === 'linked' && <TogetherSinceForm key={start ?? 'unset'} start={start} />}
-    </div>
-  );
-}
-
-function TogetherSinceForm({ start }: { start: string | null }) {
-  const setRelationshipStart = useAppStore((s) => s.setRelationshipStart);
-  const initial = toLocalInputs(start);
-  const [date, setDate] = useState(initial.date);
-  const [time, setTime] = useState(initial.time);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const value = fromLocalInputs(date, time);
-    if (!value) {
-      setSaveError('Pick a date first.');
-      return;
-    }
-    // A mistyped year would otherwise count "together for" toward a future day.
-    if (new Date(value).getTime() > Date.now()) {
-      setSaveError('Pick a date in the past.');
-      return;
-    }
-    setSaveError(null);
-    setIsSaving(true);
-    try {
-      await setRelationshipStart(value);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save the start date.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <form className="flex flex-col gap-2" onSubmit={handleSave} noValidate>
-      <div className="flex gap-2">
-        <label className="sr-only" htmlFor="settings-together-since-date">
-          Start date
-        </label>
-        <input
-          id="settings-together-since-date"
-          type="date"
-          value={date}
-          max={toLocalInputs(new Date().toISOString()).date}
-          onChange={(e) => setDate(e.target.value)}
-          className={fieldClass(false)}
-          data-testid="settings-together-since-date"
-        />
-        <label className="sr-only" htmlFor="settings-together-since-time">
-          Start time
-        </label>
-        <input
-          id="settings-together-since-time"
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className={fieldClass(false)}
-          data-testid="settings-together-since-time"
-        />
-      </div>
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="submit"
-          disabled={isSaving}
-          className={SMALL_SECONDARY}
-          data-testid="settings-together-since-save"
-        >
-          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {isSaving ? 'Saving…' : 'Save start date'}
-        </button>
-      </div>
-      {saveError && (
-        <p className={FIELD_ERROR} role="alert" data-testid="settings-together-since-error">
-          {saveError}
-        </p>
-      )}
-    </form>
-  );
-}
-
-/**
- * "Wedding": the couple's shared wedding date, any date, which either partner
- * sets, changes or clears. Shown for a linked couple only. Same save rules as
- * "Together since".
- */
-function WeddingRow() {
-  const coupleSettings = useAppStore((s) => s.coupleSettings);
-  if (coupleSettings?.status !== 'linked') return null;
-  const { weddingDate } = coupleSettings;
-
-  return (
-    <>
-      <div className={DIVIDER} aria-hidden="true" />
-      <div className="flex flex-col gap-2 py-1" data-testid="settings-wedding">
-        <div className={ROW}>
-          <span className={TILE} aria-hidden="true">
-            <Gem className="h-4.25 w-4.25" />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <p className="text-[15px] font-medium text-ink">Wedding</p>
-            <p className="text-[13px] wrap-break-word text-muted" data-testid="settings-wedding-value">
-              {weddingDate ? formatDateOnly(weddingDate) : 'Not set yet'}
-            </p>
-          </div>
-        </div>
-        <WeddingForm key={weddingDate ?? 'unset'} weddingDate={weddingDate} />
-      </div>
-    </>
-  );
-}
-
-function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
-  const setWeddingDate = useAppStore((s) => s.setWeddingDate);
-  const [date, setDate] = useState(weddingDate ?? '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const save = async (value: string | null) => {
-    setSaveError(null);
-    setIsSaving(true);
-    try {
-      await setWeddingDate(value);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save the wedding date.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!parseEventDate(date)) {
-      setSaveError('Pick a date first.');
-      return;
-    }
-    await save(date);
-  };
-
-  return (
-    <form className="flex flex-col gap-2" onSubmit={handleSave} noValidate>
-      <label className="sr-only" htmlFor="settings-wedding-date">
-        Wedding date
-      </label>
-      <input
-        id="settings-wedding-date"
-        type="date"
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-        className={fieldClass(false)}
-        data-testid="settings-wedding-date"
-      />
-      <div className="flex items-center justify-end gap-2">
-        {weddingDate && (
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => void save(null)}
-            className={SMALL_SECONDARY}
-            data-testid="settings-wedding-clear"
-          >
-            Clear
-          </button>
-        )}
-        <button
-          type="submit"
-          disabled={isSaving}
-          className={SMALL_SECONDARY}
-          data-testid="settings-wedding-save"
-        >
-          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {isSaving ? 'Saving…' : 'Save wedding date'}
-        </button>
-      </div>
-      {saveError && (
-        <p className={FIELD_ERROR} role="alert" data-testid="settings-wedding-error">
-          {saveError}
-        </p>
-      )}
-    </form>
-  );
-}
 
 /**
  * Shown on the login screen when "Log out of all devices" logged this device
@@ -458,6 +204,66 @@ const SUBPAGES = new Map<string, SettingsPageSpec>([
     },
   ],
   [
+    'dates/together-since',
+    {
+      title: 'Together since',
+      titleStyle: 'small',
+      render: () => <TogetherSincePage />,
+    },
+  ],
+  [
+    'dates/together-since/date',
+    {
+      title: 'Date',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      render: () => <TogetherSinceDatePage />,
+    },
+  ],
+  [
+    'dates/wedding',
+    {
+      title: 'Wedding',
+      titleStyle: 'small',
+      render: () => <WeddingPage />,
+    },
+  ],
+  [
+    'dates/wedding/date',
+    {
+      title: 'Date',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      render: () => <WeddingDatePage />,
+    },
+  ],
+  [
+    'dates/birthday',
+    {
+      title: 'Your birthday',
+      titleStyle: 'small',
+      render: () => <YourBirthdayPage />,
+    },
+  ],
+  [
+    'dates/birthday/date',
+    {
+      title: 'Date',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      render: () => <BirthdayPage />,
+    },
+  ],
+  [
+    'dates/partner-birthday',
+    {
+      // The partner's name is not known here; `Settings` titles the page with it.
+      title: 'Birthday',
+      titleStyle: 'small',
+      render: () => <PartnerBirthdayPage />,
+    },
+  ],
+  [
     'notifications',
     {
       title: 'Notifications',
@@ -492,6 +298,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const signOutRunningRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const loadOwnProfile = useAppStore((s) => s.loadOwnProfile);
+  // The partner's birthday page is titled with their name, which `SUBPAGES` cannot know.
+  const partnerName = useAppStore((s) => s.partner?.displayName);
   // The Photos row's value; the choice itself is made on the Photos page.
   const photosOverMobileData = useSyncExternalStore(
     subscribePhotosOverMobileData,
@@ -615,8 +423,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         </SettingsGroup>
 
         {/* The IA's unlabeled last card, with the version line 4px under it. The
-            Together and Countdowns sections and the per-date reminder list follow
-            until their stories give them pages of their own. */}
+            Countdowns section and the per-date reminder list follow until their
+            stories give them pages of their own. */}
         <div className="flex flex-col gap-1">
           {/* Log out — its own quiet card, not a red block. */}
           <SettingsGroup testId="settings-sign-out-card">
@@ -666,17 +474,6 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           </p>
         </div>
 
-        {/* Together — the couple's shared dates, until their story gives them pages of their own. */}
-        <section className="flex flex-col gap-2" aria-labelledby="settings-together-label">
-          <h2 id="settings-together-label" className={SECTION_LABEL}>
-            Together
-          </h2>
-          <div className={CARD}>
-            <TogetherSinceRow />
-            <WeddingRow />
-          </div>
-        </section>
-
         {/* Countdowns — the couple-shared events above the anniversaries. */}
         <section className="flex flex-col gap-2" aria-labelledby="settings-countdowns-label">
           <h2 id="settings-countdowns-label" className={SECTION_LABEL}>
@@ -710,8 +507,14 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   // (its path under /settings, title, title style, and `available` where a
   // device may not have it). Its row on the parent page is a `SettingsRow`
   // with `target`.
-  const resolveSettingsPage = (path: string): SettingsPageSpec | null =>
-    path === '' ? topPage : (SUBPAGES.get(path) ?? null);
+  const resolveSettingsPage = (path: string): SettingsPageSpec | null => {
+    if (path === '') return topPage;
+    const spec = SUBPAGES.get(path) ?? null;
+    if (spec && path === 'dates/partner-birthday' && partnerName) {
+      return { ...spec, title: `${partnerName}'s birthday` };
+    }
+    return spec;
+  };
 
   return <SettingsStack resolvePage={resolveSettingsPage} />;
 };

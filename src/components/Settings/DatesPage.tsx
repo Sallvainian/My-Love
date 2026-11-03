@@ -25,8 +25,8 @@
  * rows and shows its message in the Error box until the next `Load more` or
  * until the page is left.
  *
- * The rows' targets are the date pages the Dates stories register; until each
- * exists, the stack shows the top page for its path.
+ * The rows' targets are the date pages (`DatePages`) the Dates stories
+ * register; until each exists, the stack shows the top page for its path.
  *
  * @component
  */
@@ -46,11 +46,9 @@ import { parseEventDate, type EventIcon } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import { FAILURE_BOX } from '../shared/kitClasses';
 import { getCalendarDaysDiff } from '../RelationshipTimers/eventCountdownHelpers';
-import { formatDayMonth, formatListDate } from './settingsFields';
+import { coupleValue, formatListDate, parseInstant, yearlyValue } from './settingsFields';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
-
-const NOT_SET = 'Not set';
 
 /** An event's tile, the same three icons as `EventCountdown`. */
 const EVENT_ICONS: Record<EventIcon, LucideIcon> = {
@@ -62,32 +60,6 @@ const EVENT_ICONS: Record<EventIcon, LucideIcon> = {
 /** The top page's Dates row: a label and a chevron, no value. */
 export function DatesRow() {
   return <SettingsRow icon={CalendarHeart} label="Dates" target="dates" testId="settings-dates-row" />;
-}
-
-/** A `YYYY-MM-DD` date as a yearly date ("4 Apr"); `Not set` for none, empty if it does not parse. */
-function yearlyValue(value: string | null | undefined): string | undefined {
-  if (!value) return NOT_SET;
-  const date = parseEventDate(value);
-  return date ? formatDayMonth(date) : undefined;
-}
-
-/** A one-time date for a couple date: `Not set` when the loaded value is null, empty if it does not parse. */
-function coupleValue(
-  loaded: boolean,
-  value: string | null,
-  toDate: (value: string) => Date | null,
-  now: Date
-): string | undefined {
-  if (!loaded) return undefined;
-  if (!value) return NOT_SET;
-  const date = toDate(value);
-  return date ? formatListDate(date, now) : undefined;
-}
-
-/** Together since is a full ISO instant: `new Date` is right here, and an unparsable one is `null`. */
-function parseInstant(value: string): Date | null {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function DatesPage() {

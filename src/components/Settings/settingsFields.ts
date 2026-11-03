@@ -1,8 +1,9 @@
 /**
  * Settings fields -- the values and rules the Profile pages share with the
  * rows that show them: how a date reads (long on a page, short on the Dates
- * list), the earliest and latest birthday, and what makes a birthday or a
- * display name worth saving.
+ * list, and as a date row's value), the earliest and latest birthday, what
+ * makes a birthday or a display name worth saving, and the Together since
+ * field's local date and time.
  */
 
 import { parseEventDate } from '../../services/eventsService';
@@ -59,6 +60,44 @@ export function formatListDate(date: Date, now: Date = new Date()): string {
   return `${day} ${month} ${year}`;
 }
 
+/** What a date row reads while the date is unset. */
+const NOT_SET = 'Not set';
+
+/**
+ * A `YYYY-MM-DD` date as a yearly date ("4 Apr"); `Not set` for none, empty if
+ * it does not parse.
+ */
+export function yearlyValue(value: string | null | undefined): string | undefined {
+  if (!value) return NOT_SET;
+  const date = parseEventDate(value);
+  return date ? formatDayMonth(date) : undefined;
+}
+
+/**
+ * A one-time date for a couple date: `Not set` when the loaded value is null,
+ * empty if it does not parse.
+ */
+export function coupleValue(
+  loaded: boolean,
+  value: string | null,
+  toDate: (value: string) => Date | null,
+  now: Date
+): string | undefined {
+  if (!loaded) return undefined;
+  if (!value) return NOT_SET;
+  const date = toDate(value);
+  return date ? formatListDate(date, now) : undefined;
+}
+
+/**
+ * Together since is a full ISO instant: `new Date` is right here, and an
+ * unparsable one is `null`.
+ */
+export function parseInstant(value: string): Date | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** The earliest birthday the field accepts: catches a mistyped year such as 0198. */
@@ -83,4 +122,44 @@ export function isValidBirthday(value: string): boolean {
 export function isValidDisplayName(value: string): boolean {
   const length = value.trim().length;
   return length >= 3 && length <= 30;
+}
+
+/**
+ * An ISO instant as the local `YYYY-MM-DDTHH:MM` a `datetime-local` input
+ * takes, or `''` when it is missing or does not parse.
+ */
+export function toLocalDateTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const day = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  return `${day}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+/**
+ * A `datetime-local` value as an ISO instant, or `null` when it is empty or
+ * names an impossible date or time. Built from components, never
+ * `new Date(string)`: a bare date string parses as UTC midnight.
+ */
+export function fromLocalDateTime(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [y, mo, d, h, mi] = match.slice(1).map(Number);
+  if (h > 23 || mi > 59) return null;
+  const local = new Date(y, mo - 1, d, h, mi);
+  // Date parts only: a local time the clocks skip (spring forward) still maps to an instant,
+  // and the picker offers it.
+  if (local.getFullYear() !== y || local.getMonth() !== mo - 1 || local.getDate() !== d) {
+    return null;
+  }
+  return local.toISOString();
+}
+
+/**
+ * A real local date and time that is not after now: a mistyped year would
+ * otherwise count "together for" toward a future day.
+ */
+export function isValidTogetherSince(value: string): boolean {
+  const iso = fromLocalDateTime(value);
+  return iso !== null && new Date(iso).getTime() <= Date.now();
 }

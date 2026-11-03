@@ -2,8 +2,8 @@
  * E2E: birthdays and the wedding date are server-held and shared
  * (spec-unified-data-storage story 4, CAP-11).
  *
- * The partner saves their own birthday and the couple's wedding date in
- * Settings through the real UI; this worker's Home then shows the partner's
+ * The partner saves their own birthday (Profile) and the couple's wedding date
+ * (Dates, Wedding, Date) in Settings through the real UI; this worker's Home then shows the partner's
  * birthday card, labelled with the partner's display name, and the wedding
  * countdown after a reload. Clearing the wedding date brings back "Date TBD".
  * The live-clock layout check seeds both dates through the service client
@@ -95,9 +95,10 @@ async function openThisHome(
 
 /**
  * Open the partner's Settings in a second context on the same pinned clock,
- * with neither date set yet (the birthday is checked on its Profile page).
- * The context's close is deferred as it opens, so it runs before the reset the
- * caller deferred earlier: the partner's page can still be saving.
+ * with neither date set yet (the wedding is checked on the Dates list, which
+ * it leaves open; the birthday is checked on its Profile page). The context's
+ * close is deferred as it opens, so it runs before the reset the caller
+ * deferred earlier: the partner's page can still be saving.
  */
 async function openPartnerSettings(
   browser: Browser,
@@ -119,7 +120,10 @@ async function openPartnerSettings(
   );
   await partnerPage.goto('/settings');
   for (const { status } of await Promise.all(partnerReads)) expect(status).toBe(200);
-  await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+  await partnerPage.getByTestId('settings-dates-row').click();
+  await expect(partnerPage.getByTestId('settings-dates-wedding')).toHaveAccessibleName(
+    'Wedding, Not set'
+  );
   return partnerPage;
 }
 
@@ -207,6 +211,8 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       anchor
     );
 
+    // openPartnerSettings left the Dates list open: back to the top page.
+    await partnerPage.getByRole('button', { name: 'Back' }).click();
     await partnerPage.getByTestId('settings-profile-row').click();
     const birthdayRow = partnerPage.getByTestId('settings-profile-birthday');
     await expect(birthdayRow).toBeVisible();
@@ -301,19 +307,29 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     );
 
     const wedding = isoDateDaysFromNow(40, anchor);
-    await partnerPage.getByTestId('settings-wedding-date').fill(wedding);
+    // A loaded Not set opens the Date page directly.
+    await partnerPage.getByTestId('settings-dates-wedding').click();
+    await partnerPage.getByTestId('settings-wedding-field').fill(wedding);
     const weddingSaved = observeOn({
       page: partnerPage,
       method: 'POST',
       url: COUPLE_SETTINGS_SAVE,
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
-    await partnerPage.getByTestId('settings-wedding-save').click();
+    await partnerPage.getByTestId('settings-field-save').click();
     // `resetPair` left the pair's row in place, so the upsert updates it: 200,
     // where creating the row would answer 201.
     expect((await weddingSaved).status).toBe(200);
+    // The save returned to the Dates list; the Wedding page now offers Clear.
+    await expect(partnerPage.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+    await expect(partnerPage.getByTestId('settings-dates-wedding')).not.toHaveAccessibleName(
+      'Wedding, Not set'
+    );
+    await partnerPage.getByTestId('settings-dates-wedding').click();
+    await expect(partnerPage.getByRole('heading', { level: 1, name: 'Wedding' })).toBeVisible();
     await expect(partnerPage.getByTestId('settings-wedding-clear')).toBeVisible();
-    await expect(partnerPage.getByTestId('settings-wedding-error')).toHaveCount(0);
+    await expect(partnerPage.getByTestId('settings-date-error')).toHaveCount(0);
+    await expect(partnerPage.getByTestId('settings-field-error')).toHaveCount(0);
 
     await log.step('This Home shows it after a reload');
     const reloadReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ].map((url) =>
@@ -333,7 +349,11 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     });
     await partnerPage.getByTestId('settings-wedding-clear').click();
     expect((await cleared).status).toBe(200);
-    await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+    // Clear returns to the Dates list, whose Wedding row reads Not set again.
+    await expect(partnerPage.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+    await expect(partnerPage.getByTestId('settings-dates-wedding')).toHaveAccessibleName(
+      'Wedding, Not set'
+    );
 
     // The saved copy still holds the wedding date, so the card reads '39 days'
     // until this reload's own couple read has answered.
@@ -397,22 +417,30 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
     const read = await settingsRead;
     expect(read.status).toBe(200);
     expect(read.responseJson).toEqual([]);
-    await expect(selfPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
+    await selfPage.getByTestId('settings-dates-row').click();
+    await expect(selfPage.getByTestId('settings-dates-wedding')).toHaveAccessibleName(
+      'Wedding, Not set'
+    );
 
     await log.step('Saving a wedding date creates the row: 201');
     const anchor = new Date();
     const wedding = isoDateDaysFromNow(40, anchor);
-    await selfPage.getByTestId('settings-wedding-date').fill(wedding);
+    // A loaded Not set opens the Date page directly.
+    await selfPage.getByTestId('settings-dates-wedding').click();
+    await selfPage.getByTestId('settings-wedding-field').fill(wedding);
     const created = observeOn({
       page: selfPage,
       method: 'POST',
       url: COUPLE_SETTINGS_SAVE,
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
-    await selfPage.getByTestId('settings-wedding-save').click();
+    await selfPage.getByTestId('settings-field-save').click();
     expect((await created).status).toBe(201);
+    await expect(selfPage.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+    await selfPage.getByTestId('settings-dates-wedding').click();
     await expect(selfPage.getByTestId('settings-wedding-clear')).toBeVisible();
-    await expect(selfPage.getByTestId('settings-wedding-error')).toHaveCount(0);
+    await expect(selfPage.getByTestId('settings-date-error')).toHaveCount(0);
+    await expect(selfPage.getByTestId('settings-field-error')).toHaveCount(0);
 
     // The new row holds the wedding date alone: the start date stays unset.
     const after = await coupleRow();

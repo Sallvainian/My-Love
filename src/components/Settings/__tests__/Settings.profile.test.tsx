@@ -220,7 +220,7 @@ describe('Settings > Profile', () => {
       expect(screen.queryByRole('button', { name: /Display name/ })).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Your birthday')).not.toBeInTheDocument();
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2, name: 'Together' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Countdowns' })).toBeInTheDocument();
     });
 
     it('shows no value on the Profile row before the profile has answered', async () => {

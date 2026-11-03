@@ -2,9 +2,10 @@
  * E2E: the couple's shared start date is one value both partners see
  * (spec-unified-data-storage story 3, CAP-9).
  *
- * The partner saves a date and time in Settings through the real UI; this
- * worker's page then shows the same date after a reload — on Home's "Together
- * for" card and in its own Settings row.
+ * The partner saves a date and time on the Together since page through the
+ * real UI (Dates, Together since, Date, Save); this worker's page then shows
+ * the same date after a reload — on Home's "Together for" card and in its own
+ * Together since Date field.
  *
  * Identities are this worker's own pooled pair, linked once by global setup.
  * Nothing here links, unlinks or resets an account; teardown deletes only this
@@ -33,15 +34,12 @@ async function storeStart(page: Page): Promise<string | null | undefined> {
   });
 }
 
-/** The instant as the browser's local date and time input values. */
-async function localInputsOf(page: Page, iso: string): Promise<{ date: string; time: string }> {
+/** The instant as the browser's local `YYYY-MM-DDTHH:MM`, which the datetime-local field shows. */
+async function localDateTimeOf(page: Page, iso: string): Promise<string> {
   return page.evaluate((value) => {
     const d = new Date(value);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return {
-      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-    };
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }, iso);
 }
 
@@ -104,19 +102,21 @@ test.describe('Couple start date shared by both partners', () => {
       url: COUPLE_SETTINGS_READ,
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
-    await partnerPage.goto('/settings');
+    await partnerPage.goto('/settings/dates');
     expect((await partnerRead).status).toBe(200);
-    await expect(partnerPage.getByTestId('settings-together-since-value')).toHaveText(
-      'Not set yet'
-    );
+    // Not set yet: a loaded Not set opens the Date page directly.
+    const sinceRow = partnerPage.getByTestId('settings-dates-together-since');
+    await expect(sinceRow).toHaveAccessibleName('Together since, Not set');
+    await sinceRow.click();
+    await expect(partnerPage.getByRole('heading', { level: 1, name: 'Date' })).toBeVisible();
 
     // Twelve days and an hour before the pinned clock, to the minute.
     const target = new Date(anchor.getTime() - 12 * DAY_MS - 60 * 60 * 1000);
     target.setSeconds(0, 0);
     const targetIso = target.toISOString();
-    const inputs = await localInputsOf(partnerPage, targetIso);
-    await partnerPage.getByTestId('settings-together-since-date').fill(inputs.date);
-    await partnerPage.getByTestId('settings-together-since-time').fill(inputs.time);
+    await partnerPage
+      .getByTestId('settings-together-since-field')
+      .fill(await localDateTimeOf(partnerPage, targetIso));
 
     const saved = observeOn({
       page: partnerPage,
@@ -124,10 +124,13 @@ test.describe('Couple start date shared by both partners', () => {
       url: COUPLE_SETTINGS_SAVE,
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
-    await partnerPage.getByTestId('settings-together-since-save').click();
+    await partnerPage.getByTestId('settings-field-save').click();
     expect((await saved).status).toBe(201);
     await recurseUntil(() => storeStart(partnerPage), (v) => { expect(v).toBe(targetIso); });
-    await expect(partnerPage.getByTestId('settings-together-since-error')).toHaveCount(0);
+    // The page returned one level, to the Dates list, with no error left behind.
+    await expect(partnerPage.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+    await expect(partnerPage.getByTestId('settings-field-error')).toHaveCount(0);
+    await expect(sinceRow).not.toHaveAccessibleName('Together since, Not set');
 
     await log.step('This partner sees the same date after a reload');
     const reloadRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
@@ -138,13 +141,14 @@ test.describe('Couple start date shared by both partners', () => {
     await expect(card).toContainText('12 days');
     await expect(card).not.toContainText('Set your start date in Settings');
 
-    // The saved copy already holds targetIso, so the inputs are read only
+    // The saved copy already holds targetIso, so the field is read only
     // after this visit's own couple read has answered.
     const settingsRead = interceptNetworkCall({ method: 'GET', url: COUPLE_SETTINGS_READ });
-    await page.goto('/settings');
+    await page.goto('/settings/dates/together-since');
     expect((await settingsRead).status).toBe(200);
-    const own = await localInputsOf(page, targetIso);
-    await expect(page.getByTestId('settings-together-since-date')).toHaveValue(own.date);
-    await expect(page.getByTestId('settings-together-since-time')).toHaveValue(own.time);
+    await page.getByTestId('settings-date-row').click();
+    await expect(page.getByTestId('settings-together-since-field')).toHaveValue(
+      await localDateTimeOf(page, targetIso)
+    );
   });
 });
