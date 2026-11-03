@@ -93,11 +93,6 @@ vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-// The other sections pull in the events store and the anniversary storage;
-// neither has anything to do with the profile.
-vi.mock('../AnniversarySettings', () => ({ AnniversarySettings: () => null }));
-vi.mock('../EventsSettings', () => ({ EventsSettings: () => null }));
-
 import { writeLocalCopy } from '../../../services/localCopy';
 import { PROFILE_COPY_KIND } from '../../../stores/slices/profileSlice';
 import { useAppStore } from '../../../stores/useAppStore';
@@ -220,7 +215,7 @@ describe('Settings > Profile', () => {
       expect(screen.queryByRole('button', { name: /Display name/ })).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Your birthday')).not.toBeInTheDocument();
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2, name: 'Countdowns' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2, name: 'Countdowns' })).not.toBeInTheDocument();
     });
 
     it('shows no value on the Profile row before the profile has answered', async () => {

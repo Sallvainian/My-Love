@@ -14,6 +14,9 @@
  * over it, so collapsing never moves the title below -- a bar that changed
  * height on collapse would shift the title and flicker at the threshold.
  *
+ * The leading action is the back arrow, or a `Cancel` text button on a form
+ * page (`leading: 'cancel'`); both run the page's `onBack`.
+ *
  * It sits inside `<main>`, so it ends at the side column's edge by inheriting
  * `--dock-left`/`--dock-right`, and its z-30 keeps it under the dock (z-40).
  *
@@ -32,8 +35,10 @@ interface SettingsBarProps {
    * Small: attached to the bar's own h1.
    */
   titleRef: RefObject<HTMLHeadingElement | null>;
-  /** The back arrow is shown only when given. */
+  /** The leading action (the back arrow, or Cancel) is shown only when given. */
   onBack?: () => void;
+  /** What the leading action looks like: the back arrow (default) or a `Cancel` text button. */
+  leading?: 'back' | 'cancel';
   /** The bar's trailing action (Save, Add), when a page has one. */
   trailing?: ReactNode;
   /** Receives the trailing cell, which a page's `SettingsBarAction` portals into. */
@@ -47,12 +52,16 @@ export function SettingsBar({
   large,
   titleRef,
   onBack,
+  leading = 'back',
   trailing,
   trailingRef,
 }: SettingsBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const [titleGone, setTitleGone] = useState(false);
   const collapsed = !large || titleGone;
+  // `Cancel` is wider than the 44px arrow, so a Cancel bar widens both side
+  // columns equally and the title stays centred.
+  const cancel = leading === 'cancel';
 
   useEffect(() => {
     if (!large) return;
@@ -93,10 +102,22 @@ export function SettingsBar({
       {/* Measured for the collapse: its bottom is the 64px bar's, where the glass ends. */}
       <div
         ref={barRef}
-        className="absolute inset-x-0 top-[env(safe-area-inset-top)] grid h-16 grid-cols-[64px_1fr_64px] items-center"
+        className={`absolute inset-x-0 top-[env(safe-area-inset-top)] grid h-16 items-center ${
+          cancel ? 'grid-cols-[88px_1fr_88px]' : 'grid-cols-[64px_1fr_64px]'
+        }`}
       >
         <div className="flex justify-center">
-          {onBack && (
+          {onBack && cancel && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="min-h-11 rounded-full px-2 text-[17px] font-normal text-ink focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+              data-testid="settings-cancel"
+            >
+              Cancel
+            </button>
+          )}
+          {onBack && !cancel && (
             <button
               type="button"
               onClick={onBack}

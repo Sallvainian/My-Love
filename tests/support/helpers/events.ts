@@ -180,8 +180,7 @@ export async function seedEvent(
  * implementation of a date rule is exactly where an off-by-one gets in. Never
  * `toISOString().split('T')[0]`: that is UTC-based and names the next day east
  * of UTC and the previous one west of it, which is the off-by-one this whole
- * feature exists to avoid (`src/utils/dateUtils.ts:126-128`,
- * `AnniversarySettings.tsx:103`).
+ * feature exists to avoid (`src/utils/dateUtils.ts:126-128`).
  */
 export function isoDateDaysFromNow(dayOffset: number, anchor: Date): string {
   // Carry only calendar components: the anchor's time can fall in a DST gap

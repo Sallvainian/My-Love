@@ -38,12 +38,10 @@ vi.mock('motion/react', () => {
   };
 });
 
-import type { AppState } from '../../../stores/types';
-import { useAppStore } from '../../../stores/useAppStore';
 import type { LoveNote } from '../../../types/models';
 import { DisplayNameSetup } from '../../DisplayNameSetup';
 import { NoteRemoveConfirmation } from '../../love-notes/NoteRemoveConfirmation';
-import { AnniversarySettings } from '../../Settings/AnniversarySettings';
+import { ConfirmDialog } from '../../Settings/ConfirmDialog';
 import { DIALOG_BACKDROP, DIALOG_PANEL } from '../kitClasses';
 
 const SAFE_TOP = 'pt-[calc(1rem+env(safe-area-inset-top))]';
@@ -90,27 +88,21 @@ describe('kit dialog class strings', () => {
   });
 });
 
-describe('the delete dialogs scroll on a short screen', () => {
-  it('the anniversary delete panel', async () => {
-    const user = userEvent.setup();
-    const settings = useAppStore.getState().settings!;
-    useAppStore.setState({
-      settings: {
-        ...settings,
-        relationship: {
-          ...settings.relationship,
-          anniversaries: [{ id: 7, date: '2024-02-14', label: 'First date', serverId: 'ann-7' }],
-        },
-      },
-    } as Partial<AppState>);
-    render(<AnniversarySettings />);
+describe('the confirmation and removal dialogs scroll on a short screen', () => {
+  it('the Settings confirmation dialog panel', () => {
+    render(
+      <ConfirmDialog
+        question="Delete this event?"
+        confirmLabel="Delete"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        testId="settings-confirmation"
+      />
+    );
 
-    await user.click(screen.getByRole('button', { name: 'Delete First date' }));
-
-    const scrim = screen.getByRole('dialog', { name: 'Delete Anniversary?' });
-    const panel = screen.getByTestId('anniversary-delete-panel');
+    const scrim = screen.getByRole('dialog', { name: 'Delete this event?' });
+    const panel = screen.getByRole('heading', { name: 'Delete this event?' }).parentElement!;
     expect(scrim).toContainElement(panel);
-    expect(panel).toContainElement(screen.getByRole('heading', { name: 'Delete Anniversary?' }));
     expect(panel).toHaveClass('max-h-full', 'overflow-y-auto', 'max-w-sm');
     expectSafeScrim(scrim);
   });

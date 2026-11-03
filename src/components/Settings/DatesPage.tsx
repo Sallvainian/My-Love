@@ -25,6 +25,11 @@
  * rows and shows its message in the Error box until the next `Load more` or
  * until the page is left.
  *
+ * The bar's trailing `+` button (`settings-dates-add`, labelled `Add a date`)
+ * opens the Kind chooser (`KindChooser`); a kind pushes `dates/new-event` or
+ * `dates/new-anniversary` (`NewDatePages`), and a cancel closes it with no
+ * navigation.
+ *
  * The rows' targets are the date pages (`DatePages`), an event's own page
  * (`dates/event/<id>`, `EventPages`) and an anniversary's own page
  * (`dates/anniversary/<key>`, `AnniversaryPages`).
@@ -40,14 +45,18 @@ import {
   Gem,
   Heart,
   Plane,
+  Plus,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseEventDate, type EventIcon } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
-import { FAILURE_BOX } from '../shared/kitClasses';
+import { ADD_BUTTON, FAILURE_BOX } from '../shared/kitClasses';
 import { getCalendarDaysDiff } from '../RelationshipTimers/eventCountdownHelpers';
+import { KindChooser, type NewDateKind } from './NewDatePages';
 import { coupleValue, formatListDate, parseInstant, yearlyValue } from './settingsFields';
+import { SettingsBarAction } from './stack/SettingsBarAction';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
 
@@ -73,6 +82,7 @@ export function DatesPage() {
   const eventsIsLoadingMore = useAppStore((s) => s.eventsIsLoadingMore);
   const loadEvents = useAppStore((s) => s.loadEvents);
   const loadMoreEvents = useAppStore((s) => s.loadMoreEvents);
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   const coupleSettings = useAppStore((s) => s.coupleSettings);
   const anniversaries = useAppStore((s) => s.settings?.relationship.anniversaries);
   const ownProfile = useAppStore((s) => s.ownProfile);
@@ -81,6 +91,7 @@ export function DatesPage() {
   const partnerLoadError = useAppStore((s) => s.partnerLoadError);
 
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const mounted = useRef(true);
   useEffect(() => {
     // Re-armed on setup so StrictMode's cleanup/setup replay leaves the live page settled.
@@ -104,6 +115,15 @@ export function DatesPage() {
     if (mounted.current && result.status === 'failure') setLoadMoreError(result.error);
   };
 
+  // Stable: the dialog's focus trap re-runs on a new Escape handler.
+  const cancelChoosing = useCallback(() => setChoosing(false), []);
+
+  // The chooser closes, then the kind's form page is pushed (one history entry).
+  const choose = (kind: NewDateKind) => {
+    setChoosing(false);
+    openSettingsPage(kind === 'event' ? 'dates/new-event' : 'dates/new-anniversary');
+  };
+
   const now = new Date();
   const linked =
     coupleSettings?.status === 'linked' || (coupleSettings === null && partner !== null);
@@ -123,6 +143,18 @@ export function DatesPage() {
 
   return (
     <>
+      <SettingsBarAction>
+        <button
+          type="button"
+          onClick={() => setChoosing(true)}
+          className={ADD_BUTTON}
+          aria-label="Add a date"
+          data-testid="settings-dates-add"
+        >
+          <Plus className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </SettingsBarAction>
+
       {loadMoreError && (
         <div
           className={`${FAILURE_BOX} flex items-start gap-2`}
@@ -229,6 +261,11 @@ export function DatesPage() {
           </button>
         )}
       </SettingsGroup>
+
+      {/* Outside every card, like the other dialogs, so no card can clip it. */}
+      <AnimatePresence>
+        {choosing && <KindChooser onChoose={choose} onCancel={cancelChoosing} />}
+      </AnimatePresence>
     </>
   );
 }

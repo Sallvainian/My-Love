@@ -35,6 +35,9 @@
  *   identical entries, and the next back would seem to do nothing); a fresh
  *   load replaces its entry. A push to the page within the mounted stack shows
  *   it as usual.
+ * - A form page (New event, New anniversary) sets `leading: 'cancel'`: the bar's
+ *   leading cell is a `Cancel` text button instead of the arrow, running the
+ *   same `goBack`.
  * - It provides `SettingsPageContext`: the back action and the bar's trailing
  *   cell, which a page's `SettingsBarAction` portals Save (or Add) into.
  *
@@ -61,6 +64,11 @@ export interface SettingsPageSpec {
    * path) shows its parent instead.
    */
   reloadsToParent?: boolean;
+  /**
+   * The bar's leading action: the back arrow (default) or `Cancel`, a text
+   * button for a form page. Both run `goBack`.
+   */
+  leading?: 'back' | 'cancel';
   render: () => ReactNode;
 }
 
@@ -204,6 +212,7 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
           large={large}
           titleRef={titleRef}
           onBack={onBack}
+          leading={page.leading}
           trailingRef={setBarTrailing}
         />
         {/* The offline banner, under the bar as it sits under the app header on

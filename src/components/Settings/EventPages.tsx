@@ -63,11 +63,13 @@ import { ReadOnlyRow, SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
 
 /** The table's CHECK limits, counted in code points as the database does. */
-const LABEL_MAX_LENGTH = 100;
-const DESCRIPTION_MAX_LENGTH = 500;
-const codePoints = (value: string) => [...value].length;
+export const LABEL_MAX_LENGTH = 100;
+export const DESCRIPTION_MAX_LENGTH = 500;
+// eslint-disable-next-line react-refresh/only-export-components -- shared with NewDatePages
+export const codePoints = (value: string) => [...value].length;
 
-const ICON_OPTIONS: ReadonlyArray<{ value: EventIcon; label: string; Icon: LucideIcon }> = [
+// eslint-disable-next-line react-refresh/only-export-components -- shared with NewDatePages; the contract parser reads this top-level const
+export const ICON_OPTIONS: ReadonlyArray<{ value: EventIcon; label: string; Icon: LucideIcon }> = [
   { value: 'calendar', label: 'Calendar', Icon: Calendar },
   { value: 'ring', label: 'Ring', Icon: Gem },
   { value: 'plane', label: 'Plane', Icon: Plane },

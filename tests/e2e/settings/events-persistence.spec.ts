@@ -4,37 +4,37 @@
  * E2E: what an event still carries after the server hands it back.
  *
  * Story 5 (dynamic events), `automate` pass. Every row here is created through
- * the Settings form. DE.5-E2E-004/005 then reload the page, reading events
- * through `eventsService`'s row→`CoupleEvent` mapping and `eventsSlice`.
- * DE.5-E2E-006 observes the update request, response and UI without reloading.
+ * the New event form (`+` → Event on the Dates list). DE.5-E2E-004/005 then
+ * reload `/settings/dates`, reading events through `eventsService`'s
+ * row→`CoupleEvent` mapping and `eventsSlice`. DE.5-E2E-006 observes the update
+ * request, response and UI without reloading.
  *
- * - DE.5-E2E-004 [P1] the chosen icon survives a reload, into the edit form's
- *   pre-fill and into the Home card's icon treatment
- *   (`EventCountdown.tsx:32-54` maps `ring` → `Gem` + amber)
- * - DE.5-E2E-005 [P1] three future rows with distinct dates display in
- *   chronological order after a reload. The service orders future rows by
- *   `event_date`, then `created_at`; `eventsSlice.loadEvents` also reconciles
- *   completed mutations and calls `sortByDate`. The assertions establish
- *   distinct-date display order, not the source of sorting or same-date
- *   `created_at` tiebreak coverage
- * - DE.5-E2E-006 [P2] clearing a description observes a pass-through PATCH
- *   carrying `description: null`, HTTP 200, the cleared Settings row and the
- *   Home card without the description, without reloading. `EventsSettings`
- *   converts the empty input to `null`; `eventsService.updateEvent` includes
- *   defined descriptions, including `null`, in the update
+ * - DE.5-E2E-004 [P1] the icon chosen on the form survives a reload, into the
+ *   event page's Icon row and the Icon field page's selection, and into the Home
+ *   card's icon treatment (`EventCountdown.tsx:32-54` maps `ring` → `Gem`)
+ * - DE.5-E2E-005 [P1] three future rows with distinct dates display on the
+ *   Dates list in chronological order after a reload. The service orders future
+ *   rows by `event_date`, then `created_at`; `eventsSlice.loadEvents` also
+ *   reconciles completed mutations and calls `sortByDate`. The assertions
+ *   establish distinct-date display order, not the source of sorting or
+ *   same-date `created_at` tiebreak coverage
+ * - DE.5-E2E-006 [P2] clearing a note on its field page observes a pass-through
+ *   PATCH carrying `description: null`, HTTP 200, the cleared event page row and
+ *   the Home card without the description, without reloading.
+ *   `EventFieldPage` converts the empty field to `null`;
+ *   `eventsService.updateEvent` includes defined descriptions, including
+ *   `null`, in the update
  *
  * Complements `tests/e2e/settings/events-crud.spec.ts`, which owns the
- * add/edit/delete journey, the deep-link load, the past-event row, the
- * partner-owned row and the rejected write. Nothing here repeats those.
- * Validation, the dismissal guard and focus behaviour stay at component level
- * by design and are deliberately not lifted here.
+ * add/edit journey, the deep-link load, the past-event row and the rejected
+ * write. Nothing here repeats those. Validation and the double-tap guard stay at
+ * component level by design and are deliberately not lifted here.
  *
  * Test data: rows belong to THIS worker's pair only, keyed on
  * TEST_PARALLEL_INDEX through `getWorkerPairEmails()`. No partner is linked or
  * unlinked, no password is reset, no shared row is nulled — those rows belong
  * to other workers. `resolveOwnPair` / `clearPairEvents` / `clearOwnPairEvents`
- * come from `tests/support/helpers/events.ts`, which this automation run
- * extracted from the eight files that had hand-copied them.
+ * come from `tests/support/helpers/events.ts`.
  *
  * Nothing is stubbed, so no `skipNetworkMonitoring`: the merged fixtures'
  * network-error-monitor stays armed and a 4xx/5xx here is real signal.
@@ -58,16 +58,16 @@ import {
   localDateFromIso,
   resolveOwnPair,
 } from '../../support/helpers/events';
-import { EVENTS_WRITE, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import { listDate } from '../../support/helpers/dates-list-format';
+import { addEventFromDatesList, eventRowFor } from '../../support/helpers/new-date-forms';
+import { UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import {
+  openDatesList,
   openSettingsFromHome,
-  reloadSettings,
+  reloadDatesList,
   returnToSettings,
 } from '../../support/helpers/settings-screen';
-import { formatDateLong } from '../../../src/utils/dateUtils';
 import { log } from '@seontechnologies/playwright-utils';
-import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
-import type { Page } from '@playwright/test';
 
 /**
  * Labels are prefixed and deliberately unlike any fixed Home testid —
@@ -88,66 +88,7 @@ const DESCRIPTION_LABEL = 'Settings Description E2E';
 const DESCRIPTION_CARD_TESTID = 'event-countdown-settings-description-e2e';
 const DESCRIPTION_TEXT = 'Table booked for two';
 
-type EventIconValue = 'calendar' | 'ring' | 'plane';
-
-/** The list row carrying a given label. Row testids key on the event's uuid. */
-function rowFor(page: Page, label: string) {
-  return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
-}
-
-function longForm(isoDate: string): string {
-  // `localDateFromIso`, never `new Date(isoDate)` — the date-only string form is
-  // parsed as UTC midnight and names the previous day west of UTC.
-  return formatDateLong(localDateFromIso(isoDate));
-}
-
-/** Open the Settings add form and fill the two required fields. */
-async function openAddEventForm(page: Page, input: { label: string; isoDate: string }): Promise<void> {
-  await log.step(`Add "${input.label}" through the Settings form`);
-
-  await page.getByTestId('events-settings-add').click();
-  await expect(page.getByTestId('events-form')).toBeVisible();
-
-  await page.getByTestId('events-form-label').fill(input.label);
-  await page.getByTestId('events-form-date').fill(input.isoDate);
-}
-
-/** Pick an icon in the open form and confirm its radio is the checked one. */
-async function pickEventIcon(page: Page, icon: EventIconValue): Promise<void> {
-  // The radio itself is sr-only; the styled label is the control a pointer
-  // user actually hits, and it carries its own testid for exactly this.
-  await page.getByTestId(`events-form-icon-option-${icon}`).click();
-  await expect(page.getByTestId(`events-form-icon-${icon}`)).toBeChecked();
-}
-
-/** Fill the optional description in the open form. */
-async function fillEventDescription(page: Page, description: string): Promise<void> {
-  await page.getByTestId('events-form-description').fill(description);
-}
-
-/**
- * Submit the open add form and wait for the write itself.
- *
- * The POST is observed with `interceptNetworkCall` declared BEFORE the submit
- * click (network-first), so the create is confirmed at the wire before any DOM
- * assertion runs.
- */
-async function submitNewEvent(
-  page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn,
-  label: string
-): Promise<void> {
-  const createCall = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
-  await page.getByTestId('events-form-submit').click();
-
-  const { status } = await createCall;
-  expect(status).toBe(201);
-
-  // The form closes only on a successful write, so its absence is the second
-  // layer under the wire confirmation above.
-  await expect(page.getByTestId('events-form')).toHaveCount(0);
-  await expect(rowFor(page, label)).toBeVisible();
-}
+const rowFor = eventRowFor;
 
 test.beforeEach(async ({ page }) => {
   await dismissWelcomeSplash(page);
@@ -171,41 +112,41 @@ test.describe('An event survives the round trip through the server', () => {
     const anchor = new Date();
     const isoDate = isoDateDaysFromNow(30, anchor);
 
-    // GIVEN / WHEN: an event created through the Settings form with icon `ring`
+    // GIVEN / WHEN: an event created through the New event form with icon `ring`
     await openSettingsFromHome(page, interceptNetworkCall);
-    await openAddEventForm(page, { label: ICON_LABEL, isoDate });
-    await pickEventIcon(page, 'ring');
-    await submitNewEvent(page, interceptNetworkCall, ICON_LABEL);
+    await openDatesList(page, interceptNetworkCall);
+    await log.step(`Add "${ICON_LABEL}" through the New event form`);
+    await addEventFromDatesList(
+      page,
+      interceptNetworkCall,
+      { label: ICON_LABEL, date: isoDate, icon: 'ring' },
+      anchor
+    );
 
-    // WHEN: the page is reloaded, so the list can only come from the server
-    await log.step('Reload /settings so the list comes back from the server');
-    await page.waitForURL('**/settings');
+    // WHEN: the Dates list is reloaded, so the list can only come from the server
+    await log.step('Reload /settings/dates so the list comes back from the server');
     // The reload is what makes this a real round trip. `addEvent` also wrote
     // the saved copy (`saveEventsCopy` in `eventsSlice.ts`), which renders
     // first after a reload, so the row is read only once the reload's own
     // server read has settled and replaced it — then it can only have come
     // from `eventsService.getEventsPage` and its row→CoupleEvent mapping.
-    await reloadSettings(page, interceptNetworkCall);
+    await reloadDatesList(page, interceptNetworkCall);
 
     const row = rowFor(page, ICON_LABEL);
     await expect(row).toBeVisible();
-    await expect(row).toContainText(longForm(isoDate));
+    await expect(row).toContainText(listDate(localDateFromIso(isoDate), anchor));
 
-    // THEN: the edit form pre-fills with the icon that was chosen
-    await log.step('Re-open the edit form and read the icon back');
-    await row.locator('[data-testid^="event-edit-"]').click();
-    await expect(page.getByTestId('events-form')).toBeVisible();
-    // The pre-fill reads `event.icon` off the store copy that the reload's
-    // fetch produced — the assertion the CRUD spec stops short of, since it
-    // checks the radio before the submit and never looks again.
-    await expect(page.getByTestId('events-form-icon-ring')).toBeChecked();
-    await expect(page.getByTestId('events-form-icon-calendar')).not.toBeChecked();
-    await expect(page.getByTestId('events-form-icon-plane')).not.toBeChecked();
-
-    // The form is a full-viewport overlay, so it has to go before the dock is
-    // reachable again.
-    await page.getByTestId('events-form-cancel').click();
-    await expect(page.getByTestId('events-form')).toHaveCount(0);
+    // THEN: the event's page and its Icon field page carry the icon that was chosen
+    await log.step('Open the event and read the icon back');
+    await row.click();
+    // The row reads `event.icon` off the store copy that the reload's fetch
+    // produced — the assertion the CRUD spec stops short of, since it never
+    // looks at the icon again after the submit.
+    await expect(page.getByTestId('settings-event-icon')).toHaveAccessibleName('Icon, Ring');
+    await page.getByTestId('settings-event-icon').click();
+    await expect(page.getByTestId('settings-event-icon-ring').locator('input')).toBeChecked();
+    await expect(page.getByTestId('settings-event-icon-calendar').locator('input')).not.toBeChecked();
+    await expect(page.getByTestId('settings-event-icon-plane').locator('input')).not.toBeChecked();
 
     // THEN: and Home renders that icon's own treatment
     await log.step("Home renders the ring icon's own treatment");
@@ -236,40 +177,34 @@ test.describe('An event survives the round trip through the server', () => {
     const midDate = isoDateDaysFromNow(25, anchor);
 
     await openSettingsFromHome(page, interceptNetworkCall);
+    await openDatesList(page, interceptNetworkCall);
 
     // Created deliberately out of chronological order: late, then soon, then
     // mid. Creation order and `created_at` order therefore both disagree with
     // date order, so a list that echoed either would fail below.
-    await openAddEventForm(page, { label: ORDER_LATE_LABEL, isoDate: lateDate });
-    await submitNewEvent(page, interceptNetworkCall, ORDER_LATE_LABEL);
-    await openAddEventForm(page, { label: ORDER_SOON_LABEL, isoDate: soonDate });
-    await submitNewEvent(page, interceptNetworkCall, ORDER_SOON_LABEL);
-    await openAddEventForm(page, { label: ORDER_MID_LABEL, isoDate: midDate });
-    await submitNewEvent(page, interceptNetworkCall, ORDER_MID_LABEL);
+    await addEventFromDatesList(page, interceptNetworkCall, { label: ORDER_LATE_LABEL, date: lateDate }, anchor);
+    await addEventFromDatesList(page, interceptNetworkCall, { label: ORDER_SOON_LABEL, date: soonDate }, anchor);
+    await addEventFromDatesList(page, interceptNetworkCall, { label: ORDER_MID_LABEL, date: midDate }, anchor);
 
-    // WHEN: the page is reloaded
+    // WHEN: the Dates list is reloaded
     // THEN: the rows render in event_date order, not the order they were created in
-    await log.step('Reload /settings and read the rendered sequence');
-    await page.waitForURL('**/settings');
+    await log.step('Reload /settings/dates and read the rendered sequence');
     // After the reload the sequence is whatever `getEvents` returned:
     // `.order('event_date').order('created_at')` in Postgres, with no JS
     // comparator in the service (`eventsService.ts:255-268`).
-    await reloadSettings(page, interceptNetworkCall);
-    await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(3);
+    await reloadDatesList(page, interceptNetworkCall);
+    const rows = page.getByTestId('settings-dates-events').locator('[data-testid^="settings-dates-event-"]');
+    await expect(rows).toHaveCount(3);
 
     // Both assertions are ordered, element-by-element — the labels say which
     // row is where, and the dates say the sequence is ascending by
     // `event_date` rather than merely stable.
-    await expect(page.locator('[data-testid^="event-label-"]')).toHaveText([
-      ORDER_SOON_LABEL,
-      ORDER_MID_LABEL,
-      ORDER_LATE_LABEL,
-    ]);
-    await expect(page.locator('[data-testid^="event-date-"]')).toHaveText([
-      longForm(soonDate),
-      longForm(midDate),
-      longForm(lateDate),
-    ]);
+    const labels = [ORDER_SOON_LABEL, ORDER_MID_LABEL, ORDER_LATE_LABEL];
+    const dates = [soonDate, midDate, lateDate];
+    for (const [index, label] of labels.entries()) {
+      await expect(rows.nth(index)).toContainText(label);
+      await expect(rows.nth(index)).toContainText(listDate(localDateFromIso(dates[index]), anchor));
+    }
   });
 });
 
@@ -286,17 +221,16 @@ test.describe('Clearing an optional field', () => {
     const isoDate = isoDateDaysFromNow(18, anchor);
 
     await openSettingsFromHome(page, interceptNetworkCall);
-    await openAddEventForm(page, { label: DESCRIPTION_LABEL, isoDate });
-    await fillEventDescription(page, DESCRIPTION_TEXT);
-    await submitNewEvent(page, interceptNetworkCall, DESCRIPTION_LABEL);
-
-    const createdRow = rowFor(page, DESCRIPTION_LABEL);
-    await expect(createdRow.locator('[data-testid^="event-description-"]')).toHaveText(
-      DESCRIPTION_TEXT
+    await openDatesList(page, interceptNetworkCall);
+    await addEventFromDatesList(
+      page,
+      interceptNetworkCall,
+      { label: DESCRIPTION_LABEL, date: isoDate, description: DESCRIPTION_TEXT },
+      anchor
     );
 
-    // GIVEN: the description is on the row and on the Home card
-    await log.step('The description is on the Home card too');
+    // GIVEN: the description is on the Home card
+    await log.step('The description is on the Home card');
     const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
     await navigateTo(page, 'home');
     expect((await homeRead).status).toBe(200);
@@ -304,38 +238,33 @@ test.describe('Clearing an optional field', () => {
     await expect(card).toBeVisible();
     await expect(card).toContainText(DESCRIPTION_TEXT);
 
-    // WHEN: the user edits the event and clears the description
-    // THEN: the PATCH carries an explicit null and the row drops the element
-    await log.step('Edit the event and clear the description');
-    await returnToSettings(page, interceptNetworkCall);
-    const rowToEdit = rowFor(page, DESCRIPTION_LABEL);
-    await expect(rowToEdit).toBeVisible();
-    await rowToEdit.locator('[data-testid^="event-edit-"]').click();
+    // WHEN: the user opens the event's Note page and clears the note
+    // THEN: the PATCH carries an explicit null and the Note row drops its value
+    await log.step('Open the event and clear the note');
+    await returnToSettings(page);
+    await openDatesList(page, interceptNetworkCall);
+    await rowFor(page, DESCRIPTION_LABEL).click();
+    await expect(page.getByTestId('settings-event-note')).toHaveAccessibleName(`Note, ${DESCRIPTION_TEXT}`);
+    await page.getByTestId('settings-event-note').click();
 
-    await expect(page.getByTestId('events-form')).toBeVisible();
-    await expect(page.getByTestId('events-form-description')).toHaveValue(DESCRIPTION_TEXT);
-    await page.getByTestId('events-form-description').fill('');
+    await expect(page.getByTestId('settings-event-note-field')).toHaveValue(DESCRIPTION_TEXT);
+    await page.getByTestId('settings-event-note-field').fill('');
 
     const updateCall = interceptNetworkCall({ method: 'PATCH', url: '**/rest/v1/events*' });
-    await page.getByTestId('events-form-submit').click();
+    await page.getByTestId('settings-field-save').click();
 
     const { status, requestJson } = await updateCall;
     expect(status).toBe(200);
-    // The load-bearing half: `EventsSettings.tsx:544` derives the field as
-    // `trimmedDescription || null` and `:172` forwards it as
-    // `input.description ?? null`, so an emptied box has to reach the wire as
-    // an explicit `null`. `undefined` would be dropped by `updateEvent`'s
-    // `!== undefined` guards (`eventsService.ts:394-397`) and the old text
-    // would survive the save.
+    // The load-bearing half: `EventFieldPage` derives the field as
+    // `value === '' ? null : value` and forwards it as `description`, so an
+    // emptied box has to reach the wire as an explicit `null`. `undefined`
+    // would be dropped by `updateEvent`'s `!== undefined` guards
+    // (`eventsService.ts:394-397`) and the old text would survive the save.
     expect(requestJson).toMatchObject({ description: null });
 
-    await expect(page.getByTestId('events-form')).toHaveCount(0);
-
-    const clearedRow = rowFor(page, DESCRIPTION_LABEL);
-    await expect(clearedRow).toBeVisible();
-    // The paragraph is rendered only when `event.description` is truthy
-    // (`EventsSettings.tsx:332`), so its absence is the row half of the answer.
-    await expect(clearedRow.locator('[data-testid^="event-description-"]')).toHaveCount(0);
+    // Saving returns to the event page, whose Note row has no value left.
+    await expect(page.getByTestId('settings-event-page')).toBeVisible();
+    await expect(page.getByTestId('settings-event-note')).toHaveAccessibleName('Note');
 
     // THEN: and the Home card no longer carries it
     await log.step('And the Home card no longer carries it');

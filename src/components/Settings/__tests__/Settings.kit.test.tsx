@@ -1,13 +1,9 @@
 /**
  * Settings on the style kit: the page's own behaviour that the restyle added
  * or re-shaped — the About replay row, the Log out row's in-flight and failed
- * states, the version line under the last card, and the section / group
- * headings that replaced the old inner titles. (The identity row's avatar
+ * states, the version line under the last card, and the group headings that
+ * replaced the old inner titles. (The identity row's avatar
  * initial and the name row moved to the Profile page: `Settings.profile.test.tsx`.)
- *
- * The real EventsSettings and AnniversarySettings are mounted on the real
- * store (signed out, so neither loads anything) because the headings under
- * test are theirs.
  */
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -87,7 +83,7 @@ describe('Settings on the kit', () => {
     clearSignOutNotice();
   });
 
-  it('renders the group labels in order and one heading per countdown group', async () => {
+  it('renders the group labels in order, with no Countdowns section', async () => {
     await renderSettings({ onShowWelcome: vi.fn() });
 
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
@@ -95,11 +91,10 @@ describe('Settings on the kit', () => {
     // a group with no rows is not drawn. The last card has no label.
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
-    ).toEqual(['Account', 'Partner', 'About', 'Countdowns']);
-    expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
-    expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Event Countdowns/);
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Anniversary Countdowns/);
+    ).toEqual(['Account', 'Partner', 'About']);
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-countdowns-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Countdowns/);
   });
 
   it('replays the welcome message from About when a handler is passed', async () => {

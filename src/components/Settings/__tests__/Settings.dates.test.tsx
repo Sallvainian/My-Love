@@ -33,8 +33,6 @@ vi.mock('../../../api/authService', () => ({ authService: { signOut: vi.fn() } }
 vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock('../AnniversarySettings', () => ({ AnniversarySettings: () => null }));
-vi.mock('../EventsSettings', () => ({ EventsSettings: () => null }));
 
 import { offlineMessage } from '../../../services/accountDataError';
 import { useAppStore } from '../../../stores/useAppStore';
@@ -341,10 +339,13 @@ describe('Settings > Dates', () => {
       expect(screen.queryByTestId('settings-dates-load-more')).not.toBeInTheDocument();
     });
 
-    it('shows no + button and no screen-level Loading text', async () => {
+    it('shows the one + button in the bar and no screen-level Loading text', async () => {
       await openFull(userEvent.setup());
 
-      expect(screen.queryByRole('button', { name: /add|new|\+/i })).not.toBeInTheDocument();
+      // The bar's + opens the Kind chooser (`Settings.newDatePages.test.tsx`); no row is an add control.
+      expect(screen.getAllByRole('button', { name: /add|new|\+/i })).toEqual([
+        screen.getByTestId('settings-dates-add'),
+      ]);
       expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
     });
   });

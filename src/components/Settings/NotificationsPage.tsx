@@ -24,8 +24,7 @@
  *
  * The top page's Notifications row (`NotificationsRow`) reads the same store
  * and permission, so its value follows a switch on return without a reload.
- * The per-date reminder list stays on the top page (`CountdownMarks`) until
- * story 13.
+ * Each date's own Remind me switch is on its page (`RemindMe`).
  *
  * @component
  */

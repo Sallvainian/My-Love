@@ -26,20 +26,20 @@ export function extractEventsValidationContract(sql: string): EventsValidationCo
 /** Inspect declarations without importing production code or evaluating expressions. */
 export function extractEventsFormDeclarations(source: string): EventsValidationContract {
   const { diagnostics = [] } = ts.transpileModule(source, {
-    fileName: 'EventsSettings.tsx',
+    fileName: 'EventPages.tsx',
     reportDiagnostics: true,
     compilerOptions: { jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext },
   });
   if (diagnostics.length > 0) {
     throw new Error(
-      `Could not parse EventsSettings.tsx: ${diagnostics
+      `Could not parse EventPages.tsx: ${diagnostics
         .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
         .join('; ')}`
     );
   }
 
   const file = ts.createSourceFile(
-    'EventsSettings.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX
+    'EventPages.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX
   );
 
   function initializer(name: string): ts.Expression {

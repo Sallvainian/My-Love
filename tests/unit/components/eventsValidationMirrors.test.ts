@@ -2,7 +2,7 @@
  * DE.5-UNIT-001 [P1], risk R-007: form declarations mirror the shared contract.
  * The pgTAP companion compares that contract with every installed events CHECK
  * after all migrations. Ordinary unit tests need no database. Actual submission
- * boundaries are covered in EventsSettings.validation.test.tsx, independently
+ * boundaries are covered in Settings.newDatePages.test.tsx, independently
  * of constants.
  */
 import { readFileSync } from 'node:fs';
@@ -17,7 +17,7 @@ const contract = extractEventsValidationContract(
   readFileSync(join(process.cwd(), 'supabase/tests/database/21_events_validation_contract.sql'), 'utf8')
 );
 const declarations = extractEventsFormDeclarations(
-  readFileSync(join(process.cwd(), 'src/components/Settings/EventsSettings.tsx'), 'utf8')
+  readFileSync(join(process.cwd(), 'src/components/Settings/EventPages.tsx'), 'utf8')
 );
 
 function formSource(options: string): string {
@@ -116,7 +116,7 @@ describe('complete validation literal extraction', () => {
 
   it('rejects malformed TypeScript instead of recovering a partial value', () => {
     expect(() => extractEventsFormDeclarations(formSource(String.raw`[{ value: '\uQQQQ' }]`)))
-      .toThrow(/Could not parse EventsSettings/);
+      .toThrow(/Could not parse EventPages/);
   });
 
   const missingOrDuplicateTag = 'Expected exactly one tagged events validation contract in the pgTAP SQL';

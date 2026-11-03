@@ -3737,3 +3737,27 @@ source_spec: `tickets/epic-settings-rework/tickets/story-every-event-has-its-own
 severity: low
 reason: DESIGN.md Components: "An Icon field row shows the event's glyph in accent in place of a text value" and "The icon field is the three-option picker used on the Form page". This plan's matrix specified text values and check rows; the implementer flagged the mismatch. Story 5.13 builds the picker.
 status: open
+
+### DW-432: No E2E axe coverage of the new Settings pages since `events-accessibility` was deleted.
+origin: story 5.13 build (epic-settings-rework), 2026-11-03
+location: tests/e2e/settings/ (deleted `events-accessibility.spec.ts`); tests/unit/a11y/whiteOnColorContrast.test.ts (header)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: `@axe-core/playwright` ran in exactly one spec, which scanned the events modal and form that the Countdowns section drew. That section is gone, so the spec was deleted, and nothing scans the Settings stack pages (the top page, the Dates list, the date and event pages, the Form pages and the Kind chooser). The plan forbids new axe scans in this story (the owner and partner use no screen reader or keyboard), so the gap is recorded rather than filled; whether a scan is wanted at all is a decision for the owner. The `@axe-core/playwright` dependency (and its `axe-core`) was removed with the spec, since nothing else used it; it comes back if a scan is wanted.
+status: open
+
+### DW-433: `reminderDateEntries` has no production caller now that `CountdownMarks` is gone.
+origin: story 5.13 build (epic-settings-rework), 2026-11-03
+location: src/services/dateReminders.ts (`reminderDateEntries`), src/services/__tests__/dateReminders.test.ts (`describe('reminderDateEntries')`)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: `CountdownMarks` was the only production caller of `reminderDateEntries`, which listed the dates a person could mark for the per-date reminder list. Each date's own page now holds its Remind me switch (`RemindMe`), so the function and its unit tests are dead code. A later change deletes it with its tests, after a check that `planReminders` and its doc comments no longer lean on it.
+status: open
+
+### DW-434: Returning to the Dates list reloads its first window, so rows reached through `Load more`, or a date just added beyond that window, drop out of the list.
+origin: story 5.13 build (epic-settings-rework), 2026-11-03
+location: src/components/Settings/DatesPage.tsx (the mount effect calling `loadEvents()`); src/components/Settings/stack/SettingsStack.tsx (one page in the DOM, keyed by path, so a pop remounts the page)
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+reason: The Dates list loads events on every mount, and a back from an event page or a Form page remounts it, so the store's paged window is replaced by the server's first page. Since story 5.9 this drops every row reached through `Load more`. Since story 5.13 it also drops a past date added beyond the first window: it shows on the list after Add and vanishes when the reload answers. `events-history-pagination.spec.ts` waits for that reload and pages to the row. A fix keeps the loaded window across a return (for example, load only on a push or a fresh mount, not on a pop), as `EventPage` already skips its load when it holds its event.
+status: open

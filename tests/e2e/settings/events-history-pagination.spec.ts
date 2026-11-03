@@ -1,14 +1,31 @@
-/** Real Settings pagination, including dates saved beyond its initial history window. */
+/**
+ * Real Dates list pagination, including dates saved beyond its initial history
+ * window.
+ *
+ * The Dates list holds a paged window of events: its mount read brings the
+ * first page on each side of today, and the `Load more` row that ends Past
+ * appends the next page of both. A row is reached by its own page
+ * (`dates/event/<id>`), so an edit of a deep row is made on a field page.
+ *
+ * Two cases from the old Countdowns-era suite are not here. The "Edit only on
+ * this account's own events" case is `event-pages.spec.ts` (a partner's event
+ * opens read-only), and the Chromium keyboard-focus case restored focus to a
+ * history Retry control and the empty-state Add control, neither of which
+ * exists on the Dates list (a failed `Load more` shows the Error box and leaves
+ * the row where it was); the owner uses no keyboard.
+ */
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { eventDateFrom, type SeededEvent } from '../../support/factories/events';
 import { navigateTo } from '../../support/helpers/navigation';
-import { EVENTS_PAGE_SIZE } from '../../support/helpers/events';
+import { EVENTS_PAGE_SIZE, localDateFromIso } from '../../support/helpers/events';
+import { listDate } from '../../support/helpers/dates-list-format';
+import { fillNewEventForm, openNewEventForm } from '../../support/helpers/new-date-forms';
 import { EVENTS_WRITE, HISTORY_PAGE_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
-import { reloadSettings, settingsEventsLoaded } from '../../support/helpers/settings-screen';
+import { reloadDatesList } from '../../support/helpers/settings-screen';
 
 /**
  * Day offsets older than every seeded history row (the oldest sits
@@ -18,9 +35,9 @@ import { reloadSettings, settingsEventsLoaded } from '../../support/helpers/sett
 const DEEP_PAST_EDIT_DAYS = -500;
 const DEEP_PAST_ADD_DAYS = -1000;
 
-/** The row test id prefix before the event's uuid (`event-row-<id>`). */
-const ROW_PREFIX = 'event-row-';
-/** Every history row, by the prefix its test id starts with. */
+/** The row test id prefix before the event's uuid (`settings-dates-event-<id>`). */
+const ROW_PREFIX = 'settings-dates-event-';
+/** Every event row on the Dates list (the group cards are `settings-dates-events`, with an `s`). */
 const ALL_ROWS = `[data-testid^="${ROW_PREFIX}"]`;
 const rowTestId = (id: string) => `${ROW_PREFIX}${id}`;
 
@@ -32,11 +49,12 @@ const history = (size: number) => Array.from({ length: size }, (_, index) => ({
   label: `Paged history ${String(index + 1).padStart(2, '0')}`,
 }));
 
-async function openSettings(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
-  const settingsRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
-  await page.goto('/settings');
-  await expect(page.getByTestId('settings-view')).toBeVisible();
-  await settingsEventsLoaded(page, settingsRead);
+/** A fresh load of `/settings/dates`, returned once the list's own events read has answered. */
+async function openDates(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  const datesRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+  await page.goto('/settings/dates');
+  await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+  expect((await datesRead).status).toBe(200);
 }
 
 async function loadHistory(
@@ -45,7 +63,7 @@ async function loadHistory(
   expectedCount: number
 ) {
   const response = interceptNetworkCall({ method: 'GET', url: HISTORY_PAGE_READ });
-  await page.getByTestId('events-settings-load-more').click();
+  await page.getByTestId('settings-dates-load-more').click();
   expect((await response).status).toBe(200);
   await recurseUntil(
     () => page.evaluate(() => window.__APP_STORE__!.getState().events.length),
@@ -56,33 +74,51 @@ async function loadHistory(
   await expect(page.locator(ALL_ROWS)).toHaveCount(expectedCount);
 }
 
-/** The status PostgREST answers each write with: 201 for an insert, 200 for an update. */
-const SUCCESS_STATUS = { POST: 201, PATCH: 200 } as const;
+/** The id of the event the store holds under `label`. */
+const idOf = (page: Page, label: string) =>
+  page.evaluate(
+    (wanted) => window.__APP_STORE__!.getState().events.find((event) => event.label === wanted)?.id,
+    label
+  );
 
-async function submitEvent(
+/**
+ * Saves the open one-field page and waits for the write itself: the PATCH is
+ * observed with `interceptNetworkCall` declared BEFORE the Save tap, and the
+ * store must then hold the event's new `label` (checked by id from the reply).
+ * Returns once the event page is back.
+ */
+async function saveField(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn,
-  method: keyof typeof SUCCESS_STATUS,
-  label: string
+  expectedLabel?: string
 ) {
-  const response = interceptNetworkCall({ method, url: EVENTS_WRITE });
-  await page.getByTestId('events-form-submit').click();
+  const response = interceptNetworkCall({ method: 'PATCH', url: EVENTS_WRITE });
+  await page.getByTestId('settings-field-save').click();
   const reply = await response;
-  expect(reply.status).toBe(SUCCESS_STATUS[method]);
+  expect(reply.status).toBe(200);
   const body = reply.responseJson as { id: string } | { id: string }[];
   const saved = Array.isArray(body) ? body[0] : body;
   expect(saved.id).toBeTruthy();
-  await recurseUntil(
-    () => page.evaluate((id) =>
-      window.__APP_STORE__!.getState().events.find((event) => event.id === id)?.label,
-    saved.id),
-    (v) => {
-      expect(v).toBe(label);
-    }
-  );
-  await expect(page.getByTestId('events-form')).toHaveCount(0);
-  await expect(page.getByTestId(`event-label-${saved.id}`)).toHaveText(label);
+  if (expectedLabel !== undefined) {
+    await recurseUntil(
+      () => page.evaluate((id) =>
+        window.__APP_STORE__!.getState().events.find((event) => event.id === id)?.label,
+      saved.id),
+      (v) => {
+        expect(v).toBe(expectedLabel);
+      }
+    );
+  }
+  await expect(page.getByTestId('settings-event-page')).toBeVisible();
   return saved.id;
+}
+
+/** Opens a loaded row's event page, then one of its field pages. */
+async function openRowField(page: Page, id: string, field: 'name' | 'date' | 'note') {
+  await page.getByTestId(rowTestId(id)).click();
+  await expect(page.getByTestId('settings-event-page')).toBeVisible();
+  await page.getByTestId(`settings-event-${field}`).click();
+  await expect(page.getByTestId(`settings-event-${field}-page`)).toBeVisible();
 }
 
 /**
@@ -103,30 +139,40 @@ function tiedSpecs() {
   return { windowRows, specs };
 }
 
-/** The seeded rows in list order: date, then creation instant, then id. */
+/** The seeded rows in the store's order: date, then creation instant, then id. */
 function expectedOrder(seeded: SeededEvent[], specs: { createdAt: string }[]) {
   return seeded.map((row, index) => ({ ...row, createdAt: specs[index].createdAt }))
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate) ||
       a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
-/** Open Settings and load every page of the tied history until load-more is gone. */
+/**
+ * The Dates list's row order for tied rows: the Events group (upcoming, in the
+ * store's order), then Past (the past rows reversed, newest first).
+ */
+function listOrder(expected: ReturnType<typeof expectedOrder>, todayIso: string) {
+  return [
+    ...expected.filter((row) => row.eventDate >= todayIso),
+    ...expected.filter((row) => row.eventDate < todayIso).reverse(),
+  ];
+}
+
+/** Open the Dates list and load every page of the tied history until load-more is gone. */
 async function pageThroughTiedHistory(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn,
   total: number
 ) {
-  await openSettings(page, interceptNetworkCall);
+  await openDates(page, interceptNetworkCall);
   // One page per window on open, a second per window after one load-more.
   await expect(page.locator(ALL_ROWS)).toHaveCount(2 * EVENTS_PAGE_SIZE);
   await loadHistory(page, interceptNetworkCall, 4 * EVENTS_PAGE_SIZE);
-  await expect(page.getByTestId('events-settings-load-more')).toBeEnabled();
-  await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
+  await expect(page.getByTestId('settings-dates-load-more')).toBeEnabled();
   await loadHistory(page, interceptNetworkCall, total);
-  await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
+  await expect(page.getByTestId('settings-dates-load-more')).toHaveCount(0);
 }
 
-test.describe('Settings events history pagination', () => {
+test.describe('Dates list events history pagination', () => {
   test.beforeEach(async ({ page }) => {
     await dismissWelcomeSplash(page);
   });
@@ -146,28 +192,34 @@ test.describe('Settings events history pagination', () => {
     const correctedDate = eventDateFrom(coupleEvents.anchor, DEEP_PAST_EDIT_DAYS);
     // The first page of history plus the upcoming survivor.
     const firstLoad = EVENTS_PAGE_SIZE + 1;
-    await openSettings(page, interceptNetworkCall);
+    await openDates(page, interceptNetworkCall);
     await expect(page.locator(ALL_ROWS)).toHaveCount(firstLoad);
     await expect(page.getByTestId(rowTestId(oldest.id))).toHaveCount(0);
-    await expect(page.getByTestId('events-settings-history-notice')).toBeVisible();
 
     await loadHistory(page, interceptNetworkCall, seeded.length);
-    await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
-    await page.getByTestId(`event-edit-${oldest.id}`).click();
-    await expect(page.getByTestId('events-form-date')).toHaveValue(oldest.eventDate);
-    await page.getByTestId('events-form-label').fill('Corrected deep history');
-    await page.getByTestId('events-form-date').fill(correctedDate);
-    await submitEvent(page, interceptNetworkCall, 'PATCH', 'Corrected deep history');
+    await expect(page.getByTestId('settings-dates-load-more')).toHaveCount(0);
+    await openRowField(page, oldest.id, 'name');
+    await page.getByTestId('settings-event-name-field').fill('Corrected deep history');
+    await saveField(page, interceptNetworkCall, 'Corrected deep history');
+    await page.getByTestId('settings-event-date').click();
+    await expect(page.getByTestId('settings-event-date-field')).toHaveValue(oldest.eventDate);
+    await page.getByTestId('settings-event-date-field').fill(correctedDate);
+    await saveField(page, interceptNetworkCall);
 
-    await reloadSettings(page, interceptNetworkCall);
+    // Back on the Dates list, then a reload brings only the first page again.
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page).toHaveURL(/\/settings\/dates$/);
+    await reloadDatesList(page, interceptNetworkCall);
     await expect(page.locator(ALL_ROWS)).toHaveCount(firstLoad);
     await expect(page.getByTestId(rowTestId(oldest.id))).toHaveCount(0);
     await loadHistory(page, interceptNetworkCall, seeded.length);
-    await page.getByTestId(`event-edit-${oldest.id}`).click();
-    await expect(page.getByTestId('events-form-label')).toHaveValue('Corrected deep history');
-    await expect(page.getByTestId('events-form-date')).toHaveValue(correctedDate);
-    await page.getByTestId('events-form-label').fill('Edited history again');
-    await submitEvent(page, interceptNetworkCall, 'PATCH', 'Edited history again');
+    await openRowField(page, oldest.id, 'name');
+    await expect(page.getByTestId('settings-event-name-field')).toHaveValue('Corrected deep history');
+    await page.getByTestId('settings-event-name-field').fill('Edited history again');
+    await saveField(page, interceptNetworkCall, 'Edited history again');
+    await expect(page.getByTestId('settings-event-date')).toHaveAccessibleName(
+      `Date, ${listDate(localDateFromIso(correctedDate), new Date())}`
+    );
 
     await navigateTo(page, 'home');
     await expect(page.getByTestId('event-countdown-paging-upcoming-survivor')).toBeVisible();
@@ -183,35 +235,63 @@ test.describe('Settings events history pagination', () => {
     const savedDate = eventDateFrom(coupleEvents.anchor, DEEP_PAST_ADD_DAYS);
     // Every seeded row plus the one this test adds.
     const allRows = seeded.length + 1;
-    await openSettings(page, interceptNetworkCall);
-    await page.getByTestId('events-settings-add').click();
-    await page.getByTestId('events-form-label').fill('New deep-past event');
-    await page.getByTestId('events-form-date').fill(savedDate);
-    await page.getByTestId('events-form-description').fill('Saved outside the first page');
-    const id = await submitEvent(page, interceptNetworkCall, 'POST', 'New deep-past event');
+    await openDates(page, interceptNetworkCall);
+    // Add returns to the Dates list, which mounts again and reloads its first
+    // window; that window ends before a date this deep, so the new row is
+    // reached through Load more once the reload has answered (the list may
+    // show it until then, so `addEventFromDatesList`'s row check would race).
+    // Armed before the add: opening the form sends no events read, so this is
+    // the return's.
+    const returnRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+    await openNewEventForm(page);
+    await fillNewEventForm(page, {
+      label: 'New deep-past event',
+      date: savedDate,
+      description: 'Saved outside the first page',
+    });
+    const created = interceptNetworkCall({ method: 'POST', url: EVENTS_WRITE });
+    await page.getByTestId('settings-form-add').click();
+    expect((await created).status).toBe(201);
+    await expect(page).toHaveURL(/\/settings\/dates$/);
+    expect((await returnRead).status).toBe(200);
+    await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);
+    await loadHistory(page, interceptNetworkCall, allRows);
+    const id = (await idOf(page, 'New deep-past event'))!;
+    expect(id).toBeTruthy();
+    await expect(page.getByTestId(rowTestId(id))).toContainText('New deep-past event');
 
-    await reloadSettings(page, interceptNetworkCall);
+    await reloadDatesList(page, interceptNetworkCall);
     await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);
     await expect(page.getByTestId(rowTestId(id))).toHaveCount(0);
     await loadHistory(page, interceptNetworkCall, allRows);
-    await page.getByTestId(`event-edit-${id}`).click();
-    await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
-    await expect(page.getByTestId('events-form-description'))
-      .toHaveValue('Saved outside the first page');
-    await page.getByTestId('events-form-label').fill('Deep-past event edited');
-    await submitEvent(page, interceptNetworkCall, 'PATCH', 'Deep-past event edited');
+    await page.getByTestId(rowTestId(id)).click();
+    await expect(page.getByTestId('settings-event-date')).toHaveAccessibleName(
+      `Date, ${listDate(localDateFromIso(savedDate), new Date())}`
+    );
+    await expect(page.getByTestId('settings-event-note')).toHaveAccessibleName(
+      'Note, Saved outside the first page'
+    );
+    await page.getByTestId('settings-event-name').click();
+    await page.getByTestId('settings-event-name-field').fill('Deep-past event edited');
+    await saveField(page, interceptNetworkCall, 'Deep-past event edited');
 
-    await reloadSettings(page, interceptNetworkCall);
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page).toHaveURL(/\/settings\/dates$/);
+    await reloadDatesList(page, interceptNetworkCall);
     await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE);
     await loadHistory(page, interceptNetworkCall, allRows);
-    await page.getByTestId(`event-edit-${id}`).click();
-    await expect(page.getByTestId('events-form-label')).toHaveValue('Deep-past event edited');
-    await expect(page.getByTestId('events-form-date')).toHaveValue(savedDate);
+    await page.getByTestId(rowTestId(id)).click();
+    await expect(page.getByTestId('settings-event-name')).toHaveAccessibleName(
+      'Name, Deep-past event edited'
+    );
+    await expect(page.getByTestId('settings-event-date')).toHaveAccessibleName(
+      `Date, ${listDate(localDateFromIso(savedDate), new Date())}`
+    );
   });
 
-  for (const { size, rows, empty } of [
-    { size: 0, rows: 0, empty: 1 },
-    { size: EVENTS_PAGE_SIZE, rows: EVENTS_PAGE_SIZE, empty: 0 },
+  for (const { size, rows } of [
+    { size: 0, rows: 0 },
+    { size: EVENTS_PAGE_SIZE, rows: EVENTS_PAGE_SIZE },
   ]) {
     test(`[P1] ${size} past rows do not advertise another page`, async ({
       page,
@@ -219,22 +299,20 @@ test.describe('Settings events history pagination', () => {
       interceptNetworkCall,
     }) => {
       await coupleEvents.seed(history(size));
-      await openSettings(page, interceptNetworkCall);
+      await openDates(page, interceptNetworkCall);
       await expect(page.locator(ALL_ROWS)).toHaveCount(rows);
-      await expect(page.getByTestId('events-settings-empty')).toHaveCount(empty);
-      await expect(page.getByTestId('events-settings-load-more')).toHaveCount(0);
-      await expect(page.getByTestId('events-settings-history-notice')).toHaveCount(0);
+      await expect(page.getByTestId('settings-dates-load-more')).toHaveCount(0);
     });
   }
 
-  test('[P1] tied dates and microseconds stay ordered through repeated Settings pages', async ({
+  test('[P1] tied dates and microseconds stay ordered through repeated Dates list pages', async ({
     page,
     coupleEvents,
     interceptNetworkCall,
   }) => {
     const { specs } = tiedSpecs();
     const seeded = await coupleEvents.seed(specs);
-    const expected = expectedOrder(seeded, specs);
+    const expected = listOrder(expectedOrder(seeded, specs), eventDateFrom(coupleEvents.anchor, 0));
     await pageThroughTiedHistory(page, interceptNetworkCall, specs.length);
     await recurseUntil(
       () => page.locator(ALL_ROWS)
@@ -244,25 +322,6 @@ test.describe('Settings events history pagination', () => {
         expect(actualIds).toEqual(expected.map((row) => row.id));
       }
     );
-  });
-
-  test('[P1] Settings shows Edit only on this account\'s own events', async ({
-    page,
-    coupleEvents,
-    interceptNetworkCall,
-  }) => {
-    const seeded = await coupleEvents.seed([
-      { dayOffset: 10, label: 'Owned edit probe' },
-      { dayOffset: 11, label: 'Partner edit probe', owner: 'partner' },
-    ]);
-    await openSettings(page, interceptNetworkCall);
-    // Premises: the first seeded row is this account's own, the second its partner's.
-    const [own, partner] = seeded;
-    expect(own.ownerId).toBe(coupleEvents.userId);
-    expect(partner.ownerId).toBe(coupleEvents.partnerId);
-    await expect(page.getByTestId(rowTestId(partner.id))).toBeVisible();
-    await expect(page.getByTestId(`event-edit-${own.id}`)).toHaveCount(1);
-    await expect(page.getByTestId(`event-edit-${partner.id}`)).toHaveCount(0);
   });
 
   test('[P1] Home keeps the six nearest of many tied upcoming cards after paging history', async ({
@@ -293,56 +352,5 @@ test.describe('Settings events history pagination', () => {
     await expect(cards.getByRole('heading', { level: 3 })).toHaveText(expected.filter((row) =>
       row.eventDate === seeded[windowRows].eventDate
     ).slice(0, HOME_MAX_EVENT_CARDS).map((row) => row.label));
-  });
-
-  test('[P1] restores Chromium keyboard focus to history retry and then Add after the final page', async ({
-    page,
-    coupleEvents,
-    interceptNetworkCall,
-  }) => {
-    const seeded = await coupleEvents.seed(history(EVENTS_PAGE_SIZE + 1));
-    await openSettings(page, interceptNetworkCall);
-    let releaseFailure!: () => void;
-    const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
-    let shouldFail = true;
-    // playwright-utils deviation: the route must be installed before the load-more press sends the read, hold it on a gate, abort it and pass every other events request through; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-    await page.route('**/rest/v1/events*', async (route) => {
-      const request = route.request();
-      if (shouldFail && request.method() === 'GET' && new URL(request.url()).searchParams.has('or')) {
-        await failureGate;
-        await route.abort('failed');
-        return;
-      }
-      await route.continue();
-    });
-    const button = page.getByTestId('events-settings-load-more');
-    // playwright-utils deviation: waits for the load-more read the route above aborts; interceptNetworkCall's observe mode throws on a request that gets no response instead of resolving on it.
-    const failedRequest = page.waitForEvent('requestfailed', {
-      predicate: (request) => new URL(request.url()).pathname.endsWith('/rest/v1/events'),
-    });
-    await button.focus();
-    await button.press('Enter');
-    await expect(button).toBeDisabled();
-    // Confirm the browser blur that happy-dom misses before allowing settlement.
-    await expect(page.locator('body')).toBeFocused();
-    releaseFailure();
-    await failedRequest;
-    await recurseUntil(
-      () => page.evaluate(() => ({
-        loading: window.__APP_STORE__!.getState().eventsIsLoadingMore,
-        failed: Boolean(window.__APP_STORE__!.getState().eventsHistoryError),
-        count: window.__APP_STORE__!.getState().events.length,
-      })),
-      (v) => {
-        expect(v).toEqual({ loading: false, failed: true, count: EVENTS_PAGE_SIZE });
-      }
-    );
-    await expect(button).toHaveText('Retry loading history');
-    await expect(button).toBeFocused();
-
-    shouldFail = false;
-    await loadHistory(page, interceptNetworkCall, seeded.length);
-    await expect(button).toHaveCount(0);
-    await expect(page.getByTestId('events-settings-add')).toBeFocused();
   });
 });

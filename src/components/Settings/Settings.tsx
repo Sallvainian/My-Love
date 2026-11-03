@@ -3,18 +3,17 @@
  *
  * Application settings on the style kit, as a stack of pages (`SettingsStack`).
  * The top page holds the Account group (the Profile row), the Partner group
- * (the Partner and Dates rows), the preferences and about groups, the sign-out
- * card and the version line, then the sections not yet replaced by pages of their own:
- * the couple's countdowns (events and anniversaries) and the per-date reminder
- * list (`CountdownMarks`; the native shell with the local-notifications plugin
- * only). Profile (the display name and your own birthday, each on a one-field
- * page, see `ProfilePage`), Partner (who the account is linked to, see
+ * (the Partner and Dates rows), the preferences and about groups, the log-out
+ * card and the version line, and nothing else. Profile (the display name and
+ * your own birthday, each on a one-field page, see `ProfilePage`), Partner (who the account is linked to, see
  * `PartnerPage`), Dates (every date in one list, see `DatesPage`) and the
  * pages its Together since, Wedding and birthday rows open (see `DatePages`),
  * an event's own page and its four one-field pages (`dates/event/<id>…`, see
  * `EventPages`; matched in `resolveSettingsPage` since the path carries an id),
  * an anniversary's own page and its three one-field pages
  * (`dates/anniversary/<key>…`, see `AnniversaryPages`; matched the same way),
+ * the New event and New anniversary form pages the Dates list's `+` button
+ * opens (`dates/new-event`, `dates/new-anniversary`, see `NewDatePages`),
  * Photos (this device's mobile-data choice for the offline album)
  * and Notifications (a switch for each kind of
  * push and the Date reminders switch; the native shell with the push plugins
@@ -54,18 +53,13 @@ import { useAppStore } from '../../stores/useAppStore';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { logger } from '../../utils/logger';
 import {
-  CARD,
   DESTRUCTIVE_BUTTON,
   DIALOG_BACKDROP,
   DIALOG_PANEL,
   DIALOG_TITLE,
-  DIVIDER,
-  SECTION_LABEL,
   SECONDARY_BUTTON,
 } from '../shared/kitClasses';
 import { AnniversaryFieldPage, AnniversaryPage, type AnniversaryField } from './AnniversaryPages';
-import { AnniversarySettings } from './AnniversarySettings';
-import { CountdownMarks } from './CountdownMarks';
 import {
   PartnerBirthdayPage,
   TogetherSinceDatePage,
@@ -76,7 +70,7 @@ import {
 } from './DatePages';
 import { DatesPage, DatesRow } from './DatesPage';
 import { EventFieldPage, EventPage, type EventField } from './EventPages';
-import { EventsSettings } from './EventsSettings';
+import { NewAnniversaryPage, NewEventPage } from './NewDatePages';
 import { NotificationsPage, NotificationsRow } from './NotificationsPage';
 import { PartnerPage, PartnerRow } from './PartnerPage';
 import { PhotosPage } from './PhotosPage';
@@ -207,6 +201,26 @@ const SUBPAGES = new Map<string, SettingsPageSpec>([
       title: 'Dates',
       titleStyle: 'large',
       render: () => <DatesPage />,
+    },
+  ],
+  [
+    'dates/new-event',
+    {
+      title: 'New event',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      leading: 'cancel',
+      render: () => <NewEventPage />,
+    },
+  ],
+  [
+    'dates/new-anniversary',
+    {
+      title: 'New anniversary',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      leading: 'cancel',
+      render: () => <NewAnniversaryPage />,
     },
   ],
   [
@@ -451,9 +465,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           )}
         </SettingsGroup>
 
-        {/* The IA's unlabeled last card, with the version line 4px under it. The
-            Countdowns section and the per-date reminder list follow until their
-            stories give them pages of their own. */}
+        {/* The IA's unlabeled last card, with the version line 4px under it. */}
         <div className="flex flex-col gap-1">
           {/* Log out — its own quiet card, not a red block. */}
           <SettingsGroup testId="settings-sign-out-card">
@@ -502,22 +514,6 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             Version {__APP_VERSION__} · made for the two of you
           </p>
         </div>
-
-        {/* Countdowns — the couple-shared events above the anniversaries. */}
-        <section className="flex flex-col gap-2" aria-labelledby="settings-countdowns-label">
-          <h2 id="settings-countdowns-label" className={SECTION_LABEL}>
-            Countdowns
-          </h2>
-          <div className={CARD} data-testid="settings-countdowns-card">
-            <EventsSettings />
-            <div className={DIVIDER} aria-hidden="true" />
-            <AnniversarySettings />
-          </div>
-        </section>
-
-        {/* The per-date reminder list — only in the native shell with the local-notifications
-            plugin; story 13 moves each switch onto its date's page. */}
-        <CountdownMarks />
 
         {/* Outside every card, like the other dialogs, so no card can clip it. */}
         <AnimatePresence>

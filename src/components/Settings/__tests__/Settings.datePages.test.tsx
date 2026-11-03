@@ -51,8 +51,6 @@ vi.mock('../../../api/authService', () => ({ authService: { signOut: vi.fn() } }
 vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock('../AnniversarySettings', () => ({ AnniversarySettings: () => null }));
-vi.mock('../EventsSettings', () => ({ EventsSettings: () => null }));
 
 import { setOnline } from '../../../../tests/unit/stores/accountDataFixtures';
 import { AccountDataError, offlineMessage } from '../../../services/accountDataError';

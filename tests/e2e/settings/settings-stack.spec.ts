@@ -106,6 +106,10 @@ test.describe('Settings page stack', () => {
     page,
     interceptNetworkCall,
   }) => {
+    // A short phone: the top page holds only its rows now (the Countdowns
+    // section that made it taller is gone), so at 844px tall it no longer
+    // scrolls at all.
+    await page.setViewportSize({ width: 390, height: 480 });
     await openSettingsFromHome(page, interceptNetworkCall);
     const bar = page.getByTestId('settings-bar');
     await expect(bar).toHaveAttribute('data-collapsed', 'false');

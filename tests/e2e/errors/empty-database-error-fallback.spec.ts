@@ -4,7 +4,8 @@ import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { createDatabaseErrorEnvelope } from '../../support/factories/database-error-envelope';
 import { isoDateDaysFromNow, resolveOwnPair } from '../../support/helpers/events';
-import { openSettingsFromHome } from '../../support/helpers/settings-screen';
+import { fillNewEventForm, openNewEventForm } from '../../support/helpers/new-date-forms';
+import { openDatesList, openSettingsFromHome } from '../../support/helpers/settings-screen';
 
 test.describe('DW-39 empty database error fallback', () => {
   test(
@@ -30,19 +31,20 @@ test.describe('DW-39 empty database error fallback', () => {
       });
 
       await log.step('Given an event form with a valid label and future date');
-      // Settings' own events load has settled, so the store and list checks
-      // below read loaded state rather than a list that has not arrived yet.
+      // The Dates list's own events load has settled, so the store and list
+      // checks below read loaded state rather than a list that has not arrived
+      // yet.
       await openSettingsFromHome(page, interceptNetworkCall);
+      await openDatesList(page, interceptNetworkCall);
       const { userId } = await resolveOwnPair(supabaseAdmin);
       expect(await page.evaluate(() => window.__APP_STORE__?.getState().userId)).toBe(userId);
-      await page.getByTestId('events-settings-add').click();
-      const form = page.getByTestId('events-form');
-      const labelInput = page.getByTestId('events-form-label');
-      const dateInput = page.getByTestId('events-form-date');
-      const submit = page.getByTestId('events-form-submit');
+      await openNewEventForm(page);
+      const form = page.getByTestId('settings-new-event-page');
+      const labelInput = page.getByTestId('settings-new-event-name-field');
+      const dateInput = page.getByTestId('settings-new-event-date-field');
+      const submit = page.getByTestId('settings-form-add');
       await expect(form).toBeVisible();
-      await labelInput.fill(label);
-      await dateInput.fill(eventDate);
+      await fillNewEventForm(page, { label, date: eventDate });
 
       await log.step('When submitting receives a database error containing only whitespace');
       await submit.click();
@@ -58,7 +60,7 @@ test.describe('DW-39 empty database error fallback', () => {
       // A rejected create changes no store field. The new error proves that
       // addEvent returned its failure before checking the store; eventsError
       // is load-only, and an enabled submit alone could be its initial state.
-      const alert = page.getByTestId('events-form-error');
+      const alert = page.getByTestId('settings-form-error');
       await expect(alert).toHaveText(expectedMessage);
       await expect(submit).toBeEnabled();
       const storedEvents = await page.evaluate((attemptedLabel) => {
@@ -74,9 +76,14 @@ test.describe('DW-39 empty database error fallback', () => {
       await expect(labelInput).toHaveValue(label);
       await expect(dateInput).toHaveValue(eventDate);
       await expect(submit).toBeEnabled();
-      await expect(page.getByTestId('events-form-cancel')).toBeEnabled();
-      await expect(page.getByTestId('events-settings-load-region').getByText(label, { exact: true }))
-        .toHaveCount(0);
+      await expect(page.getByTestId('settings-cancel')).toBeEnabled();
+
+      // And no event row was added behind it.
+      await page.getByTestId('settings-cancel').click();
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      await expect(
+        page.locator('[data-testid^="settings-dates-event-"]').filter({ hasText: label })
+      ).toHaveCount(0);
     }
   );
 });

@@ -2,12 +2,15 @@
  * tests/e2e/settings/events-load-recovery.spec.ts
  *
  * Active ATDD recovery coverage for story 5 (`spec-dynamic-events`, "manage
- * events in Settings"), activated under the configured runner by DW-30.
+ * events in Settings"), activated under the configured runner by DW-30 and
+ * moved onto the Dates list by the story that deleted the Countdowns section.
  *
  * Test design: the E2E half of **DE.5-COMP-003**, [P2] — "a failed load
- * re-fires on reconnect and clears its notice"
+ * re-fires on reconnect"
  * (`_bmad-output/test-artifacts/test-design-epic-5.md:359`), originally blocked
- * on the DW-27 fix. Risk R-003.
+ * on the DW-27 fix. Risk R-003. The Dates list shows no notice for a failed
+ * mount load (it is not an action just tried), so the recovery is observed as
+ * the rows appearing.
  *
  * ── HISTORICAL first run: RED before DW-27 ───────────────────────────────────
  *
@@ -15,7 +18,7 @@
  * `npx playwright test tests/e2e/settings/events-load-recovery.spec.ts
  * --project=chromium --workers=1`. Result: **1 failed** — as predicted below,
  * and for the predicted reason. Its component-level twin
- * (DE.5-COMP-003 in EventsSettings.errorIsolation.test.tsx) failed in the same
+ * (DE.5-COMP-003 in the Countdowns-era errorIsolation suite) failed in the same
  * run with `expected "vi.fn()" to be called 2 times, but got 1 times`: the
  * reconnect never re-fires the load at either level.
  *
@@ -31,7 +34,8 @@
  *    Home.' There is no retry control, and clearEventsError ... still has zero
  *    production callers."
  *
- * The deps are at `src/components/Settings/EventsSettings.tsx:141`; App's Home
+ * The deps are now on the Dates list's mount effect
+ * (`src/components/Settings/DatesPage.tsx`); App's Home
  * effect and its comment are at `src/App.tsx:443-447`.
  *
  * The production change was made to the load effect rather than the assertion.
@@ -69,6 +73,7 @@
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { navigateTo } from '../../support/helpers/navigation';
+import { eventRowFor } from '../../support/helpers/new-date-forms';
 import {
   clearOwnPairEvents,
   clearPairEvents,
@@ -77,7 +82,6 @@ import {
   seedEvent,
 } from '../../support/helpers/events';
 import { log } from '@seontechnologies/playwright-utils';
-import type { Page } from '@playwright/test';
 
 /**
  * Deliberately unlike any fixed Home testid — `Wedding` slugifies to
@@ -92,10 +96,7 @@ const RECOVERY_LABEL = 'Settings Recovery E2E';
 // 'on' globally, so the opt-out has to be stated here.
 test.use({ trace: 'off', video: 'off' });
 
-/** The list row carrying a given label. Row testids key on the event's uuid. */
-function rowFor(page: Page, label: string) {
-  return page.locator('[data-testid^="event-row-"]').filter({ hasText: label });
-}
+const rowFor = eventRowFor;
 
 test.beforeEach(async ({ page }) => {
   await dismissWelcomeSplash(page);
@@ -105,9 +106,9 @@ test.afterEach(async ({ supabaseAdmin }) => {
   await clearOwnPairEvents(supabaseAdmin);
 });
 
-test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-003)', () => {
+test.describe('A failed Dates list events load recovers on reconnect (DE.5-COMP-003)', () => {
   test(
-    '[P2] DE.5-COMP-003 restoring the connection re-fires the load and clears the notice, with no reload',
+    '[P2] DE.5-COMP-003 restoring the connection re-fires the load and the rows appear, with no reload',
     async ({ page, supabaseAdmin, interceptNetworkCall }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
@@ -133,7 +134,9 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
       // request.
       await navigateTo(page, 'settings');
       await expect(page.getByTestId('settings-view')).toBeVisible();
-      await expect(page.getByTestId('events-settings-load-error')).toBeVisible();
+      await page.getByTestId('settings-dates-row').click();
+      await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+      await expect(page.locator('[data-testid^="settings-dates-event-"]')).toHaveCount(0);
       // Leave Settings through a view that never calls loadEvents. Returning to
       // Home would start another events load, which would muddy which read the
       // reconnect assertion below is observing.
@@ -150,7 +153,7 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
         icon: 'calendar',
       });
 
-      await log.step('Go offline, then open Settings so its own load fails');
+      await log.step('Go offline, then open the Dates list so its own load fails');
       // getEvents refuses before any request when navigator.onLine is false
       // (eventsService.ts:246-250, isOnline at src/api/errorHandlers.ts:44).
       // The dispatched event is what App.tsx:365-366 listens on to update
@@ -160,16 +163,12 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
 
       await navigateTo(page, 'settings');
       await expect(page.getByTestId('settings-view')).toBeVisible();
+      await page.getByTestId('settings-dates-row').click();
+      await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
 
-      // The failed-load notice and its explicit manual fallback are rendered
-      // with role="status" and aria-live="polite".
-      const loadErrorNotice = page.getByTestId('events-settings-load-error');
-      await expect(loadErrorNotice).toBeVisible();
-      await expect(loadErrorNotice).toContainText(
-        "We couldn't load your events. Check your connection and try again."
-      );
-      await expect(page.getByTestId('events-settings-retry')).toBeEnabled();
-      await expect(page.locator('[data-testid^="event-row-"]')).toHaveCount(0);
+      // No event is listed: nothing was saved and the load could not reach the server.
+      await expect(page.getByTestId('settings-dates-events')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="settings-dates-event-"]')).toHaveCount(0);
 
       await log.step('Restore the connection without reloading the page');
       // Declared before the trigger, so a re-fire cannot be missed. This is the
@@ -193,7 +192,7 @@ test.describe('A failed Settings events load recovers on reconnect (DE.5-COMP-00
 
       const row = rowFor(page, RECOVERY_LABEL);
       await expect(row).toBeVisible();
-      await expect(page.getByTestId('events-settings-load-error')).toHaveCount(0);
+      await expect(page.getByTestId('settings-dates-events')).toContainText(RECOVERY_LABEL);
     }
   );
 });
