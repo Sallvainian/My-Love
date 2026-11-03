@@ -2,7 +2,7 @@
 # Settings.tsx, the slices it reads and the old date sections form one ordered
 # lane, so most entries wait on the one before; the edge-swipe spike and its
 # build are the only side lane.
-# R16, R17 and R18 (accessibility, states, design) are delivered by each story
+# R16, R17 and R18 (touch targets, states, design) are delivered by each story
 # for the pages it adds or changes.
 # Every story updates the existing E2E specs and helpers its change breaks
 # (tests/e2e/settings, the sign-out helpers, "Sign out" text) in the same
