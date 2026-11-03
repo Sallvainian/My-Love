@@ -68,16 +68,27 @@ interface SettingsRowProps {
   /** For a row that does something other than open a subpage. */
   onClick?: () => void;
   testId?: string;
+  /** Not yet usable, for a row whose page must prefill from an answer that has not arrived. */
+  disabled?: boolean;
 }
 
-export function SettingsRow({ label, value, icon: Icon, target, onClick, testId }: SettingsRowProps) {
+export function SettingsRow({
+  label,
+  value,
+  icon: Icon,
+  target,
+  onClick,
+  testId,
+  disabled,
+}: SettingsRowProps) {
   const openSettingsPage = useAppStore((s) => s.openSettingsPage);
 
   return (
     <button
       type="button"
       onClick={target === undefined ? onClick : () => openSettingsPage(target)}
-      className={ROW_BUTTON}
+      disabled={disabled}
+      className={`${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60`}
       // The value is part of the row's name: "Photos, Wi-Fi only".
       aria-label={value ? `${label}, ${value}` : undefined}
       // Where focus returns when the page this row opened is left.

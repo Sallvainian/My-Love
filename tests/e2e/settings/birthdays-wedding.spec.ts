@@ -95,9 +95,9 @@ async function openThisHome(
 
 /**
  * Open the partner's Settings in a second context on the same pinned clock,
- * with neither date set yet. The context's close is deferred as it opens, so it
- * runs before the reset the caller deferred earlier: the partner's page can
- * still be saving.
+ * with neither date set yet (the birthday is checked on its Profile page).
+ * The context's close is deferred as it opens, so it runs before the reset the
+ * caller deferred earlier: the partner's page can still be saving.
  */
 async function openPartnerSettings(
   browser: Browser,
@@ -119,7 +119,6 @@ async function openPartnerSettings(
   );
   await partnerPage.goto('/settings');
   for (const { status } of await Promise.all(partnerReads)) expect(status).toBe(200);
-  await expect(partnerPage.getByTestId('settings-birthday-value')).toHaveText('Not set yet');
   await expect(partnerPage.getByTestId('settings-wedding-value')).toHaveText('Not set yet');
   return partnerPage;
 }
@@ -208,16 +207,22 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
       anchor
     );
 
+    await partnerPage.getByTestId('settings-profile-row').click();
+    const birthdayRow = partnerPage.getByTestId('settings-profile-birthday');
+    await expect(birthdayRow).toBeVisible();
+    await expect(birthdayRow).toHaveAccessibleName('Birthday, Not set');
+    await birthdayRow.click();
+
     // Ten days from now, thirty years ago: "turns 30" in "10 days".
     const birthday = isoBirthdayDaysFromNow(10, 30, anchor);
-    await partnerPage.getByTestId('settings-birthday-date').fill(birthday);
+    await partnerPage.getByTestId('settings-birthday-field').fill(birthday);
     const birthdaySaved = observeOn({
       page: partnerPage,
       method: 'PATCH',
       url: '**/rest/v1/users?*',
       timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
-    await partnerPage.getByTestId('settings-birthday-save').click();
+    await partnerPage.getByTestId('settings-field-save').click();
     expect((await birthdaySaved).status).toBe(200);
     await recurseUntil(
       () => partnerPage.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday),
@@ -225,7 +230,12 @@ test.describe('Birthdays and wedding date shared by both partners', () => {
         expect(v).toBe(birthday);
       }
     );
-    await expect(partnerPage.getByTestId('settings-birthday-error')).toHaveCount(0);
+    // The page returned to Profile, whose Birthday row shows the saved date.
+    await expect(partnerPage.getByTestId('settings-birthday-page')).toHaveCount(0);
+    await expect(birthdayRow).toBeVisible();
+    await expect(birthdayRow).toHaveAccessibleName(
+      new RegExp(`^Birthday, .*${birthday.slice(0, 4)}$`)
+    );
 
     await log.step('This Home shows it after a reload');
     const reloadReads = [COUPLE_SETTINGS_READ, PARTNER_RECORD_READ].map((url) =>

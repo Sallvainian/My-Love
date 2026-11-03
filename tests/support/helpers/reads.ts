@@ -74,6 +74,9 @@ export const FAVORITES_READ = '**/rest/v1/message_favorites?select=message_key*'
 /** The signed-in user's own profile (`profileService`). */
 export const OWN_PROFILE_READ = '**/rest/v1/users?select=display_name%2Cbirthday*';
 
+/** A write to the signed-in user's own profile row (`profileService.saveDisplayName` / `saveBirthday`). */
+export const OWN_PROFILE_WRITE = '**/rest/v1/users?id=eq.*';
+
 /** The linked partner's record (`partnerService.getPartner`). */
 export const PARTNER_RECORD_READ = '**/rest/v1/users?select=id%2Cemail%2Cdisplay_name%2Cbirthday*';
 

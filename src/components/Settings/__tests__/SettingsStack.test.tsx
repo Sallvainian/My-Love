@@ -12,6 +12,8 @@ import {
   settingsPathFromRoute,
 } from '../../../stores/slices/navigationSlice';
 import { useAppStore } from '../../../stores/useAppStore';
+import { SettingsBarAction } from '../stack/SettingsBarAction';
+import { useSettingsPage } from '../stack/settingsPageContext';
 import { SettingsRow } from '../stack/SettingsRows';
 import { onPopState } from './settingsStackKit';
 import { SettingsStack, type SettingsPageSpec } from '../stack/SettingsStack';
@@ -26,6 +28,21 @@ vi.mock('../../../hooks/useSideColumn', () => ({
 }));
 
 const available = vi.hoisted(() => ({ photos: true }));
+
+/** A stand-in one-field page: its Save sits in the bar and returns one level. */
+function EditPage() {
+  const { goBack } = useSettingsPage();
+  return (
+    <>
+      <SettingsBarAction>
+        <button type="button" onClick={goBack} data-testid="bar-save">
+          Save
+        </button>
+      </SettingsBarAction>
+      <p data-testid="edit-body">Edit body</p>
+    </>
+  );
+}
 
 const PAGES: Record<string, SettingsPageSpec> = {
   '': {
@@ -46,8 +63,15 @@ const PAGES: Record<string, SettingsPageSpec> = {
       <>
         <p data-testid="photos-body">Photos body</p>
         <SettingsRow label="Deeper" target="photos/deeper" testId="row-deeper" />
+        <SettingsRow label="Edit" target="photos/edit" testId="row-edit" />
       </>
     ),
+  },
+  'photos/edit': {
+    title: 'Edit',
+    titleStyle: 'small',
+    reloadsToParent: true,
+    render: () => <EditPage />,
   },
   'photos/deeper': {
     title: 'Deeper',
@@ -261,6 +285,85 @@ describe('SettingsStack', () => {
       expect(screen.getByTestId('photos-body')).toBeInTheDocument();
       expect(container.querySelector('[class*="animate-settings"]')).toBeNull();
       expect(document.body).toHaveFocus();
+    });
+  });
+
+  describe('a page that reloads to its parent', () => {
+    it('shows the parent and goes back once when an entry the app created is reloaded', async () => {
+      const user = userEvent.setup();
+      openedInApp();
+      renderStack();
+      await user.click(screen.getByTestId('row-photos'));
+      await user.click(screen.getByTestId('row-edit'));
+      cleanup();
+      // A reload: the entry (and its state) survives, the store starts afresh.
+      act(() => useAppStore.getState().showSettingsPage('photos/edit'));
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+
+      renderStack();
+
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('photos-body')).toBeInTheDocument();
+      expect(screen.queryByTestId('edit-body')).not.toBeInTheDocument();
+      expect(useAppStore.getState().settingsPath).toBe('photos');
+    });
+
+    it('replaces the URL with the parent\'s on a fresh load, without leaving the app', async () => {
+      const user = userEvent.setup();
+      freshLoadAt('/settings/photos/edit');
+      const back = vi.spyOn(window.history, 'back');
+      const before = window.history.length;
+
+      renderStack();
+
+      expect(back).not.toHaveBeenCalled();
+      expect(window.history.length).toBe(before);
+      expect(window.location.pathname).toBe('/settings/photos');
+      expect(screen.getByTestId('photos-body')).toBeInTheDocument();
+      expect(screen.queryByTestId('edit-body')).not.toBeInTheDocument();
+      expect(window.history.state.inApp).toBeUndefined();
+
+      // One back arrow press then reaches the top page.
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+      expect(window.location.pathname).toBe('/settings');
+      expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    });
+
+    it('is shown by a push within the mounted stack', async () => {
+      const user = userEvent.setup();
+      openedInApp();
+      renderStack();
+      await user.click(screen.getByTestId('row-photos'));
+      const back = vi.spyOn(window.history, 'back');
+
+      await user.click(screen.getByTestId('row-edit'));
+
+      expect(back).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/settings/photos/edit');
+      expect(screen.getByTestId('edit-body')).toBeInTheDocument();
+    });
+  });
+
+  describe('a page\'s bar action', () => {
+    it('renders in the bar\'s trailing cell, and its goBack returns one level', async () => {
+      const user = userEvent.setup();
+      openedInApp();
+      renderStack();
+      await user.click(screen.getByTestId('row-photos'));
+      await user.click(screen.getByTestId('row-edit'));
+
+      const bar = screen.getByTestId('settings-bar');
+      const save = within(bar).getByTestId('bar-save');
+      expect(save).toHaveTextContent('Save');
+      const before = window.history.length;
+
+      await user.click(save);
+
+      await vi.waitFor(() => expect(screen.getByTestId('photos-body')).toBeInTheDocument());
+      expect(screen.queryByTestId('edit-body')).not.toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/photos');
+      expect(window.history.length).toBe(before);
+      expect(screen.queryByTestId('bar-save')).not.toBeInTheDocument();
     });
   });
 

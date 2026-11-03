@@ -2,30 +2,29 @@
  * Settings Component
  *
  * Application settings on the style kit, as a stack of pages (`SettingsStack`).
- * The top page holds the preferences and about groups, the sign-out card and
- * the version line, then the sections not yet replaced by pages of their own:
- * account (identity, display name, your own birthday, the couple's shared
- * "Together since" start and wedding date), the couple's countdowns (events and
- * anniversaries) and the per-date reminder list (`CountdownMarks`; the native
- * shell with the local-notifications plugin only). Photos (this device's
- * mobile-data choice for the offline album) and Notifications (a switch for
- * each kind of push and the Date reminders switch; the native shell with the
- * push plugins only, see `NotificationsPage`) are the subpages.
+ * The top page holds the Account group (the Profile row), the preferences and
+ * about groups, the sign-out card and the version line, then the sections not
+ * yet replaced by pages of their own: the couple's shared "Together since"
+ * start and wedding date (the `Together` section), the couple's countdowns
+ * (events and anniversaries) and the per-date reminder list (`CountdownMarks`;
+ * the native shell with the local-notifications plugin only). Profile (the
+ * display name and your own birthday, each on a one-field page, see
+ * `ProfilePage`), Photos (this device's mobile-data choice for the offline
+ * album) and Notifications (a switch for each kind of push and the Date
+ * reminders switch; the native shell with the push plugins only, see
+ * `NotificationsPage`) are the subpages.
  *
  * @component
  */
 
 import {
   CircleAlert,
-  Cake,
-  ChevronRight,
   Gem,
   Heart,
   Image as ImageIcon,
   LoaderCircle,
   LogOut,
   MonitorSmartphone,
-  Pencil,
   RotateCcw,
 } from 'lucide-react';
 import { AnimatePresence, m as motion } from 'motion/react';
@@ -52,7 +51,6 @@ import {
 import { useAppStore } from '../../stores/useAppStore';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { logger } from '../../utils/logger';
-import { DisplayNameSetup } from '../DisplayNameSetup/DisplayNameSetup';
 import {
   CARD,
   DESTRUCTIVE_BUTTON,
@@ -73,6 +71,8 @@ import { CountdownMarks } from './CountdownMarks';
 import { EventsSettings } from './EventsSettings';
 import { NotificationsPage, NotificationsRow } from './NotificationsPage';
 import { PhotosPage } from './PhotosPage';
+import { BirthdayPage, NamePage, ProfilePage, ProfileRow } from './ProfilePage';
+import { formatDateOnly } from './settingsFields';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { SettingsStack, type SettingsPageSpec } from './stack/SettingsStack';
 import { ROW_BUTTON } from './SwitchRow';
@@ -220,127 +220,6 @@ function TogetherSinceForm({ start }: { start: string | null }) {
       </div>
       {saveError && (
         <p className={FIELD_ERROR} role="alert" data-testid="settings-together-since-error">
-          {saveError}
-        </p>
-      )}
-    </form>
-  );
-}
-
-/** A `YYYY-MM-DD` date as a long local date ("May 20, 2000"). */
-function formatDateOnly(value: string): string {
-  const date = parseEventDate(value);
-  return date ? date.toLocaleDateString(undefined, { dateStyle: 'long' }) : value;
-}
-
-/** A local date as the `YYYY-MM-DD` a date input takes. */
-function toDateInput(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-
-/**
- * "Birthday": your own birthday, which only you set. Server-held
- * (`ownProfile`, from `public.users.birthday`); it must be in the past, and
- * there is no Clear. A save needs a connection; a refused or failed one leaves
- * the value unchanged and says why here.
- */
-function BirthdayRow() {
-  const ownProfile = useAppStore((s) => s.ownProfile);
-
-  const subtitle = !ownProfile
-    ? 'Loading...'
-    : ownProfile.birthday
-      ? formatDateOnly(ownProfile.birthday)
-      : 'Not set yet';
-
-  return (
-    <div className="flex flex-col gap-2 py-1" data-testid="settings-birthday">
-      <div className={ROW}>
-        <span className={TILE} aria-hidden="true">
-          <Cake className="h-4.25 w-4.25" />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-[15px] font-medium text-ink">Birthday</p>
-          <p className="text-[13px] wrap-break-word text-muted" data-testid="settings-birthday-value">
-            {subtitle}
-          </p>
-        </div>
-      </div>
-      {/* Remounted when the saved value changes, so the input picks it up. */}
-      {ownProfile && (
-        <BirthdayForm key={ownProfile.birthday ?? 'unset'} birthday={ownProfile.birthday} />
-      )}
-    </div>
-  );
-}
-
-/** The earliest birthday the form accepts: catches a mistyped year such as 0198. */
-const BIRTHDAY_MIN = '1900-01-01';
-
-function BirthdayForm({ birthday }: { birthday: string | null }) {
-  const setBirthday = useAppStore((s) => s.setBirthday);
-  const [date, setDate] = useState(birthday ?? '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const now = new Date();
-  const yesterday = toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
-
-  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const parsed = parseEventDate(date);
-    if (!parsed) {
-      setSaveError('Pick a date first.');
-      return;
-    }
-    if (date < BIRTHDAY_MIN) {
-      setSaveError('Pick a date after 1900.');
-      return;
-    }
-    const today = new Date();
-    if (parsed >= new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
-      setSaveError('Pick a date in the past.');
-      return;
-    }
-    setSaveError(null);
-    setIsSaving(true);
-    try {
-      await setBirthday(date);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save your birthday.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <form className="flex flex-col gap-2" onSubmit={handleSave} noValidate>
-      <label className="sr-only" htmlFor="settings-birthday-date">
-        Your birthday
-      </label>
-      <input
-        id="settings-birthday-date"
-        type="date"
-        value={date}
-        min={BIRTHDAY_MIN}
-        max={yesterday}
-        onChange={(e) => setDate(e.target.value)}
-        className={fieldClass(false)}
-        data-testid="settings-birthday-date"
-      />
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="submit"
-          disabled={isSaving}
-          className={SMALL_SECONDARY}
-          data-testid="settings-birthday-save"
-        >
-          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          {isSaving ? 'Saving…' : 'Save birthday'}
-        </button>
-      </div>
-      {saveError && (
-        <p className={FIELD_ERROR} role="alert" data-testid="settings-birthday-error">
           {saveError}
         </p>
       )}
@@ -533,6 +412,32 @@ function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywher
 /** Settings' subpages by path under /settings; the top page is built in `Settings`. */
 const SUBPAGES = new Map<string, SettingsPageSpec>([
   [
+    'profile',
+    {
+      title: 'Profile',
+      titleStyle: 'large',
+      render: () => <ProfilePage />,
+    },
+  ],
+  [
+    'profile/name',
+    {
+      title: 'Name',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      render: () => <NamePage />,
+    },
+  ],
+  [
+    'profile/birthday',
+    {
+      title: 'Birthday',
+      titleStyle: 'small',
+      reloadsToParent: true,
+      render: () => <BirthdayPage />,
+    },
+  ],
+  [
     'notifications',
     {
       title: 'Notifications',
@@ -566,17 +471,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   /** A sign-out is running; the guard `handleLogout` reads before `isLoggingOut` can. */
   const signOutRunningRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  // The name row reads the store's own profile (`profileSlice`), which Home
-  // shares; only "a read is in flight" is local to the row.
-  const ownProfile = useAppStore((s) => s.ownProfile);
-  const ownProfileLoadFailed = useAppStore((s) => s.ownProfileLoadFailed);
   const loadOwnProfile = useAppStore((s) => s.loadOwnProfile);
-  /** True from mount, and from a name save, until `loadOwnProfile` settles. */
-  const [nameReading, setNameReading] = useState(true);
-  /** Bumped to re-run the read after a save, which is the whole re-read. */
-  const [nameReadToken, setNameReadToken] = useState(0);
-  const [isEditingName, setIsEditingName] = useState(false);
   // The Photos row's value; the choice itself is made on the Photos page.
   const photosOverMobileData = useSyncExternalStore(
     subscribePhotosOverMobileData,
@@ -584,59 +479,14 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     getPhotosOverMobileData
   );
 
-  // Get current user email on mount
-  useState(() => {
-    authService.getUser().then((user) => {
-      setUserEmail(user?.email ?? null);
-    });
-  });
-
-  // A cancelled flag rather than an AbortSignal — the read has no abort to
-  // offer, so what is guarded is the `set`, not the request. A failed read is
-  // not surfaced in the page-level error banner: that one is for actions the
-  // user just took, and a failed name read still leaves every other setting
-  // usable. The row says so itself, the slice logs a failed server read (an
-  // offline one is not logged), and editing stays open.
+  // The Profile rows and pages read the store's own profile (`profileSlice`),
+  // which Home shares; this fills it when Settings opens. A failed read is not
+  // surfaced in the page-level error banner: that one is for actions the user
+  // just took, and the pages say what they know themselves. The slice logs a
+  // failed server read (an offline one is not logged).
   useEffect(() => {
-    let cancelled = false;
-
-    // No `setNameReading(true)` here: a synchronous setState in an effect body is
-    // a lint error (react-hooks/set-state-in-effect). The one caller that needs
-    // the row back in its in-flight state — `onComplete`, so the Change control
-    // is disabled across the re-read — sets it from the event handler instead.
-    void loadOwnProfile().then(() => {
-      if (!cancelled) setNameReading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadOwnProfile, nameReadToken]);
-
-  // The name only while a read is neither in flight nor failed. A failed read
-  // can leave the pre-save name in the store; offering it as the prefill would
-  // invite the user to save it back over the name just stored.
-  const shownName = nameReading || ownProfileLoadFailed ? null : (ownProfile?.displayName ?? null);
-
-  // Only a successfully-read name pre-fills the field. An unset name has no name
-  // to offer and a failed read does not know one — offering a guess there would
-  // invite the user to save it back over whatever is really stored.
-  const editPrefill = shownName ?? '';
-
-  const displayNameLabel = nameReading
-    ? 'Loading...'
-    : ownProfileLoadFailed
-      ? "Couldn't load your name"
-      : (shownName ?? 'Not set yet');
-
-  // The avatar's letter: the chosen display name's, else the email's.
-  const avatarSource = shownName?.trim() || userEmail;
-  // First grapheme, not `charAt(0)` or the first code point: a flag, skin-tone
-  // or ZWJ emoji spans several code points and would otherwise render in part.
-  const [firstGrapheme] = avatarSource
-    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(avatarSource.trim())
-    : [];
-  const avatarInitial = firstGrapheme?.segment.toUpperCase() ?? '';
+    void loadOwnProfile();
+  }, [loadOwnProfile]);
 
   const handleLogout = async (everywhere = false) => {
     // A ref, not `isLoggingOut`: a second press in the same tick, or on the
@@ -708,6 +558,11 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           </div>
         )}
 
+        {/* Account: the Profile row opens the display name and birthday. */}
+        <SettingsGroup label="Account">
+          <ProfileRow key="profile" />
+        </SettingsGroup>
+
         {/* Preferences: the rows whose pages exist; nothing renders where none does. */}
         <SettingsGroup label="Preferences">
           {hasNativePush() && <NotificationsRow key="notifications" />}
@@ -734,7 +589,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         </SettingsGroup>
 
         {/* The IA's unlabeled last card, with the version line 4px under it. The
-            Account and Countdowns sections and the per-date reminder list follow
+            Together and Countdowns sections and the per-date reminder list follow
             until their stories give them pages of their own. */}
         <div className="flex flex-col gap-1">
           {/* Log out — its own quiet card, not a red block. */}
@@ -785,65 +640,12 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           </p>
         </div>
 
-        {/* Account */}
-        <section className="flex flex-col gap-2" aria-labelledby="settings-account-label">
-          <h2 id="settings-account-label" className={SECTION_LABEL}>
-            Account
+        {/* Together — the couple's shared dates, until their story gives them pages of their own. */}
+        <section className="flex flex-col gap-2" aria-labelledby="settings-together-label">
+          <h2 id="settings-together-label" className={SECTION_LABEL}>
+            Together
           </h2>
           <div className={CARD}>
-            {userEmail && (
-              <>
-                <div className={ROW} data-testid="settings-identity">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fill text-base font-semibold text-white"
-                    aria-hidden="true"
-                    data-testid="settings-avatar"
-                  >
-                    {avatarInitial}
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p
-                      className="text-[15px] font-medium wrap-break-word text-ink"
-                      data-testid="settings-email"
-                    >
-                      {userEmail}
-                    </p>
-                    <p className="text-[13px] text-muted">Signed in</p>
-                  </div>
-                </div>
-                <div className={DIVIDER} aria-hidden="true" />
-              </>
-            )}
-
-            {/* Enabled on a failed read too: the user may well know the name
-                they want, and the form's own refusals are what protect the
-                column. Disabled only while the first read is in flight, when
-                opening would pre-fill from an answer that has not arrived. */}
-            <button
-              type="button"
-              onClick={() => setIsEditingName(true)}
-              disabled={nameReading}
-              className={`${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60`}
-              data-testid="settings-display-name-edit"
-            >
-              <span className={TILE} aria-hidden="true">
-                <Pencil className="h-4.25 w-4.25" />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                {/* "Change " keeps the verb the old Change button carried in
-                    the row's accessible name. */}
-                <span className="text-[15px] font-medium text-ink">
-                  <span className="sr-only">Change </span>Display name
-                </span>
-                <span className="text-[13px] wrap-break-word text-muted" data-testid="settings-display-name">
-                  {displayNameLabel}
-                </span>
-              </span>
-              <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
-            </button>
-            <div className={DIVIDER} aria-hidden="true" />
-            <BirthdayRow />
-            <div className={DIVIDER} aria-hidden="true" />
             <TogetherSinceRow />
             <WeddingRow />
           </div>
@@ -874,37 +676,6 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             />
           )}
         </AnimatePresence>
-
-        {/* Mounted only while open, so `useState(initialName)` inside the form
-            actually picks the current name up — kept mounted behind
-            `isOpen={false}` it would hold the name it first saw forever. Outside
-            every card, so no card's layout can clip or contain the overlay. */}
-        {isEditingName && (
-          <DisplayNameSetup
-            isOpen
-            mode="edit"
-            initialName={editPrefill}
-            onCancel={() => setIsEditingName(false)}
-            onComplete={() => {
-              setIsEditingName(false);
-              // Back to the in-flight state FIRST, so `disabled={nameReading}`
-              // covers the re-read too. Left holding the pre-save answer, the
-              // Change control stays live across that window and reopening the
-              // form there prefills `editPrefill` from the OLD name — which the
-              // next save then writes back over the name just stored.
-              //
-              // Set here rather than in the effect body, where a synchronous
-              // setState is a lint error (react-hooks/set-state-in-effect): this
-              // is an event handler, so the same call is fine.
-              setNameReading(true);
-              // Re-read rather than trust the submitted string: the store's
-              // `ownProfile` is what the rest of the app (Home included) renders
-              // from, and the read applies the seed rule the write side only
-              // refuses.
-              setNameReadToken((token) => token + 1);
-            }}
-          />
-        )}
       </>
     ),
   };

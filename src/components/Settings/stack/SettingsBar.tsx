@@ -36,11 +36,20 @@ interface SettingsBarProps {
   onBack?: () => void;
   /** The bar's trailing action (Save, Add), when a page has one. */
   trailing?: ReactNode;
+  /** Receives the trailing cell, which a page's `SettingsBarAction` portals into. */
+  trailingRef?: (node: HTMLDivElement | null) => void;
 }
 
 const BAR_TITLE = 'min-w-0 truncate text-center text-[17px] font-semibold text-ink';
 
-export function SettingsBar({ title, large, titleRef, onBack, trailing }: SettingsBarProps) {
+export function SettingsBar({
+  title,
+  large,
+  titleRef,
+  onBack,
+  trailing,
+  trailingRef,
+}: SettingsBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const [titleGone, setTitleGone] = useState(false);
   const collapsed = !large || titleGone;
@@ -120,7 +129,9 @@ export function SettingsBar({ title, large, titleRef, onBack, trailing }: Settin
             {title}
           </h1>
         )}
-        <div className="flex justify-center">{trailing}</div>
+        <div ref={trailingRef} className="flex justify-center">
+          {trailing}
+        </div>
       </div>
     </div>
   );

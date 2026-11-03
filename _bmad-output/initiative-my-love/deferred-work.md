@@ -3697,3 +3697,11 @@ source_spec: `tickets/epic-settings-rework/tickets/story-settings-state-splits-i
 severity: low
 reason: Story 5.3 moved the anniversaries kind, reader, refresher and actions into `datesSlice` but left the in-memory list at `settings.relationship.anniversaries`. Giving it a field of its own would change `partialize`, the `getItem` blanking, `discardAccountState` and every test that reads the mirror, which a code-moving refactor that changes only import paths rules out. Until then one slice writes a field inside another slice's persisted object.
 status: open
+
+### DW-427: `DisplayNameSetup`'s `edit` mode, `onCancel` and `initialName` are unused, and its name rules duplicate `profileService.saveDisplayName`.
+origin: spec-deferred (story 5.7, 2026-11-03)
+location: src/components/DisplayNameSetup/DisplayNameSetup.tsx; src/services/profileService.ts (`saveDisplayName`); src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx
+source_spec: `tickets/epic-settings-rework/tickets/story-profile-edits-name-and-birthday-on-one-field-pages-plan.md`
+severity: low
+reason: Story 5.7 moved the Settings name edit onto the Name page, which writes through `profileSlice.setDisplayName` and `profileService.saveDisplayName`. The signup gate in `App.tsx` is the only caller left, and it passes neither `initialName` nor `onCancel` and stays in `setup` mode, so the `edit` copy, the Cancel control, the Escape handler and the `initialName` prop are dead code. The gate also still holds its own copy of the 3-30 length rule, the account-email and `Unknown` refusals and the `users` update, now the same as `saveDisplayName`'s. The story's "Never" list kept `DisplayNameSetup` and the gate unchanged. The sweep (story 16) removes the dead props and mode, then either points the gate at `setDisplayName` or leaves it with a comment naming `saveDisplayName` as the twin.
+status: open

@@ -1,9 +1,9 @@
 /**
  * Settings on the style kit: the page's own behaviour that the restyle added
  * or re-shaped — the About replay row, the Log out row's in-flight and failed
- * states, the version line under the last card, the identity row and its avatar
- * initial, the display-name row's loading state and accessible name, and the
- * section / group headings that replaced the old inner titles.
+ * states, the version line under the last card, and the section / group
+ * headings that replaced the old inner titles. (The identity row's avatar
+ * initial and the name row moved to the Profile page: `Settings.profile.test.tsx`.)
  *
  * The real EventsSettings and AnniversarySettings are mounted on the real
  * store (signed out, so neither loads anything) because the headings under
@@ -19,7 +19,6 @@ import { useAppStore } from '../../../stores/useAppStore';
 
 const backend = vi.hoisted(() => ({
   fetchOwnProfile: vi.fn(),
-  getUser: vi.fn(),
   signOut: vi.fn(),
 }));
 
@@ -28,13 +27,13 @@ vi.mock('../../../api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
 }));
-// The name row reads the store's own profile, which `loadOwnProfile` fills
-// from this read.
+// The store's own profile, which Settings fills with `loadOwnProfile`, is read
+// from here.
 vi.mock('../../../services/profileService', () => ({
   profileService: { fetchOwnProfile: backend.fetchOwnProfile, saveBirthday: vi.fn() },
 }));
 vi.mock('../../../api/authService', () => ({
-  authService: { getUser: backend.getUser, signOut: backend.signOut },
+  authService: { signOut: backend.signOut },
 }));
 vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -57,26 +56,23 @@ import { Settings } from '../Settings';
 let accountCounter = 0;
 
 /**
- * Renders Settings and waits for the name row to finish its read. Offline the
- * read has no server answer, so the row settles on `settledAs` instead.
+ * Renders Settings and waits for the profile read to settle (an answer, or a
+ * failed read offline), so no later state change lands outside the case.
  */
-async function renderSettings(
-  props: { onShowWelcome?: () => void } = {},
-  settledAs = 'Jessie'
-) {
+async function renderSettings(props: { onShowWelcome?: () => void } = {}) {
   render(<Settings {...props} />);
-  await waitFor(() =>
-    expect(screen.getByTestId('settings-display-name').textContent).toBe(settledAs)
-  );
+  await waitFor(() => {
+    const { ownProfile, ownProfileLoadFailed } = useAppStore.getState();
+    expect(ownProfile !== null || ownProfileLoadFailed).toBe(true);
+  });
 }
 
 describe('Settings on the kit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
     backend.fetchOwnProfile.mockResolvedValue({ displayName: 'Jessie', birthday: null });
-    // A fresh account and session per case, so no earlier case's saved copy decides the name.
+    // A fresh account and session per case, so no earlier case's saved copy decides the profile.
     accountCounter += 1;
     useAppStore.setState({
       userId: `user-${accountCounter}`,
@@ -99,7 +95,7 @@ describe('Settings on the kit', () => {
     // a group with no rows is not drawn. The last card has no label.
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
-    ).toEqual(['About', 'Account', 'Countdowns']);
+    ).toEqual(['Account', 'About', 'Together', 'Countdowns']);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
     expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Event Countdowns/);
@@ -213,9 +209,7 @@ describe('Settings on the kit', () => {
   it('keeps focus where the person moved it when Settings re-renders', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
-    );
+    await waitFor(() => expect(useAppStore.getState().ownProfile).not.toBeNull());
 
     const dialog = await openEverywhereDialog(user);
     const confirm = within(dialog).getByRole('button', { name: 'Log out everywhere' });
@@ -314,7 +308,7 @@ describe('Settings on the kit', () => {
   it('refuses to log out of all devices offline, before any dialog or request', async () => {
     const user = userEvent.setup();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    await renderSettings({}, "Couldn't load your name");
+    await renderSettings();
 
     await user.click(screen.getByTestId('settings-sign-out-everywhere'));
 
@@ -325,87 +319,5 @@ describe('Settings on the kit', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(backend.signOut).not.toHaveBeenCalled();
     expect(screen.getByTestId('settings-sign-out-everywhere')).toBeEnabled();
-  });
-
-  it('disables the display-name row and says Loading... while the first read is in flight', async () => {
-    // Released before the case ends: the read runs in the shared account-data
-    // queue, and one left pending would hold every later case's read behind it.
-    let releaseRead: () => void = () => {};
-    backend.fetchOwnProfile.mockReturnValueOnce(
-      new Promise((resolve) => {
-        releaseRead = () => resolve({ displayName: 'Jessie', birthday: null });
-      })
-    );
-    render(<Settings />);
-
-    expect(screen.getByTestId('settings-display-name-edit')).toBeDisabled();
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Loading...');
-
-    releaseRead();
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
-    );
-  });
-
-  it('renders no identity row when the user has no email', async () => {
-    backend.getUser.mockResolvedValue({ id: 'user-a' });
-    await renderSettings();
-    // Let the user read settle, so the absence below is its answer.
-    await act(async () => {
-      await backend.getUser.mock.results[0]?.value;
-    });
-
-    expect(screen.queryByTestId('settings-identity')).not.toBeInTheDocument();
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('Signed in');
-    expect(screen.getByTestId('settings-view')).not.toHaveTextContent('person@example.com');
-  });
-
-  it('renders the identity row with the display name initial when there is an email', async () => {
-    await renderSettings();
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-identity')).toHaveTextContent('Signed in');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('J');
-  });
-
-  it('takes the avatar initial from the email when no display name is set', async () => {
-    backend.fetchOwnProfile.mockResolvedValue({ displayName: null, birthday: null });
-    render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('Not set yet')
-    );
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('P');
-  });
-
-  it('shows a whole emoji, not half a surrogate pair, for an emoji-led name', async () => {
-    backend.fetchOwnProfile.mockResolvedValue({ displayName: '💖 Jessie', birthday: null });
-    render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('💖 Jessie')
-    );
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('💖');
-  });
-
-  it('shows a whole multi-code-point emoji for a name led by a skin-tone emoji', async () => {
-    backend.fetchOwnProfile.mockResolvedValue({ displayName: '👍🏽 Jessie', birthday: null });
-    render(<Settings />);
-    await waitFor(() =>
-      expect(screen.getByTestId('settings-display-name').textContent).toBe('👍🏽 Jessie')
-    );
-
-    expect((await screen.findByTestId('settings-email')).textContent).toBe('person@example.com');
-    expect(screen.getByTestId('settings-avatar').textContent).toBe('👍🏽');
-  });
-
-  it('keeps the "Change" verb in the display-name row\'s accessible name', async () => {
-    await renderSettings();
-
-    expect(screen.getByRole('button', { name: /^Change Display name/ })).toBe(
-      screen.getByTestId('settings-display-name-edit')
-    );
   });
 });

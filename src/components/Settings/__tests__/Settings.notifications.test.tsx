@@ -72,10 +72,10 @@ function setConnection(connection: object | undefined) {
   Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
 }
 
-/** Renders Settings and waits for the name row to finish its read. */
+/** Renders Settings and waits for the profile read to settle. */
 async function renderSettings() {
   render(<Settings />);
-  await waitFor(() => expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie'));
+  await waitFor(() => expect(useAppStore.getState().ownProfile).not.toBeNull());
 }
 
 describe('Settings: the Notifications row', () => {

@@ -5,17 +5,18 @@
  * `ownProfile` is the in-memory state, NOT persisted with `settings`: its saved
  * copy is the local copy of kind `profile`, filled only from server reads and
  * confirmed writes, so Home's own birthday card works offline.
- * `loadOwnProfile` is the kind's refresher; `setBirthday` needs a connection.
- * The display name is still written by `DisplayNameSetup`; Settings' name row
- * reads `ownProfile` through `loadOwnProfile` and re-reads it after a name save,
- * so Home and the row share one name.
+ * `loadOwnProfile` is the kind's refresher; `setDisplayName` and `setBirthday`
+ * need a connection and write server first. Each returns the stored row, which
+ * replaces state and copy, so Settings' Profile rows and header, the top page's
+ * Profile row and Home all read the one `ownProfile` with no re-read after a
+ * save. (The signup gate, `DisplayNameSetup`, still writes the first name
+ * itself.)
  *
  * `ownProfileLoadFailed` is true when the last `loadOwnProfile` could not get a
  * server answer (offline, or a failed read), and false after a successful read
- * or a confirmed `setBirthday`. Unlike `pushPreferencesLoadFailed` it is set
- * even while a name is shown: after a name save whose re-read fails, the store
- * still holds the pre-save name, and prefilling the edit form from it would
- * write the old name back.
+ * or a confirmed write. A failed read leaves `ownProfile` as it was (the saved
+ * copy or an earlier answer), which is the account's last confirmed profile, so
+ * the pages may show and prefill it.
  */
 
 import { requireOnline } from '../../services/accountDataError';
@@ -34,7 +35,7 @@ export interface ProfileSlice {
   /**
    * The last `loadOwnProfile` could not get a server answer (offline, or a
    * failed read); `ownProfile` and its copy were left as they were. False after
-   * a successful read or a confirmed `setBirthday`.
+   * a successful read or a confirmed `setDisplayName` / `setBirthday`.
    */
   ownProfileLoadFailed: boolean;
 
@@ -43,6 +44,13 @@ export interface ProfileSlice {
    * replace state and copy with the server's row. Never throws.
    */
   loadOwnProfile: () => Promise<void>;
+  /**
+   * Set the account's own display name (trimmed, 3-30 characters, not the email
+   * or `Unknown`). Server first, then state and copy. Throws:
+   * `AccountDataError('offline')` without a connection,
+   * `AccountDataError('invalid-response')` for a refused name.
+   */
+  setDisplayName: (name: string) => Promise<void>;
   /**
    * Set the account's own birthday (`YYYY-MM-DD`). Server first, then state
    * and copy. Throws: `AccountDataError('offline')` without a connection.
@@ -147,6 +155,24 @@ export const createProfileSlice: AppStateCreator<ProfileSlice> = (set, get, _api
         console.error('[Settings] Failed to load the profile from the server:', error);
         if (isCurrent()) set({ ownProfileLoadFailed: true });
       }
+    },
+
+    setDisplayName: async (name) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to set your name');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      // Refused before any request, so an offline edit changes nothing.
+      requireOnline('Name changes');
+
+      await serializeAccountDataWrite(async () => {
+        if (!isCurrent()) return;
+        const next = await profileService.saveDisplayName(name);
+        if (!isCurrent()) return;
+        set({ ownProfile: next, ownProfileLoadFailed: false });
+        await saveOwnProfileCopy(requestedBy, requestedInSession, next);
+      });
     },
 
     setBirthday: async (birthday) => {

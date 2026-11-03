@@ -23,6 +23,15 @@
  *   form's capsule is a destination, not a place to go back from.
  * - A path with no page, or one the device cannot use, falls back to the top
  *   page and rewrites the URL to match.
+ * - A page marked `reloadsToParent` (a one-field or form page) is never shown
+ *   by a fresh mount of the stack, since its field has nothing to start from
+ *   after a reload: the parent is shown instead. An entry the app created goes
+ *   up with `history.back()` (replacing it with the parent would leave two
+ *   identical entries, and the next back would seem to do nothing); a fresh
+ *   load replaces its entry. A push to the page within the mounted stack shows
+ *   it as usual.
+ * - It provides `SettingsPageContext`: the back action and the bar's trailing
+ *   cell, which a page's `SettingsBarAction` portals Save (or Add) into.
  *
  * @component
  */
@@ -34,6 +43,7 @@ import { useAppStore } from '../../../stores/useAppStore';
 import { withBasePath } from '../../../utils/basePath';
 import { NetworkStatusIndicator } from '../../shared/NetworkStatusIndicator';
 import { SettingsBar } from './SettingsBar';
+import { SettingsPageContext } from './settingsPageContext';
 
 export interface SettingsPageSpec {
   title: string;
@@ -41,6 +51,11 @@ export interface SettingsPageSpec {
   titleStyle: 'large' | 'small';
   /** A page the device cannot use answers false and is never shown. */
   available?: () => boolean;
+  /**
+   * A one-field or form page: a reload (a fresh mount of the stack on this
+   * path) shows its parent instead.
+   */
+  reloadsToParent?: boolean;
   render: () => ReactNode;
 }
 
@@ -100,6 +115,24 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
     showSettingsPage('');
   }, [redirect, showSettingsPage]);
 
+  // A reload on a one-field page shows its parent. Once per mount: the ref
+  // keeps StrictMode's second run, and every later path change, out of it.
+  const reloadChecked = useRef(false);
+  const reloadsToParent = usable && requestedPage.reloadsToParent === true;
+  useLayoutEffect(() => {
+    if (reloadChecked.current) return;
+    reloadChecked.current = true;
+    if (!reloadsToParent) return;
+    const parent = parentOf(requested);
+    if (window.history.state?.inApp === true) window.history.back();
+    else replaceSettingsRoute(parent);
+    showSettingsPage(parent);
+  }, [reloadsToParent, requested, showSettingsPage]);
+
+  // The bar's trailing cell, held in state so a page's action portals into it
+  // once it exists.
+  const [barTrailing, setBarTrailing] = useState<HTMLElement | null>(null);
+
   useEffect(() => {
     const record = () => {
       scrollByPath.current.set(shownPath.current ?? '', window.scrollY);
@@ -154,7 +187,13 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
   return (
     <div className="overflow-x-clip" data-testid="settings-view">
       <div key={path} ref={pageRef} className={motionClass}>
-        <SettingsBar title={page.title} large={large} titleRef={titleRef} onBack={onBack} />
+        <SettingsBar
+          title={page.title}
+          large={large}
+          titleRef={titleRef}
+          onBack={onBack}
+          trailingRef={setBarTrailing}
+        />
         {/* The offline banner, under the bar as it sits under the app header on
             every other view: the bar holds the status bar's inset, which the
             banner has none of. */}
@@ -173,7 +212,9 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
               {page.title}
             </h1>
           )}
-          {page.render()}
+          <SettingsPageContext.Provider value={{ goBack, barTrailing }}>
+            {page.render()}
+          </SettingsPageContext.Provider>
         </div>
       </div>
     </div>

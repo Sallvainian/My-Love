@@ -182,14 +182,19 @@ test.describe('Birthdays and wedding date from the local copy', () => {
     expect(profile.status).toBe(200);
     expect(profile.responseJson).toEqual([expect.objectContaining({ birthday: own })]);
     await navigateTo(page, 'settings');
-    const dateInput = page.getByTestId('settings-birthday-date');
+    await page.getByTestId('settings-profile-row').click();
+    await page.getByTestId('settings-profile-birthday').click();
+    const dateInput = page.getByTestId('settings-birthday-field');
     await expect(dateInput).toHaveValue(own);
 
     await goOffline(page, true);
     await dateInput.fill('1990-02-02');
-    await page.getByTestId('settings-birthday-save').click();
+    await page.getByTestId('settings-field-save').click();
 
-    await expect(page.getByTestId('settings-birthday-error')).toContainText(/need a connection/i);
+    // Refused in the Error box; the page stays and keeps the typed date.
+    await expect(page.getByTestId('settings-field-error')).toContainText(/need a connection/i);
+    await expect(page.getByTestId('settings-birthday-page')).toBeVisible();
+    await expect(dateInput).toHaveValue('1990-02-02');
     // Store, copy and server all still hold the saved birthday.
     expect(
       await page.evaluate(() => window.__APP_STORE__?.getState().ownProfile?.birthday)

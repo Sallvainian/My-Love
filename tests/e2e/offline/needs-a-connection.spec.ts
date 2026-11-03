@@ -273,24 +273,28 @@ test.describe('Display name offline', () => {
       const nameRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
       await navigateTo(page, 'settings');
       expect((await nameRead).status).toBe(200);
-      const nameRow = page.getByTestId('settings-display-name');
-      await expect(nameRow).toBeVisible();
       // The saved name is the only text a finished read can show.
-      await expect(nameRow).toHaveText(original!.trim());
-      await page.getByTestId('settings-display-name-edit').click();
-      await expect(page.getByTestId('display-name-setup')).toBeVisible();
-      await page.getByLabel('Display Name').fill(`E2E ${Date.now().toString().slice(-8)}`);
+      await page.getByTestId('settings-profile-row').click();
+      const nameRow = page.getByTestId('settings-profile-name');
+      await expect(nameRow).toBeVisible();
+      await expect(nameRow).toHaveAccessibleName(`Name, ${original!.trim()}`);
+      await nameRow.click();
+      const field = page.getByTestId('settings-name-field');
+      const typed = `E2E ${Date.now().toString().slice(-8)}`;
+      await field.fill(typed);
 
       await goOffline(page, true);
       const watch = watchSupabaseRequests(page);
-      await page.getByTestId('display-name-submit').click();
+      await page.getByTestId('settings-field-save').click();
 
-      await expect(page.getByTestId('display-name-error')).toHaveText(
+      await expect(page.getByTestId('settings-field-error')).toHaveText(
         offline('Name changes need a connection to save.')
       );
       watch.stop();
       expect(watch.requests).toEqual([]);
-      await expect(page.getByTestId('display-name-setup')).toBeVisible();
+      // The page stays and keeps what was typed.
+      await expect(page.getByTestId('settings-name-page')).toBeVisible();
+      await expect(field).toHaveValue(typed);
       expect(await readName()).toBe(original);
     } finally {
       await page.context().setOffline(false);

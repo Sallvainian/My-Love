@@ -14,6 +14,7 @@ const fetchCoupleSettings = vi.fn();
 const saveWeddingDate = vi.fn();
 const fetchOwnProfile = vi.fn();
 const saveBirthday = vi.fn();
+const saveDisplayName = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -35,6 +36,7 @@ vi.mock('../../../src/services/profileService', () => ({
   profileService: {
     fetchOwnProfile: () => fetchOwnProfile(),
     saveBirthday: (birthday: string) => saveBirthday(birthday),
+    saveDisplayName: (name: string) => saveDisplayName(name),
   },
 }));
 
@@ -264,6 +266,66 @@ describe('own profile (display name and birthday) on the local copy', () => {
     state().clearAuth();
     state().setAuthUser(B);
     settle({ displayName: 'A-NAME', birthday: '2000-05-20' });
+    await inFlight;
+
+    expect(state().ownProfile).toBeNull();
+    expect(await readLocalCopy(A, PROFILE_COPY_KIND)).toBeNull();
+    expect(await readLocalCopy(B, PROFILE_COPY_KIND)).toBeNull();
+  });
+});
+
+describe('own display name on the local copy', () => {
+  it('a confirmed name save updates state and the copy, and clears ownProfileLoadFailed', async () => {
+    useAppStore.setState({ ownProfile: SAVED_PROFILE, ownProfileLoadFailed: true });
+    const saved = { displayName: 'Casey', birthday: SAVED_PROFILE.birthday };
+    saveDisplayName.mockResolvedValue(saved);
+
+    await state().setDisplayName('Casey');
+
+    expect(saveDisplayName).toHaveBeenCalledExactlyOnceWith('Casey');
+    expect(state().ownProfile).toEqual(saved);
+    expect(state().ownProfileLoadFailed).toBe(false);
+    expect(await readLocalCopy(A, PROFILE_COPY_KIND)).toEqual(saved);
+  });
+
+  it('a refused or failed name save throws and leaves state and copy unchanged', async () => {
+    await writeLocalCopy(A, PROFILE_COPY_KIND, SAVED_PROFILE);
+    useAppStore.setState({ ownProfile: SAVED_PROFILE });
+    saveDisplayName.mockRejectedValue(new AccountDataError('invalid-response', 'not a name'));
+
+    await expect(state().setDisplayName('Unknown')).rejects.toThrow('not a name');
+
+    expect(state().ownProfile).toEqual(SAVED_PROFILE);
+    expect(await readLocalCopy(A, PROFILE_COPY_KIND)).toEqual(SAVED_PROFILE);
+  });
+
+  it('an offline name edit is refused up front with the name wording and changes nothing', async () => {
+    await writeLocalCopy(A, PROFILE_COPY_KIND, SAVED_PROFILE);
+    useAppStore.setState({ ownProfile: SAVED_PROFILE });
+    setOnline(false);
+
+    const attempt = state().setDisplayName('Casey');
+    await expect(attempt).rejects.toMatchObject({ code: 'offline' });
+    await expect(attempt).rejects.toThrow('You are offline. Name changes need a connection to save.');
+
+    expect(saveDisplayName).not.toHaveBeenCalled();
+    expect(state().ownProfile).toEqual(SAVED_PROFILE);
+    expect(await readLocalCopy(A, PROFILE_COPY_KIND)).toEqual(SAVED_PROFILE);
+  });
+
+  it('a name save that lands after sign-out writes neither state nor copy', async () => {
+    let settle: (value: unknown) => void = () => {};
+    saveDisplayName.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve;
+      })
+    );
+
+    const inFlight = state().setDisplayName('Casey');
+    await vi.waitFor(() => expect(saveDisplayName).toHaveBeenCalled());
+    state().clearAuth();
+    state().setAuthUser(B);
+    settle({ displayName: 'Casey', birthday: null });
     await inFlight;
 
     expect(state().ownProfile).toBeNull();
