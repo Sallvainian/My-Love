@@ -3712,7 +3712,8 @@ location: src/components/PartnerMoodView/PartnerMoodView.tsx (the `!partner && !
 source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
 severity: low
 reason: The view renders the Connect UI whenever `partner` is null, no load is running and no error is set; on first open that holds for the render before `loadPartner` sets `isLoadingPartner`. Story 5.8 added `partnerKnown` to `partnerSlice` (true only once a saved copy or a server answer is applied), which separates the two states, but its "Never" list left the Partner view's behaviour unchanged. Gating the Connect UI on `partnerKnown` (and showing the loading state until then) removes the flash; check `PartnerMoodView.*.test.tsx`, which mock the store wholesale and would need the field.
-status: open
+status: done 2026-11-03
+resolution: false premise: PartnerMoodView.tsx:123-125 calls loadPartner from a useLayoutEffect, and partnerSlice.ts:168 sets isLoadingPartner before its first await, so the first render is replaced before the browser paints and the Connect UI never shows over a linked user (771a93b7). Closed at the owner's request.
 
 ### DW-429: `partnerService.getPartner` still selects `users.updated_at`, now unused.
 origin: spec-deferred (story 5.8, 2026-11-03)
