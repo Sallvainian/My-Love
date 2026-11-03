@@ -30,6 +30,10 @@
  * gives way to a spacer of its size that keeps the wordmark centred; the
  * bottom form keeps the gear and five dock buttons.
  *
+ * Settings has no header at all: its own bar (`SettingsStack`) replaces it on
+ * the top page and every subpage, so the gear is only ever shown where it can
+ * be tapped and carries no active state.
+ *
  * Every colour is a style-kit token from index.css (`bg-glass`, `text-ink`,
  * `text-muted`, `bg-tint`/`text-accent`, `bg-fill`, `ring-line`,
  * `shadow-float`), matching the approved style kit. Each token switches with the
@@ -113,51 +117,50 @@ export function AppNavigation({ currentView, onViewChange, badgeCounts }: AppNav
 
   return (
     <>
-      <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
-        <div className="flex h-16 items-center gap-2 px-3">
-          {/* Balances the gear so the wordmark stays optically centred; also
-              the slot a future notifications button takes. */}
-          <span aria-hidden="true" className="min-h-11 min-w-11" />
-
-          {/* The app name rather than the active destination, and a span rather
-              than a heading: Mood, Notes, Partner and Settings each render
-              their own level-1 heading naming themselves, so a chrome heading
-              would duplicate that title on screen and make a level-1-heading
-              query ambiguous -- which is exactly what broke
-              notes/love-notes.spec.ts:27 when this was an h1. */}
-          <span
-            className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
-            data-testid="app-wordmark"
-          >
-            <Heart className="h-3.5 w-3.5 shrink-0 fill-current text-accent" strokeWidth={0} />
-            <span
-              className="truncate font-lora text-[19px] font-semibold text-ink italic"
-              data-testid="app-wordmark-text"
-            >
-              My Love
-            </span>
-          </span>
-
-          {column ? (
-            // Settings is in the column capsule; this keeps the gear's space so
-            // the wordmark stays centred.
+      {!isSettings && (
+        <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
+          <div className="flex h-16 items-center gap-2 px-3">
+            {/* Balances the gear so the wordmark stays optically centred; also
+                the slot a future notifications button takes. */}
             <span aria-hidden="true" className="min-h-11 min-w-11" />
-          ) : (
-            <button
-              type="button"
-              onClick={() => onViewChange('settings')}
-              className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors ${
-                isSettings ? 'bg-tint text-accent' : 'text-muted hover:text-ink'
-              }`}
-              data-testid="nav-settings"
-              aria-label="Settings"
-              aria-current={isSettings ? 'page' : undefined}
+
+            {/* The app name rather than the active destination, and a span rather
+                than a heading: Mood, Notes, Partner and Settings each render
+                their own level-1 heading naming themselves, so a chrome heading
+                would duplicate that title on screen and make a level-1-heading
+                query ambiguous -- which is exactly what broke
+                notes/love-notes.spec.ts:27 when this was an h1. */}
+            <span
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
+              data-testid="app-wordmark"
             >
-              <SettingsIcon className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </header>
+              <Heart className="h-3.5 w-3.5 shrink-0 fill-current text-accent" strokeWidth={0} />
+              <span
+                className="truncate font-lora text-[19px] font-semibold text-ink italic"
+                data-testid="app-wordmark-text"
+              >
+                My Love
+              </span>
+            </span>
+
+            {column ? (
+              // Settings is in the column capsule; this keeps the gear's space so
+              // the wordmark stays centred.
+              <span aria-hidden="true" className="min-h-11 min-w-11" />
+            ) : (
+              <button
+                type="button"
+                onClick={() => onViewChange('settings')}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted transition-colors hover:text-ink"
+                data-testid="nav-settings"
+                aria-label="Settings"
+              >
+                <SettingsIcon className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       <nav
         className={

@@ -3,8 +3,9 @@
  * line and a track and thumb. A native button with `role="switch"`, so Enter
  * and Space reach it from the keyboard; `aria-checked` carries the state.
  *
- * Extracted from Settings' "Download photos over mobile data" row, which
- * renders through it unchanged, and reused by the push section. `id` names the
+ * Extracted from Settings' old "Download photos over mobile data" row, which
+ * is now the Photos page's pair of radios, so it serves the push section
+ * alone. `ROW_BUTTON` is also the base of every list row. `id` names the
  * row's test id (`<id>`, `<id>-helper`) and the label and helper ids that
  * `aria-labelledby` and `aria-describedby` point at.
  *

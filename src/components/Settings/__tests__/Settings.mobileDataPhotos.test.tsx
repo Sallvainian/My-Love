@@ -1,9 +1,10 @@
 /**
- * Settings — "Download photos over mobile data": a per-device switch, default
- * off, saved in localStorage and read by the background photo fill. Its helper
- * text depends on whether the browser reports the connection type.
+ * Settings: the Photos row. "Download photos over mobile data" is this
+ * device's choice, now made on the Photos page; the top page's Preferences
+ * group carries a row that reads the choice and opens the page, and only where
+ * the browser reports its connection type.
  */
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,11 +45,9 @@ import {
   getPhotosOverMobileData,
   setPhotosOverMobileData,
 } from '../../../services/photoDownloadPreference';
+import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
-
-const WIFI_HELPER = 'Off: the photo album is saved for offline use only on Wi-Fi.';
-const UNKNOWN_HELPER =
-  "This phone doesn't tell the app whether it's on Wi-Fi, so photos are saved on any connection.";
+import { onPopState } from './settingsStackKit';
 
 function setConnection(connection: object | undefined) {
   Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
@@ -61,7 +60,7 @@ async function renderSettings() {
   );
 }
 
-describe('Settings: Download photos over mobile data', () => {
+describe('Settings: the Photos row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -69,84 +68,83 @@ describe('Settings: Download photos over mobile data', () => {
     backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
     act(() => setPhotosOverMobileData(false));
     localStorage.removeItem(PHOTOS_OVER_MOBILE_DATA_KEY);
+    window.history.replaceState(null, '', '/');
+    useAppStore.setState({ currentView: 'settings', settingsPath: '' });
+    window.addEventListener('popstate', onPopState);
   });
 
   afterEach(() => {
     cleanup();
+    window.removeEventListener('popstate', onPopState);
     setConnection(undefined);
+    window.history.replaceState(null, '', '/');
+    useAppStore.setState({ currentView: 'home', settingsPath: '' });
   });
 
-  it('is an off switch labelled with the Wi-Fi helper when the phone reports its connection', async () => {
+  it('shows "Photos, Wi-Fi only" in Preferences when the phone reports its connection', async () => {
     setConnection(Object.assign(new EventTarget(), { type: 'wifi' }));
     await renderSettings();
 
-    const row = screen.getByRole('switch', { name: 'Download photos over mobile data' });
-    expect(row).toHaveAttribute('aria-checked', 'false');
-    expect(row).toHaveAccessibleDescription(WIFI_HELPER);
-    expect(screen.getByTestId('settings-mobile-data-photos-helper').textContent).toBe(WIFI_HELPER);
+    const row = screen.getByRole('button', { name: 'Photos, Wi-Fi only' });
+    expect(row).toBe(screen.getByTestId('settings-photos-row'));
+    expect(row).toHaveTextContent('Wi-Fi only');
+    const preferences = screen.getByRole('heading', { level: 2, name: 'Preferences' });
+    expect(preferences.closest('section')).toContainElement(row);
   });
 
-  it("says photos are saved on any connection when the browser can't tell", async () => {
-    setConnection(undefined);
+  it.each([
+    ['no connection type', undefined],
+    ['an unknown connection type', Object.assign(new EventTarget(), { type: 'unknown' })],
+  ])('has no Photos row, and no Preferences group, with %s', async (_name, connection) => {
+    setConnection(connection);
     await renderSettings();
 
-    const row = screen.getByRole('switch', { name: 'Download photos over mobile data' });
-    expect(row).toHaveAccessibleDescription(UNKNOWN_HELPER);
+    expect(screen.queryByTestId('settings-photos-row')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Preferences' })
+    ).not.toBeInTheDocument();
   });
 
-  it("treats a reported type of 'unknown' like no type at all", async () => {
-    setConnection(Object.assign(new EventTarget(), { type: 'unknown' }));
-    await renderSettings();
-
-    expect(screen.getByTestId('settings-mobile-data-photos-helper').textContent).toBe(
-      UNKNOWN_HELPER
-    );
-  });
-
-  it('toggles and saves the choice on this device', async () => {
-    const user = userEvent.setup();
+  it('reads the saved choice', async () => {
     setConnection(Object.assign(new EventTarget(), { type: 'cellular' }));
-    await renderSettings();
-    const row = screen.getByRole('switch', { name: 'Download photos over mobile data' });
-
-    await user.click(row);
-    expect(row).toHaveAttribute('aria-checked', 'true');
-    expect(localStorage.getItem(PHOTOS_OVER_MOBILE_DATA_KEY)).toBe('true');
-    expect(getPhotosOverMobileData()).toBe(true);
-
-    await user.click(row);
-    expect(row).toHaveAttribute('aria-checked', 'false');
-    expect(localStorage.getItem(PHOTOS_OVER_MOBILE_DATA_KEY)).toBe('false');
-    expect(getPhotosOverMobileData()).toBe(false);
-  });
-
-  it('shows the saved choice when the page opens again', async () => {
     act(() => setPhotosOverMobileData(true));
     await renderSettings();
 
-    expect(
-      screen.getByRole('switch', { name: 'Download photos over mobile data' })
-    ).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: 'Photos, Any connection' })).toBeInTheDocument();
   });
 
-  it('is a native button, so Enter and Space reach it from the keyboard', async () => {
+  it('opens the Photos page, where a choice saved offline shows on the row after back', async () => {
     const user = userEvent.setup();
+    setConnection(Object.assign(new EventTarget(), { type: 'wifi' }));
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    window.history.replaceState(null, '', '/');
+    useAppStore.getState().setView('settings');
     await renderSettings();
-    const row = screen.getByRole('switch', { name: 'Download photos over mobile data' });
 
-    expect(row.tagName).toBe('BUTTON');
-    expect(row).toHaveAttribute('type', 'button');
-    // The click that focuses it also turns it on; the keys then flip it back and forth.
-    await user.click(row);
-    expect(row).toHaveFocus();
-    expect(row).toHaveAttribute('aria-checked', 'true');
+    await user.click(screen.getByTestId('settings-photos-row'));
 
-    await user.keyboard('{Enter}');
-    expect(row).toHaveAttribute('aria-checked', 'false');
-    expect(getPhotosOverMobileData()).toBe(false);
+    expect(window.location.pathname).toBe('/settings/photos');
+    expect(screen.getByRole('heading', { level: 1, name: 'Photos' })).toHaveFocus();
+    expect(screen.queryByTestId('settings-sign-out')).not.toBeInTheDocument();
 
-    await user.keyboard(' ');
-    expect(row).toHaveAttribute('aria-checked', 'true');
+    await user.click(screen.getByRole('radio', { name: 'Any connection' }));
     expect(getPhotosOverMobileData()).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+
+    const row = await screen.findByRole('button', { name: 'Photos, Any connection' });
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(window.location.pathname).toBe('/settings');
+  });
+
+  it('sends a page this phone cannot use back to the top page', async () => {
+    setConnection(undefined);
+    window.history.replaceState(null, '', '/settings/photos');
+    useAppStore.setState({ settingsPath: 'photos' });
+    await renderSettings();
+
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings');
+    expect(within(screen.getByTestId('settings-view')).queryByText('Wi-Fi only')).toBeNull();
   });
 });

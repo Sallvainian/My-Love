@@ -1,9 +1,9 @@
 /**
  * Settings on the style kit: the page's own behaviour that the restyle added
  * or re-shaped — the About replay row, the Sign out row's in-flight and failed
- * states, the identity row and its avatar initial, the display-name row's
- * loading state and accessible name, and the section / group headings that
- * replaced the old inner titles.
+ * states, the version line under the last card, the identity row and its avatar
+ * initial, the display-name row's loading state and accessible name, and the
+ * section / group headings that replaced the old inner titles.
  *
  * The real EventsSettings and AnniversarySettings are mounted on the real
  * store (signed out, so neither loads anything) because the headings under
@@ -69,13 +69,15 @@ describe('Settings on the kit', () => {
     clearSignOutNotice();
   });
 
-  it('renders the four section labels and one heading per countdown group', async () => {
-    await renderSettings();
+  it('renders the group labels in order and one heading per countdown group', async () => {
+    await renderSettings({ onShowWelcome: vi.fn() });
 
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    // No Preferences group: nothing in it exists without a connection type, and
+    // a group with no rows is not drawn. The last card has no label.
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
-    ).toEqual(['Account', 'Countdowns', 'Photos', 'About']);
+    ).toEqual(['About', 'Account', 'Countdowns']);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Events' })).toHaveLength(1);
     expect(screen.getAllByRole('heading', { level: 3, name: 'Anniversaries' })).toHaveLength(1);
     expect(screen.getByTestId('settings-view')).not.toHaveTextContent(/Event Countdowns/);
@@ -93,17 +95,22 @@ describe('Settings on the kit', () => {
     expect(onShowWelcome).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the package.json version in the About row', async () => {
+  it('shows the package.json version in the line under the last card', async () => {
     await renderSettings();
 
-    expect(screen.getByTestId('settings-version').textContent).toBe(
-      `Version ${pkg.version} · made for the two of you`
-    );
+    const version = screen.getByTestId('settings-version');
+    expect(version.textContent).toBe(`Version ${pkg.version} · made for the two of you`);
+    // Directly under the sign-out card, not inside it.
+    expect(screen.getByTestId('settings-sign-out-card')).not.toContainElement(version);
+    expect(screen.getByTestId('settings-sign-out-card').nextElementSibling).toBe(version);
   });
 
-  it('renders no replay row without a handler', async () => {
+  it('renders no replay row, and no About group, without a handler', async () => {
     await renderSettings();
 
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'About' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-replay-welcome')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-view')).not.toHaveTextContent('Replay welcome message');
   });

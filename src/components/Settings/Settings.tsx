@@ -1,13 +1,14 @@
 /**
  * Settings Component
  *
- * Application settings screen on the style kit: account (identity, display
- * name, your own birthday, the couple's shared "Together since" start and
- * wedding date), the couple's
- * countdowns (events and anniversaries), photos (this device's mobile-data
- * choice for the offline album), push and reminders (a switch for each kind of
- * push; the native shell only, see `PushSettings`), about (with the
- * welcome-message replay) and sign out.
+ * Application settings on the style kit, as a stack of pages (`SettingsStack`).
+ * The top page holds the preferences and about groups, the sign-out card and
+ * the version line, then the sections not yet replaced by pages of their own:
+ * account (identity, display name, your own birthday, the couple's shared
+ * "Together since" start and wedding date), the couple's countdowns (events and
+ * anniversaries) and push and reminders (a switch for each kind of push; the
+ * native shell only, see `PushSettings`). Photos (this device's mobile-data
+ * choice for the offline album) is the first subpage.
  *
  * @component
  */
@@ -18,13 +19,12 @@ import {
   ChevronRight,
   Gem,
   Heart,
-  Info,
+  Image as ImageIcon,
   LoaderCircle,
   LogOut,
   MonitorSmartphone,
   Pencil,
   RotateCcw,
-  Signal,
 } from 'lucide-react';
 import { AnimatePresence, m as motion } from 'motion/react';
 import {
@@ -44,7 +44,7 @@ import { showSignOutNotice } from '../../services/signOutNotice';
 import {
   canTellMobileData,
   getPhotosOverMobileData,
-  setPhotosOverMobileData,
+  photoDownloadLabel,
   subscribePhotosOverMobileData,
 } from '../../services/photoDownloadPreference';
 import { refreshLocalCopy } from '../../services/localCopy';
@@ -70,8 +70,11 @@ import {
 } from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
 import { EventsSettings } from './EventsSettings';
+import { PhotosPage } from './PhotosPage';
 import { PushSettings } from './PushSettings';
-import { ROW_BUTTON, SwitchRow } from './SwitchRow';
+import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
+import { SettingsStack, type SettingsPageSpec } from './stack/SettingsStack';
+import { ROW_BUTTON } from './SwitchRow';
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -447,34 +450,6 @@ function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
 }
 
 /**
- * "Download photos over mobile data": this DEVICE's choice for the background
- * photo fill (`photoImageCache.ts`), default off. Photos opened on screen are
- * downloaded either way. A browser that does not report the connection type
- * cannot be held to Wi-Fi, so the row says so instead.
- */
-function MobileDataPhotosRow() {
-  const allowed = useSyncExternalStore(
-    subscribePhotosOverMobileData,
-    getPhotosOverMobileData,
-    getPhotosOverMobileData
-  );
-  const helper = canTellMobileData()
-    ? 'Off: the photo album is saved for offline use only on Wi-Fi.'
-    : "This phone doesn't tell the app whether it's on Wi-Fi, so photos are saved on any connection.";
-
-  return (
-    <SwitchRow
-      id="settings-mobile-data-photos"
-      icon={Signal}
-      label="Download photos over mobile data"
-      helper={helper}
-      checked={allowed}
-      onChange={setPhotosOverMobileData}
-    />
-  );
-}
-
-/**
  * Shown on the login screen when "Sign out of all devices" signed this device
  * out but could not reach every other one (the server was unreachable, or the
  * push registrations could not be removed). Settings owns the wording; the
@@ -554,6 +529,19 @@ function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywher
   );
 }
 
+/** Settings' subpages by path under /settings; the top page is built in `Settings`. */
+const SUBPAGES = new Map<string, SettingsPageSpec>([
+  [
+    'photos',
+    {
+      title: 'Photos',
+      titleStyle: 'large',
+      available: canTellMobileData,
+      render: () => <PhotosPage />,
+    },
+  ],
+]);
+
 interface SettingsProps {
   /** Replays the welcome splash; the About row is not rendered without it. */
   onShowWelcome?: () => void;
@@ -574,6 +562,12 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   /** Bumped to re-run the read after a save, which is the whole re-read. */
   const [nameReadToken, setNameReadToken] = useState(0);
   const [isEditingName, setIsEditingName] = useState(false);
+  // The Photos row's value; the choice itself is made on the Photos page.
+  const photosOverMobileData = useSyncExternalStore(
+    subscribePhotosOverMobileData,
+    getPhotosOverMobileData,
+    getPhotosOverMobileData
+  );
 
   // Get current user email on mount
   useState(() => {
@@ -695,239 +689,227 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     void handleLogout(true);
   };
 
-  return (
-    <div
-      className="mx-auto flex w-full max-w-200 flex-col gap-4 px-4 pt-3 pb-6"
-      data-testid="settings-view"
-    >
-      <header className="px-1 pt-1">
-        <h1 className="font-serif text-[30px] leading-[1.1] font-semibold text-ink">Settings</h1>
-      </header>
-
-      {error && (
-        <div
-          className="flex items-center gap-2 rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
-          role="alert"
-        >
-          <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Account */}
-      <section className="flex flex-col gap-2" aria-labelledby="settings-account-label">
-        <h2 id="settings-account-label" className={SECTION_LABEL}>
-          Account
-        </h2>
-        <div className={CARD}>
-          {userEmail && (
-            <>
-              <div className={ROW} data-testid="settings-identity">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fill text-base font-semibold text-white"
-                  aria-hidden="true"
-                  data-testid="settings-avatar"
-                >
-                  {avatarInitial}
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <p
-                    className="text-[15px] font-medium wrap-break-word text-ink"
-                    data-testid="settings-email"
-                  >
-                    {userEmail}
-                  </p>
-                  <p className="text-[13px] text-muted">Signed in</p>
-                </div>
-              </div>
-              <div className={DIVIDER} aria-hidden="true" />
-            </>
-          )}
-
-          {/* Enabled on a failed read too: the user may well know the name
-              they want, and the form's own refusals are what protect the
-              column. Disabled only while the first read is in flight, when
-              opening would pre-fill from an answer that has not arrived. */}
-          <button
-            type="button"
-            onClick={() => setIsEditingName(true)}
-            disabled={nameLookup === null}
-            className={`${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60`}
-            data-testid="settings-display-name-edit"
+  const topPage: SettingsPageSpec = {
+    title: 'Settings',
+    titleStyle: 'large',
+    render: () => (
+      <>
+        {error && (
+          <div
+            className="flex items-center gap-2 rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
+            role="alert"
           >
-            <span className={TILE} aria-hidden="true">
-              <Pencil className="h-4.25 w-4.25" />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              {/* "Change " keeps the verb the old Change button carried in
-                  the row's accessible name. */}
-              <span className="text-[15px] font-medium text-ink">
-                <span className="sr-only">Change </span>Display name
-              </span>
-              <span className="text-[13px] wrap-break-word text-muted" data-testid="settings-display-name">
-                {displayNameLabel}
-              </span>
-            </span>
-            <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
-          </button>
-          <div className={DIVIDER} aria-hidden="true" />
-          <BirthdayRow />
-          <div className={DIVIDER} aria-hidden="true" />
-          <TogetherSinceRow />
-          <WeddingRow />
-        </div>
-      </section>
-
-      {/* Countdowns — the couple-shared events above the anniversaries. */}
-      <section className="flex flex-col gap-2" aria-labelledby="settings-countdowns-label">
-        <h2 id="settings-countdowns-label" className={SECTION_LABEL}>
-          Countdowns
-        </h2>
-        <div className={CARD} data-testid="settings-countdowns-card">
-          <EventsSettings />
-          <div className={DIVIDER} aria-hidden="true" />
-          <AnniversarySettings />
-        </div>
-      </section>
-
-      {/* Photos — a device preference, not account data. */}
-      <section className="flex flex-col gap-2" aria-labelledby="settings-photos-label">
-        <h2 id="settings-photos-label" className={SECTION_LABEL}>
-          Photos
-        </h2>
-        <div className={CARD}>
-          <MobileDataPhotosRow />
-        </div>
-      </section>
-
-      {/* Push and reminders — only in the native shell with the push plugins. */}
-      <PushSettings />
-
-      {/* About */}
-      <section className="flex flex-col gap-2" aria-labelledby="settings-about-label">
-        <h2 id="settings-about-label" className={SECTION_LABEL}>
-          About
-        </h2>
-        <div className={CARD}>
-          <div className={ROW}>
-            <span className={TILE} aria-hidden="true">
-              <Info className="h-4.25 w-4.25" />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <p className="text-[15px] font-medium text-ink">My Love</p>
-              <p className="text-[13px] text-muted" data-testid="settings-version">
-                Version {__APP_VERSION__} · made for the two of you
-              </p>
-            </div>
+            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
           </div>
-          {onShowWelcome && (
-            <>
-              <div className={DIVIDER} aria-hidden="true" />
-              <button
-                type="button"
-                onClick={onShowWelcome}
-                className={ROW_BUTTON}
-                data-testid="settings-replay-welcome"
-              >
-                <span className={TILE} aria-hidden="true">
-                  <RotateCcw className="h-4.25 w-4.25" />
-                </span>
-                <span className="min-w-0 flex-1 text-[15px] font-medium text-ink">
-                  Replay welcome message
-                </span>
-                <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
-              </button>
-            </>
+        )}
+
+        {/* Preferences: the rows whose pages exist; nothing renders where none does. */}
+        <SettingsGroup label="Preferences">
+          {canTellMobileData() && (
+            <SettingsRow
+              icon={ImageIcon}
+              label="Photos"
+              value={photoDownloadLabel(photosOverMobileData)}
+              target="photos"
+              testId="settings-photos-row"
+            />
           )}
+        </SettingsGroup>
+
+        <SettingsGroup label="About">
+          {onShowWelcome && (
+            <SettingsRow
+              icon={RotateCcw}
+              label="Replay welcome message"
+              onClick={onShowWelcome}
+              testId="settings-replay-welcome"
+            />
+          )}
+        </SettingsGroup>
+
+        {/* The IA's unlabeled last card, with the version line 4px under it. The old
+            Account, Countdowns and push sections follow until their stories give
+            them pages of their own. */}
+        <div className="flex flex-col gap-1">
+          {/* Sign out — its own quiet card, not a red block. */}
+          <SettingsGroup testId="settings-sign-out-card">
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={isLoggingOut}
+              className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
+              data-testid="settings-sign-out"
+            >
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
+                aria-hidden="true"
+              >
+                {isLoggingOut && !signingOutEverywhere ? (
+                  <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
+                ) : (
+                  <LogOut className="h-4.25 w-4.25" />
+                )}
+              </span>
+              {isLoggingOut && !signingOutEverywhere ? 'Signing out…' : 'Sign out'}
+            </button>
+            {/* For a lost or given-away phone: Sign out above ends this device's
+                session only. */}
+            <button
+              type="button"
+              onClick={handleSignOutEverywhereRow}
+              disabled={isLoggingOut}
+              className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
+              data-testid="settings-sign-out-everywhere"
+            >
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
+                aria-hidden="true"
+              >
+                {signingOutEverywhere ? (
+                  <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
+                ) : (
+                  <MonitorSmartphone className="h-4.25 w-4.25" />
+                )}
+              </span>
+              {signingOutEverywhere ? 'Signing out of all devices…' : 'Sign out of all devices'}
+            </button>
+          </SettingsGroup>
+          <p className="text-center text-[13px] text-muted" data-testid="settings-version">
+            Version {__APP_VERSION__} · made for the two of you
+          </p>
         </div>
-      </section>
 
-      {/* Sign out — its own quiet card, not a red block. */}
-      <div className={CARD} data-testid="settings-sign-out-card">
-        <button
-          type="button"
-          onClick={() => void handleLogout()}
-          disabled={isLoggingOut}
-          className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
-          data-testid="settings-sign-out"
-        >
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
-            aria-hidden="true"
-          >
-            {isLoggingOut && !signingOutEverywhere ? (
-              <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
-            ) : (
-              <LogOut className="h-4.25 w-4.25" />
+        {/* Account */}
+        <section className="flex flex-col gap-2" aria-labelledby="settings-account-label">
+          <h2 id="settings-account-label" className={SECTION_LABEL}>
+            Account
+          </h2>
+          <div className={CARD}>
+            {userEmail && (
+              <>
+                <div className={ROW} data-testid="settings-identity">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fill text-base font-semibold text-white"
+                    aria-hidden="true"
+                    data-testid="settings-avatar"
+                  >
+                    {avatarInitial}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <p
+                      className="text-[15px] font-medium wrap-break-word text-ink"
+                      data-testid="settings-email"
+                    >
+                      {userEmail}
+                    </p>
+                    <p className="text-[13px] text-muted">Signed in</p>
+                  </div>
+                </div>
+                <div className={DIVIDER} aria-hidden="true" />
+              </>
             )}
-          </span>
-          {isLoggingOut && !signingOutEverywhere ? 'Signing out…' : 'Sign out'}
-        </button>
-        <div className={DIVIDER} aria-hidden="true" />
-        {/* For a lost or given-away phone: Sign out above ends this device's
-            session only. */}
-        <button
-          type="button"
-          onClick={handleSignOutEverywhereRow}
-          disabled={isLoggingOut}
-          className={`${ROW_BUTTON} text-[15px] font-medium text-danger disabled:cursor-not-allowed disabled:opacity-60`}
-          data-testid="settings-sign-out-everywhere"
-        >
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-dtint"
-            aria-hidden="true"
-          >
-            {signingOutEverywhere ? (
-              <LoaderCircle className="h-4.25 w-4.25 animate-spin" />
-            ) : (
-              <MonitorSmartphone className="h-4.25 w-4.25" />
-            )}
-          </span>
-          {signingOutEverywhere ? 'Signing out of all devices…' : 'Sign out of all devices'}
-        </button>
-      </div>
 
-      {/* Outside every card, like the other dialogs, so no card can clip it. */}
-      <AnimatePresence>
-        {confirmingEverywhere && (
-          <SignOutEverywhereConfirmation
-            onCancel={handleCancelEverywhere}
-            onConfirm={handleConfirmEverywhere}
+            {/* Enabled on a failed read too: the user may well know the name
+                they want, and the form's own refusals are what protect the
+                column. Disabled only while the first read is in flight, when
+                opening would pre-fill from an answer that has not arrived. */}
+            <button
+              type="button"
+              onClick={() => setIsEditingName(true)}
+              disabled={nameLookup === null}
+              className={`${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60`}
+              data-testid="settings-display-name-edit"
+            >
+              <span className={TILE} aria-hidden="true">
+                <Pencil className="h-4.25 w-4.25" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {/* "Change " keeps the verb the old Change button carried in
+                    the row's accessible name. */}
+                <span className="text-[15px] font-medium text-ink">
+                  <span className="sr-only">Change </span>Display name
+                </span>
+                <span className="text-[13px] wrap-break-word text-muted" data-testid="settings-display-name">
+                  {displayNameLabel}
+                </span>
+              </span>
+              <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
+            </button>
+            <div className={DIVIDER} aria-hidden="true" />
+            <BirthdayRow />
+            <div className={DIVIDER} aria-hidden="true" />
+            <TogetherSinceRow />
+            <WeddingRow />
+          </div>
+        </section>
+
+        {/* Countdowns — the couple-shared events above the anniversaries. */}
+        <section className="flex flex-col gap-2" aria-labelledby="settings-countdowns-label">
+          <h2 id="settings-countdowns-label" className={SECTION_LABEL}>
+            Countdowns
+          </h2>
+          <div className={CARD} data-testid="settings-countdowns-card">
+            <EventsSettings />
+            <div className={DIVIDER} aria-hidden="true" />
+            <AnniversarySettings />
+          </div>
+        </section>
+
+        {/* Push and reminders — only in the native shell with the push plugins. */}
+        <PushSettings />
+
+        {/* Outside every card, like the other dialogs, so no card can clip it. */}
+        <AnimatePresence>
+          {confirmingEverywhere && (
+            <SignOutEverywhereConfirmation
+              onCancel={handleCancelEverywhere}
+              onConfirm={handleConfirmEverywhere}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Mounted only while open, so `useState(initialName)` inside the form
+            actually picks the current name up — kept mounted behind
+            `isOpen={false}` it would hold the name it first saw forever. Outside
+            every card, so no card's layout can clip or contain the overlay. */}
+        {isEditingName && (
+          <DisplayNameSetup
+            isOpen
+            mode="edit"
+            initialName={editPrefill}
+            onCancel={() => setIsEditingName(false)}
+            onComplete={() => {
+              setIsEditingName(false);
+              // Back to the in-flight state FIRST, so `disabled={nameLookup === null}`
+              // covers the re-read too. Left holding the pre-save answer, the
+              // Change control stays live across that window and reopening the
+              // form there prefills `editPrefill` from the OLD name — which the
+              // next save then writes back over the name just stored.
+              //
+              // Cleared here rather than in the effect body, where a synchronous
+              // setState is a lint error (react-hooks/set-state-in-effect): this
+              // is an event handler, so the same call is fine.
+              setNameLookup(null);
+              // Re-read rather than trust the submitted string: the row is what
+              // the rest of the app renders from, and the read applies the seed
+              // rule the write side only refuses.
+              setNameReadToken((token) => token + 1);
+              // Home's own birthday card is labelled with this name.
+              void refreshLocalCopy(PROFILE_COPY_KIND);
+            }}
           />
         )}
-      </AnimatePresence>
+      </>
+    ),
+  };
 
-      {/* Mounted only while open, so `useState(initialName)` inside the form
-          actually picks the current name up — kept mounted behind
-          `isOpen={false}` it would hold the name it first saw forever. Outside
-          every card, so no card's layout can clip or contain the overlay. */}
-      {isEditingName && (
-        <DisplayNameSetup
-          isOpen
-          mode="edit"
-          initialName={editPrefill}
-          onCancel={() => setIsEditingName(false)}
-          onComplete={() => {
-            setIsEditingName(false);
-            // Back to the in-flight state FIRST, so `disabled={nameLookup === null}`
-            // covers the re-read too. Left holding the pre-save answer, the
-            // Change control stays live across that window and reopening the
-            // form there prefills `editPrefill` from the OLD name — which the
-            // next save then writes back over the name just stored.
-            //
-            // Cleared here rather than in the effect body, where a synchronous
-            // setState is a lint error (react-hooks/set-state-in-effect): this
-            // is an event handler, so the same call is fine.
-            setNameLookup(null);
-            // Re-read rather than trust the submitted string: the row is what
-            // the rest of the app renders from, and the read applies the seed
-            // rule the write side only refuses.
-            setNameReadToken((token) => token + 1);
-            // Home's own birthday card is labelled with this name.
-            void refreshLocalCopy(PROFILE_COPY_KIND);
-          }}
-        />
-      )}
-    </div>
-  );
+  // The top page is built above; every subpage is registered in `SUBPAGES`
+  // (its path under /settings, title, title style, and `available` where a
+  // device may not have it). Its row on the parent page is a `SettingsRow`
+  // with `target`.
+  const resolveSettingsPage = (path: string): SettingsPageSpec | null =>
+    path === '' ? topPage : (SUBPAGES.get(path) ?? null);
+
+  return <SettingsStack resolvePage={resolveSettingsPage} />;
 };

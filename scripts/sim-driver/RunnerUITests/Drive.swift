@@ -141,7 +141,7 @@ final class Drive: XCTestCase {
         }
         settings.tap()
         let signOut = app.webViews.buttons["Sign out"].firstMatch
-        // The button sits at the end of Settings; swipe until it shows.
+        // The button sits below the fold on Settings' top page; swipe until it shows.
         for _ in 0..<8 where !signOut.isHittable {
             if !signOut.exists { _ = signOut.waitForExistence(timeout: 2) }
             if signOut.isHittable { break }

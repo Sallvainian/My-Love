@@ -3631,3 +3631,41 @@ location: eslint.config.js; package.json (devDependencies); AGENTS.md (Known pit
 severity: low
 reason: AGENTS.md requires every `eslint-disable` directive to carry its reason after ` -- ` and says no lint rule enforces it; `eslint.config.js` sets only `reportUnusedDisableDirectives`. `@eslint-community/eslint-plugin-eslint-comments`' `require-description` would fail a directive without one (all 18 current directives comply). Needs the owner's yes for the new devDependency; once the rule is live, the AGENTS.md line goes.
 status: open
+
+### DW-419: The Settings page stack's column-dock form has no end-to-end check.
+origin: story 5.1 review (epic-settings-rework), 2026-11-02
+location: tests/e2e/settings/settings-stack.spec.ts; src/components/Settings/stack/SettingsStack.tsx (top-page back arrow); src/hooks/useSideColumn.ts
+severity: low
+reason: The column form (iPhone Duo capsule) is chosen from `env(safe-area-inset-left/right)`, which a desktop Playwright browser cannot set, so the stack's column-form behaviour (no top-page back arrow, a subpage arrow, bar and cards ending at the column's edge) is proven only by unit tests that mock `useSideColumn`. The same holds for every column-form feature. Close it with a sim-driver check on the Duo simulator, or by the ship story's hand run of the Key Flows on the owner's Duo.
+status: open
+
+### DW-420: No test pins that sign-out keeps the device's photo-download choice.
+origin: story 5.1 review (epic-settings-rework), 2026-11-02
+location: src/stores/slices/authSlice.ts (deleteAccountData); src/services/photoDownloadPreference.ts (PHOTOS_OVER_MOBILE_DATA_KEY)
+severity: low
+reason: Epic-settings-rework R12 says the Photos choice survives sign-out, and AGENTS.md says sign-out must not reset it, but no unit or E2E test signs out and then reads `my-love-photos-over-mobile-data`. A future addition to `deleteAccountData()` that clears localStorage wholesale would pass every suite. Add an assertion to the sign-out clearing tests (`signOutClearsAccountState.test.ts`) that the key keeps its value.
+status: open
+
+### DW-421: The Settings page stack's column-dock form has no end-to-end check (ledger DW-419).
+origin: spec-deferred b9cb78c93e32
+location: tests/e2e/settings/settings-stack.spec.ts
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
+severity: low
+reason: The column form is chosen from env(safe-area-inset-*), which desktop Playwright cannot set; settings-stack.spec.ts runs the bottom dock only and SettingsStack.test.tsx mocks useSideColumn. Pre-existing limitation shared by every column-form feature.
+status: open
+
+### DW-422: No test pins that sign-out keeps the device's photo-download choice (ledger DW-420).
+origin: spec-deferred ab598e369099
+location: src/stores/slices/authSlice.ts (deleteAccountData)
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
+severity: low
+reason: grep finds my-love-photos-over-mobile-data only in photoDownloadPreference.test.ts and this story's tests; none signs out first. Behaviour unchanged by this story.
+status: open
+
+### DW-423: Nothing ties a subpage row's visibility to its page's `available`, and the AGENTS.md subpage rule does not say to gate the row.
+origin: spec-deferred 445948d64bee
+location: AGENTS.md (Where things are, Settings subpage rule); src/components/Settings/Settings.tsx (SUBPAGES)
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
+severity: low
+reason: The Photos row checks canTellMobileData() by hand (Settings.tsx, Preferences group) while its page is gated by `available: canTellMobileData` in SUBPAGES. A later subpage with `available` whose row is not gated shows a row that pushes /settings/<page>, then the stack's redirect replaces that entry with /settings, leaving two top-page entries and one extra Back. The fix is a sentence in the AGENTS.md "Settings subpage" rule (gate the row on the same check), or deriving row visibility from the spec.
+status: open

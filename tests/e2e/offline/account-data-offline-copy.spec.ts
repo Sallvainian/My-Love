@@ -17,7 +17,6 @@ import { test, expect } from '../../support/merged-fixtures';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { readStore } from '../../support/helpers/indexed-db';
-import { navigateTo } from '../../support/helpers/navigation';
 import { ANNIVERSARIES_READ, FAVORITES_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 
@@ -110,8 +109,8 @@ test.describe('Account data from the local copy', () => {
     await goOffline(page, true);
 
     // THEN: the anniversary is still listed — from the copy, since the
-    // device-global blob no longer holds any.
-    await navigateTo(page, 'settings');
+    // device-global blob no longer holds any. The page is already Settings, and
+    // Settings has no gear to tap.
     await expect(page.getByRole('heading', { level: 4, name: label })).toBeVisible();
     const blob = await page.evaluate(() => localStorage.getItem('my-love-storage') ?? '');
     expect(blob).not.toContain(label);

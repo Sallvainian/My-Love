@@ -127,7 +127,10 @@ describe('AppNavigation', () => {
       expect(onViewChange).toHaveBeenCalledWith(view);
     });
 
-    it.each(ALL_DESTINATIONS)('gives aria-current="page" to %s alone when active', (view) => {
+    // Settings is covered below: in the bottom form it has no control while it is
+    // open (no header, so no gear), and the column form's capsule button is checked
+    // under Forms.
+    it.each(DOCK_DESTINATIONS)('gives aria-current="page" to %s alone when active', (view) => {
       renderNavigation({ currentView: view });
 
       expect(screen.getByTestId(`nav-${view}`)).toHaveAttribute('aria-current', 'page');
@@ -358,29 +361,56 @@ describe('AppNavigation', () => {
       expect(onViewChange).not.toHaveBeenCalled();
     });
 
-    it('moves Settings between the gear and the column on a form switch, aria-current following', () => {
+    it('moves Settings between the gear and the column on a form switch', () => {
       const onViewChange = vi.fn();
-      const { rerender } = render(
-        <AppNavigation currentView="settings" onViewChange={onViewChange} />
-      );
+      const { rerender } = render(<AppNavigation currentView="mood" onViewChange={onViewChange} />);
       const header = screen.getByTestId('app-header');
       const dock = screen.getByTestId('nav-dock');
 
       for (const side of [null, 'right', null] as const) {
         sideColumn.current = side;
-        rerender(<AppNavigation currentView="settings" onViewChange={onViewChange} />);
+        rerender(<AppNavigation currentView="mood" onViewChange={onViewChange} />);
 
         const settings = screen.getByTestId('nav-settings');
         expect(screen.getAllByTestId('nav-settings')).toHaveLength(1);
         expect(side ? dock : header).toContainElement(settings);
         expect(side ? header : dock).not.toContainElement(settings);
-        expect(settings).toHaveAttribute('aria-current', 'page');
-        expect(settings).toHaveClass('bg-tint', 'text-accent');
-        for (const view of DOCK_DESTINATIONS) {
-          expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
-        }
+        // Not the open view in either form, so neither control is current.
+        expect(settings).not.toHaveAttribute('aria-current');
       }
       expect(onViewChange).not.toHaveBeenCalled();
+    });
+
+    it('draws no app header on Settings, which has its own bar, and no gear in the bottom form', () => {
+      sideColumn.current = null;
+      const { rerender } = render(<AppNavigation currentView="settings" onViewChange={vi.fn()} />);
+
+      expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-wordmark')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument();
+      expect(within(screen.getByTestId('nav-dock')).getAllByRole('button')).toHaveLength(5);
+
+      // The column form keeps Settings as the capsule's sixth button, current,
+      // and still has no header (so no spacer pair either).
+      sideColumn.current = 'right';
+      rerender(<AppNavigation currentView="settings" onViewChange={vi.fn()} />);
+      expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+      const settings = screen.getByTestId('nav-settings');
+      expect(screen.getByTestId('nav-dock')).toContainElement(settings);
+      expect(settings).toHaveAttribute('aria-current', 'page');
+      expect(settings).toHaveClass('bg-tint', 'text-accent');
+      for (const view of DOCK_DESTINATIONS) {
+        expect(screen.getByTestId(`nav-${view}`)).not.toHaveAttribute('aria-current');
+      }
+    });
+
+    it('brings the header back when Settings is left', () => {
+      sideColumn.current = null;
+      const { rerender } = render(<AppNavigation currentView="settings" onViewChange={vi.fn()} />);
+      expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+
+      rerender(<AppNavigation currentView="home" onViewChange={vi.fn()} />);
+      expect(screen.getByTestId('app-header')).toContainElement(screen.getByTestId('nav-settings'));
     });
 
     it('clears data-dock on unmount', () => {
