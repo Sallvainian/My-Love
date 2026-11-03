@@ -199,19 +199,11 @@ Behavioral. Visual specs live in `DESIGN.md` → Components.
   - In the Duo column form, Settings is the capsule's sixth button and the header has no gear, so the top page has no back arrow ([v2 frame 2](mockups/key-settings-v2.html)).
 - **Banned.** Switches, fields or descriptions on the top page. A two-pane layout. A new dock destination. A second partner connect flow. An unlink action.
 
-## Accessibility Floor
+## Touch Floor
 
-Behavioral. Contrast lives in `DESIGN.md` → Colors.
+Neither user relies on a screen reader or a keyboard, so this spec sets no screen-reader or keyboard rules and asks for no VoiceOver or keyboard pass (AGENTS.md, Maintained by hand). Contrast lives in `DESIGN.md` → Colors.
 
-- Every List row is one native button whose accessible name is its label and value ("Partner, Jessie"). The chevron and icon tile are hidden from assistive tech.
-- Switch rows keep `SwitchRow`'s semantics: a native button with `role="switch"` and `aria-checked`, labeled by its label, operable with Enter and Space. When a Footnote explains the switch, the switch is described by it (`aria-describedby`).
-- Read-only rows are plain text, read as label then value, never announced as buttons. A disabled Remind me switch is announced as disabled, and its Footnote says why.
-- Each page has exactly one heading level 1, its title. The collapsed bar's small title repeats it visually and is hidden from assistive tech.
-- On a push, focus moves to the new page's title. On back, focus returns to the row that opened the page.
-- The back arrow's accessible name is "Back". The `+` button is named "Add date".
-- Errors and offline refusals are announced (`role="alert"`). The Confirmation dialog traps focus, starts on Cancel and closes on Escape.
 - Every target is at least 44pt: rows `{spacing.row-min}`, round buttons `{spacing.hit-target}`.
-- Keyboard focus shows a 2px `{colors.accent}` ring on rows, switches and bar actions.
 - Fields use 16px text (`{typography.field}`) so iOS never zooms the page.
 - Reduce Motion replaces the slide with a fade.
 

@@ -52,7 +52,7 @@ R14 (deferred-work.md DW-416): Adding or changing any date (an event, the weddin
 
 R15 (deferred-work.md DW-399): Settings state is split by domain, so no slice owns local-copy kinds of unrelated domains. Met when the split in Notes is in place, every kind keeps its refresher and saved copy, and sign-out still clears every moved account field.
 
-R16 (EXPERIENCE.md Accessibility Floor): Every page meets the Accessibility Floor: one native button per row named by label and value, switch semantics kept, read-only rows as plain text, one heading per page, focus to the new title on a push and back to the opening row on back, announced errors, a focus-trapped Confirmation dialog starting on Cancel, 44pt targets, 16px fields. Met when a keyboard and VoiceOver pass over each page shows each point.
+R16 (EXPERIENCE.md Touch Floor): Every page meets the Touch Floor: 44pt targets and 16px fields. Met when each page's rows, round buttons and fields measure so. No screen-reader or keyboard requirement and no VoiceOver pass (AGENTS.md, Maintained by hand).
 
 R17 (EXPERIENCE.md State Patterns, Loading first open, Offline refusal, Save error; Component Patterns, Error box): Rows render at once from local copies, and a value not known yet is left empty, never `Loading...`. Every write is refused offline before any request or local change and keeps what was typed; a refusal or save error shows in the Error box under the bar, announced, cleared on the next attempt or on leaving. Which writes need a connection does not change. Met when each write, tried offline and against a failing server, behaves so.
 
