@@ -54,7 +54,7 @@ public class NativeAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationP
 }
 
 /// The app's bridge view controller: registers the plugins that live in this
-/// target rather than in a package, turns on the left-edge back swipe, and
+/// target rather than in a package, adds the left-edge back swipe, and
 /// gives the left pane of two apps side by side a column like the right pane's.
 class MainViewController: CAPBridgeViewController {
     /// The iPhone Duo's status column, 84 pt in every pose that has one
@@ -66,6 +66,28 @@ class MainViewController: CAPBridgeViewController {
     private weak var previousDocumentEntry: WKBackForwardListItem?
     private var backSwipeObservations: [NSKeyValueObservation] = []
     private var documentLoadObserver: NSObjectProtocol?
+
+    /// The left-edge back swipe. It is the app's own rather than WebKit's
+    /// (`allowsBackForwardNavigationGestures`): WebKit slides in a picture it
+    /// took of the page when it was left, keeps those pictures in one 50 MB
+    /// store on iOS and drops the oldest first (ViewSnapshotStore.cpp,
+    /// maximumSnapshotCacheSize and pruneSnapshots). A Duo screen fills that
+    /// with two or three pages, so three levels deep Home's picture was gone
+    /// and the swipe back to it slid in a blank page.
+    private let backPan = UIScreenEdgePanGestureRecognizer()
+    /// One picture per back-forward entry, taken as the page is left, for the
+    /// page that slides in under the swipe. Entries no longer in the list are
+    /// dropped on every page change.
+    private var pagePictures: [ObjectIdentifier: UIView] = [:]
+    /// The entry on screen and when it arrived. A page left within
+    /// `settleTime` of arriving never drew, so its picture is kept rather than
+    /// replaced with whatever was mid-change on screen (a dock pick walks back
+    /// to Home and pushes the next view straight away).
+    private weak var shownEntry: WKBackForwardListItem?
+    private var shownSince = Date.distantPast
+    private static let settleTime: TimeInterval = 0.3
+    /// The views of a swipe in progress, laid over the web view.
+    private var swipe: (container: UIView, below: UIView, shade: UIView, above: UIView)?
 
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(NativeAuthPlugin())
@@ -80,9 +102,9 @@ class MainViewController: CAPBridgeViewController {
         }
     }
 
-    /// WKWebView's own back-forward swipe (epic-settings-rework, spike 2):
-    /// every Settings page and every view change is a pushState entry, so a
-    /// swipe from the left edge goes back exactly one of them.
+    /// Every Settings page and every view change is a pushState entry
+    /// (epic-settings-rework, spike 2), so a swipe from the left edge goes back
+    /// exactly one of them.
     ///
     /// The live updater swaps in a new bundle with webView.load, a new
     /// document whose back list still holds the old bundle's entries, so a
@@ -93,23 +115,32 @@ class MainViewController: CAPBridgeViewController {
     /// records nothing and back across it keeps working.
     private func startBackSwipe() {
         guard let webView else { return }
+        webView.allowsBackForwardNavigationGestures = false
+        backPan.edges = .left
+        backPan.addTarget(self, action: #selector(handleBackPan(_:)))
+        webView.addGestureRecognizer(backPan)
+        webView.scrollView.panGestureRecognizer.require(toFail: backPan)
+
         documentLoadObserver = NotificationCenter.default.addObserver(
             forName: .capacitorDecidePolicyForNavigationAction, object: nil, queue: .main
         ) { [weak self] notification in
             guard let self, let action = notification.object as? WKNavigationAction else { return }
             self.noteDocumentLoad(action)
         }
-        // url changes on pushState and popstate too, so every page change
-        // re-decides; canGoBack covers the first entry gaining a back item. A
-        // new document's url changes when its load starts, before its entry
-        // joins the back list, so the swipe stays off while a load runs and
-        // isLoading re-decides once it is done.
+        // url changes on pushState and popstate too, before the new page
+        // draws, so the page being left is still on screen to be pictured;
+        // canGoBack covers the first entry gaining a back item. A new
+        // document's url changes when its load starts, before its entry joins
+        // the back list, so the swipe stays off while a load runs, and
+        // isLoading re-reads the list once it is done: without that the
+        // launch page (Home) was never taken as the page on screen, so it had
+        // no picture and a swipe back to it slid in a blank page.
         backSwipeObservations = [
-            webView.observe(\.url) { [weak self] _, _ in self?.updateBackSwipe() },
-            webView.observe(\.canGoBack) { [weak self] _, _ in self?.updateBackSwipe() },
-            webView.observe(\.isLoading) { [weak self] _, _ in self?.updateBackSwipe() },
+            webView.observe(\.url) { [weak self] _, _ in self?.pageChanged() },
+            webView.observe(\.canGoBack) { [weak self] _, _ in self?.pageChanged() },
+            webView.observe(\.isLoading) { [weak self] _, _ in self?.pageChanged() },
         ]
-        updateBackSwipe()
+        pageChanged()
     }
 
     /// A main-frame load of an app URL that is neither a reload nor a back or
@@ -127,13 +158,108 @@ class MainViewController: CAPBridgeViewController {
         updateBackSwipe()
     }
 
-    private func updateBackSwipe() {
+    /// Pictures the page being left, then forgets entries the list dropped.
+    private func pageChanged() {
         guard let webView else { return }
+        let list = webView.backForwardList
+        let current = list.currentItem
+        if current !== shownEntry {
+            if let left = shownEntry,
+               Date().timeIntervalSince(shownSince) >= Self.settleTime,
+               let picture = webView.snapshotView(afterScreenUpdates: false) {
+                pagePictures[ObjectIdentifier(left)] = picture
+            }
+            shownEntry = current
+            shownSince = Date()
+        }
+        let kept = Set((list.backList + list.forwardList + [current].compactMap { $0 }).map(ObjectIdentifier.init))
+        pagePictures = pagePictures.filter { kept.contains($0.key) }
+        updateBackSwipe()
+    }
+
+    private func updateBackSwipe() {
+        guard let webView, swipe == nil else { return }
         let backItem = webView.backForwardList.backItem
         let allowed = !webView.isLoading && backItem != nil && backItem !== previousDocumentEntry
-        if webView.allowsBackForwardNavigationGestures != allowed {
-            webView.allowsBackForwardNavigationGestures = allowed
+        if backPan.isEnabled != allowed {
+            backPan.isEnabled = allowed
         }
+    }
+
+    @objc private func handleBackPan(_ pan: UIScreenEdgePanGestureRecognizer) {
+        guard let webView, let host = webView.superview else { return }
+        let width = webView.bounds.width
+        switch pan.state {
+        case .began:
+            guard swipe == nil,
+                  let back = webView.backForwardList.backItem,
+                  let above = webView.snapshotView(afterScreenUpdates: false) else { return }
+            let container = UIView(frame: webView.frame)
+            container.clipsToBounds = true
+            container.backgroundColor = webView.underPageBackgroundColor
+            let below = pagePictures[ObjectIdentifier(back)] ?? UIView()
+            below.frame = container.bounds
+            below.transform = .identity
+            let shade = UIView(frame: container.bounds)
+            shade.backgroundColor = UIColor.black.withAlphaComponent(0.12)
+            above.frame = container.bounds
+            above.layer.shadowColor = UIColor.black.cgColor
+            above.layer.shadowOpacity = 0.25
+            above.layer.shadowRadius = 8
+            above.layer.shadowOffset = CGSize(width: -2, height: 0)
+            container.addSubview(below)
+            container.addSubview(shade)
+            container.addSubview(above)
+            host.insertSubview(container, aboveSubview: webView)
+            swipe = (container, below, shade, above)
+            followSwipe(0, width: width)
+        case .changed:
+            followSwipe(pan.translation(in: host).x, width: width)
+        case .ended, .cancelled, .failed:
+            guard let swipe else { return }
+            let x = pan.translation(in: host).x
+            let speed = pan.velocity(in: host).x
+            let goesBack = pan.state == .ended && (speed > 300 || (x > width / 2 && speed > -300))
+            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
+                self.followSwipe(goesBack ? width : 0, width: width)
+            } completion: { _ in
+                guard goesBack else {
+                    self.endSwipe(swipe)
+                    return
+                }
+                swipe.above.removeFromSuperview()
+                swipe.shade.removeFromSuperview()
+                webView.goBack()
+                // The picture stays over the page until the page has drawn.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    UIView.animate(withDuration: 0.12) {
+                        swipe.container.alpha = 0
+                    } completion: { _ in
+                        self.endSwipe(swipe)
+                    }
+                }
+            }
+        default:
+            break
+        }
+    }
+
+    /// The page above follows the finger; the page below drifts in from a
+    /// third of the way left under a fading shade, as iOS's own swipe does.
+    private func followSwipe(_ translation: CGFloat, width: CGFloat) {
+        guard let swipe, width > 0 else { return }
+        let x = min(max(translation, 0), width)
+        swipe.above.transform = CGAffineTransform(translationX: x, y: 0)
+        swipe.below.transform = CGAffineTransform(translationX: (x - width) * 0.3, y: 0)
+        swipe.shade.alpha = 1 - x / width
+    }
+
+    private func endSwipe(_ ended: (container: UIView, below: UIView, shade: UIView, above: UIView)) {
+        ended.below.transform = .identity
+        ended.below.removeFromSuperview()
+        ended.container.removeFromSuperview()
+        swipe = nil
+        updateBackSwipe()
     }
 
     override func viewSafeAreaInsetsDidChange() {
