@@ -1,9 +1,0 @@
-[workflow]
-
-activation_steps_prepend = [
-  "Read `_bmad/_config/custom/bmad-workflow-lang.md` for the workflow language specification, then execute `_bmad/_config/custom/workflows/bmad-ux/activation.yaml`. If it switched the session into a worktree, use that worktree's root as {project-root} for every remaining step of this skill, the config it resolves next included, so every file the skill writes lands in the worktree.",
-]
-
-on_complete = """
-Read `_bmad/_config/custom/bmad-workflow-lang.md` for the workflow language specification, then execute `_bmad/_config/custom/workflows/bmad-ux/complete.yaml`.
-"""

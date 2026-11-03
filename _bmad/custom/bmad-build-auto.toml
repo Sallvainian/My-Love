@@ -12,7 +12,3 @@ Launch a subagent with no prior conversation context, on the Sonnet model at hig
 >
 > When done, report what you changed, how you verified it, and anything left incomplete or risky.
 """
-
-on_complete = """
-Read `_bmad/_config/custom/bmad-workflow-lang.md` for the workflow language specification, then execute `_bmad/_config/custom/workflows/common/post-build-dispatch-auto.yaml` IN FULL, with plan_file set to {plan_file} (it marks the unattended review producer, then routes to the right phase of `common/post-dev-complete.yaml` by the plan's status). Do NOT run `git add .` — the worktree may have orchestrator-owned files that must not be staged.
-"""

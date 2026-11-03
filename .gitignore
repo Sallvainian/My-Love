@@ -139,10 +139,6 @@ gha-creds-*.json
 .bmad-loop/runs/
 .bmad-loop/cache/
 .bmad-loop/archive/
-# bmad-issue-tracking's CI gate and post-merge plugin: copied in by its setup
-# skill and seeded into each unit worktree by [scm] worktree_seed.
-.bmad-loop/ci-status.sh
-.bmad-loop/plugins/
 # BMAD specs are tracked, so a finished spec can be deleted and stay in history.
 # The v7 ticket store is tracked too: initiatives (their tickets own status),
 # backlog tickets with no epic, archived documents and the v6-to-v7 migration

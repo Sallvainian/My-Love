@@ -16,16 +16,9 @@ jobs:
     # 'claude'` below so its PRs still get reviewed, and a blanket type check
     # would undo that. Matching on `user.type` covers copilot-swe-agent and
     # ecc-tools too, without maintaining a login denylist.
-    #
-    # bmad-loop unit branches are skipped too. bmad-issue-tracking opens a trace
-    # PR into main for every ticket a loop run builds (that PR runs the CI the
-    # loop waits on) and closes it once the loop merges the ticket into
-    # loop/integration. The ticket was already reviewed inside its build session,
-    # and the run's final loop/integration PR still gets this review.
     if: |
       !github.event.pull_request.draft &&
       !github.event.pull_request.merged &&
-      !startsWith(github.head_ref, 'bmad-loop/') &&
       (github.event.pull_request.user.type != 'Bot' ||
        github.event.pull_request.user.login == 'claude[bot]')
     runs-on: ubuntu-latest
