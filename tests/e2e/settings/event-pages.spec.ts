@@ -175,7 +175,10 @@ test.describe('Settings > Dates > an event\'s page', () => {
     );
     await expect(page.getByTestId('settings-event-note-readonly')).toContainText('Her idea');
     await expect(page.getByTestId('settings-event-icon-readonly')).toContainText('Plane');
-    await expect(page.getByTestId('settings-event-page').locator('button, svg')).toHaveCount(0);
+    // Nothing to press and no chevrons: the only picture is the Icon row's glyph.
+    await expect(page.getByTestId('settings-event-page').locator('button')).toHaveCount(0);
+    await expect(page.getByTestId('settings-event-page').locator('svg')).toHaveCount(1);
+    await expect(page.getByTestId('settings-event-icon-readonly').locator('svg')).toBeVisible();
     await expect(page.getByTestId('settings-event-name')).toHaveCount(0);
     await expect(page.getByTestId('settings-event-delete')).toHaveCount(0);
 

@@ -144,9 +144,9 @@ test.describe('An event survives the round trip through the server', () => {
     // looks at the icon again after the submit.
     await expect(page.getByTestId('settings-event-icon')).toHaveAccessibleName('Icon, Ring');
     await page.getByTestId('settings-event-icon').click();
-    await expect(page.getByTestId('settings-event-icon-ring').locator('input')).toBeChecked();
-    await expect(page.getByTestId('settings-event-icon-calendar').locator('input')).not.toBeChecked();
-    await expect(page.getByTestId('settings-event-icon-plane').locator('input')).not.toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Ring' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Calendar' })).not.toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Plane' })).not.toBeChecked();
 
     // THEN: and Home renders that icon's own treatment
     await log.step("Home renders the ring icon's own treatment");

@@ -257,6 +257,10 @@ describe('Settings > Dates > an event\'s page', () => {
           `dates/event/event-1/${field}`
         );
       }
+      // The Icon row shows the event's glyph in accent, not the icon's name.
+      const iconRow = screen.getByTestId('settings-event-icon');
+      expect(iconRow).toHaveTextContent(/^Icon$/);
+      expect(iconRow.querySelector('svg.text-accent')).not.toBeNull();
       expect(deleteRow()).toHaveTextContent('Delete event');
       // Delete sits alone in its own card.
       expect(deleteRow().parentElement?.children).toHaveLength(1);
@@ -361,14 +365,20 @@ describe('Settings > Dates > an event\'s page', () => {
       expect(screen.getByTestId('settings-event-date-readonly')).toHaveTextContent(`Date${date}`);
       expect(screen.getByTestId('settings-event-note-readonly')).toHaveTextContent('Note');
       expect(screen.getByTestId('settings-event-note-readonly')).toHaveTextContent('Her pick');
+      // The glyph in accent, with the icon's name kept as hidden text.
       expect(screen.getByTestId('settings-event-icon-readonly')).toHaveTextContent('IconPlane');
+      expect(screen.getByTestId('settings-event-icon-readonly').querySelector('svg.text-accent')).not.toBeNull();
+      expect(screen.getByText('Plane')).toHaveClass('sr-only');
       // Nothing to press but the bar's Back.
       expect(screen.getAllByRole('button').map((button) => button.textContent || button.ariaLabel)).toHaveLength(1);
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
       expect(screen.queryByTestId('settings-event-name')).not.toBeInTheDocument();
       expect(screen.queryByTestId('settings-event-delete')).not.toBeInTheDocument();
       expect(screen.queryByText(/added this/)).not.toBeInTheDocument();
-      expect(screen.getByTestId('settings-event-page').querySelector('svg')).toBeNull();
+      // No chevrons: the page's one picture is the Icon row's glyph.
+      const pictures = screen.getByTestId('settings-event-page').querySelectorAll('svg');
+      expect(pictures).toHaveLength(1);
+      expect(screen.getByTestId('settings-event-icon-readonly')).toContainElement(pictures[0] as unknown as HTMLElement);
     });
 
     it('has Remind me while upcoming (the shell), and none once past', async () => {
@@ -701,6 +711,11 @@ describe('Settings > Dates > an event\'s page', () => {
         expect(screen.getByTestId('settings-event-icon-ring')).toHaveTextContent('Ring');
         expect(screen.getByTestId('settings-event-icon-plane')).toHaveTextContent('Plane');
         expect(screen.getByRole('radio', { name: 'Plane' })).toBeChecked();
+        // The page's field is the tile group, so it takes the page's focus.
+        await waitFor(() => expect(screen.getByTestId('settings-event-icon-options')).toHaveFocus());
+        // The New event form's three tiles, the current one selected.
+        expect(screen.getByTestId('settings-event-icon-plane')).toHaveAttribute('data-selected', 'true');
+        expect(screen.getByTestId('settings-event-icon-ring')).toHaveAttribute('data-selected', 'false');
         expect(saveButton()).toBeDisabled();
 
         await user.click(screen.getByTestId('settings-event-icon-ring'));

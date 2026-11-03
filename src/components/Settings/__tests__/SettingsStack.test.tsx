@@ -381,6 +381,29 @@ describe('SettingsStack', () => {
       expect(screen.getByTestId('edit-body')).toBeInTheDocument();
     });
 
+    it('slides the page in, scrolls to the top and focuses its title, as a push within the stack does', () => {
+      window.history.replaceState(null, '', '/');
+      act(() => useAppStore.getState().openSettingsPage('photos', { fromHome: true }));
+      const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+
+      const { container } = renderStack();
+
+      const page = container.querySelector('.animate-settings-push');
+      expect(page).not.toBeNull();
+      expect(page).toHaveClass('motion-reduce:animate-settings-fade');
+      expect(page).toContainElement(screen.getByTestId('photos-body'));
+      expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+      expect(screen.getByRole('heading', { level: 1, name: 'Photos' })).toHaveFocus();
+    });
+
+    it('does not slide the top page in when the gear opens Settings', () => {
+      openedInApp();
+      const { container } = renderStack();
+
+      expect(container.querySelector('[class*="animate-settings"]')).toBeNull();
+      expect(document.body).toHaveFocus();
+    });
+
     it('still goes back one level after a reload, which leaves nothing pushed', () => {
       window.history.replaceState(
         { view: 'settings', settingsPath: 'photos/edit', inApp: true, from: 'home' },

@@ -9,7 +9,7 @@
  * focus move and the back arrow.
  *
  * - Push: the page slides in from the right, scrolls to the top and focuses
- *   its h1. Back: the page returned to drifts in from the left, gets its scroll
+ *   its h1, including a push that mounts the stack (a Home date card, Add). Back: the page returned to drifts in from the left, gets its scroll
  *   position back and focus returns to the row that opened the page we left.
  *   Reduce Motion swaps both slides for a fade. The animations are enter-only:
  *   two pages never share the DOM, so there are no duplicate test ids and no
@@ -41,8 +41,10 @@
  * - A form page (New event, New anniversary) sets `leading: 'cancel'`: the bar's
  *   leading cell is a `Cancel` text button instead of the arrow, running the
  *   same `goBack`.
- * - It provides `SettingsPageContext`: the back action and the bar's trailing
- *   cell, which a page's `SettingsBarAction` portals Save (or Add) into.
+ * - It provides `SettingsPageContext`: the back action, the bar's trailing
+ *   cell, which a page's `SettingsBarAction` portals Save (or Add) into, and
+ *   `arrivedBack`, true when the page was reached by going back to it (the
+ *   Dates list keeps its loaded rows then).
  *
  * @component
  */
@@ -134,10 +136,13 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
 
   // Which way the page moved, held until the next change so a re-render for
   // any other reason keeps the same animation class and does not restart it.
-  const [trail, setTrail] = useState<{ path: string; direction: Direction }>({
+  // A push that mounts the stack on a subpage (a Home date card, Home's Add)
+  // is a push like any other; a reload, a history restore and the top page
+  // opened from the gear or the dock start with none.
+  const [trail, setTrail] = useState<{ path: string; direction: Direction }>(() => ({
     path,
-    direction: null,
-  });
+    direction: path !== '' && path === requested && pushedPath === requested ? 'push' : null,
+  }));
   let direction = trail.direction;
   if (trail.path !== path) {
     direction = segments(path) < segments(trail.path) ? 'pop' : 'push';
@@ -184,7 +189,8 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
   useLayoutEffect(() => {
     const from = shownPath.current;
     shownPath.current = path;
-    if (from === null || from === path) return;
+    if (from === path) return;
+    if (from === null && direction !== 'push') return;
 
     if (direction === 'pop') {
       window.scrollTo?.(0, scrollByPath.current.get(path) ?? 0);
@@ -253,7 +259,9 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
               {page.title}
             </h1>
           )}
-          <SettingsPageContext.Provider value={{ goBack, barTrailing }}>
+          <SettingsPageContext.Provider
+            value={{ goBack, barTrailing, arrivedBack: direction === 'pop' }}
+          >
             {page.render()}
           </SettingsPageContext.Provider>
         </div>

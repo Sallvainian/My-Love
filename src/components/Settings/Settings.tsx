@@ -303,6 +303,16 @@ const SUBPAGES = new Map<string, SettingsPageSpec>([
   ],
 ]);
 
+/**
+ * Whether the subpage at `path` exists on this device. A top-page row whose page
+ * has `available` reads the same check the page uses, from `SUBPAGES`, rather
+ * than calling that function again. A path missing from `SUBPAGES` counts as
+ * available.
+ */
+function subpageAvailable(path: string): boolean {
+  return SUBPAGES.get(path)?.available?.() !== false;
+}
+
 /** `dates/event/<id>` and its field pages; the id is any one path segment. */
 const EVENT_PATH = /^dates\/event\/([^/]+)(?:\/(name|date|note|icon))?$/;
 
@@ -442,8 +452,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
 
         {/* Preferences: the rows whose pages exist; nothing renders where none does. */}
         <SettingsGroup label="Preferences">
-          {hasNativePush() && <NotificationsRow key="notifications" />}
-          {canTellMobileData() && (
+          {subpageAvailable('notifications') && <NotificationsRow key="notifications" />}
+          {subpageAvailable('photos') && (
             <SettingsRow
               icon={ImageIcon}
               label="Photos"
