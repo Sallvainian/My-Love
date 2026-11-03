@@ -39,7 +39,7 @@ vi.mock('../EventsSettings', () => ({ EventsSettings: () => null }));
 import { offlineMessage } from '../../../services/accountDataError';
 import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
-import { formatDayMonth, formatListDate } from '../settingsFields';
+import { formatListDate } from '../settingsFields';
 import { onPopState } from './settingsStackKit';
 
 const PARTNER: PartnerInfo = {
