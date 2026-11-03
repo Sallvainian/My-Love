@@ -3,7 +3,7 @@ title: 'Find how the edge swipe returns one level in the shell'
 type: 'chore'
 ticket: '2'
 created: '2026-11-02'
-status: 'built'
+status: done
 baseline_revision: '1e4220c8875a27e42b7bd7381f1659c6b723af68'
 route: 'oneshot'
 route_source: 'auto'
