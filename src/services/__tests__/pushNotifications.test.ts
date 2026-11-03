@@ -484,8 +484,9 @@ describe('removeAllPushRegistrations', () => {
 
   it('logs a thrown call and resolves false', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-    answer(Promise.reject(new Error('network')));
     const { removeAllPushRegistrations } = await freshModule();
+    // Created after the import, so the RPC's catch attaches before a macrotask.
+    answer(Promise.reject(new Error('network')));
 
     await expect(removeAllPushRegistrations('access-1')).resolves.toBe(false);
 
