@@ -3610,6 +3610,14 @@ reason: `sim signin` dismisses the welcome splash, but the shell shows it again 
 status: done 2026-11-02
 resolution: `sim signout` now gets past the splash as `sim signin` does (Drive.swift pastWelcome, shared by both). The splash shows when the app opens an hour or more after it last showed (App.tsx WELCOME_DISPLAY_INTERVAL), not after every restart: the clock moves made that happen. Checked on the Duo simulator 2026-11-02 by setting the shell's lastWelcomeView to 0 while it was closed: the splash showed, and `sim signout` printed "dismissed the welcome splash" and "signed out" (18 s).
 
+### DW-416: Remove the push sent to a partner when a date is added or changed.
+origin: owner decision 2026-11-02 during the Settings rework UX run (_bmad-output/initiative-my-love/ux-settings-page/.memlog.md, override entry)
+location: supabase/migrations/20261031030000_push_date_changes.sql (notify_date_change, five triggers, date_changes, push_requests.date_change_id); supabase/functions/send-push (the 'date' kind in handler.ts and payload.ts, handler.test.ts); src/services/pushPreferencesService.ts and src/stores/slices/settingsSlice.ts (the 'dates' push preference); src/components/Settings/PushSettings.tsx (the Dates switch); supabase/tests/database/35_push_devices.sql
+severity: medium
+reason: The owner wants no notification when an event, the wedding date, together-since or a birthday is added or changed; the only date notifications should be epic-date-reminders' upcoming-date reminders. This reverses the date part of epic-push-notifications R1 (owner request 2026-10-29, story 3.5). The rework's Notifications page drops the Dates switch, and with tap-a-row-to-edit each field save would otherwise send its own push. Needs a new migration that drops the triggers and function (and decides whether date_changes and the push_preferences.dates column go), the send-push date kind removed, and the pgTAP pins updated in the same change. Not a sweep bundle: it belongs with the Settings rework's tickets.
+status: open
+decision: 2026-11-02 remove — owner, 2026-11-02: "I don't want a notification at all to be pushed when something is added or changed. The only notifications that come from dates should be from like when the date is upcoming."
+
 ### DW-417: `npm run test:ci-local` skips the send-push Edge Function tests that CI runs.
 origin: bmad-project-context refresh, 2026-11-02
 location: scripts/ci-local.sh:50; .github/workflows/test.yml:208-209
