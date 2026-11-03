@@ -14,6 +14,7 @@
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { eventDateFrom, seedEvents, type EventSpec } from '../../support/factories/events';
+import { dayMonth, listDate } from '../../support/helpers/dates-list-format';
 import { EVENTS_PAGE_SIZE, localDateFromIso, resolveOwnPair } from '../../support/helpers/events';
 import {
   COUPLE_SETTINGS_READ,
@@ -27,26 +28,6 @@ import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
 const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
-
-/** One `en-US` part of a date, as the Dates list's formatters build its text. */
-function part(date: Date, options: Intl.DateTimeFormatOptions, type: Intl.DateTimeFormatPartTypes) {
-  return new Intl.DateTimeFormat('en-US', options).formatToParts(date).find((p) => p.type === type)!.value;
-}
-
-/** A yearly date as the Dates list writes it (`settingsFields.formatDayMonth`): `4 Apr`. */
-function dayMonth(date: Date): string {
-  return `${part(date, { day: 'numeric' }, 'day')} ${part(date, { month: 'short' }, 'month')}`;
-}
-
-/**
- * A one-time date as the Dates list writes it (`settingsFields.formatListDate`):
- * `Sat 14 Nov` in the current year, `3 Feb 2022` in another.
- */
-function listDate(date: Date, now: Date): string {
-  return date.getFullYear() === now.getFullYear()
-    ? `${part(date, { weekday: 'short' }, 'weekday')} ${dayMonth(date)}`
-    : `${dayMonth(date)} ${date.getFullYear()}`;
-}
 
 /** A row the app read as an array of at most one (`maybeSingle`), or `undefined` for none. */
 const firstRow = <T>(json: unknown): T | undefined => (Array.isArray(json) ? json[0] : json) as T | undefined;

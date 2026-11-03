@@ -25,8 +25,9 @@
  * rows and shows its message in the Error box until the next `Load more` or
  * until the page is left.
  *
- * The rows' targets are the date pages (`DatePages`) the Dates stories
- * register; until each exists, the stack shows the top page for its path.
+ * The rows' targets are the date pages (`DatePages`), an event's own page
+ * (`dates/event/<id>`, `EventPages`), and, until story 12 builds it, the
+ * anniversary page, for which the stack shows the top page.
  *
  * @component
  */

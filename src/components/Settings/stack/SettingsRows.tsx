@@ -63,6 +63,11 @@ interface SettingsRowProps {
   label: string;
   /** The current state in a word or two, muted at the right. */
   value?: string;
+  /**
+   * For a value that can run long (an event's name or note): it truncates at a
+   * capped width instead of spilling past the card. Other values stay whole.
+   */
+  truncateValue?: boolean;
   icon?: LucideIcon;
   /** The subpage this row opens (a path relative to `/settings`). */
   target?: string;
@@ -76,6 +81,7 @@ interface SettingsRowProps {
 export function SettingsRow({
   label,
   value,
+  truncateValue,
   icon: Icon,
   target,
   onClick,
@@ -103,7 +109,15 @@ export function SettingsRow({
       )}
       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-ink">{label}</span>
       {value && (
-        <span className="shrink-0 text-[15px] whitespace-nowrap text-muted">{value}</span>
+        <span
+          className={
+            truncateValue
+              ? 'max-w-[60%] min-w-0 truncate text-[15px] text-muted'
+              : 'shrink-0 text-[15px] whitespace-nowrap text-muted'
+          }
+        >
+          {value}
+        </span>
       )}
       <ChevronRight className="h-4.5 w-4.5 shrink-0 text-muted" aria-hidden="true" />
     </button>

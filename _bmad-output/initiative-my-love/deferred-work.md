@@ -3722,3 +3722,18 @@ source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-
 severity: low
 reason: The link date moved to the accepted `partner_requests` row (`PartnerInfo.linkedSince`), so nothing reads `updated_at` from the first `users` read any more. It stays in the select because E2E routes match the URL `select=partner_id%2Cupdated_at`, and the story's "Never" list forbade changing the `users` read columns. A later change drops the column from the select together with those routes and the fixtures that fulfil `updated_at`.
 status: open
+
+### DW-430: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker.
+origin: story 5.11 build (epic-settings-rework), 2026-11-03
+location: src/components/Settings/EventPages.tsx (EventPage Icon row, EventFieldPage `icon`)
+severity: low
+reason: DESIGN.md (Components, List row) says "An Icon field row shows the event's glyph in accent in place of a text value", and (One-field edit page) "The icon field is the three-option picker used on the Form page": three equal 48px tiles, glyph and name, the selected one tint-filled with an accent label and 2px accent ring. Story 5.11's plan specified the text value (`Calendar`/`Ring`/`Plane`) and check rows instead, so R18 is not met for the Icon row and page. Story 5.13 builds the Form page's picker; reuse it on the Icon page there and give `SettingsRow` a glyph value for the Icon row.
+status: open
+
+### DW-431: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker (ledger DW-430).
+origin: spec-deferred 6be699f2d039
+location: src/components/Settings/EventPages.tsx
+source_spec: `tickets/epic-settings-rework/tickets/story-every-event-has-its-own-page-plan.md`
+severity: low
+reason: DESIGN.md Components: "An Icon field row shows the event's glyph in accent in place of a text value" and "The icon field is the three-option picker used on the Form page". This plan's matrix specified text values and check rows; the implementer flagged the mismatch. Story 5.13 builds the picker.
+status: open

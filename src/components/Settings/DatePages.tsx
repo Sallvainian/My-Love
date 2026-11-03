@@ -36,6 +36,7 @@ import { parseEventDate } from '../../services/eventsService';
 import { MARK_KEYS } from '../../services/dateReminders';
 import { useAppStore } from '../../stores/useAppStore';
 import { FAILURE_BOX, FOOTNOTE, fieldClass } from '../shared/kitClasses';
+import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
 import {
   coupleValue,
@@ -66,22 +67,6 @@ function useCoupleAbsent(): boolean {
   return coupleSettings?.status === 'unlinked' || (coupleSettings === null && confirmedUnlinked);
 }
 
-/**
- * Goes back one level (to the Dates list) the first time `absent` is true on
- * this mount. The ref keeps StrictMode's second effect run, and any later
- * change, from going back again.
- */
-function useFallBackToDates(absent: boolean): void {
-  const { goBack } = useSettingsPage();
-  const fired = useRef(false);
-
-  useEffect(() => {
-    if (!absent || fired.current) return;
-    fired.current = true;
-    goBack();
-  }, [absent, goBack]);
-}
-
 interface DatePageProps {
   testId: string;
   error: string | null;
@@ -89,7 +74,7 @@ interface DatePageProps {
 }
 
 /** A date page's wrapper, with its Error box above the first card. */
-function DatePage({ testId, error, children }: DatePageProps) {
+export function DatePage({ testId, error, children }: DatePageProps) {
   return (
     <div className="flex flex-col gap-4" data-testid={testId}>
       {error && (

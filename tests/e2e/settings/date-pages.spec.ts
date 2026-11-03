@@ -14,21 +14,13 @@
  * as `dates-list.spec.ts` runs.
  */
 import { test, expect } from '../../support/merged-fixtures';
+import { dayMonth } from '../../support/helpers/dates-list-format';
 import { localDateFromIso, resolveOwnPair } from '../../support/helpers/events';
 import { OWN_PROFILE_READ, partnerRecordRead } from '../../support/helpers/reads';
 import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
 const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
-
-/** A yearly date as the Dates list writes it (`settingsFields.formatDayMonth`): `4 Apr`. */
-function dayMonth(date: Date): string {
-  const part = (options: Intl.DateTimeFormatOptions, type: Intl.DateTimeFormatPartTypes) =>
-    new Intl.DateTimeFormat('en-US', options)
-      .formatToParts(date)
-      .find((p) => p.type === type)!.value;
-  return `${part({ day: 'numeric' }, 'day')} ${part({ month: 'short' }, 'month')}`;
-}
 
 /** A row the app read as an array of at most one (`maybeSingle`), or `undefined` for none. */
 const firstRow = <T>(json: unknown): T | undefined =>

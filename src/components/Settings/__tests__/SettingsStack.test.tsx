@@ -83,6 +83,29 @@ const PAGES: Record<string, SettingsPageSpec> = {
     titleStyle: 'small',
     render: () => <p data-testid="name-body">Name body</p>,
   },
+  // `items/thing` is deliberately no page, like `dates/event`: a path with an id under it.
+  items: {
+    title: 'Items',
+    titleStyle: 'large',
+    render: () => <p data-testid="items-body">Items body</p>,
+  },
+  'items/thing/1': {
+    title: 'Thing',
+    titleStyle: 'small',
+    render: () => <p data-testid="thing-body">Thing body</p>,
+  },
+  'items/thing/1/edit': {
+    title: 'Edit',
+    titleStyle: 'small',
+    reloadsToParent: true,
+    render: () => <EditPage />,
+  },
+  'items/thing/2/edit': {
+    title: 'Edit',
+    titleStyle: 'small',
+    reloadsToParent: true,
+    render: () => <EditPage />,
+  },
 };
 
 const resolvePage = (path: string) => PAGES[path] ?? null;
@@ -274,6 +297,42 @@ describe('SettingsStack', () => {
       await user.click(screen.getByRole('button', { name: 'Back' }));
 
       expect(back).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('the page above a path with no page of its own parent', () => {
+    it('is the nearest ancestor that has a page: a fresh load\'s back arrow skips the missing one', async () => {
+      const user = userEvent.setup();
+      freshLoadAt('/settings/items/thing/1');
+      renderStack();
+      expect(screen.getByTestId('thing-body')).toBeInTheDocument();
+      const back = vi.spyOn(window.history, 'back');
+
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+
+      expect(back).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/settings/items');
+      expect(screen.getByRole('heading', { level: 1, name: 'Items' })).toBeInTheDocument();
+    });
+
+    it('is the direct parent when it has a page: a reload-to-parent page shows it', () => {
+      freshLoadAt('/settings/items/thing/1/edit');
+
+      renderStack();
+
+      expect(window.location.pathname).toBe('/settings/items/thing/1');
+      expect(screen.getByTestId('thing-body')).toBeInTheDocument();
+      expect(screen.queryByTestId('edit-body')).not.toBeInTheDocument();
+    });
+
+    it('is the nearest ancestor on a reload-to-parent page whose parent has no page', () => {
+      freshLoadAt('/settings/items/thing/2/edit');
+
+      renderStack();
+
+      expect(window.location.pathname).toBe('/settings/items');
+      expect(screen.getByTestId('items-body')).toBeInTheDocument();
+      expect(screen.queryByTestId('edit-body')).not.toBeInTheDocument();
     });
   });
 

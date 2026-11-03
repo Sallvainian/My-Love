@@ -23,9 +23,14 @@
  *   form's capsule is a destination, not a place to go back from.
  * - A path with no page, or one the device cannot use, falls back to the top
  *   page and rewrites the URL to match.
+ * - "The page above" is the nearest ancestor path that has a page
+ *   (`pageAbove`): `dates/event/<id>` goes up to `dates`, because
+ *   `dates/event` is not a page. The back arrow's fresh-load replace and the
+ *   reload-to-parent below both use it; the focus walk and the slide direction
+ *   read the path's own segments.
  * - A page marked `reloadsToParent` (a one-field or form page) is never shown
  *   by a fresh mount of the stack, since its field has nothing to start from
- *   after a reload: the parent is shown instead. An entry the app created goes
+ *   after a reload: the page above is shown instead. An entry the app created goes
  *   up with `history.back()` (replacing it with the parent would leave two
  *   identical entries, and the next back would seem to do nothing); a fresh
  *   load replaces its entry. A push to the page within the mounted stack shows
@@ -68,6 +73,13 @@ type Direction = 'push' | 'pop' | null;
 
 const segments = (path: string) => (path ? path.split('/').length : 0);
 const parentOf = (path: string) => path.split('/').slice(0, -1).join('/');
+
+/** The nearest ancestor of `path` that `resolvePage` answers; the top page (`''`) at the end. */
+function pageAbove(path: string, resolvePage: (path: string) => SettingsPageSpec | null): string {
+  let ancestor = parentOf(path);
+  while (ancestor !== '' && resolvePage(ancestor) === null) ancestor = parentOf(ancestor);
+  return ancestor;
+}
 
 /** Rewrites the current entry to a Settings route, keeping whether the app created it. */
 function replaceSettingsRoute(path: string) {
@@ -123,11 +135,11 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
     if (reloadChecked.current) return;
     reloadChecked.current = true;
     if (!reloadsToParent) return;
-    const parent = parentOf(requested);
+    const parent = pageAbove(requested, resolvePage);
     if (window.history.state?.inApp === true) window.history.back();
     else replaceSettingsRoute(parent);
     showSettingsPage(parent);
-  }, [reloadsToParent, requested, showSettingsPage]);
+  }, [reloadsToParent, requested, resolvePage, showSettingsPage]);
 
   // The bar's trailing cell, held in state so a page's action portals into it
   // once it exists.
@@ -170,7 +182,7 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
       window.history.back();
       return;
     }
-    const parent = parentOf(path);
+    const parent = pageAbove(path, resolvePage);
     replaceSettingsRoute(parent);
     showSettingsPage(parent);
   };

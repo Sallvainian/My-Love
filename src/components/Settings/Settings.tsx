@@ -11,6 +11,8 @@
  * page, see `ProfilePage`), Partner (who the account is linked to, see
  * `PartnerPage`), Dates (every date in one list, see `DatesPage`) and the
  * pages its Together since, Wedding and birthday rows open (see `DatePages`),
+ * an event's own page and its four one-field pages (`dates/event/<id>…`, see
+ * `EventPages`; matched in `resolveSettingsPage` since the path carries an id),
  * Photos (this device's mobile-data choice for the offline album)
  * and Notifications (a switch for each kind of
  * push and the Date reminders switch; the native shell with the push plugins
@@ -70,6 +72,7 @@ import {
   YourBirthdayPage,
 } from './DatePages';
 import { DatesPage, DatesRow } from './DatesPage';
+import { EventFieldPage, EventPage, type EventField } from './EventPages';
 import { EventsSettings } from './EventsSettings';
 import { NotificationsPage, NotificationsRow } from './NotificationsPage';
 import { PartnerPage, PartnerRow } from './PartnerPage';
@@ -283,6 +286,16 @@ const SUBPAGES = new Map<string, SettingsPageSpec>([
   ],
 ]);
 
+/** `dates/event/<id>` and its field pages; the id is any one path segment. */
+const EVENT_PATH = /^dates\/event\/([^/]+)(?:\/(name|date|note|icon))?$/;
+
+const EVENT_FIELD_TITLES: Record<EventField, string> = {
+  name: 'Name',
+  date: 'Date',
+  note: 'Note',
+  icon: 'Icon',
+};
+
 interface SettingsProps {
   /** Replays the welcome splash; the About row is not rendered without it. */
   onShowWelcome?: () => void;
@@ -300,6 +313,8 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const loadOwnProfile = useAppStore((s) => s.loadOwnProfile);
   // The partner's birthday page is titled with their name, which `SUBPAGES` cannot know.
   const partnerName = useAppStore((s) => s.partner?.displayName);
+  // An event's page is titled with its name, which `SUBPAGES` cannot know either.
+  const events = useAppStore((s) => s.events);
   // The Photos row's value; the choice itself is made on the Photos page.
   const photosOverMobileData = useSyncExternalStore(
     subscribePhotosOverMobileData,
@@ -505,10 +520,29 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
 
   // The top page is built above; every subpage is registered in `SUBPAGES`
   // (its path under /settings, title, title style, and `available` where a
-  // device may not have it). Its row on the parent page is a `SettingsRow`
+  // device may not have it), except the event pages, whose path carries an id
+  // and which are matched here. Its row on the parent page is a `SettingsRow`
   // with `target`.
   const resolveSettingsPage = (path: string): SettingsPageSpec | null => {
     if (path === '') return topPage;
+    const eventMatch = EVENT_PATH.exec(path);
+    if (eventMatch) {
+      const eventId = eventMatch[1];
+      const field = eventMatch[2] as EventField | undefined;
+      if (field) {
+        return {
+          title: EVENT_FIELD_TITLES[field],
+          titleStyle: 'small',
+          reloadsToParent: true,
+          render: () => <EventFieldPage eventId={eventId} field={field} />,
+        };
+      }
+      return {
+        title: events.find((event) => event.id === eventId)?.label ?? 'Event',
+        titleStyle: 'small',
+        render: () => <EventPage eventId={eventId} />,
+      };
+    }
     const spec = SUBPAGES.get(path) ?? null;
     if (spec && path === 'dates/partner-birthday' && partnerName) {
       return { ...spec, title: `${partnerName}'s birthday` };
