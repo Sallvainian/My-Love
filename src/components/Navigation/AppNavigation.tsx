@@ -49,6 +49,7 @@
 import {
   Camera,
   Heart,
+  House,
   MessageCircle,
   Settings as SettingsIcon,
   FaceSlightlySmiling,
@@ -65,8 +66,9 @@ interface Destination {
   label: string;
   Icon: LucideIcon;
   /**
-   * Fill the icon while active. Only the heart reads well solid -- FaceSlightlySmiling,
-   * MessageCircle, Camera and Users lose their inner strokes to the fill.
+   * Fill the icon while active. No destination sets it now: House,
+   * FaceSlightlySmiling, MessageCircle, Camera and Users lose their inner
+   * strokes to the fill.
    */
   fillWhenActive?: boolean;
 }
@@ -76,7 +78,7 @@ interface Destination {
  * column capsule's sixth button.
  */
 const DESTINATIONS: readonly Destination[] = [
-  { view: 'home', label: 'Home', Icon: Heart, fillWhenActive: true },
+  { view: 'home', label: 'Home', Icon: House },
   { view: 'mood', label: 'Mood', Icon: FaceSlightlySmiling },
   { view: 'notes', label: 'Love Notes', Icon: MessageCircle },
   { view: 'photos', label: 'Photos', Icon: Camera },
