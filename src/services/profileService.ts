@@ -2,7 +2,7 @@
  * Profile Service — the signed-in account's own profile row (`public.users`):
  * its display name and its birthday.
  *
- * Supabase is the source of truth; `settingsSlice.ownProfile` and its local
+ * Supabase is the source of truth; `profileSlice.ownProfile` and its local
  * copy (kind `profile`) are filled only from these reads and confirmed writes.
  * Reads and writes are online-only and THROW — see `accountDataError.ts` for
  * the error convention (offline is `AccountDataError('offline')`).

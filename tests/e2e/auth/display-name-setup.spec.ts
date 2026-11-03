@@ -30,7 +30,12 @@ import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { deleteSentNote } from '../../support/helpers/love-notes';
 import { navigateTo } from '../../support/helpers/navigation';
-import { LOVE_NOTES_READ, LOVE_NOTE_SEND, gateNameRead } from '../../support/helpers/reads';
+import {
+  LOVE_NOTES_READ,
+  LOVE_NOTE_SEND,
+  OWN_PROFILE_READ,
+  gateNameRead,
+} from '../../support/helpers/reads';
 
 type Dedicated = { email: string; userId: string; cleanup: () => Promise<void> };
 
@@ -313,9 +318,9 @@ test.describe('Display Name Edit', () => {
     await page.goto('/');
 
     // WHEN: The user opens Settings and changes the name. Settings' mount
-    // reads the name; the app's own gate read of the same URL may answer
-    // first, with the same name.
-    const nameRead = interceptNetworkCall({ method: 'GET', url: gateNameRead(userId) });
+    // reads the profile (`loadOwnProfile`); the signed-in start's profile
+    // refresh of the same URL may answer first, with the same name.
+    const nameRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
     await navigateTo(page, 'settings');
     expect((await nameRead).status).toBe(200);
 

@@ -9,14 +9,17 @@ import type { StateCreator } from 'zustand';
 
 // Import slice interfaces (NOT the slice creators, NOT AppSlice)
 import type { AuthSlice } from './slices/authSlice';
+import type { DatesSlice } from './slices/datesSlice';
 import type { EventsSlice } from './slices/eventsSlice';
 import type { InteractionsSlice } from './slices/interactionsSlice';
 import type { MessagesSlice } from './slices/messagesSlice';
 import type { MoodSlice } from './slices/moodSlice';
 import type { NavigationSlice } from './slices/navigationSlice';
 import type { NotesSlice } from './slices/notesSlice';
+import type { NotificationsSlice } from './slices/notificationsSlice';
 import type { PartnerSlice } from './slices/partnerSlice';
 import type { PhotosSlice } from './slices/photosSlice';
+import type { ProfileSlice } from './slices/profileSlice';
 import type { SettingsSlice } from './slices/settingsSlice';
 
 /**
@@ -50,6 +53,9 @@ export interface AppState
     MessagesSlice,
     PhotosSlice,
     SettingsSlice,
+    DatesSlice,
+    ProfileSlice,
+    NotificationsSlice,
     NavigationSlice,
     MoodSlice,
     InteractionsSlice,

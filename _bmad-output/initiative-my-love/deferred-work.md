@@ -3454,7 +3454,8 @@ origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date
 location: src/stores/slices/settingsSlice.ts
 severity: low
 reason: It grew from 930 lines at 58da06ce as stories 4.2, 4.3 and 4.6 added the countdown-marks and push-preferences copies, readers, refreshers and setters. A split candidate (copy kinds and readers by domain), not broken; a refactor story if ever, not a sweep bundle.
-status: open
+status: done 2026-11-03
+resolution: story 5.3: settingsSlice.ts split into datesSlice, profileSlice and notificationsSlice; settingsSlice keeps start-up, device settings and onboarding; the anniversaries mirror's residue is DW-426.
 decision: 2026-11-02 hold-for-settings-rework — owner, 2026-11-02: not a sweep bundle. Keep it open as an input to the owner's planned Settings page rework, which will decide how the slice splits; a sweep should leave it untouched until that work is planned.
 
 ### DW-400: The launch re-plan of date reminders waits for the slowest copy refresher, and the partner lookup has no request timeout.
@@ -3684,4 +3685,12 @@ location: ios/App/App/NativeAuth.swift (MainViewController); src/components/Dail
 source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: medium (unverified)
 reason: The Duo trial covered Settings pushes and dock views in the bottom dock and folded with the column, side not recorded. The simulator's first-entry result rests on synthesized pans that register about one time in four. Unchecked: (1) a real swipe on the session's first entry stays on the page; (2) with the column on the left edge (one folded landscape, the left pane side by side) the swipe still goes back and the capsule still taps; (3) an edge swipe that starts over Home's message card, which turns to the next message on a right drag, goes back without also turning the card. Story 15 checks all three by hand on the Duo once the Swift line is in.
+status: open
+
+### DW-426: The anniversaries mirror still sits inside the persisted `settings` object that `settingsSlice` owns, though `datesSlice` now writes it.
+origin: spec-deferred (story 5.3, 2026-11-03)
+location: src/stores/slices/datesSlice.ts (withAnniversaries and the anniversary actions); src/stores/slices/settingsSlice.ts (`settings`); src/stores/useAppStore.ts (`partialize`, `getItem` blanking); src/stores/slices/authSlice.ts (`discardAccountState`)
+source_spec: `tickets/epic-settings-rework/tickets/story-settings-state-splits-into-dates-profile-and-notifications-s-plan.md`
+severity: low
+reason: Story 5.3 moved the anniversaries kind, reader, refresher and actions into `datesSlice` but left the in-memory list at `settings.relationship.anniversaries`. Giving it a field of its own would change `partialize`, the `getItem` blanking, `discardAccountState` and every test that reads the mirror, which a code-moving refactor that changes only import paths rules out. Until then one slice writes a field inside another slice's persisted object.
 status: open

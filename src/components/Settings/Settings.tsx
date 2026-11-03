@@ -37,7 +37,6 @@ import {
 } from 'react';
 import { authService } from '../../api/authService';
 import { isOnline } from '../../api/errorHandlers';
-import { lookupOwnDisplayName, type OwnDisplayNameLookup } from '../../api/supabaseClient';
 import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
 import { showSignOutNotice } from '../../services/signOutNotice';
@@ -47,8 +46,6 @@ import {
   photoDownloadLabel,
   subscribePhotosOverMobileData,
 } from '../../services/photoDownloadPreference';
-import { refreshLocalCopy } from '../../services/localCopy';
-import { PROFILE_COPY_KIND } from '../../stores/slices/settingsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { logger } from '../../utils/logger';
@@ -557,8 +554,13 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const signOutRunningRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  /** `null` while the read is in flight; the lookup's own three answers after. */
-  const [nameLookup, setNameLookup] = useState<OwnDisplayNameLookup | null>(null);
+  // The name row reads the store's own profile (`profileSlice`), which Home
+  // shares; only "a read is in flight" is local to the row.
+  const ownProfile = useAppStore((s) => s.ownProfile);
+  const ownProfileLoadFailed = useAppStore((s) => s.ownProfileLoadFailed);
+  const loadOwnProfile = useAppStore((s) => s.loadOwnProfile);
+  /** True from mount, and from a name save, until `loadOwnProfile` settles. */
+  const [nameReading, setNameReading] = useState(true);
   /** Bumped to re-run the read after a save, which is the whole re-read. */
   const [nameReadToken, setNameReadToken] = useState(0);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -576,57 +578,46 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     });
   });
 
-  // The name is read here rather than taken from a store because nothing keeps
-  // it: `lookupOwnDisplayName` recomputes the seed classification on every read
-  // and no slice caches the answer. A cancelled flag rather than an AbortSignal
-  // — the lookup has no abort to offer, so what is guarded is the `set`, not
-  // the request.
+  // A cancelled flag rather than an AbortSignal — the read has no abort to
+  // offer, so what is guarded is the `set`, not the request. A failed read is
+  // not surfaced in the page-level error banner: that one is for actions the
+  // user just took, and a failed name read still leaves every other setting
+  // usable. The row says so itself, the slice logs a failed server read (an
+  // offline one is not logged), and editing stays open.
   useEffect(() => {
     let cancelled = false;
 
-    // No `setNameLookup(null)` here: a synchronous setState in an effect body is
+    // No `setNameReading(true)` here: a synchronous setState in an effect body is
     // a lint error (react-hooks/set-state-in-effect). The one caller that needs
     // the row back in its in-flight state — `onComplete`, so the Change control
-    // is disabled across the re-read — clears it from the event handler instead.
-    void lookupOwnDisplayName().then((result) => {
-      if (cancelled) return;
-
-      if (result.status === 'error') {
-        // Not surfaced in the page-level error banner: that one is for actions
-        // the user just took, and a failed name read still leaves every other
-        // setting usable. The row says so itself and editing stays open.
-        console.error('[Settings] Could not read the profile display name:', result.reason);
-      }
-
-      setNameLookup(result);
+    // is disabled across the re-read — sets it from the event handler instead.
+    void loadOwnProfile().then(() => {
+      if (!cancelled) setNameReading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [nameReadToken]);
+  }, [loadOwnProfile, nameReadToken]);
 
-  // Only a successfully-read name pre-fills the field. 'unset' has no name to
-  // offer and 'error' does not know one — offering a guess there would invite
-  // the user to save it back over whatever is really stored.
-  const editPrefill = nameLookup?.status === 'chosen' ? nameLookup.displayName : '';
+  // The name only while a read is neither in flight nor failed. A failed read
+  // can leave the pre-save name in the store; offering it as the prefill would
+  // invite the user to save it back over the name just stored.
+  const shownName = nameReading || ownProfileLoadFailed ? null : (ownProfile?.displayName ?? null);
 
-  const displayNameLabel = (() => {
-    switch (nameLookup?.status) {
-      case 'chosen':
-        return nameLookup.displayName;
-      case 'unset':
-        return 'Not set yet';
-      case 'error':
-        return "Couldn't load your name";
-      default:
-        return 'Loading...';
-    }
-  })();
+  // Only a successfully-read name pre-fills the field. An unset name has no name
+  // to offer and a failed read does not know one — offering a guess there would
+  // invite the user to save it back over whatever is really stored.
+  const editPrefill = shownName ?? '';
+
+  const displayNameLabel = nameReading
+    ? 'Loading...'
+    : ownProfileLoadFailed
+      ? "Couldn't load your name"
+      : (shownName ?? 'Not set yet');
 
   // The avatar's letter: the chosen display name's, else the email's.
-  const avatarSource =
-    (nameLookup?.status === 'chosen' && nameLookup.displayName.trim()) || userEmail;
+  const avatarSource = shownName?.trim() || userEmail;
   // First grapheme, not `charAt(0)` or the first code point: a flag, skin-tone
   // or ZWJ emoji spans several code points and would otherwise render in part.
   const [firstGrapheme] = avatarSource
@@ -817,7 +808,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             <button
               type="button"
               onClick={() => setIsEditingName(true)}
-              disabled={nameLookup === null}
+              disabled={nameReading}
               className={`${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60`}
               data-testid="settings-display-name-edit"
             >
@@ -881,22 +872,21 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             onCancel={() => setIsEditingName(false)}
             onComplete={() => {
               setIsEditingName(false);
-              // Back to the in-flight state FIRST, so `disabled={nameLookup === null}`
+              // Back to the in-flight state FIRST, so `disabled={nameReading}`
               // covers the re-read too. Left holding the pre-save answer, the
               // Change control stays live across that window and reopening the
               // form there prefills `editPrefill` from the OLD name — which the
               // next save then writes back over the name just stored.
               //
-              // Cleared here rather than in the effect body, where a synchronous
+              // Set here rather than in the effect body, where a synchronous
               // setState is a lint error (react-hooks/set-state-in-effect): this
               // is an event handler, so the same call is fine.
-              setNameLookup(null);
-              // Re-read rather than trust the submitted string: the row is what
-              // the rest of the app renders from, and the read applies the seed
-              // rule the write side only refuses.
+              setNameReading(true);
+              // Re-read rather than trust the submitted string: the store's
+              // `ownProfile` is what the rest of the app (Home included) renders
+              // from, and the read applies the seed rule the write side only
+              // refuses.
               setNameReadToken((token) => token + 1);
-              // Home's own birthday card is labelled with this name.
-              void refreshLocalCopy(PROFILE_COPY_KIND);
             }}
           />
         )}

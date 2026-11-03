@@ -12,21 +12,24 @@
  * than a stub, because the two things worth pinning are precisely the seam
  * between them: that the field arrives carrying the name the row actually
  * holds, and that Settings re-reads the row afterwards instead of trusting the
- * string it just watched go by.
+ * string it just watched go by. The row reads the store's `ownProfile` through
+ * `loadOwnProfile` (profileSlice), so the profile read is stubbed at
+ * `profileService.fetchOwnProfile` and the store is real.
  */
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AccountDataError } from '../../../services/accountDataError';
+import type { OwnProfile } from '../../../services/profileService';
 
 type UpdateResult = { data: { id: string }[] | null; error: null };
 
 const backend = vi.hoisted(() => ({
-  lookupOwnDisplayName: vi.fn(),
+  fetchOwnProfile: vi.fn<() => Promise<OwnProfile>>(),
   getUser: vi.fn(),
   signOut: vi.fn(),
   sessionUser: vi.fn(),
-  refreshLocalCopy: vi.fn(async (_kind: string) => {}),
   updatePayload: null as Record<string, unknown> | null,
   updateResult: { data: [{ id: 'user-a' }], error: null } as UpdateResult,
 }));
@@ -35,9 +38,10 @@ const backend = vi.hoisted(() => ({
 // VITE_SUPABASE_* env vars. `supabase` and `SEED_FALLBACK_NAME` are here
 // because the REAL DisplayNameSetup is mounted below and reaches for both;
 // their true shapes are pinned against the real module in
-// tests/unit/api/ownDisplayNameContract.test.ts.
+// tests/unit/api/ownDisplayNameContract.test.ts. `lookupPartnerId` is there
+// for the real store's dates slice, which imports it.
 vi.mock('../../../api/supabaseClient', () => ({
-  lookupOwnDisplayName: backend.lookupOwnDisplayName,
+  lookupPartnerId: vi.fn(),
   SEED_FALLBACK_NAME: 'Unknown',
   supabase: {
     from: (table: string) => {
@@ -55,9 +59,8 @@ vi.mock('../../../api/authService', () => ({
   authService: { getUser: backend.getUser, signOut: backend.signOut },
 }));
 vi.mock('../../../api/auth/sessionService', () => ({ getUser: backend.sessionUser }));
-vi.mock('../../../services/localCopy', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../services/localCopy')>()),
-  refreshLocalCopy: backend.refreshLocalCopy,
+vi.mock('../../../services/profileService', () => ({
+  profileService: { fetchOwnProfile: backend.fetchOwnProfile, saveBirthday: vi.fn() },
 }));
 vi.mock('../../../utils/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -68,7 +71,19 @@ vi.mock('../../../utils/logger', () => ({
 vi.mock('../AnniversarySettings', () => ({ AnniversarySettings: () => null }));
 vi.mock('../EventsSettings', () => ({ EventsSettings: () => null }));
 
+import { writeLocalCopy } from '../../../services/localCopy';
+import { PROFILE_COPY_KIND } from '../../../stores/slices/profileSlice';
+import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
+
+/** What the profile read answers for a chosen name. */
+const chosen = (displayName: string): OwnProfile => ({ displayName, birthday: null });
+
+function setOnline(value: boolean) {
+  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
+}
+
+let accountCounter = 0;
 
 const nameRow = () => screen.getByTestId('settings-display-name');
 const changeButton = () => screen.getByTestId('settings-display-name-edit');
@@ -90,14 +105,43 @@ describe('Settings offers a way to change the display name', () => {
     backend.updateResult = { data: [{ id: 'user-a' }], error: null };
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
     backend.sessionUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
+    backend.fetchOwnProfile.mockResolvedValue(chosen('Jessie'));
+    // A fresh account and session per case, so no saved copy or "fresh" mark
+    // from an earlier case decides what this one shows.
+    accountCounter += 1;
+    useAppStore.setState({
+      userId: `user-${accountCounter}`,
+      authSessionVersion: accountCounter,
+      ownProfile: null,
+      ownProfileLoadFailed: false,
+    });
   });
 
   afterEach(() => {
     cleanup();
+    setOnline(true);
+    useAppStore.setState({ userId: null, ownProfile: null, ownProfileLoadFailed: false });
   });
 
   describe('the row reports whatever the profile read answered', () => {
+    it('shows Loading... with Change disabled until the first read answers', async () => {
+      let releaseRead: (v: OwnProfile) => void = () => {};
+      backend.fetchOwnProfile.mockReturnValueOnce(
+        new Promise<OwnProfile>((resolve) => {
+          releaseRead = resolve;
+        })
+      );
+      render(<Settings />);
+
+      expect(nameRow().textContent).toBe('Loading...');
+      expect(changeButton()).toBeDisabled();
+
+      releaseRead(chosen('Jessie'));
+
+      await waitFor(() => expect(nameRow().textContent).toBe('Jessie'));
+      expect(changeButton()).toBeEnabled();
+    });
+
     it('shows a chosen name', async () => {
       await renderSettings('Jessie');
 
@@ -105,7 +149,7 @@ describe('Settings offers a way to change the display name', () => {
     });
 
     it('says so when no name has been chosen yet', async () => {
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
+      backend.fetchOwnProfile.mockResolvedValue({ displayName: null, birthday: null });
       await renderSettings('Not set yet');
 
       // Not the email, and not a blank: the label has to be distinguishable
@@ -114,12 +158,29 @@ describe('Settings offers a way to change the display name', () => {
     });
 
     it('says the name could not be loaded when the read fails', async () => {
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'error', reason: 'boom' });
+      backend.fetchOwnProfile.mockRejectedValue(new AccountDataError('transport', 'boom'));
       await renderSettings("Couldn't load your name");
 
       // A failed read is not evidence the name is unset, so it must not read as
       // one — same fail-open-on-display rule App applies to its setup gate.
       expect(nameRow().textContent).not.toContain('Not set yet');
+      expect(useAppStore.getState().ownProfileLoadFailed).toBe(true);
+    });
+
+    it('says the name could not be loaded when offline, even with a saved copy', async () => {
+      const user = userEvent.setup();
+      const { userId } = useAppStore.getState();
+      await writeLocalCopy(userId!, PROFILE_COPY_KIND, chosen('Jessie'));
+      setOnline(false);
+      await renderSettings("Couldn't load your name");
+
+      // The saved copy reaches the store, but the row has no server answer to
+      // vouch for it, so it neither shows nor prefills it.
+      expect(backend.fetchOwnProfile).not.toHaveBeenCalled();
+      expect(useAppStore.getState().ownProfile?.displayName).toBe('Jessie');
+      expect(changeButton()).toBeEnabled();
+      await user.click(changeButton());
+      expect(nameField()).toHaveValue('');
     });
   });
 
@@ -154,7 +215,7 @@ describe('Settings offers a way to change the display name', () => {
       // The read failing says nothing about whether the user knows the name
       // they want. An empty field rather than a guess: pre-filling something
       // the row may not hold invites saving it back over the real value.
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'error', reason: 'boom' });
+      backend.fetchOwnProfile.mockRejectedValue(new AccountDataError('transport', 'boom'));
       await renderSettings("Couldn't load your name");
 
       expect(changeButton()).toBeEnabled();
@@ -165,7 +226,7 @@ describe('Settings offers a way to change the display name', () => {
 
     it('leaves the field empty when there is no name to prefill', async () => {
       const user = userEvent.setup();
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
+      backend.fetchOwnProfile.mockResolvedValue({ displayName: null, birthday: null });
       await renderSettings('Not set yet');
 
       await user.click(changeButton());
@@ -184,7 +245,7 @@ describe('Settings offers a way to change the display name', () => {
       // The second read is what the row renders from — the component never
       // takes the submitted string for granted, because the read applies the
       // seed rule and the write only refuses it.
-      backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: name });
+      backend.fetchOwnProfile.mockResolvedValue(chosen(name));
       await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => expect(nameRow().textContent).toBe(name));
@@ -196,7 +257,7 @@ describe('Settings offers a way to change the display name', () => {
       await saveNameAs(user, 'Casey');
 
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
-      expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(2);
+      expect(backend.fetchOwnProfile).toHaveBeenCalledTimes(2);
     });
 
     it('writes the new name to the users row', async () => {
@@ -207,21 +268,39 @@ describe('Settings offers a way to change the display name', () => {
       expect(backend.updatePayload).toMatchObject({ display_name: 'Casey' });
     });
 
-    it('refreshes Home’s profile copy so its birthday card shows the new name', async () => {
+    it('puts the saved name in the store, where Home reads it', async () => {
       const user = userEvent.setup();
       await renderSettings('Jessie');
       await saveNameAs(user, 'Casey');
 
-      // Home's own birthday card is labelled with the name: its copy refreshes.
-      expect(backend.refreshLocalCopy).toHaveBeenCalledWith('profile');
+      // Home's own birthday card is labelled with the name: it reads the store.
+      expect(useAppStore.getState().ownProfile?.displayName).toBe('Casey');
+    });
+
+    it('says the name could not be loaded when the re-read fails, with an empty field', async () => {
+      const user = userEvent.setup();
+      await renderSettings('Jessie');
+
+      await user.click(changeButton());
+      await user.clear(nameField());
+      await user.type(nameField(), 'Casey');
+      // The store still holds the pre-save name; prefilling it would write it
+      // back over the name just stored.
+      backend.fetchOwnProfile.mockRejectedValue(new AccountDataError('transport', 'boom'));
+      await user.click(screen.getByTestId('display-name-submit'));
+
+      await waitFor(() => expect(nameRow().textContent).toBe("Couldn't load your name"));
+      expect(changeButton()).toBeEnabled();
+      await user.click(changeButton());
+      expect(nameField()).toHaveValue('');
     });
 
     it('disables Change across the re-read, so the old name cannot be saved back', async () => {
       const user = userEvent.setup();
       // The window this closes: `onComplete` used to bump the read token while
-      // `nameLookup` still held the PRE-save answer, leaving Change live. A
-      // click in that window reopened the form prefilled from `editPrefill` —
-      // derived from that stale answer — and the next submit wrote the OLD name
+      // the row still held the PRE-save answer, leaving Change live. A click in
+      // that window reopened the form prefilled from `editPrefill` — derived
+      // from that stale answer — and the next submit wrote the OLD name
       // straight back over the one just saved.
       await renderSettings('Jessie');
 
@@ -230,9 +309,9 @@ describe('Settings offers a way to change the display name', () => {
       await user.type(nameField(), 'Casey');
 
       // Hold the re-read open so the window is observable at all.
-      let releaseReRead: (v: { status: 'chosen'; displayName: string }) => void = () => {};
-      backend.lookupOwnDisplayName.mockReturnValueOnce(
-        new Promise<{ status: 'chosen'; displayName: string }>((resolve) => {
+      let releaseReRead: (v: OwnProfile) => void = () => {};
+      backend.fetchOwnProfile.mockReturnValueOnce(
+        new Promise<OwnProfile>((resolve) => {
           releaseReRead = resolve;
         })
       );
@@ -242,8 +321,9 @@ describe('Settings offers a way to change the display name', () => {
       // The form has closed and the re-read has not answered yet.
       await waitFor(() => expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument());
       await waitFor(() => expect(changeButton()).toBeDisabled());
+      expect(nameRow().textContent).toBe('Loading...');
 
-      releaseReRead({ status: 'chosen', displayName: 'Casey' });
+      releaseReRead(chosen('Casey'));
 
       await waitFor(() => expect(nameRow().textContent).toBe('Casey'));
       expect(changeButton()).toBeEnabled();
@@ -263,10 +343,7 @@ describe('Settings offers a way to change the display name', () => {
       await user.clear(nameField());
       await user.type(nameField(), 'Casey');
 
-      backend.lookupOwnDisplayName.mockResolvedValue({
-        status: 'chosen',
-        displayName: 'Trimmed By The Row',
-      });
+      backend.fetchOwnProfile.mockResolvedValue(chosen('Trimmed By The Row'));
       await user.click(screen.getByTestId('display-name-submit'));
 
       await waitFor(() => expect(nameRow().textContent).toBe('Trimmed By The Row'));
@@ -286,7 +363,7 @@ describe('Settings offers a way to change the display name', () => {
       await waitFor(() => expect(screen.getByTestId('display-name-error')).toBeInTheDocument());
       expect(screen.getByTestId('display-name-setup')).toBeInTheDocument();
       expect(nameRow().textContent).toBe('Jessie');
-      expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(1);
+      expect(backend.fetchOwnProfile).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -303,7 +380,7 @@ describe('Settings offers a way to change the display name', () => {
       expect(screen.queryByTestId('display-name-setup')).not.toBeInTheDocument();
       expect(nameRow().textContent).toBe('Jessie');
       expect(backend.updatePayload).toBeNull();
-      expect(backend.lookupOwnDisplayName).toHaveBeenCalledTimes(1);
+      expect(backend.fetchOwnProfile).toHaveBeenCalledTimes(1);
     });
 
     it('discards the abandoned edit, so reopening shows the stored name again', async () => {

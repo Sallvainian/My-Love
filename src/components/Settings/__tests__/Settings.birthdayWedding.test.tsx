@@ -11,12 +11,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backend = vi.hoisted(() => ({
-  lookupOwnDisplayName: vi.fn(),
   getUser: vi.fn(),
 }));
 
 vi.mock('../../../api/supabaseClient', () => ({
-  lookupOwnDisplayName: backend.lookupOwnDisplayName,
   lookupPartnerId: vi.fn(),
   SEED_FALLBACK_NAME: 'Unknown',
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -47,7 +45,6 @@ const NO_PROFILE = { displayName: null, birthday: null } as const;
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-  backend.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
 });
 
 afterEach(() => {

@@ -4,7 +4,7 @@
  * marked date key).
  *
  * Supabase is the source of truth. The marks reach the screens through the
- * `countdown-marks` local copy (`settingsSlice.countdownMarks`), so the date
+ * `countdown-marks` local copy (`datesSlice.countdownMarks`), so the date
  * reminders' re-plan reads them offline. A date with no row is not marked.
  * Reads and writes are online-only and THROW — see `accountDataError.ts` for
  * the error convention (offline is `AccountDataError('offline')`).

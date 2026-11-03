@@ -4,7 +4,7 @@
  * account).
  *
  * Supabase is the source of truth. This service caches nothing: Settings loads
- * the switches when its push section opens (`settingsSlice.pushPreferences`),
+ * the switches when its push section opens (`notificationsSlice.pushPreferences`),
  * and the slice keeps the answer as the `push-preferences` local copy, which is
  * how the shell's date reminders know the date reminders' switch offline
  * (story 4.3). A missing row means every switch is on,

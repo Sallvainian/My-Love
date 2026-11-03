@@ -57,7 +57,7 @@ import {
   ALL_PUSH_PREFERENCES_ON,
   type PushPreferences,
 } from '../../../services/pushPreferencesService';
-import { PUSH_PREFERENCES_COPY_KIND } from '../../../stores/slices/settingsSlice';
+import { PUSH_PREFERENCES_COPY_KIND } from '../../../stores/slices/notificationsSlice';
 import { useAppStore } from '../../../stores/useAppStore';
 import { PushSettings } from '../PushSettings';
 

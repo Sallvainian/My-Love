@@ -52,7 +52,7 @@ import {
   INTERACTIONS_READ,
   LOVE_NOTES_READ,
   PHOTOS_LIST_READ,
-  gateNameRead,
+  OWN_PROFILE_READ,
   partnerRecordRead,
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -267,9 +267,10 @@ test.describe('Display name offline', () => {
 
     try {
       await page.goto('/');
-      // Settings' mount reads the name; the app's own gate read of the same
-      // URL may answer first, with the same name.
-      const nameRead = interceptNetworkCall({ method: 'GET', url: gateNameRead(userId) });
+      // Settings' mount reads the profile (`loadOwnProfile`); the signed-in
+      // start's profile refresh of the same URL may answer first, with the same
+      // name.
+      const nameRead = interceptNetworkCall({ method: 'GET', url: OWN_PROFILE_READ });
       await navigateTo(page, 'settings');
       expect((await nameRead).status).toBe(200);
       const nameRow = page.getByTestId('settings-display-name');

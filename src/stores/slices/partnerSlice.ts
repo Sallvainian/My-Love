@@ -10,7 +10,7 @@
  * Cross-slice dependencies:
  * - Accepting a request, or `loadPartner` seeing a partner the couple
  *   settings do not name, refreshes the `couple-settings` local copy
- *   (settingsSlice) through the local-copy registry, not a direct import
+ *   (datesSlice) through the local-copy registry, not a direct import
  *
  * Persistence:
  * - NOT persisted through Zustand. The partner profile is kept in the shared

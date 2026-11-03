@@ -6,7 +6,7 @@
  * The website, the Home Screen web app and a shell installed before the push
  * plugins existed render nothing and fetch nothing (`hasNativePush()`). The
  * switches are the account's `push_preferences` row, loaded when the section
- * opens (`settingsSlice.loadPushPreferences`) and written one column at a
+ * opens (`notificationsSlice.loadPushPreferences`) and written one column at a
  * time, server first (`setPushPreference`). The sender reads the receiver's
  * switch, so a switch off here stops that kind on every one of the person's
  * devices.

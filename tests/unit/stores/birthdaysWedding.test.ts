@@ -41,10 +41,8 @@ vi.mock('../../../src/services/profileService', () => ({
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import {
-  COUPLE_SETTINGS_COPY_KIND,
-  PROFILE_COPY_KIND,
-} from '../../../src/stores/slices/settingsSlice';
+import { COUPLE_SETTINGS_COPY_KIND } from '../../../src/stores/slices/datesSlice';
+import { PROFILE_COPY_KIND } from '../../../src/stores/slices/profileSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
 const A = 'USER-A-ID';
@@ -140,6 +138,43 @@ describe('own profile (display name and birthday) on the local copy', () => {
     await state().loadOwnProfile();
 
     expect(state().ownProfile).toEqual({ displayName: 'SAVED-NAME', birthday: null });
+  });
+
+  it('flags a failed read in ownProfileLoadFailed and clears it on a successful one', async () => {
+    await writeLocalCopy(A, PROFILE_COPY_KIND, SAVED_PROFILE);
+    fetchOwnProfile.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadOwnProfile();
+
+    expect(state().ownProfileLoadFailed).toBe(true);
+    // The shown profile and its copy are untouched by the failure.
+    expect(state().ownProfile).toEqual(SAVED_PROFILE);
+
+    fetchOwnProfile.mockResolvedValue(SERVER_PROFILE);
+    await state().loadOwnProfile();
+
+    expect(state().ownProfileLoadFailed).toBe(false);
+    expect(state().ownProfile).toEqual(SERVER_PROFILE);
+  });
+
+  it('flags an offline read in ownProfileLoadFailed, saved copy or not', async () => {
+    await writeLocalCopy(A, PROFILE_COPY_KIND, SAVED_PROFILE);
+    setOnline(false);
+
+    await state().loadOwnProfile();
+
+    expect(state().ownProfileLoadFailed).toBe(true);
+    expect(state().ownProfile).toEqual(SAVED_PROFILE);
+    expect(fetchOwnProfile).not.toHaveBeenCalled();
+  });
+
+  it('a confirmed birthday save clears ownProfileLoadFailed', async () => {
+    useAppStore.setState({ ownProfileLoadFailed: true });
+    saveBirthday.mockResolvedValue({ displayName: 'SERVER-NAME', birthday: '2000-05-20' });
+
+    await state().setBirthday('2000-05-20');
+
+    expect(state().ownProfileLoadFailed).toBe(false);
   });
 
   // Matrix: "Partner sets birthday" — the saving side.

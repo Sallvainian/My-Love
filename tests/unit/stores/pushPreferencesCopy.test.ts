@@ -33,7 +33,7 @@ import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesSe
 import {
   PUSH_PREFERENCES_COPY_KIND,
   readSavedPushPreferences,
-} from '../../../src/stores/slices/settingsSlice';
+} from '../../../src/stores/slices/notificationsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { deferred, setOnline } from './accountDataFixtures';
 

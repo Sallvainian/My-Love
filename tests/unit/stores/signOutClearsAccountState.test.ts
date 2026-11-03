@@ -97,6 +97,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   eventsHistoryError: null,
   coupleSettings: null,
   ownProfile: null,
+  ownProfileLoadFailed: false,
   pushPreferences: null,
   pushPreferencesLoadFailed: false,
   countdownMarks: null,
@@ -522,6 +523,7 @@ describe('clearAuth on sign-out', () => {
         weddingDate: '2021-06-12',
       },
       ownProfile: { displayName: 'PREVIOUS-NAME', birthday: '1990-01-02' },
+      ownProfileLoadFailed: true,
       pushPreferences: {
         loveNotes: false,
         moods: true,
@@ -546,6 +548,7 @@ describe('clearAuth on sign-out', () => {
     expect(state.coupleSettings).toBeNull();
     // The previous account's own name and birthday go too.
     expect(state.ownProfile).toBeNull();
+    expect(state.ownProfileLoadFailed).toBe(false);
     // So do the previous account's push switches: the next account must not see them.
     expect(state.pushPreferences).toBeNull();
     expect(state.pushPreferencesLoadFailed).toBe(false);

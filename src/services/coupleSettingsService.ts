@@ -7,7 +7,7 @@
  * side, `get_my_partner_id()` on the other), which is why a row is always
  * addressed by both ids and never by one.
  *
- * Supabase is the source of truth; `settingsSlice.coupleSettings` and its local
+ * Supabase is the source of truth; `datesSlice.coupleSettings` and its local
  * copy (kind `couple-settings`) are filled only from these reads and confirmed
  * writes. Last write wins. Reads and writes are online-only and THROW — see
  * `accountDataError.ts` for the error convention (offline is

@@ -40,7 +40,7 @@ import {
 import { clearSignOutNotice } from './services/signOutNotice';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
-import { PROFILE_COPY_KIND } from './stores/slices/settingsSlice';
+import { PROFILE_COPY_KIND } from './stores/slices/profileSlice';
 import { isSettingsRoute, settingsPathFromRoute } from './stores/slices/navigationSlice';
 import { stripBasePath } from './utils/basePath';
 import { logger } from './utils/logger';

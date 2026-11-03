@@ -10,16 +10,20 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backend = vi.hoisted(() => ({
-  lookupOwnDisplayName: vi.fn(),
+  fetchOwnProfile: vi.fn(),
   getUser: vi.fn(),
   signOut: vi.fn(),
 }));
 
 vi.mock('../../../api/supabaseClient', () => ({
-  lookupOwnDisplayName: backend.lookupOwnDisplayName,
   SEED_FALLBACK_NAME: 'Unknown',
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
+}));
+// The name row reads the store's own profile, which `loadOwnProfile` fills
+// from this read.
+vi.mock('../../../services/profileService', () => ({
+  profileService: { fetchOwnProfile: backend.fetchOwnProfile, saveBirthday: vi.fn() },
 }));
 vi.mock('../../../api/authService', () => ({
   authService: { getUser: backend.getUser, signOut: backend.signOut },
@@ -49,14 +53,20 @@ import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
 import { onPopState } from './settingsStackKit';
 
+let accountCounter = 0;
+
 function setConnection(connection: object | undefined) {
   Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
 }
 
-async function renderSettings() {
+/**
+ * Renders Settings and waits for the name row to finish its read. Offline the
+ * read has no server answer, so the row settles on `settledAs` instead.
+ */
+async function renderSettings(settledAs = 'Jessie') {
   render(<Settings />);
   await waitFor(() =>
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
+    expect(screen.getByTestId('settings-display-name').textContent).toBe(settledAs)
   );
 }
 
@@ -65,7 +75,15 @@ describe('Settings: the Photos row', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
+    backend.fetchOwnProfile.mockResolvedValue({ displayName: 'Jessie', birthday: null });
+    // A fresh account and session per case, so no earlier case's saved copy decides the name.
+    accountCounter += 1;
+    useAppStore.setState({
+      userId: `user-${accountCounter}`,
+      authSessionVersion: accountCounter,
+      ownProfile: null,
+      ownProfileLoadFailed: false,
+    });
     act(() => setPhotosOverMobileData(false));
     localStorage.removeItem(PHOTOS_OVER_MOBILE_DATA_KEY);
     window.history.replaceState(null, '', '/');
@@ -119,7 +137,7 @@ describe('Settings: the Photos row', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     window.history.replaceState(null, '', '/');
     useAppStore.getState().setView('settings');
-    await renderSettings();
+    await renderSettings("Couldn't load your name");
 
     await user.click(screen.getByTestId('settings-photos-row'));
 

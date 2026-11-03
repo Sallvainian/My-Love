@@ -51,7 +51,7 @@ vi.mock('../../../src/services/coupleSettingsService', async (importOriginal) =>
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { COUPLE_SETTINGS_COPY_KIND, type CoupleSettings } from '../../../src/stores/slices/settingsSlice';
+import { COUPLE_SETTINGS_COPY_KIND, type CoupleSettings } from '../../../src/stores/slices/datesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 
 const A = 'USER-A-ID';

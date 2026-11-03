@@ -15,18 +15,23 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import pkg from '../../../../package.json';
 import { clearSignOutNotice, getSignOutNotice } from '../../../services/signOutNotice';
+import { useAppStore } from '../../../stores/useAppStore';
 
 const backend = vi.hoisted(() => ({
-  lookupOwnDisplayName: vi.fn(),
+  fetchOwnProfile: vi.fn(),
   getUser: vi.fn(),
   signOut: vi.fn(),
 }));
 
 vi.mock('../../../api/supabaseClient', () => ({
-  lookupOwnDisplayName: backend.lookupOwnDisplayName,
   SEED_FALLBACK_NAME: 'Unknown',
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
   getPartnerId: vi.fn(),
+}));
+// The name row reads the store's own profile, which `loadOwnProfile` fills
+// from this read.
+vi.mock('../../../services/profileService', () => ({
+  profileService: { fetchOwnProfile: backend.fetchOwnProfile, saveBirthday: vi.fn() },
 }));
 vi.mock('../../../api/authService', () => ({
   authService: { getUser: backend.getUser, signOut: backend.signOut },
@@ -49,10 +54,19 @@ vi.mock('motion/react', () => ({
 
 import { Settings } from '../Settings';
 
-async function renderSettings(props: { onShowWelcome?: () => void } = {}) {
+let accountCounter = 0;
+
+/**
+ * Renders Settings and waits for the name row to finish its read. Offline the
+ * read has no server answer, so the row settles on `settledAs` instead.
+ */
+async function renderSettings(
+  props: { onShowWelcome?: () => void } = {},
+  settledAs = 'Jessie'
+) {
   render(<Settings {...props} />);
   await waitFor(() =>
-    expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
+    expect(screen.getByTestId('settings-display-name').textContent).toBe(settledAs)
   );
 }
 
@@ -61,7 +75,15 @@ describe('Settings on the kit', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.getUser.mockResolvedValue({ id: 'user-a', email: 'person@example.com' });
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: 'Jessie' });
+    backend.fetchOwnProfile.mockResolvedValue({ displayName: 'Jessie', birthday: null });
+    // A fresh account and session per case, so no earlier case's saved copy decides the name.
+    accountCounter += 1;
+    useAppStore.setState({
+      userId: `user-${accountCounter}`,
+      authSessionVersion: accountCounter,
+      ownProfile: null,
+      ownProfileLoadFailed: false,
+    });
   });
 
   afterEach(() => {
@@ -292,7 +314,7 @@ describe('Settings on the kit', () => {
   it('refuses to sign out of all devices offline, before any dialog or request', async () => {
     const user = userEvent.setup();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    await renderSettings();
+    await renderSettings({}, "Couldn't load your name");
 
     await user.click(screen.getByTestId('settings-sign-out-everywhere'));
 
@@ -306,11 +328,23 @@ describe('Settings on the kit', () => {
   });
 
   it('disables the display-name row and says Loading... while the first read is in flight', async () => {
-    backend.lookupOwnDisplayName.mockReturnValue(new Promise(() => {}));
+    // Released before the case ends: the read runs in the shared account-data
+    // queue, and one left pending would hold every later case's read behind it.
+    let releaseRead: () => void = () => {};
+    backend.fetchOwnProfile.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseRead = () => resolve({ displayName: 'Jessie', birthday: null });
+      })
+    );
     render(<Settings />);
 
     expect(screen.getByTestId('settings-display-name-edit')).toBeDisabled();
     expect(screen.getByTestId('settings-display-name').textContent).toBe('Loading...');
+
+    releaseRead();
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-display-name').textContent).toBe('Jessie')
+    );
   });
 
   it('renders no identity row when the user has no email', async () => {
@@ -335,7 +369,7 @@ describe('Settings on the kit', () => {
   });
 
   it('takes the avatar initial from the email when no display name is set', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'unset' });
+    backend.fetchOwnProfile.mockResolvedValue({ displayName: null, birthday: null });
     render(<Settings />);
     await waitFor(() =>
       expect(screen.getByTestId('settings-display-name').textContent).toBe('Not set yet')
@@ -346,7 +380,7 @@ describe('Settings on the kit', () => {
   });
 
   it('shows a whole emoji, not half a surrogate pair, for an emoji-led name', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '💖 Jessie' });
+    backend.fetchOwnProfile.mockResolvedValue({ displayName: '💖 Jessie', birthday: null });
     render(<Settings />);
     await waitFor(() =>
       expect(screen.getByTestId('settings-display-name').textContent).toBe('💖 Jessie')
@@ -357,7 +391,7 @@ describe('Settings on the kit', () => {
   });
 
   it('shows a whole multi-code-point emoji for a name led by a skin-tone emoji', async () => {
-    backend.lookupOwnDisplayName.mockResolvedValue({ status: 'chosen', displayName: '👍🏽 Jessie' });
+    backend.fetchOwnProfile.mockResolvedValue({ displayName: '👍🏽 Jessie', birthday: null });
     render(<Settings />);
     await waitFor(() =>
       expect(screen.getByTestId('settings-display-name').textContent).toBe('👍🏽 Jessie')

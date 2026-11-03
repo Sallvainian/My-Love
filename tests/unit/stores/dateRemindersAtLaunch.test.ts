@@ -100,9 +100,9 @@ import {
   ANNIVERSARIES_COPY_KIND,
   COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
-  PROFILE_COPY_KIND,
-  PUSH_PREFERENCES_COPY_KIND,
-} from '../../../src/stores/slices/settingsSlice';
+} from '../../../src/stores/slices/datesSlice';
+import { PUSH_PREFERENCES_COPY_KIND } from '../../../src/stores/slices/notificationsSlice';
+import { PROFILE_COPY_KIND } from '../../../src/stores/slices/profileSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { deferred, setOnline, type StoreState } from './accountDataFixtures';
 

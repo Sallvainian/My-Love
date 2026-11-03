@@ -75,7 +75,7 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
 import type { ServerAnniversary } from '../../../src/services/anniversariesService';
 import { readLocalCopy, refreshLocalCopies, writeLocalCopy } from '../../../src/services/localCopy';
 import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
-import { ANNIVERSARIES_COPY_KIND } from '../../../src/stores/slices/settingsSlice';
+import { ANNIVERSARIES_COPY_KIND } from '../../../src/stores/slices/datesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import type { Anniversary } from '../../../src/types';
 import { deferred, offline, setAnniversaries, setOnline, type StoreState } from './accountDataFixtures';

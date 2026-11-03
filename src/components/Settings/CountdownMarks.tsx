@@ -2,7 +2,7 @@
  * CountdownMarks — the "Reminders" group of Settings' "Push and reminders"
  * section. Its first row is the "Date reminders" switch (story 4.3), which
  * turns every date reminder off or back on: it is the `dateReminders` field of
- * the account's push switches (`settingsSlice.pushPreferences`, kept as the
+ * the account's push switches (`notificationsSlice.pushPreferences`, kept as the
  * `push-preferences` local copy), and writing the copy re-plans the reminders.
  * It is disabled until the switches have loaded and while a save is in flight;
  * the marks rows below stay usable while it is off. Under it (story 4.2) is one
@@ -15,7 +15,7 @@
  * the Home Screen web app, a shell installed before the plugin existed) it
  * renders nothing and reads nothing (`hasNativeReminders()`). The marks are
  * the account's `countdown_marks` rows, kept as the `countdown-marks` local
- * copy (`settingsSlice.countdownMarks`): they load when the section opens and
+ * copy (`datesSlice.countdownMarks`): they load when the section opens and
  * show offline, and a toggle writes the server first, then state and copy
  * (`setCountdownMark`), which re-plans the reminders. A toggle offline is
  * refused with `offlineMessage`.
