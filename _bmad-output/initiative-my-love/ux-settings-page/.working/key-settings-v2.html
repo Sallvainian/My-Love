@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings key screens v2</title>
+<style>
+/*
+  Key screens v2 — Settings rework (late Discovery, round 2). Spine sections each frame illustrates:
+  1  Top page, bottom-dock form (gear) — Information Architecture (top-page groups); Interaction Primitives: collapsing title (expanded, back arrow); Component Patterns: list row
+  2  Top page, Duo column form         — Information Architecture; Layout: column dock (capsule, --dock-right); Interaction Primitives: no back arrow on the top page
+  3  Profile                           — Information Architecture (Profile); Component Patterns: identity header, list row (tap to edit)
+  4  Partner, linked                   — Information Architecture (Partner); Component Patterns: read-only row
+  5  Partner, not linked               — State Patterns: unlinked; Component Patterns: list row
+  6  Partner's birthday (read-only)    — Component Patterns: read-only row, switch row; State Patterns: partner-owned date
+  7  Partner's event (read-only)       — Component Patterns: read-only row, switch row; State Patterns: partner-owned date
+  8  New event form                    — Component Patterns: create form page (the one exception to tap-to-edit)
+  9  Notifications (five pushes)       — Component Patterns: switch row; Information Architecture (Notifications)
+  Visual system unchanged from v1. Tokens are the light --kit-* values from
+  src/index.css; sizes and radii from src/components/shared/kitClasses.ts
+  (CARD, DIVIDER, GROUP_ROW, GROUP_TILE, SECTION_LABEL, NOTICE, ADD_BUTTON,
+  FIELD_LABEL, fieldClass), SwitchRow.tsx, the EventsSettings icon picker and
+  the AppNavigation column capsule. Inter and Playfair Display are Google
+  webfonts; offline the mock falls back to the system sans and a system serif.
+*/
+:root {
+  --kit-page: #fdf4f7;
+  --kit-card: #ffffff;
+  --kit-card2: #f6eef2;
+  --kit-ink: #1f2430;
+  --kit-muted: #646b78;
+  --kit-accent: #c8216b;
+  --kit-fill: #db2777;
+  --kit-tint: #fce7f3;
+  --kit-danger: #cf2121;
+  --kit-dtint: #fdecec;
+  --kit-line: rgba(157, 23, 77, 0.09);
+  --kit-line-strong: #987d90;
+  --kit-glass: rgba(255, 255, 255, 0.8);
+  --kit-field: #fbf7f9;
+  --kit-shadow-card: 0 1px 2px rgba(157, 23, 77, 0.05), 0 8px 24px rgba(157, 23, 77, 0.06);
+  --kit-shadow-float: 0 10px 30px rgba(157, 23, 77, 0.16);
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --serif: 'Playfair Display', 'Iowan Old Style', Palatino, Georgia, serif;
+  --canvas: #ebe9e7;
+  --canvas-ink: #3b3f47;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--canvas);
+  color: var(--canvas-ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  padding: 32px 16px 64px;
+}
+.sheet-head { max-width: 1400px; margin: 0 auto 28px; }
+.sheet-head h1 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+.sheet-head p { margin: 0; font-size: 13px; line-height: 1.5; max-width: 760px; }
+.board {
+  display: flex; flex-wrap: wrap; gap: 40px 36px;
+  justify-content: center; align-items: flex-start;
+  max-width: 1400px; margin: 0 auto;
+}
+figure.shot { margin: 0; width: 410px; max-width: 100%; }
+figcaption { margin-top: 12px; font-size: 13px; line-height: 1.5; padding: 0 6px; }
+figcaption b { font-weight: 600; }
+.tag {
+  display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: #8a5a00; background: #fbecc8; border-radius: 6px;
+  padding: 1px 6px; margin: 0 2px; vertical-align: 1px;
+}
+
+/* Device frame */
+.phone {
+  border: 10px solid #1b1d22; border-radius: 54px; background: #1b1d22;
+  box-shadow: 0 20px 50px rgba(0,0,0,.18);
+}
+.screen {
+  position: relative; overflow: hidden; border-radius: 44px;
+  background: var(--kit-page); color: var(--kit-ink);
+  min-height: 844px; padding-bottom: 130px; /* --dock-clearance: 6rem + 34px home-indicator inset */
+}
+.screen.crop { min-height: 0; height: 560px; padding-bottom: 0; }
+.screen.crop::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 90px;
+  background: linear-gradient(to bottom, rgba(253,244,247,0), var(--kit-page));
+}
+.status {
+  height: 47px; display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 0 30px 8px 36px; font-size: 16px; font-weight: 600; color: var(--kit-ink);
+  position: relative; z-index: 3;
+}
+.status .icons { display: flex; gap: 6px; align-items: center; }
+.home-ind {
+  position: absolute; left: 50%; bottom: 8px; width: 134px; height: 5px;
+  margin-left: -67px; border-radius: 3px; background: var(--kit-ink); z-index: 6;
+}
+
+/* Settings' own bar */
+.toprow { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; }
+.bar {
+  height: 64px; display: grid; grid-template-columns: 64px 1fr 64px; align-items: center;
+  padding: 0 8px; border-bottom: 1px solid var(--kit-line);
+}
+.bar-title { text-align: center; font-size: 17px; font-weight: 600; color: var(--kit-ink); }
+.glass { background: var(--kit-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.overlay-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; }
+.icon-btn {
+  width: 44px; height: 44px; border-radius: 999px; display: flex;
+  align-items: center; justify-content: center; color: var(--kit-ink);
+}
+.icon-btn svg { width: 24px; height: 24px; }
+.add-btn { background: var(--kit-tint); color: var(--kit-accent); justify-self: end; }
+.add-btn svg { width: 20px; height: 20px; }
+.save { justify-self: end; padding-right: 8px; font-size: 17px; font-weight: 600; color: var(--kit-accent); }
+.large-title {
+  margin: 0; padding: 0 20px 16px; font-family: var(--serif);
+  font-size: 30px; line-height: 1.1; font-weight: 600; color: var(--kit-ink);
+}
+
+/* Page body */
+.content { padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+.content.below-bar { padding-top: 16px; }
+.section { display: flex; flex-direction: column; gap: 8px; }
+.label { /* SECTION_LABEL */
+  padding: 0 4px; font-size: 12px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--kit-muted); margin: 0;
+}
+.card { /* CARD */
+  display: flex; flex-direction: column; gap: 6px; padding: 12px;
+  background: var(--kit-card); border: 1px solid var(--kit-line);
+  border-radius: 20px; box-shadow: var(--kit-shadow-card);
+}
+.div { height: 1px; margin: 0 -12px; background: var(--kit-line); } /* DIVIDER */
+.row { display: flex; align-items: center; gap: 12px; min-height: 48px; } /* GROUP_ROW */
+.tile { /* GROUP_TILE */
+  width: 36px; height: 36px; flex: none; border-radius: 12px;
+  background: var(--kit-tint); color: var(--kit-accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.tile svg { width: 17px; height: 17px; }
+.row .name { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; color: var(--kit-ink); }
+.row .value { font-size: 15px; color: var(--kit-muted); white-space: nowrap; }
+.row .glyph { color: var(--kit-accent); display: flex; }
+.row .glyph svg { width: 20px; height: 20px; }
+.chev { width: 18px; height: 18px; flex: none; color: var(--kit-muted); margin-left: -4px; }
+.row.danger .tile { background: var(--kit-dtint); color: var(--kit-danger); }
+.row.danger .name { color: var(--kit-danger); }
+.row.center { justify-content: center; }
+.row.center .name { flex: none; color: var(--kit-danger); }
+.foot { margin: 0; padding: 0 4px; font-size: 13px; line-height: 1.4; color: var(--kit-muted); }
+.version { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--kit-muted); }
+.notice { /* NOTICE */
+  margin: 0; padding: 12px; border-radius: 14px; background: var(--kit-card2);
+  font-size: 16px; line-height: 1.45; color: var(--kit-ink);
+}
+.dim { opacity: .6; } /* SwitchRow disabled */
+
+/* SwitchRow track and thumb: h-7 w-12, thumb h-5 w-5, translate-x-6 when on */
+.switch {
+  position: relative; width: 48px; height: 28px; flex: none; border-radius: 999px;
+  background: var(--kit-line-strong);
+}
+.switch::after {
+  content: ''; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px;
+  border-radius: 999px; background: var(--kit-card);
+  box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.1);
+}
+.switch.on { background: var(--kit-fill); }
+.switch.on::after { left: 24px; }
+
+/* One-field edit: fieldClass(false) */
+.field {
+  height: 48px; border-radius: 14px; background: var(--kit-field);
+  box-shadow: inset 0 0 0 1px var(--kit-line-strong);
+  display: flex; align-items: center; padding: 0 16px; font-size: 16px; color: var(--kit-ink);
+}
+
+/* Bottom dock (AppNavigation, bottom form) */
+.dock {
+  position: absolute; left: 16px; right: 16px; bottom: 50px; height: 60px; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 8px;
+  border-radius: 999px; background: var(--kit-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: var(--kit-shadow-float), 0 0 0 1px var(--kit-line);
+}
+.dock span { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--kit-muted); }
+.dock svg { width: 22px; height: 22px; }
+
+svg.i { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 440px) {
+  body { padding: 20px 0 48px; }
+  .sheet-head { padding: 0 16px; }
+  figure.shot { width: 100%; padding: 0 4px; }
+  .phone { border-width: 6px; border-radius: 46px; }
+}
+
+/* v2 additions */
+.bar.wide { grid-template-columns: 84px 1fr 84px; }
+.bar-text { font-size: 17px; color: var(--kit-ink); padding-left: 8px; }
+.save.dimmed { opacity: .5; }
+.ident { display: flex; align-items: center; gap: 12px; padding: 0 4px; min-height: 48px; }
+.avatar {
+  width: 40px; height: 40px; flex: none; border-radius: 999px; background: var(--kit-fill);
+  color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600;
+}
+.ident .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ident .who b { font-size: 15px; font-weight: 500; color: var(--kit-ink); }
+.ident .who span { font-size: 13px; color: var(--kit-muted); }
+.lead { margin: 0; padding: 0 4px; font-size: 15px; line-height: 1.45; color: var(--kit-muted); }
+.card.form { gap: 16px; }
+.flabel { display: block; margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--kit-ink); } /* FIELD_LABEL */
+.field.ph { color: var(--kit-muted); }
+.field.multi { height: 96px; align-items: flex-start; padding-top: 12px; }
+.opts { display: flex; gap: 8px; }
+.opt {
+  flex: 1; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  gap: 8px; font-size: 14px; font-weight: 600; color: var(--kit-muted);
+  box-shadow: inset 0 0 0 1px var(--kit-line-strong);
+}
+.opt svg { width: 16px; height: 16px; }
+.opt.sel { background: var(--kit-tint); color: var(--kit-accent); box-shadow: inset 0 0 0 2px var(--kit-accent); }
+.inset { margin: 12px 6px 0; }
+.inset-label { display: block; font-size: 12px; font-weight: 600; margin: 0 0 6px 4px; color: var(--canvas-ink); }
+.inset .card { box-shadow: none; }
+
+/* Duo folded, column form: 84pt column on the right; content ends at its edge */
+figure.shot.duo { width: 494px; }
+.screen.duo { padding-bottom: 34px; } /* --dock-clearance shrinks to the home-indicator band */
+.screen.duo .status, .screen.duo .toprow, .screen.duo .large-title, .screen.duo .content { margin-right: 84px; } /* --dock-right */
+.capsule { /* AppNavigation column form: w-10, py-0.5, gap-2, h-9 w-9 buttons */
+  position: absolute; right: 22px; bottom: 50px; width: 40px; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 2px 0;
+  border-radius: 999px; background: var(--kit-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: var(--kit-shadow-float), 0 0 0 1px var(--kit-line);
+}
+.capsule span { width: 36px; height: 36px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: var(--kit-muted); }
+.capsule span.on { background: var(--kit-tint); color: var(--kit-accent); }
+.capsule svg { width: 22px; height: 22px; }
+</style>
+</head>
+<body>
+
+<!-- Icon set: simple approximations of the named lucide icons (24px grid, 2px stroke). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-calendar-heart" viewBox="0 0 24 24"><path d="M3 10h18V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h7"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M21.29 14.7a2.43 2.43 0 0 0-2.65-.52c-.3.12-.57.3-.8.53l-.34.34-.35-.34a2.43 2.43 0 0 0-2.65-.53c-.3.12-.56.3-.79.53-.95.94-1 2.53.2 3.74L17.5 22l3.6-3.55c1.2-1.21 1.14-2.8.19-3.74Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-monitor-smartphone" viewBox="0 0 24 24"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 19v-4"/><path d="M7 19h5"/><rect width="6" height="10" x="16" y="12" rx="2"/></symbol>
+    <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></symbol>
+    <symbol id="i-cake" viewBox="0 0 24 24"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/><path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-message-circle-heart" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M15.8 9.2a2.5 2.5 0 0 0-3.5 0l-.3.4-.35-.3a2.42 2.42 0 1 0-3.2 3.6l3.6 3.5 3.6-3.5c1.2-1.2 1.1-2.7.2-3.7"/></symbol>
+    <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+    <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></symbol>
+    <symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
+<header class="sheet-head">
+  <h1>Settings rework: key screens v2</h1>
+  <p>Round 2, with the owner's decisions after v1. Visual system unchanged from v1 (light kit tokens from <code>src/index.css</code>). Frames grow taller than a phone screen where the page is longer, so every row shows. Items tagged <span class="tag">assumption</span> are guesses for the owner to confirm, not decisions.</p>
+</header>
+
+<main class="board">
+
+<!-- 1. Top page, bottom-dock form ------------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+    <div class="toprow"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span></div>
+    <h2 class="large-title">Settings</h2>
+    <div class="content">
+      <section class="section">
+        <h3 class="label">Account</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-user"/></svg></span><span class="name">Profile</span><span class="value">Casey</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">Partner</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-users"/></svg></span><span class="name">Partner</span><span class="value">Jessie</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+          <div class="div"></div>
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-calendar-heart"/></svg></span><span class="name">Dates</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">Preferences</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-bell"/></svg></span><span class="name">Notifications</span><span class="value">On</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">About</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-rotate-ccw"/></svg></span><span class="name">Replay welcome message</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <div class="card">
+          <div class="row danger"><span class="tile"><svg class="i"><use href="#i-log-out"/></svg></span><span class="name">Log out</span></div>
+          <div class="div"></div>
+          <div class="row danger"><span class="tile"><svg class="i"><use href="#i-monitor-smartphone"/></svg></span><span class="name">Log out of all devices</span></div>
+        </div>
+        <p class="version">Version 1.0.0 · made for the two of you</p>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>1. Top page on the iPhone (bottom dock).</b> Opened from the header gear, so it has a back arrow above the large title. No Photos row, because the iPhone can't report the connection type. "Log out" comes first, then "Log out of all devices".</figcaption>
+</figure>
+
+<!-- 2. Top page, Duo column form --------------------------------------- -->
+<figure class="shot duo">
+  <div class="phone"><div class="screen duo">
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+    <div class="toprow"></div>
+    <h2 class="large-title">Settings</h2>
+    <div class="content">
+      <section class="section">
+        <h3 class="label">Account</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-user"/></svg></span><span class="name">Profile</span><span class="value">Casey</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">Partner</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-users"/></svg></span><span class="name">Partner</span><span class="value">Jessie</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+          <div class="div"></div>
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-calendar-heart"/></svg></span><span class="name">Dates</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">Preferences</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-bell"/></svg></span><span class="name">Notifications</span><span class="value">On</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">About</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-rotate-ccw"/></svg></span><span class="name">Replay welcome message</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+      <section class="section">
+        <div class="card">
+          <div class="row danger"><span class="tile"><svg class="i"><use href="#i-log-out"/></svg></span><span class="name">Log out</span></div>
+          <div class="div"></div>
+          <div class="row danger"><span class="tile"><svg class="i"><use href="#i-monitor-smartphone"/></svg></span><span class="name">Log out of all devices</span></div>
+        </div>
+        <p class="version">Version 1.0.0 · made for the two of you</p>
+      </section>
+    </div>
+    <nav class="capsule" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+      <span class="on"><svg class="i"><use href="#i-settings"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>2. Top page on the iPhone Duo, folded (column dock).</b> Settings is the capsule's sixth button (highlighted gear) at the bottom of the 84pt right column. No back arrow and no gear in the bar. The content stops at the column's edge.</figcaption>
+</figure>
+
+<!-- 3. Profile -------------------------------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+    <div class="toprow"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span></div>
+    <h2 class="large-title">Profile</h2>
+    <div class="content">
+      <div class="ident">
+        <span class="avatar">C</span>
+        <span class="who"><b>Casey</b><span>casey@example.com</span></span>
+      </div>
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="name">Name</span><span class="value">Casey</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+          <div class="div"></div>
+          <div class="row"><span class="name">Birthday</span><span class="value">4 Apr 1995</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>3. Profile</b>, pushed from the Profile row. A small header with the initial avatar, name and email, then tap-to-edit Name and Birthday rows that open one-field pages.</figcaption>
+</figure>
+
+<!-- 4. Partner, linked ------------------------------------------------ -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+    <div class="toprow"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span></div>
+    <h2 class="large-title">Partner</h2>
+    <div class="content">
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="name">Name</span><span class="value">Jessie</span></div>
+          <div class="div"></div>
+          <div class="row"><span class="name">Email</span><span class="value">jessie@example.com</span></div>
+          <div class="div"></div>
+          <div class="row"><span class="name">Linked since</span><span class="value">3 Feb 2022</span></div>
+        </div>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>4. Partner, linked.</b> Three read-only rows with no chevrons and no unlink action. Jessie's birthday stays on the Dates list.</figcaption>
+</figure>
+
+<!-- 5. Partner, not linked -------------------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+    <div class="toprow"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span></div>
+    <h2 class="large-title">Partner</h2>
+    <div class="content">
+      <p class="lead">You aren't linked with a partner yet.</p>
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-users"/></svg></span><span class="name">Go to Partner</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+        </div>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <div class="inset">
+    <span class="inset-label">Top-page row when not linked</span>
+    <div class="card">
+      <div class="row"><span class="tile"><svg class="i"><use href="#i-users"/></svg></span><span class="name">Partner</span><span class="value">Not linked</span><svg class="i chev"><use href="#i-chev-r"/></svg></div>
+    </div>
+  </div>
+  <figcaption><b>5. Partner, not linked.</b> One short line, then a row that opens the Partner view, where the one connect flow lives. The line "You aren't linked with a partner yet." and the row label "Go to Partner" <span class="tag">assumption</span>.</figcaption>
+</figure>
+
+<!-- 6. Jessie's birthday, read-only ----------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="glass">
+      <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+      <div class="bar wide"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span><span class="bar-title">Jessie's birthday</span><span></span></div>
+    </div>
+    <div class="content below-bar">
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="name">Date</span><span class="value">19 Sep</span></div>
+        </div>
+        <p class="foot">Jessie sets this in their Profile.</p>
+      </section>
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="name">Remind me</span><span class="switch"></span></div>
+        </div>
+        <p class="foot">A month and a week before.</p>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>6. Jessie's birthday</b>, opened from the Dates list, read-only. The Date row has no chevron, a footnote says who sets it, and Casey's own Remind me switch is shown off here. Bar title "Jessie's birthday" <span class="tag">assumption</span>.</figcaption>
+</figure>
+
+<!-- 7. Jessie's event, read-only -------------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="glass">
+      <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+      <div class="bar"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span><span class="bar-title">Concert</span><span></span></div>
+    </div>
+    <div class="content below-bar">
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="name">Date</span><span class="value">Fri 4 Dec</span></div>
+          <div class="div"></div>
+          <div class="row"><span class="name">Note</span><span class="value">Front row</span></div>
+          <div class="div"></div>
+          <div class="row"><span class="name">Icon</span><span class="glyph"><svg class="i"><use href="#i-calendar"/></svg></span></div>
+        </div>
+        <p class="foot">Jessie added this.</p>
+      </section>
+      <section class="section">
+        <div class="card">
+          <div class="row"><span class="name">Remind me</span><span class="switch on"></span></div>
+        </div>
+        <p class="foot">A month and a week before.</p>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>7. An event Jessie made</b>, read-only for Casey (only the creator can edit or delete an event). Rows have no chevrons and there is no Delete; Casey's Remind me switch still works. Footnote "Jessie added this." <span class="tag">assumption</span>.</figcaption>
+</figure>
+
+<!-- 8. New event form ------------------------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="glass">
+      <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+      <div class="bar wide"><span class="bar-text">Cancel</span><span class="bar-title">New event</span><span class="save dimmed">Add</span></div>
+    </div>
+    <div class="content below-bar">
+      <section class="section">
+        <div class="card form">
+          <div><span class="flabel">Name</span><div class="field ph">e.g., Weekend trip</div></div>
+          <div><span class="flabel">Date</span><div class="field">14 Nov 2026</div></div>
+          <div><span class="flabel">Note</span><div class="field multi ph">Add a note about this event...</div></div>
+          <div><span class="flabel">Icon</span>
+            <div class="opts">
+              <span class="opt sel"><svg class="i"><use href="#i-calendar"/></svg>Calendar</span>
+              <span class="opt"><svg class="i"><use href="#i-gem"/></svg>Ring</span>
+              <span class="opt"><svg class="i"><use href="#i-plane"/></svg>Plane</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>8. New event form</b>, from the Dates "+" after choosing Event (or from Home's Add <span class="tag">assumption</span>). All the fields at once: Cancel on the left, Add on the right, dimmed until the name is filled. Calendar is the selected icon. This is the one page that doesn't use tap-to-edit.</figcaption>
+</figure>
+
+<!-- 9. Notifications, five pushes ------------------------------------- -->
+<figure class="shot">
+  <div class="phone"><div class="screen">
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><rect x="23" y="4" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".4"/></svg>
+    </span></div>
+    <div class="toprow"><span class="icon-btn"><svg class="i"><use href="#i-chev-l"/></svg></span></div>
+    <h2 class="large-title">Notifications</h2>
+    <div class="content">
+      <section class="section">
+        <h3 class="label">Notify me about</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-message-circle-heart"/></svg></span><span class="name">Love notes</span><span class="switch on"></span></div>
+          <div class="div"></div>
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-smile"/></svg></span><span class="name">Moods</span><span class="switch on"></span></div>
+          <div class="div"></div>
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-image"/></svg></span><span class="name">Photos</span><span class="switch on"></span></div>
+          <div class="div"></div>
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-hand"/></svg></span><span class="name">Pokes and kisses</span><span class="switch on"></span></div>
+          <div class="div"></div>
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-user-plus"/></svg></span><span class="name">Partner requests</span><span class="switch on"></span></div>
+        </div>
+      </section>
+      <section class="section">
+        <h3 class="label">Reminders</h3>
+        <div class="card">
+          <div class="row"><span class="tile"><svg class="i"><use href="#i-bell"/></svg></span><span class="name">Date reminders</span><span class="switch on"></span></div>
+        </div>
+        <p class="foot">At 9:00 the day before, and on the day for birthdays and anniversaries.</p>
+      </section>
+    </div>
+    <nav class="dock" aria-label="Dock">
+      <span><svg class="i"><use href="#i-heart"/></svg></span>
+      <span><svg class="i"><use href="#i-smile"/></svg></span>
+      <span><svg class="i"><use href="#i-message-circle"/></svg></span>
+      <span><svg class="i"><use href="#i-camera"/></svg></span>
+      <span><svg class="i"><use href="#i-users"/></svg></span>
+    </nav>
+    <div class="home-ind"></div>
+  </div></div>
+  <figcaption><b>9. Notifications</b> with five push switches under "Notify me about". The Dates push is removed because no push is sent when a date changes; the Reminders group is unchanged.</figcaption>
+</figure>
+
+</main>
+
+</body>
+</html>
