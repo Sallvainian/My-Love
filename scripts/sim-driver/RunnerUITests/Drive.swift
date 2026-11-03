@@ -17,7 +17,7 @@ import XCTest
 //                           decline-push, answer the notification permission
 //                           alert Don't Allow (XCUITest's own handling taps
 //                           Allow on the first interaction after sign-in)
-//   signout                 tap Settings, then Sign out, and wait for the
+//   signout                 tap Settings, then Log out, and wait for the
 //                           login form
 // Every step brings the shell to the front first. Backgrounding is not a
 // step: XCUIDevice's Home press leaves the shell in front on the Duo
@@ -166,17 +166,17 @@ final class Drive: XCTestCase {
             return XCTFail("no Settings button: signed out already, or the page did not load")
         }
         settings.tap()
-        let signOut = app.webViews.buttons["Sign out"].firstMatch
+        let signOut = app.webViews.buttons["Log out"].firstMatch
         // The button sits below the fold on Settings' top page; swipe until it shows.
         for _ in 0..<8 where !signOut.isHittable {
             if !signOut.exists { _ = signOut.waitForExistence(timeout: 2) }
             if signOut.isHittable { break }
             app.webViews.firstMatch.swipeUp()
         }
-        guard signOut.isHittable else { return XCTFail("no Sign out button in Settings") }
+        guard signOut.isHittable else { return XCTFail("no Log out button in Settings") }
         signOut.tap()
         if !app.webViews.textFields.firstMatch.waitForExistence(timeout: 20) {
-            return XCTFail("tapped Sign out, but the login form never showed")
+            return XCTFail("tapped Log out, but the login form never showed")
         }
         say("signed out")
     }

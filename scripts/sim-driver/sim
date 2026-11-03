@@ -87,7 +87,7 @@ Accounts (local stack only):
                          answers a notification permission alert Allow when it
                          next touches the app; --decline-push answers it Don't
                          Allow instead (after sim permission reset).
-  signout                Sign out through Settings and wait for the login form.
+  signout                Log out through Settings and wait for the login form.
 
 Device:
   pose closed|partial|open   Fold or unfold (ax pose).

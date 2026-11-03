@@ -417,7 +417,7 @@ export async function removePushRegistration(): Promise<void> {
 
 /**
  * Deletes every push registration the account owns, on every device, for
- * "Sign out of all devices" (DW-353). Called after the global
+ * "Log out of all devices" (DW-353). Called after the global
  * `supabase.auth.signOut()` with the access token read before it (DW-412):
  * the sign-out removes the session from the client, but the token stays valid
  * until it expires, and the RPC reads only `auth.uid()`. With no token there

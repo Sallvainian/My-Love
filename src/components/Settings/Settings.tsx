@@ -447,13 +447,13 @@ function WeddingForm({ weddingDate }: { weddingDate: string | null }) {
 }
 
 /**
- * Shown on the login screen when "Sign out of all devices" signed this device
+ * Shown on the login screen when "Log out of all devices" logged this device
  * out but could not reach every other one (the server was unreachable, or the
  * push registrations could not be removed). Settings owns the wording; the
  * login screen only displays it (`services/signOutNotice.ts`).
  */
 const PARTIAL_SIGN_OUT_NOTICE =
-  "You're signed out on this device, but your other devices could not be signed out. Sign in again when you're online and try Sign out of all devices once more.";
+  "You're logged out on this device, but your other devices could not be logged out. Sign in again when you're online and try Log out of all devices once more.";
 
 interface SignOutEverywhereConfirmationProps {
   onCancel: () => void;
@@ -500,7 +500,7 @@ function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywher
         className={`${DIALOG_PANEL} max-w-sm`}
       >
         <h3 id={titleId} className={`${DIALOG_TITLE} mb-5`}>
-          Sign out on every device? You'll need to sign in again on each one.
+          Log out on every device? You'll need to sign in again on each one.
         </h3>
         <div className="flex gap-3">
           <button
@@ -518,7 +518,7 @@ function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywher
             data-testid="settings-sign-out-everywhere-confirm"
             className={DESTRUCTIVE_BUTTON}
           >
-            Sign out everywhere
+            Log out everywhere
           </button>
         </div>
       </motion.div>
@@ -548,7 +548,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   // Which sign-out is running; both buttons wait while either does.
   const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
-  /** The "Sign out on every device?" dialog is open; nothing is signed out until it confirms. */
+  /** The "Log out on every device?" dialog is open; nothing is signed out until it confirms. */
   const [confirmingEverywhere, setConfirmingEverywhere] = useState(false);
   /** A sign-out is running; the guard `handleLogout` reads before `isLoggingOut` can. */
   const signOutRunningRef = useRef(false);
@@ -633,7 +633,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     // Ending the other devices' sessions is a server call; refuse it up front
     // rather than sign out only this device.
     if (everywhere && !isOnline()) {
-      setError(offlineMessage('Signing out of all devices', 'go through', 'needs'));
+      setError(offlineMessage('Logging out of all devices', 'go through', 'needs'));
       return;
     }
     signOutRunningRef.current = true;
@@ -653,7 +653,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
       // User will automatically be redirected to LoginScreen
     } catch (err) {
       console.error('[Settings] Logout failed:', err);
-      setError('Failed to sign out. Please try again.');
+      setError('Failed to log out. Please try again.');
       signOutRunningRef.current = false;
       setIsLoggingOut(false);
       setSigningOutEverywhere(false);
@@ -665,7 +665,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
   const handleSignOutEverywhereRow = () => {
     setError(null);
     if (!isOnline()) {
-      setError(offlineMessage('Signing out of all devices', 'go through', 'needs'));
+      setError(offlineMessage('Logging out of all devices', 'go through', 'needs'));
       return;
     }
     setConfirmingEverywhere(true);
@@ -723,7 +723,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
             Account, Countdowns and push sections follow until their stories give
             them pages of their own. */}
         <div className="flex flex-col gap-1">
-          {/* Sign out — its own quiet card, not a red block. */}
+          {/* Log out — its own quiet card, not a red block. */}
           <SettingsGroup testId="settings-sign-out-card">
             <button
               type="button"
@@ -742,9 +742,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
                   <LogOut className="h-4.25 w-4.25" />
                 )}
               </span>
-              {isLoggingOut && !signingOutEverywhere ? 'Signing out…' : 'Sign out'}
+              {isLoggingOut && !signingOutEverywhere ? 'Logging out…' : 'Log out'}
             </button>
-            {/* For a lost or given-away phone: Sign out above ends this device's
+            {/* For a lost or given-away phone: Log out above ends this device's
                 session only. */}
             <button
               type="button"
@@ -763,7 +763,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
                   <MonitorSmartphone className="h-4.25 w-4.25" />
                 )}
               </span>
-              {signingOutEverywhere ? 'Signing out of all devices…' : 'Sign out of all devices'}
+              {signingOutEverywhere ? 'Logging out of all devices…' : 'Log out of all devices'}
             </button>
           </SettingsGroup>
           <p className="text-center text-[13px] text-muted" data-testid="settings-version">

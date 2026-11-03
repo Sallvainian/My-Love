@@ -3,8 +3,8 @@
  *
  * Settings at 390x844 in both OS themes, read at the rendered surface: one
  * "Events" and one "Anniversaries" group heading with none of the old inner
- * titles, the countdown and Sign out cards on the kit card colour, a quiet
- * Sign out (no gradient, kit danger text), no horizontal overflow, and the
+ * titles, the countdown and Log out cards on the kit card colour, a quiet
+ * Log out (no gradient, kit danger text), no horizontal overflow, and the
  * About row that replays the welcome splash and returns to Settings. The kit
  * colours are `--kit-*` variables that switch under `prefers-color-scheme`, so
  * `emulateMedia` alone flips them.
@@ -62,14 +62,14 @@ test.describe('Settings on the style kit', () => {
       }
     });
 
-    test(`[P1] should draw the Countdowns and Sign out cards on the kit card in ${colorScheme}`, async ({
+    test(`[P1] should draw the Countdowns and Log out cards on the kit card in ${colorScheme}`, async ({
       page,
       interceptNetworkCall,
     }) => {
       await openSettings(page, interceptNetworkCall, colorScheme);
 
       // Cards on the kit card colour: Countdowns (the events group's card) and
-      // the Sign out card.
+      // the Log out card.
       await expect(page.getByTestId('settings-countdowns-card')).toHaveCSS(
         'background-color',
         KIT_CARD[colorScheme]
@@ -80,17 +80,17 @@ test.describe('Settings on the style kit', () => {
       );
     });
 
-    test(`[P1] should draw a quiet Sign out in ${colorScheme}`, async ({
+    test(`[P1] should draw a quiet Log out in ${colorScheme}`, async ({
       page,
       interceptNetworkCall,
     }) => {
       await openSettings(page, interceptNetworkCall, colorScheme);
 
-      // Quiet Sign out: no gradient, kit danger text.
+      // Quiet Log out: no gradient, kit danger text.
       const signOut = page.getByTestId('settings-sign-out');
       await expect(signOut).toHaveCSS('background-image', 'none');
       await expect(signOut).toHaveCSS('color', KIT_DANGER[colorScheme]);
-      await expect(signOut).toHaveText('Sign out');
+      await expect(signOut).toHaveText('Log out');
     });
 
     test(`[P1] should not scroll sideways at phone width in ${colorScheme}`, async ({
