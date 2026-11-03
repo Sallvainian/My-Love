@@ -45,7 +45,7 @@ test.describe('Log out of all devices', () => {
     const everywhere = page.getByTestId('settings-sign-out-everywhere');
     await expect(everywhere).toHaveText('Log out of all devices');
     const dialog = page.getByTestId('settings-sign-out-everywhere-confirmation');
-    // Settings' Error box; the app's offline banner sits outside the view.
+    // Settings' Error box; the offline banner inside the view is role="status", not an alert.
     const errorBox = page.getByTestId('settings-view').getByRole('alert');
 
     try {
