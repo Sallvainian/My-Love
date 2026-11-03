@@ -1,0 +1,219 @@
+# Epic 5, Settings Rework: every planned story in build order.
+# Settings.tsx, the slices it reads and the old date sections form one ordered
+# lane, so most entries wait on the one before; the edge-swipe spike and its
+# build are the only side lane.
+# R16, R17 and R18 (accessibility, states, design) are delivered by each story
+# for the pages it adds or changes.
+# Every story updates the existing E2E specs and helpers its change breaks
+# (tests/e2e/settings, the sign-out helpers, "Sign out" text) in the same
+# story, so main stays green.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Settings opens as a stack of pages with the new top page"
+description = "Builds the page stack every later story adds to: Settings' own bar (large title collapsing on scroll, small title on single-item pages), one pushState entry per page under the /settings/ scheme in the epic's Notes, a list page reloading to itself, the first-entry back rule, the slide (fade under Reduce Motion) and focus moves; the top page's groups with the Photos row and Photos page, Replay welcome message and the two log-out rows moved into their cards; removes the old Photos section (Settings.tsx:794); adds the AGENTS.md rule for adding a Settings subpage. Old sections not yet replaced stay below the rows until their stories move them."
+verify = "On npm run dev:local, Settings opens on the new top page; tapping Photos slides in the Photos page, the choice saves offline, a reload stays on it, and the back arrow and browser back each return one level, in both dock forms."
+covers = ["R1", "R2", "R12", "R16", "R17", "R18"]
+after = ["2.8"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "spike"
+title = "Find how the edge swipe returns one level in the shell"
+description = "Decides between the native WKWebView back-forward gesture (allowsBackForwardNavigationGestures, a reinstall on both phones) and a web gesture, by trying the native one against story 1's pushState entries; records whether the native gesture also goes back across views outside Settings, since it applies app-wide. A device trial uses AGENTS.md's build-number procedure, never an uninstall. Also finds whether the simulator driver can swipe: if so it adds a sim swipe command for story 15, if not story 15's check becomes a hand check. Records the choice as a Decision in the epic's Notes."
+verify = "The epic's Notes hold a dated Decision naming native or web, with what was tried and seen, and whether sim swipe exists."
+covers = ["R2"]
+after = [1]
+hitl = true
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Settings state splits into dates, profile and notifications slices"
+description = "Splits settingsSlice.ts by domain as the epic's Notes decide: datesSlice (anniversaries, couple settings, countdown marks), profileSlice (own profile, with the display name moved in from Settings.tsx's local lookup, giving R4 its one name store), notificationsSlice (push preferences), each with its copy kind, reader and refresher; signedOutState covers every moved field; AGENTS.md's slice count is updated. No visible change."
+verify = "The unit and E2E suites pass with only import paths changed, sign-out still clears every moved field (signOutClearsAccountState), and settingsSlice.ts holds only start-up, device settings and onboarding."
+covers = ["R15", "R4"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Adding or changing a date sends no push"
+description = "First DW-416 deploy: a migration drops the five date triggers, notify_date_change, date_changes and push_requests.date_change_id (with the source check) after a read-only check of the hosted catalog; send-push loses its date kind; the client stops reading and writing the dates preference (PUSH_PREFERENCE_KEYS, the service's column list, the Dates switch, the date tap route); pgTAP pins, database.types.ts and scripts/sim-driver/README.md (its sim dates line about date-change pushes) follow. push_preferences.dates stays for story 18."
+verify = "On a linked local stack, adding or changing an event, the wedding date, Together since or a birthday creates no push_requests row, supabase test db and the send-push Deno tests pass, and push settings still load and save."
+covers = ["R14"]
+after = [3, "3.5", "3.6", "3.9"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Log out replaces Sign out everywhere"
+description = "Every UI string EXPERIENCE.md's Voice and Tone lists reads Log out, the login screen's partial notice included, with Sign in unchanged; the two log-out rows run, refuse offline and confirm as its Danger action row says."
+verify = "No UI string reads Sign out; Log out of all devices refuses offline with no dialog and otherwise asks before logging out."
+covers = ["R13", "R16", "R17", "R18"]
+after = [3]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Notifications has its own page"
+description = "Moves the push switches into the Notifications page: the permission Notice re-read on open and foreground, Notify me about with five switches, Reminders with the Date reminders switch split out of CountdownMarks and its Footnote; the per-date reminder list stays on the top page under the rows until story 13 removes it; adds the Notifications row with its On / Off / Some value, shown only with the push plugins."
+verify = "In the shell, each switch saves on tap, the row's value follows the switches and the iOS permission, and the row is absent on the website."
+covers = ["R11", "R1", "R16", "R17", "R18"]
+after = [4, 5, "3.7", "4.3"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Profile edits name and birthday on one-field pages"
+description = "Adds the Profile row and page (header, Name, Birthday) and the one-field edit page every later field reuses, with a one-field page reloading to the page above it; R4's rows, pages and past-birthday rule, reading story 3's name store; removes the name and birthday editors from the old Account section."
+verify = "Saving a new name updates the top page, the header and the row without a reload; a future birthday cannot be saved; an offline Save keeps the typed value."
+covers = ["R4", "R3", "R1", "R16", "R17", "R18"]
+after = [6]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Partner page shows who you are linked to"
+description = "Adds the Partner row and its three-state page: linked (Name, Email, Linked since from the accepted request's updated_at, hidden when absent), not linked with Go to Partner, and unknown with the Partner view's load-error wording. If Linked since becomes a local-copy kind, its refresher's read is stubbed in the auth-bootstrap harness and login.spec.ts in the same change (AGENTS.md)."
+verify = "A linked account sees Linked since, an unlinked one sees the lead line and Go to Partner, and a failed read never shows Not linked."
+covers = ["R5", "R1", "R16", "R17", "R18"]
+after = [7]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Dates lists every date in one place"
+description = "Adds the Dates row and list: Together, Birthdays, Events, Anniversaries and Past with Load more, dates on the right, Not set, hidden empty groups, Together and the partner's birthday only when linked. Rows open the pages stories 10 to 12 add."
+verify = "A linked and an unlinked account each see exactly the groups and rows EXPERIENCE.md's Dates list gives, and Load more appends older past events in place."
+covers = ["R6", "R1", "R16", "R17", "R18"]
+after = [8]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Together since, Wedding and both birthdays have their own pages"
+description = "Adds the Together since, Wedding (with Clear), your birthday and the partner's read-only birthday pages, each with the Remind me switch (shell only, disabled with its Footnote while Date reminders is off, setting kept); a date page reloads to itself and falls back to the Dates list when its date is absent once loaded; removes the old Account date fields."
+verify = "Each page edits or shows its date as EXPERIENCE.md says, Clear returns the wedding to Not set, and Remind me schedules the month and week reminders on the simulator."
+covers = ["R7", "R8", "R3", "R16", "R17", "R18"]
+after = [9, "4.2", "4.3"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Every event has its own page"
+description = "Adds the own, past and partner's event pages: Name, Date, Note and Icon on one-field pages for the creator, read-only rows for the partner, Remind me except on a past event, Delete event with its Confirmation dialog."
+verify = "The creator edits each field and deletes after confirming; the partner sees read-only rows and a working Remind me; a past event's page has no Remind me."
+covers = ["R7", "R8", "R3", "R16", "R17", "R18"]
+after = [10]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 12
+type = "story"
+title = "Every anniversary has its own page"
+description = "Adds the anniversary page: Name, Date and Note on one-field pages, Remind me, Delete anniversary with its Confirmation dialog; only its creator sees it."
+verify = "The creator edits and deletes an anniversary; the partner's Dates list never shows it."
+covers = ["R7", "R8", "R3", "R16", "R17", "R18"]
+after = [11]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 13
+type = "story"
+title = "New events and anniversaries are added from the Dates list"
+description = "Adds the + button, the Kind chooser and the New event and New anniversary forms (Add disabled until Name and Date, Calendar by default, return to the opener, a form reloading to the page above it); removes the old Countdowns section and the per-date reminder list, leaving the top page holding only its rows."
+verify = "Both forms create their date, which appears on the Dates list and on Home, and the old Countdowns section is gone."
+covers = ["R9", "R1", "R16", "R17", "R18"]
+after = [12]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 14
+type = "story"
+title = "Home's date cards and Add button open the date pages"
+description = "Every Home card that shows a date opens that date's page with Home highlighted and back returning to Home, through the from-Home history marker: TimeTogether opens Together since, BirthdayWeddingCards open the birthday and wedding pages, an event card its event, an anniversary countdown in DailyMessage its anniversary. Home's Add event opens the New event form directly, without the Kind chooser."
+verify = "From Home, tapping a card and going back lands on Home with Home highlighted, in both dock forms and after a reload; Add event opens New event."
+covers = ["R10", "R16", "R17", "R18"]
+after = [13]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 15
+type = "story"
+title = "The edge swipe returns one level in the shell"
+description = "Builds the gesture story 2 chose: either the native back-forward gesture, which needs a reinstall on both phones at story 17, or a web gesture on the page stack."
+verify = "An edge swipe from the left on a Settings subpage and on a date page opened from Home returns exactly one level, on the simulator through sim swipe, or by hand on a device if story 2 found the driver cannot swipe."
+covers = ["R2"]
+after = [2, 14]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 16
+type = "story"
+title = "Refactor sweep"
+description = "Cleanup only, scoped at its start from the plans and review findings this epic deferred."
+verify = "The full unit, E2E and pgTAP suites and the typecheck pass after the cleanup."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 19
+type = "story"
+title = "The Settings navigation rules have an E2E spec"
+description = "Closing end-to-end story: one tests/e2e spec covering the navigation rules in the epic's Notes: a reload restores a list page, a date page and the page above a one-field page or form; back from a date page opened from Home returns to Home with Home highlighted; a pasted /settings/... link opens its page and its back arrow goes to the page above."
+verify = "The new spec passes in the Playwright E2E project, locally and in CI."
+covers = ["R2", "R10"]
+after = [16]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 17
+type = "story"
+title = "The Settings rework ships to both phones"
+description = "Deploys through deploy.yml, gets the update onto the owner's Duo and the partner's iPhone (a reinstall on both if story 15 went native), and a person runs Key Flows 1, 3 and 4 on the Duo and Flow 2 on the partner's iPhone."
+verify = "The owner runs the four Key Flows on the two phones and each ends as EXPERIENCE.md describes."
+covers = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R16", "R17", "R18"]
+after = [16, 19]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 18
+type = "story"
+title = "The unused dates push preference column is dropped"
+description = "Second DW-416 deploy: after a read-only check of the hosted catalog, a migration drops push_preferences.dates if it exists; its pgTAP pins and database.types.ts follow; closes DW-416."
+verify = "supabase test db passes, the hosted schema has no push_preferences.dates after deploy, and push settings still load and save on both phones."
+covers = ["R14"]
+after = [4, 17]
+hitl = true
+risk = "low"
+unknown = "Do both phones run the update that stops using push_preferences.dates? (owner confirms before this is built)"
