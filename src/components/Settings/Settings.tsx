@@ -6,9 +6,11 @@
  * the version line, then the sections not yet replaced by pages of their own:
  * account (identity, display name, your own birthday, the couple's shared
  * "Together since" start and wedding date), the couple's countdowns (events and
- * anniversaries) and push and reminders (a switch for each kind of push; the
- * native shell only, see `PushSettings`). Photos (this device's mobile-data
- * choice for the offline album) is the first subpage.
+ * anniversaries) and the per-date reminder list (`CountdownMarks`; the native
+ * shell with the local-notifications plugin only). Photos (this device's
+ * mobile-data choice for the offline album) and Notifications (a switch for
+ * each kind of push and the Date reminders switch; the native shell with the
+ * push plugins only, see `NotificationsPage`) are the subpages.
  *
  * @component
  */
@@ -39,6 +41,7 @@ import { authService } from '../../api/authService';
 import { isOnline } from '../../api/errorHandlers';
 import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
+import { hasNativePush } from '../../services/pushNotifications';
 import { showSignOutNotice } from '../../services/signOutNotice';
 import {
   canTellMobileData,
@@ -66,9 +69,10 @@ import {
   fieldClass,
 } from '../shared/kitClasses';
 import { AnniversarySettings } from './AnniversarySettings';
+import { CountdownMarks } from './CountdownMarks';
 import { EventsSettings } from './EventsSettings';
+import { NotificationsPage, NotificationsRow } from './NotificationsPage';
 import { PhotosPage } from './PhotosPage';
-import { PushSettings } from './PushSettings';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { SettingsStack, type SettingsPageSpec } from './stack/SettingsStack';
 import { ROW_BUTTON } from './SwitchRow';
@@ -529,6 +533,15 @@ function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywher
 /** Settings' subpages by path under /settings; the top page is built in `Settings`. */
 const SUBPAGES = new Map<string, SettingsPageSpec>([
   [
+    'notifications',
+    {
+      title: 'Notifications',
+      titleStyle: 'large',
+      available: hasNativePush,
+      render: () => <NotificationsPage />,
+    },
+  ],
+  [
     'photos',
     {
       title: 'Photos',
@@ -697,6 +710,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
 
         {/* Preferences: the rows whose pages exist; nothing renders where none does. */}
         <SettingsGroup label="Preferences">
+          {hasNativePush() && <NotificationsRow key="notifications" />}
           {canTellMobileData() && (
             <SettingsRow
               icon={ImageIcon}
@@ -719,9 +733,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           )}
         </SettingsGroup>
 
-        {/* The IA's unlabeled last card, with the version line 4px under it. The old
-            Account, Countdowns and push sections follow until their stories give
-            them pages of their own. */}
+        {/* The IA's unlabeled last card, with the version line 4px under it. The
+            Account and Countdowns sections and the per-date reminder list follow
+            until their stories give them pages of their own. */}
         <div className="flex flex-col gap-1">
           {/* Log out — its own quiet card, not a red block. */}
           <SettingsGroup testId="settings-sign-out-card">
@@ -847,8 +861,9 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
           </div>
         </section>
 
-        {/* Push and reminders — only in the native shell with the push plugins. */}
-        <PushSettings />
+        {/* The per-date reminder list — only in the native shell with the local-notifications
+            plugin; story 13 moves each switch onto its date's page. */}
+        <CountdownMarks />
 
         {/* Outside every card, like the other dialogs, so no card can clip it. */}
         <AnimatePresence>

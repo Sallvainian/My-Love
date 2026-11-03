@@ -1,13 +1,16 @@
 /**
- * SwitchRow — one Settings row that is a switch: icon tile, label, helper
- * line and a track and thumb. A native button with `role="switch"`, so Enter
- * and Space reach it from the keyboard; `aria-checked` carries the state.
+ * SwitchRow — one Settings row that is a switch: icon tile, label, an
+ * optional helper line and a track and thumb. A native button with
+ * `role="switch"`, so Enter and Space reach it from the keyboard;
+ * `aria-checked` carries the state.
  *
  * Extracted from Settings' old "Download photos over mobile data" row, which
- * is now the Photos page's pair of radios, so it serves the push section
- * alone. `ROW_BUTTON` is also the base of every list row. `id` names the
- * row's test id (`<id>`, `<id>-helper`) and the label and helper ids that
- * `aria-labelledby` and `aria-describedby` point at.
+ * is now the Photos page's pair of radios, so it serves the Notifications
+ * page and the per-date reminder rows. `ROW_BUTTON` is also the base of every
+ * list row. `id` names the row's test id (`<id>`, `<id>-helper`) and the label
+ * and helper ids that `aria-labelledby` and `aria-describedby` point at. With
+ * no `helper` there is no helper line and no `aria-describedby`; a card's
+ * Footnote explains its rows instead.
  *
  * @component
  */
@@ -21,7 +24,8 @@ interface SwitchRowProps {
   id: string;
   icon: LucideIcon;
   label: string;
-  helper: string;
+  /** One line under the label; leave it out where a Footnote under the card explains the rows. */
+  helper?: string;
   checked: boolean;
   /** Called with the state the click asks for: the opposite of `checked`. */
   onChange: (next: boolean) => void;
@@ -35,7 +39,7 @@ export function SwitchRow({ id, icon: Icon, label, helper, checked, onChange, di
       role="switch"
       aria-checked={checked}
       aria-labelledby={`${id}-label`}
-      aria-describedby={`${id}-helper`}
+      aria-describedby={helper === undefined ? undefined : `${id}-helper`}
       onClick={() => onChange(!checked)}
       disabled={disabled}
       className={disabled ? `${ROW_BUTTON} disabled:cursor-not-allowed disabled:opacity-60` : ROW_BUTTON}
@@ -48,13 +52,15 @@ export function SwitchRow({ id, icon: Icon, label, helper, checked, onChange, di
         <span id={`${id}-label`} className="text-[15px] font-medium text-ink">
           {label}
         </span>
-        <span
-          id={`${id}-helper`}
-          className="text-[13px] wrap-break-word text-muted"
-          data-testid={`${id}-helper`}
-        >
-          {helper}
-        </span>
+        {helper !== undefined && (
+          <span
+            id={`${id}-helper`}
+            className="text-[13px] wrap-break-word text-muted"
+            data-testid={`${id}-helper`}
+          >
+            {helper}
+          </span>
+        )}
       </span>
       {/* The switch's track and thumb; the state itself is `aria-checked`. */}
       <span

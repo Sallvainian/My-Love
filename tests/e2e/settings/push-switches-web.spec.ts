@@ -1,24 +1,24 @@
 /**
- * E2E: the website's Settings has no push switches (story 3.7, R11)
+ * E2E: the website's Settings has no Notifications page (stories 3.7 and 6, R11)
  *
- * "Push and reminders" is rendered only in the native iOS shell, where
- * `Capacitor.isNativePlatform()` is true and both push plugins exist. A browser
- * is neither, so its Settings shows About and the old sections and nothing
- * between them: no section, no heading, no switch, and no read of
- * `push_preferences`.
- * The "Reminders" group of marked dates (story 4.2) and its "Date reminders"
- * switch (story 4.3) are absent too, and `countdown_marks` is never requested.
+ * The Notifications row and its page are rendered only in the native iOS
+ * shell, where `Capacitor.isNativePlatform()` is true and both push plugins
+ * exist. A browser is neither, so its Settings has no Notifications row, no
+ * old "Push and reminders" section, no switch, and no read of
+ * `push_preferences`; opening `/settings/notifications` directly lands on the
+ * top page. The per-date reminder list (story 4.2) and its card are absent
+ * too, and `countdown_marks` is never requested.
  */
 import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { openSettingsFromHome } from '../../support/helpers/settings-screen';
 
-test.describe('Settings push switches on the web', () => {
+test.describe('Settings notifications on the web', () => {
   test.beforeEach(async ({ page }) => {
     await dismissWelcomeSplash(page);
   });
 
-  test('[P1] should show no push section in a browser', async ({ page, interceptNetworkCall }) => {
+  test('[P1] should show no Notifications row or page in a browser', async ({ page, interceptNetworkCall }) => {
     // Attached before the page loads, so a read made at mount cannot slip past.
     const preferenceRequests: string[] = [];
     const markRequests: string[] = [];
@@ -38,6 +38,9 @@ test.describe('Settings push switches on the web', () => {
     await expect(view.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
     await expect(view.getByRole('heading', { name: 'About', exact: true })).toBeVisible();
 
+    // No Notifications row (by test id and by name), so the page has no way in.
+    await expect(page.getByTestId('settings-notifications-row')).toHaveCount(0);
+    await expect(view.getByRole('button', { name: /^Notifications/ })).toHaveCount(0);
     await expect(page.getByTestId('settings-push')).toHaveCount(0);
     await expect(view.getByRole('heading', { name: 'Push and reminders' })).toHaveCount(0);
     await expect(view.getByRole('switch', { name: 'Love notes' })).toHaveCount(0);
@@ -49,6 +52,18 @@ test.describe('Settings push switches on the web', () => {
     // A browser has no switch at all: the photos choice is a Photos page of
     // radios, behind a row that only a device reporting its connection type shows.
     await expect(view.getByRole('switch')).toHaveCount(0);
+    expect(preferenceRequests).toEqual([]);
+    expect(markRequests).toEqual([]);
+
+    // WHEN: the page's path is opened directly
+    await page.goto('/settings/notifications');
+
+    // THEN: the top page at /settings, with none of the page's content, and still no read
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByTestId('settings-notifications')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Notify me about' })).toHaveCount(0);
+    await expect(page.getByRole('switch')).toHaveCount(0);
     expect(preferenceRequests).toEqual([]);
     expect(markRequests).toEqual([]);
   });

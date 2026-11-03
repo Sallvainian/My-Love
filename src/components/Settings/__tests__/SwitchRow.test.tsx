@@ -38,6 +38,15 @@ describe('SwitchRow', () => {
     expect(row).toHaveAccessibleDescription('Demo helper.');
   });
 
+  it('has no helper line and no description when it has no helper', () => {
+    const { row } = renderRow({ helper: undefined });
+
+    expect(row).toHaveAccessibleName('Demo label');
+    expect(row).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByTestId('demo-row-helper')).not.toBeInTheDocument();
+    expect(document.getElementById('demo-row-helper')).toBeNull();
+  });
+
   it('derives its test ids and element ids from the id', () => {
     renderRow();
 

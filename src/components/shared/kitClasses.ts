@@ -40,6 +40,9 @@ export const SMALL_SECONDARY =
 /** The small uppercase label above a section of cards. */
 export const SECTION_LABEL = 'px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase';
 
+/** One sentence under a card, muted, inset 4px (DESIGN `typography.footnote`). */
+export const FOOTNOTE = 'px-1 text-[13px] leading-[1.4] text-muted';
+
 /** Quiet in-card notice surface. */
 export const NOTICE = 'rounded-[14px] bg-card2 p-3';
 

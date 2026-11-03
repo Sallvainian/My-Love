@@ -2,8 +2,9 @@
  * SettingsRows -- the two pieces every Settings list page is built from.
  *
  * `SettingsGroup` is an optional uppercase label above one kit card whose rows
- * are separated by a hairline; `SettingsRow` is one list row (tile, label,
- * value, chevron) that either opens a subpage (`target`) or runs a handler.
+ * are separated by a hairline, and an optional footnote under it;
+ * `SettingsRow` is one list row (tile, label, value, chevron) that either
+ * opens a subpage (`target`) or runs a handler.
  *
  * @component
  */
@@ -19,11 +20,13 @@ interface SettingsGroupProps {
   label?: string;
   /** Applied to the card. */
   testId?: string;
+  /** A Footnote, or a line about the card, 8px under it; shown only with rows. */
+  footnote?: ReactNode;
   /** Rows; a falsy row is skipped, and a group with none renders nothing. */
   children?: ReactNode;
 }
 
-export function SettingsGroup({ label, testId, children }: SettingsGroupProps) {
+export function SettingsGroup({ label, testId, footnote, children }: SettingsGroupProps) {
   const labelId = useId();
   const rows = Children.toArray(children);
   if (rows.length === 0) return null;
@@ -40,14 +43,17 @@ export function SettingsGroup({ label, testId, children }: SettingsGroupProps) {
       ))}
     </div>
   );
-  if (!label) return card;
+  if (!label && !footnote) return card;
 
   return (
-    <section className="flex flex-col gap-2" aria-labelledby={labelId}>
-      <h2 id={labelId} className={SECTION_LABEL}>
-        {label}
-      </h2>
+    <section className="flex flex-col gap-2" aria-labelledby={label ? labelId : undefined}>
+      {label && (
+        <h2 id={labelId} className={SECTION_LABEL}>
+          {label}
+        </h2>
+      )}
       {card}
+      {footnote}
     </section>
   );
 }
