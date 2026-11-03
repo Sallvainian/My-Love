@@ -29,3 +29,11 @@ title = "Date Reminders"
 description = "The native iOS shell schedules 9:00 local reminders before every date (day before; month and week before for countdown-marked dates; on the day for anniversaries and birthdays), with a Settings switch, and no notification for the daily message."
 covers = []
 after = [{ epic = 2, needs = "story 2.9: the simulator driver story 4.7 extends with the scheduled-reminders reader, and story 2.4: the Duo sweep, which may change the driver too" }, { epic = 3, needs = "story 3.12: the notification steps story 4.7 builds after, since both change the driver and its host app; story 3.1: the one iOS notification permission prompt; story 3.7: the Settings notifications section; story 3.8: the non-love-note lock-screen group name; story 3.9: the cold-start and background navigation a reminder tap reuses; stories 3.10 and 3.11: the push sweep and device install, which share the Settings section, the native code and the owner's iPhone" }]
+
+[[epic]]
+id = 5
+slug = "epic-settings-rework"
+title = "Settings Rework"
+description = "Settings is a stack of one-line rows that each open their own page, as the Settings UX spines describe; every date is edited, deleted and reminded from its own page, reached from its Home card or the Dates list; and adding or changing a date sends no push."
+covers = []
+after = [{ epic = 2, needs = "story 2.8: the header gear and the column dock's sixth button that open Settings" }, { epic = 3, needs = "stories 3.5, 3.6, 3.7 and 3.9: the date-change push path, the push_requests source check, the push switches and the push tap routes this epic removes or moves" }, { epic = 4, needs = "stories 4.2 and 4.3: the per-date countdown marks and the Date reminders switch whose rows move onto each date's page" }]
