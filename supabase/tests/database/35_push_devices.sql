@@ -4,7 +4,8 @@
 -- (20261031010000); the mood, photo and interaction triggers and the
 -- one-source check on push_requests (20261031020000); the partner request and
 -- acceptance triggers and the sixth and seventh sources (20261031040000); and the
--- removal of the date-change push, which 20261031030000 added (20261103000000)
+-- removal of the date-change push, which 20261031030000 added (20261103000000),
+-- with the drop of push_preferences.dates that finishes it (20261104000000)
 --
 -- Pinned here: the exact policy sets (a policy added, renamed or dropped fails
 -- this file), who can touch each table, the register RPC (reassignment by
@@ -528,8 +529,8 @@ select is(
 -- Date changes removed (20261103000000, story 5.4)
 -- ============================================
 -- No date change pushes any more: the five triggers, notify_date_change(),
--- date_changes and push_requests.date_change_id are gone. push_preferences.dates
--- stays (installed shells still select and upsert it) until story 18.
+-- date_changes and push_requests.date_change_id are gone, and story 5.18
+-- (20261104000000) dropped push_preferences.dates.
 create temporary table t_pair as
 select least(a_id, b_id) as lo, greatest(a_id, b_id) as hi from t_ids;
 grant select on t_pair to authenticated, anon;
@@ -565,7 +566,7 @@ select ok(
   'PUSH-DB-062: the source check names the six remaining sources'
 );
 
-select has_column('public', 'push_preferences', 'dates', 'PUSH-DB-063: push_preferences.dates remains');
+select hasnt_column('public', 'push_preferences', 'dates', 'PUSH-DB-063: push_preferences.dates is gone');
 
 -- Sender settings present, the queue emptied: a date write must still queue nothing.
 delete from public.push_sender_settings;

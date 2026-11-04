@@ -82,7 +82,7 @@ describe('fetchPushPreferences', () => {
     expect(argsOf('eq')).toEqual([['user_id', 'USER-A']]);
   });
 
-  it('does not select the dates column, which stays in the table unread', async () => {
+  it('does not select the dates column, which story 5.18 dropped', async () => {
     results.push({ data: ROW, error: null });
 
     await pushPreferencesService.fetchPushPreferences('USER-A');

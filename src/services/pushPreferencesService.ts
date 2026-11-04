@@ -3,9 +3,8 @@
  * push, and the date reminders' switch (`public.push_preferences`, one row per
  * account).
  *
- * `push_preferences.dates` remains in the table, unread and unwritten, until
- * story 18 drops it: no date change sends a push since story 5.4, but a shell
- * installed before it still selects and upserts the column.
+ * No date change sends a push since story 5.4, and story 5.18 dropped the
+ * `push_preferences.dates` column it used to switch.
  *
  * Supabase is the source of truth. This service caches nothing: Settings loads
  * the switches when its push section opens (`notificationsSlice.pushPreferences`),
