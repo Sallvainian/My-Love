@@ -101,10 +101,13 @@ export function SettingsBar({
           collapsed ? 'opacity-100' : 'opacity-0'
         }`}
       />
-      {/* Measured for the collapse: its bottom is the 64px bar's, where the glass ends. */}
+      {/* Measured for the collapse: its bottom is the 64px bar's, where the glass ends.
+          As wide as the page's column (SettingsStack's max-w-200), so on a wide
+          screen the arrow and the trailing button sit over the cards' edges,
+          not out at the screen's. */}
       <div
         ref={barRef}
-        className={`absolute inset-x-0 top-[env(safe-area-inset-top)] grid h-16 items-center ${
+        className={`absolute inset-x-0 top-[env(safe-area-inset-top)] mx-auto grid h-16 max-w-200 items-center ${
           cancel ? 'grid-cols-[88px_1fr_88px]' : 'grid-cols-[64px_1fr_64px]'
         }`}
       >
