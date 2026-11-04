@@ -3685,7 +3685,7 @@ source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe
 severity: medium (unverified)
 reason: Spike 5.2 chose WKWebView's back-forward gesture, which follows the web view's whole back list, not only this document's pushState entries. The live updater loads each new bundle as a new document, so the old document's entries may stay in that list, and a swipe on the first page after an update would then navigate to the old bundle's URL. The trial never applied an update. Story 15 settles it with `sim build --update-port` and `sim serve-update`: apply an update, then `sim swipe back` on the first page; if the page reloads, cancel cross-document back navigations in the shell.
 status: done 2026-11-03
-resolution: confirmed, then fixed in story 5.15. On the Duo simulator with the gesture alone, Settings → Profile, Refresh in the update toast, then a swipe on the new Home opened the old bundle's Profile. The updater's swap is `webView.load` of the server URL (`CapacitorUpdater.applyCurrentBundleToBridge`), which keeps the old document's entries. `MainViewController` (ios/App/App/NativeAuth.swift) now records the entry that was current when each main-frame `.other` load of an app URL starts (the launch load and every bundle swap, seen through `.capacitorDecidePolicyForNavigationAction`). It turns the gesture off while the back item is that entry or a load is still running, and re-decides on `url`, `canGoBack` and `isLoading`. A reload records nothing, so back across one still works. Rather than cancelling cross-document back navigations, it does not offer the swipe there: cancelling would also block the in-app back arrow after a reload. Checked on the simulator: after an update, 16 pans on the new Home did nothing, and pages pushed in the new bundle swiped back one level each.
+resolution: confirmed, then fixed in story 5.15. On the Duo simulator with the gesture alone, Settings → Profile, Refresh in the update toast, then a swipe on the new Home opened the old bundle's Profile. The updater's swap is `webView.load` of the server URL (`CapacitorUpdater.applyCurrentBundleToBridge`), which keeps the old document's entries. `MainViewController` (ios/App/App/NativeAuth.swift) now records the entry that was current when each main-frame `.other` load of an app URL starts (the launch load and every bundle swap, seen through `.capacitorDecidePolicyForNavigationAction`). It turns the gesture off while the back item is that entry or a load is still running, and re-decides on `url`, `canGoBack` and `isLoading`. A reload records nothing, so back across one still works. Rather than cancelling cross-document back navigations, it does not offer the swipe there: cancelling would also block the in-app back arrow after a reload. Checked on the simulator: after an update, 16 pans on the new Home did nothing, and pages pushed in the new bundle swiped back one level each. Re-checked on 2026-11-04 after the shell's own swipe replaced WebKit's (`e1ba2117`) and after `69dfb58c`. The run used the iPhone Duo simulator folded with the column dock, a shell built from main `49006f72`, and `sim serve-update`. With the update applied on Profile, 8 swipes on the new Home did nothing, Profile → Settings → Home went back one level per swipe, and a swipe on Home did nothing. With the update applied on Home (the `69dfb58c` case), the same: 8 swipes on the new Home did nothing, Profile → Settings → Home went back one level per swipe, and a swipe on Home did nothing.
 
 ### DW-425: Three native edge-swipe cases no device has checked: the first entry, the column on the left edge, and Home's message card.
 origin: review (spike 5.2, 2026-11-02)
@@ -3754,6 +3754,7 @@ location: tests/e2e/settings/ (deleted `events-accessibility.spec.ts`); tests/un
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
 reason: `@axe-core/playwright` ran in exactly one spec, which scanned the events modal and form that the Countdowns section drew. That section is gone, so the spec was deleted, and nothing scans the Settings stack pages (the top page, the Dates list, the date and event pages, the Form pages and the Kind chooser). The plan forbids new axe scans in this story (the owner and partner use no screen reader or keyboard), so the gap is recorded rather than filled; whether a scan is wanted at all is a decision for the owner. The `@axe-core/playwright` dependency (and its `axe-core`) was removed with the spec, since nothing else used it; it comes back if a scan is wanted.
+progress: 2026-11-04 the epic-settings-rework retrospective's diff review found the same gap again (its V6). No new entry was filed.
 status: open
 
 ### DW-433: `reminderDateEntries` has no production caller now that `CountdownMarks` is gone.
@@ -3823,4 +3824,122 @@ location: src/components/Settings/DatesPage.tsx (the connectivity load and the `
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
 reason: The list asks the server again on a reconnect, and on the iPhone shell when the app comes back to the foreground (the events refresher marks it `eventsStale`). `loadEvents` answers with the first window only and replaces the list, so the older past dates `Load more` added are hidden until it is tapped again. Nothing is lost on the server. The owner chose an up-to-date list over keeping those rows (2026-11-03). It shows only with more than one window of past dates. A fix re-reads as many windows as were loaded, keeping the cursors' depth.
+status: open
+
+### DW-441: The dock's walk back to Home has no way out if the browser never reports the back, which can leave every dock tap doing nothing.
+origin: epic-settings-rework retrospective (diff review, findings V1 and V2), 2026-11-04
+location: src/stores/slices/navigationSlice.ts (`setView`, the `walkingDown` walk); tests/unit/stores/navigationSlice.settingsStack.test.ts
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: high (the trigger has not been reproduced)
+reason: A dock pick above the first history entry sets `walkingDown`, adds a one-shot `popstate` listener and calls `history.go(-depth)`. Only that `popstate` clears `walkingDown`. If it never arrives, every later `setView` just overwrites `pendingView`, so the dock stops working until a reload. That happens when the stored `depth` is larger than the real history, or when the walk crosses a reload such as the live updater's swap. The code path is confirmed; neither trigger has been reproduced. No test covers a second dock tap while a walk is under way: every `setView` test taps once and waits for it to land, so removing either `walkingDown` check fails nothing. Fix: clear the walk on a fallback (a timer, or a `depth` checked against `history.length`) and land the pending view; then test a second tap mid-walk and a walk whose `popstate` never comes.
+status: open
+
+### DW-442: The backlog live-update prompt story still has `hitl: true` and hands its check to a person on the owner's iPhone, though the simulator can run it.
+origin: epic-settings-rework retrospective (P1), 2026-11-04
+location: _bmad-output/backlog/story-native-shell-live-update-prompt.md (frontmatter `hitl`; Description; the 2026-10-30 risk Decision)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: medium
+reason: AGENTS.md (Maintained by hand, hand checks) orders checks Playwright, then the simulator, then a real phone, and forbids `hitl` for a check a machine can run. This story says "A person checks the flow on the owner's iPhone after a deploy" and asks for two deploys in a row on that phone. `sim build --update-port` and `sim serve-update` already apply a downloaded update on the simulator, and the DW-424 re-check of 2026-11-04 used them. Fix: set `hitl: false`, move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the simulator, and keep a phone step only for something the simulator cannot show, saying why.
+status: open
+
+### DW-443: The simulator driver tells the reader to run `sudo /bin/date`, which moves the Mac's clock.
+origin: epic-settings-rework retrospective (diff review, finding V3), 2026-11-04
+location: scripts/sim-driver/README.md (line 5, the `sudo /bin/date` and `sim reboot` steps); scripts/sim-driver/sim (`sim help`, the `reboot` entry, which says the same)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: high
+reason: An iOS simulator has no clock of its own: it reads the Mac's clock. So the README's step, `sudo /bin/date` followed by `sim reboot` so the simulator sees the change, moves the Mac's clock. AGENTS.md forbids changing the date or time on any of the owner's devices, the Mac included, and forbids writing a step that asks for it (corrected on main in `5013b869`, "a simulator has no clock of its own to move"). Moving the iPhone's clock already broke its Watch pairing.
+- **Fix:** remove the `sudo /bin/date` and `sim reboot` steps from scripts/sim-driver/README.md, and the matching text in `sim help`.
+- **Test time-based behaviour three ways instead:**
+  - fake time in unit tests for the reminder planning;
+  - `sim pending` for what the shell has scheduled and when;
+  - a notification scheduled a minute or two ahead with `sim watch`, for delivery.
+- **History, not templates:** these date-reminders files still move a clock, and each now carries a note saying so:
+  - `tickets/epic-date-reminders/epic-date-reminders.md` (Done when 1, the 2026-10-30 story 8 decision);
+  - its `tickets/tickets.toml` (stories 8 and 5);
+  - `story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md` (`sudo date` on the Mac);
+  - `story-date-reminders-ship-to-the-owner-s-iphone-plan.md` (the iPhone's clock, Set Automatically);
+  - `plan-dw-375-376-sim-reboot-and-watch.md` (the reboot after a Mac clock jump).
+status: open
+
+### DW-444: A failed Linked since read fails the whole partner lookup.
+origin: epic-settings-rework retrospective (diff review, finding V4), 2026-11-04
+location: src/api/partnerService.ts (`getPartner`, the `partner_requests` read)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: `getPartner` returns `{ status: 'error' }` when the accepted-request read for Linked since fails, though the partner's own row loaded. Every reader of `getPartner` then treats the partner as unknown, for one optional date. The strict form may be deliberate: AGENTS.md lets only a successful read overwrite a snapshot. Decide: continue with `linkedSince: null`, or record why the whole lookup must fail.
+status: open
+
+### DW-445: Reloading the page of an event beyond the first loaded window sends the reader to the Dates list as if the event were deleted.
+origin: epic-settings-rework retrospective (diff review, finding V5), 2026-11-04
+location: src/components/Settings/EventPages.tsx (the load effect and `useFallBackToDates`)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: On a reload the event page holds no event, so it calls `loadEvents`, which returns the first window only. An older past event reached through `Load more` is not in it, so `answered && event === undefined` falls back to the Dates list. The code path was read but not reproduced. Fix: read the one event by id before falling back.
+status: open
+
+### DW-446: No check has scheduled a reminder through a date page's Remind me switch.
+origin: epic-settings-rework retrospective (S3), 2026-11-04
+location: src/components/Settings/RemindMe.tsx; scripts/sim-driver (`sim pending`)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: Stories 5.10 to 5.12's verify lines ask for Remind me to schedule the month and week reminders on the simulator, and each plan lists that as not run. Flow 2 on the simulator checked the footnote and that the setting survived a relaunch, not what was scheduled. Fix: on the simulator, turn on Remind me on a date page and confirm with `sim pending` that the month and week reminders are scheduled.
+status: open
+
+### DW-447: The Settings rework solved the same problems several ways across its pages and test files.
+origin: epic-settings-rework retrospective (duplication map and test kits), 2026-11-04
+location: src/components/Settings/ (ConfirmDialog.tsx, Settings.tsx `SignOutEverywhereConfirmation` and Error box, NewDatePages.tsx `KindChooser`, EventPages.tsx, AnniversaryPages.tsx, DatePages.tsx, ProfilePage.tsx, settingsFields.ts); src/components/DisplayNameSetup/DisplayNameSetup.tsx; src/stores/slices/datesSlice.ts, profileSlice.ts, notificationsSlice.ts; src/components/Settings/__tests__/
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason:
+- **Dialogs:** three confirmation-dialog implementations (`ConfirmDialog`, `SignOutEverywhereConfirmation`, and `KindChooser`, which copies the focus trap and backdrop).
+- **Error box:** six inline copies, one a hand-typed copy of `FAILURE_BOX` in Settings.tsx.
+- **Copied constants:** `FIELD_CLASS` identical in 5 files, and `NOT_SET` defined twice.
+- **Delete flow:** the same shape in EventPages and AnniversaryPages.
+- **Display-name rule:** in `settingsFields.ts` and `DisplayNameSetup.tsx`.
+- **`isOnline()`:** a private copy in three new slices, while `api/errorHandlers.ts` exports one.
+- **One birthday, two formats:** the Profile row shows the long date and the Your birthday page shows "4 Apr". This one is user-visible.
+- **Test kits:**
+  - `setOnline` is reimplemented in `NotificationsPage.test.tsx` and `Settings.profile.test.tsx`, though `tests/unit/stores/accountDataFixtures.ts` exports it. That breaks AGENTS.md's shared-helper rule.
+  - `renderAt` is identical in 4 test files, and `setConnection` and `makeEvent` are each copied twice.
+- **Fix:** one cleanup story: one dialog, one Error box, shared field constants and rules, one birthday format, and the test helpers imported from shared kits.
+status: open
+
+### DW-448: Only the Settings stack has ever been checked in the Duo's column form; every other view is unchecked.
+origin: epic-settings-rework retrospective (P5, S4), 2026-11-04
+location: every view in src/components (Home, Love Notes, Mood, Photos and the photo viewer, Partner, Settings); scripts/sim-driver
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: medium
+reason: In story 5.17's checks the owner found Love Notes not opening at the bottom and the photo viewer's buttons under the column icons. Both were from before this epic (`db5bfb2b`, `0ffa2caf`), and neither view had a column-form test. DW-419's simulator check covered the Settings stack alone, and its own text says the same holds for every column-form feature. Desktop Playwright cannot set `env(safe-area-inset-*)`. Fix: one simulator sweep of every view in both column forms (capsule left and right), with a screenshot of each, fixing what it finds. After that, each epic sweeps the views it changes.
+status: open
+
+### DW-449: The simulator driver checks none of its prerequisites up front.
+origin: epic-settings-rework retrospective (P6), 2026-11-04
+location: scripts/sim-driver/sim (header needs at lines 24-25; `resolve_device`, `require_booted`, `require_window`, `require_stack`)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: During the epic, non-interactive shells got Homebrew's Supabase CLI 3.0.0, which rejects the repo's config, and stories 5.1 and 5.4 worked around it with a shim. The fix then made mise refuse the driver's staged copy until `trusted_config_paths` covered it. `sim` lists its needs but checks them only inside each command, so a wrong environment fails partway through a build. Fix: a `sim doctor` preflight, run before `sim build`. It checks the Supabase CLI on PATH against the `.mise.toml` pin, that mise trusts the staged path, Xcode and Device Hub, and the local stack's health.
+status: open
+
+### DW-450: The simulator driver cannot hold a back swipe halfway, so it cannot see the picture that slides in.
+origin: epic-settings-rework retrospective (P3), 2026-11-04
+location: scripts/sim-driver/sim (the `swipe` command takes only `back`); RunnerUITests/Drive.swift (the pan holds for 0 s); scripts/sim-driver/README.md
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: `sim swipe back` compares the page text after the pan, so it checks where a swipe lands, not what it shows. Two of story 5.15's later bugs were in the picture: WebKit's dark or white page three levels deep (`e1ba2117`), and the Add a date chooser still in the picture (`a9906618`). An agent caught the second only with an ad hoc halfway-hold probe that never entered the driver. Fix: a swipe step that stops halfway and takes a screenshot (for example `sim swipe back --hold PATH`), documented in the README.
+status: open
+
+### DW-451: The Settings Touch Floor and design-token measurement of 2026-11-04 was done once by hand and kept as no test.
+origin: epic-settings-rework retrospective (P2), 2026-11-04
+location: tests/e2e/settings/ (no spec measures hit areas, field font size or colours)
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: R16 (44pt targets, 16px fields) and R18 (DESIGN.md tokens) were "delivered by each story" according to tickets.toml, but no story measured them. The measurement recorded in the epic's Notes on 2026-11-04 walked 25 pages in Playwright, light and dark, and passed, but nothing keeps it. Fix: an E2E spec that walks those pages and asserts every target's hit area is at least 44pt, every field is 16px, and every colour is a DESIGN.md token.
+status: open
+
+### DW-452: A unit test still asserts a bare `console.error` call.
+origin: epic-settings-rework retrospective (Date Reminders follow-through, item 6), 2026-11-04
+location: tests/unit/stores/moodSlice.historyBackfill.test.ts:221
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+reason: AGENTS.md forbids a bare `expect(console.error).toHaveBeenCalled()`, since the bare form passed twice on an unrelated error in epic-date-reminders. `497e2515` fixed 13 such asserts and `2b5f27e7` fixed the one in PushSettings.test.tsx, but this one, `expect(errorSpy).toHaveBeenCalled()`, was missed. Fix: assert the message the code under test logs.
 status: open

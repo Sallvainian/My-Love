@@ -10,6 +10,8 @@ risk: medium
 status: done
 ---
 
+> **History, not a template.** This file moves a device clock (the Mac's or the iPhone's), which AGENTS.md now forbids (`5013b869`): an iOS simulator reads the Mac's clock and has none of its own. Test time-based behaviour with fake time in unit tests for the reminder planning, `sim pending` for what the shell has scheduled and when, and a notification scheduled a minute or two ahead with `sim watch` for delivery (DW-443).
+
 # Date Reminders
 
 ## Description

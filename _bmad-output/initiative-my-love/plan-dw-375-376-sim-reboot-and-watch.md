@@ -15,6 +15,8 @@ review_loop_iteration: 0
 context: []
 ---
 
+> **History, not a template.** This file moves a device clock (the Mac's or the iPhone's), which AGENTS.md now forbids (`5013b869`): an iOS simulator reads the Mac's clock and has none of its own. Test time-based behaviour with fake time in unit tests for the reminder planning, `sim pending` for what the shell has scheduled and when, and a notification scheduled a minute or two ahead with `sim watch` for delivery (DW-443).
+
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
 
 ## Intent
