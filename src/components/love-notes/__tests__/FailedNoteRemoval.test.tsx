@@ -128,24 +128,13 @@ function bubbleWith(text: string): HTMLElement {
 }
 
 /**
- * Render the screen and run MessageList's first frame before the test goes on:
- * its initial scroll-to-bottom runs in a requestAnimationFrame with the row
- * count it saw at mount, so a removal inside that frame scrolls to a row that
- * is gone. The frame is captured and run here rather than waited for, so the
- * test never depends on when a real frame fires.
+ * Render the screen and let its mount settle before the test goes on. The list
+ * opens at the newest note through react-window's initial scroll offset, in
+ * the mount itself, so no later frame scrolls to a row a removal took away.
  */
 async function renderScreen() {
-  const frames: FrameRequestCallback[] = [];
-  const requestFrame = vi
-    .spyOn(globalThis, 'requestAnimationFrame')
-    .mockImplementation((callback) => frames.push(callback));
   render(<LoveNotes />);
-  requestFrame.mockRestore();
-  // Premise: the mount scheduled its scroll-to-bottom frame.
-  expect(frames).toHaveLength(1);
-  await act(async () => {
-    frames.forEach((frame) => frame(performance.now()));
-  });
+  await act(async () => {});
 }
 
 async function openRemoval(user: UserEvent, text: string) {

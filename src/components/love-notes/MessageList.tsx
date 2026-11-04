@@ -221,7 +221,6 @@ export function MessageList({
 }: MessageListProps): ReactNode {
   // Use react-window v2's typed ref hook for proper API access
   const listRef = useListRef(null);
-  const hasScrolledToBottom = useRef(false);
   const scrollToBottomOnNextRender = useRef(false);
   // The notes at either end as of the last commit: an older page moves the
   // first, a new message the last. Length alone cannot tell the two apart.
@@ -234,8 +233,8 @@ export function MessageList({
   // until a report shows the scroll has landed or left the top
   const anchorRow = useRef<number | null>(null);
   // Whether the list has shown its last row since the thread appeared. It
-  // opens scrolled to the newest note, but its first frame, before that
-  // scroll, reports the top; older pages wait until the end has been seen.
+  // opens scrolled to the newest note; older pages wait until the end has
+  // been seen, so a report of the top before that asks for nothing.
   const hasShownEnd = useRef(false);
 
   // Story 2.3: Track if user is at bottom and show new message indicator
@@ -345,21 +344,18 @@ export function MessageList({
     [notes, hasMore]
   );
 
-  // Automatic scroll to bottom on initial load
-  useEffect(() => {
-    if (notes.length > 0 && listRef.current && !hasScrolledToBottom.current) {
-      hasScrolledToBottom.current = true;
-      // Defer scroll to next frame so react-window can complete its layout pass.
-      // Without this, scrollToRow fires before the list has measured its rows,
-      // causing the chat to stay scrolled to the top when re-entering the tab.
-      requestAnimationFrame(() => {
-        if (listRef.current) {
-          listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
-          queueMicrotask(() => setIsAtBottom(true));
-        }
-      });
-    }
-  }, [listRef, notes.length, totalRowCount]);
+  // A list that shrinks keeps its scroll offset, so a reader at the end loses
+  // the bottom of the newest note -- the partner row gains its "Connected"
+  // line once the feed joins, just after the thread opens. Keep them there.
+  const keepEndInView = useCallback(
+    (_size: { height: number }, prevSize: { height: number }) => {
+      const element = listRef.current?.element;
+      if (element && element.scrollHeight - element.scrollTop - prevSize.height <= 1) {
+        element.scrollTo({ top: element.scrollHeight });
+      }
+    },
+    [listRef]
+  );
 
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
@@ -514,7 +510,16 @@ export function MessageList({
         rowCount={totalRowCount}
         rowHeight={getRowHeight}
         onRowsRendered={onRowsRendered}
+        onResize={keepEndInView}
         defaultHeight={600}
+        // Opens at the newest note: an offset past the end is clamped to it.
+        // react-window sizes the thread from the rows it has measured, and
+        // works out the rows for this offset before its first paint, so every
+        // row is measured and the clamp lands on the real end. The one-off
+        // scrollToRow this replaces ran a frame later, against the estimate
+        // from the top rows alone and the 600px guess at the list's height,
+        // and opened the thread a note or two short of the bottom.
+        defaultScrollOffset={Number.MAX_SAFE_INTEGER}
         rowComponent={MessageRow}
         rowProps={rowProps}
       />

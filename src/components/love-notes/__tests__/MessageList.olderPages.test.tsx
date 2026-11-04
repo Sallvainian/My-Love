@@ -14,7 +14,7 @@
 import { act, render, screen } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { useEffect } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
 
 vi.mock('motion/react', () => {
@@ -50,6 +50,7 @@ vi.mock('../LoveNoteMessage', () => ({
 const view = vi.hoisted(() => ({
   visible: { startIndex: 0, stopIndex: 5 },
   rowCount: 0,
+  defaultScrollOffset: undefined as number | undefined,
   listRef: { current: { scrollToRow: vi.fn() } },
 }));
 
@@ -60,13 +61,16 @@ vi.mock('react-window', () => ({
     onRowsRendered,
     rowComponent: Row,
     rowProps,
+    defaultScrollOffset,
   }: {
     rowCount: number;
     onRowsRendered: (rows: { startIndex: number; stopIndex: number }) => void;
     rowComponent: (props: Record<string, unknown>) => ReactNode;
     rowProps: Record<string, unknown>;
+    defaultScrollOffset?: number;
   }) => {
     view.rowCount = rowCount;
+    view.defaultScrollOffset = defaultScrollOffset;
     const startIndex = view.visible.startIndex;
     const stopIndex = Math.min(view.visible.stopIndex, rowCount - 1);
     useEffect(() => {
@@ -166,14 +170,8 @@ async function showRows(
 beforeEach(() => {
   view.visible = { startIndex: 0, stopIndex: 5 };
   view.rowCount = 0;
+  view.defaultScrollOffset = undefined;
   view.listRef.current.scrollToRow.mockReset();
-  // The first-open scroll to the end runs on the next frame; it is left out
-  // here so each test owns the reported range.
-  vi.stubGlobal('requestAnimationFrame', () => 0);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
 });
 
 describe('MessageList older pages', () => {
@@ -196,21 +194,16 @@ describe('MessageList older pages', () => {
   });
 
   it('asks for nothing until the thread has opened at the newest note', async () => {
-    let frame: FrameRequestCallback | undefined;
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      frame = callback;
-      return 1;
-    });
-    // The first frame, before the scroll to the end, reports the top.
+    // A report of the top before the list has reached its end.
     view.visible = { startIndex: 0, stopIndex: 6 };
     const onLoadMore = vi.fn();
     const { rerender } = render(list(notesBetween(51, 100), onLoadMore));
     await settle();
     expect(onLoadMore).not.toHaveBeenCalled();
 
-    // The scroll to the end runs on the next frame and lands.
-    act(() => frame?.(0));
-    expect(view.listRef.current.scrollToRow).toHaveBeenCalledWith({ align: 'end', index: 50 });
+    // The list opens at an offset past the end, which react-window clamps to
+    // the newest note, and that lands.
+    expect(view.defaultScrollOffset).toBe(Number.MAX_SAFE_INTEGER);
     await showRows(rerender, onLoadMore, 45, 50);
     expect(onLoadMore).not.toHaveBeenCalled();
 
