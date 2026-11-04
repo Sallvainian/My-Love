@@ -31,3 +31,48 @@ url = "https://nodejs.org/dist/v24.19.0/node-v24.19.0-darwin-x64.tar.gz"
 [tools.node."platforms.windows-x64"]
 checksum = "sha256:57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73"
 url = "https://nodejs.org/dist/v24.19.0/node-v24.19.0-win-x64.zip"
+
+[[tools.supabase]]
+version = "2.122.0"
+backend = "aqua:supabase/cli"
+
+[tools.supabase."platforms.linux-arm64"]
+checksum = "sha256:8980b46044aba0863f26a1b4134a498d2c74df0dadf24289bb4faa86729511cc"
+checksum_source = "mise-versions"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850044"
+
+[tools.supabase."platforms.linux-arm64-musl"]
+checksum = "sha256:8980b46044aba0863f26a1b4134a498d2c74df0dadf24289bb4faa86729511cc"
+checksum_source = "mise-versions"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850044"
+
+[tools.supabase."platforms.linux-x64"]
+checksum = "sha256:59ed066847b98d7461c60e9109d40cab6b9756177ce06ebb05b51338519f5136"
+checksum_source = "mise-versions"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850237"
+
+[tools.supabase."platforms.linux-x64-musl"]
+checksum = "sha256:59ed066847b98d7461c60e9109d40cab6b9756177ce06ebb05b51338519f5136"
+checksum_source = "mise-versions"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850237"
+
+[tools.supabase."platforms.macos-arm64"]
+checksum = "sha256:fe87a5f9781d5423dbd5ebba2d5a6e1a541d01754d14941c574952e5695eaab0"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668849778"
+
+[tools.supabase."platforms.macos-x64"]
+checksum = "sha256:8be7d5bb00091e67618d12fb0a4a1bb10624c69435ecd5b9b95d91d571cc34d8"
+checksum_source = "mise-versions"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_darwin_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668849898"
+
+[tools.supabase."platforms.windows-x64"]
+checksum = "sha256:f891d9bb641f7fa28fd9c61ea0f31be4964254bc84be9ff66f2376b6aaa7a9ed"
+checksum_source = "mise-versions"
+url = "https://github.com/supabase/cli/releases/download/v2.122.0/supabase_windows_amd64.tar.gz"
+url_api = "https://api.github.com/repos/supabase/cli/releases/assets/668850578"
