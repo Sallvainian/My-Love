@@ -565,8 +565,11 @@ export function PhotoViewer({
             Tab cycle reaches them under the overlay and Enter operates them --
             navigating or closing behind an open delete confirmation. Disabling
             them also drops them from FOCUSABLE_SELECTOR's button:not([disabled]),
-            confining Tab to Cancel/Delete. */}
-        <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 flex gap-2">
+            confining Tab to Cancel/Delete.
+            The viewer covers the whole screen, so every control keeps clear of
+            the side insets as of the top one: on the iPhone Duo the side column
+            holds the status capsule at its top, which covered Close. */}
+        <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-[calc(1rem+env(safe-area-inset-right))] z-10 flex gap-2">
           {/* AC 6.4.10: Delete button (own photos only) */}
           {currentPhoto.isOwn && (
             <button
@@ -598,7 +601,7 @@ export function PhotoViewer({
         <button
           onClick={() => navigatePhoto('prev')}
           disabled={showDeleteDialog || !canNavigatePrev}
-          className="absolute top-1/2 left-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
+          className="absolute top-1/2 left-[calc(1rem+env(safe-area-inset-left))] z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous photo"
         >
           <ChevronLeft className="h-6 w-6" aria-hidden="true" />
@@ -607,7 +610,7 @@ export function PhotoViewer({
         <button
           onClick={() => navigatePhoto('next')}
           disabled={showDeleteDialog || !canNavigateNext}
-          className="absolute top-1/2 right-4 z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
+          className="absolute top-1/2 right-[calc(1rem+env(safe-area-inset-right))] z-10 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-card transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent text-ink disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Next photo"
         >
           <ChevronRight className="h-6 w-6" aria-hidden="true" />
@@ -691,7 +694,7 @@ export function PhotoViewer({
 
         {/* AC 6.4.8, 6.4.9: Photo caption and metadata */}
         <motion.div
-          className="absolute right-0 bottom-0 left-0 rounded-t-[20px] border-t border-line bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-ink"
+          className="absolute right-0 bottom-0 left-0 rounded-t-[20px] border-t border-line bg-card p-4 pr-[calc(1rem+env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] text-ink"
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
