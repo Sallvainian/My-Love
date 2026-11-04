@@ -1,9 +1,26 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import checker from 'vite-plugin-checker';
 import pkg from './package.json' with { type: 'json' };
+
+// `--mode test` (dev:local, Playwright's dev server) must reach local Supabase.
+// Vite lets process.env override .env.test, and a shell that loads the
+// project's fnox secrets (mise's fnox-env) carries the hosted URL and key, so
+// dev:local signed in against the hosted project. A plugin's config hook runs
+// before Vite reads the env files, so it drops an inherited pair that is not
+// local there; the local pair playwright.config.ts sets is kept.
+const localSupabaseInTestMode: Plugin = {
+  name: 'local-supabase-in-test-mode',
+  config(_config, { mode }) {
+    const url = process.env.VITE_SUPABASE_URL;
+    if (mode !== 'test' || url === undefined) return;
+    if (/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) return;
+    delete process.env.VITE_SUPABASE_URL;
+    delete process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+  },
+};
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
@@ -52,6 +69,7 @@ export default defineConfig(() => ({
     },
   },
   plugins: [
+    localSupabaseInTestMode,
     react(),
     checker({ typescript: true }),
     VitePWA({
