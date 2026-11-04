@@ -55,6 +55,9 @@ after = [2]
 hitl = false
 risk = "low"
 
+# History, not a template: this entry moves a device clock, which AGENTS.md now
+# forbids (5013b869). Test time with fake time in unit tests, `sim pending`, and
+# a notification scheduled a minute or two ahead with `sim watch` (DW-443).
 [[entry]]
 id = 8
 type = "story"
@@ -77,6 +80,9 @@ after = [7, 1, 6, 2, 3, 8]
 hitl = false
 risk = "low"
 
+# History, not a template: this entry moves a device clock, which AGENTS.md now
+# forbids (5013b869). Test time with fake time in unit tests, `sim pending`, and
+# a notification scheduled a minute or two ahead with `sim watch` (DW-443).
 [[entry]]
 id = 5
 type = "story"

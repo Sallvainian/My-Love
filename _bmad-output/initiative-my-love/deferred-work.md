@@ -3844,10 +3844,21 @@ status: open
 
 ### DW-443: The simulator driver tells the reader to run `sudo /bin/date`, which moves the Mac's clock.
 origin: epic-settings-rework retrospective (diff review, finding V3), 2026-11-04
-location: scripts/sim-driver/README.md (line 5, `sim reboot`); scripts/sim-driver/sim (`sim help`, the `reboot` entry); `cmd_reboot` (it prints the Mac clock)
+location: scripts/sim-driver/README.md (line 5, the `sudo /bin/date` and `sim reboot` steps); scripts/sim-driver/sim (`sim help`, the `reboot` entry, which says the same)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: high
-reason: AGENTS.md (Known pitfalls) forbids changing the date or time on any of the owner's devices, the Mac included, and forbids writing a step that does. Moving the iPhone's clock already broke its Watch pairing. The README and `sim help` both say to run `sim reboot` "after each `sudo /bin/date`", because the simulator follows the Mac's clock, so the scheduled-notification checks (`sim watch` for a reminder falling due) rely on moving the Mac clock. Fix: remove the instruction from both, and give the scheduled-notification steps a way to test time that never touches the Mac's clock. Options are scheduling a test reminder a minute or two ahead (as `sim watch` already suggests), or faked time inside a test build. Which one is a decision for whoever builds the fix.
+reason: An iOS simulator has no clock of its own: it reads the Mac's clock. So the README's step, `sudo /bin/date` followed by `sim reboot` so the simulator sees the change, moves the Mac's clock. AGENTS.md forbids changing the date or time on any of the owner's devices, the Mac included, and forbids writing a step that asks for it (corrected on main in `5013b869`, "a simulator has no clock of its own to move"). Moving the iPhone's clock already broke its Watch pairing.
+- **Fix:** remove the `sudo /bin/date` and `sim reboot` steps from scripts/sim-driver/README.md, and the matching text in `sim help`.
+- **Test time-based behaviour three ways instead:**
+  - fake time in unit tests for the reminder planning;
+  - `sim pending` for what the shell has scheduled and when;
+  - a notification scheduled a minute or two ahead with `sim watch`, for delivery.
+- **History, not templates:** these date-reminders files still move a clock, and each now carries a note saying so:
+  - `tickets/epic-date-reminders/epic-date-reminders.md` (Done when 1, the 2026-10-30 story 8 decision);
+  - its `tickets/tickets.toml` (stories 8 and 5);
+  - `story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md` (`sudo date` on the Mac);
+  - `story-date-reminders-ship-to-the-owner-s-iphone-plan.md` (the iPhone's clock, Set Automatically);
+  - `plan-dw-375-376-sim-reboot-and-watch.md` (the reboot after a Mac clock jump).
 status: open
 
 ### DW-444: A failed Linked since read fails the whole partner lookup.
