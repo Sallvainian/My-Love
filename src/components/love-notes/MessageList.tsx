@@ -40,6 +40,8 @@ interface MessageRowCustomProps {
   partnerName: string;
   onRetry?: (tempId: string) => void;
   onRequestRemove?: (note: LoveNote) => void;
+  /** Row keys of the notes whose bubbles play their entrance when they mount */
+  enteringKeys: ReadonlySet<string>;
 }
 
 /**
@@ -62,6 +64,7 @@ function MessageRow({
   partnerName,
   onRetry,
   onRequestRemove,
+  enteringKeys,
 }: {
   index: number;
   style: React.CSSProperties;
@@ -104,6 +107,7 @@ function MessageRow({
         senderName={senderName}
         onRetry={onRetry}
         onRequestRemove={onRequestRemove}
+        animateEntrance={enteringKeys.has(rowKeyOf(note))}
       />
     </div>
   );
@@ -165,6 +169,56 @@ function LoadingSpinner({ style }: { style?: React.CSSProperties }) {
 function composedKey(note: LoveNote): string | undefined {
   return note.tempId ?? (note as LoveNote & { idempotency_key?: string }).idempotency_key;
 }
+
+/**
+ * A note's row key: the key it was composed with, which its committed row
+ * keeps, else its id. react-window keys rows by index unless given one, and
+ * an older page moves every note to a new index.
+ */
+function rowKeyOf(note: LoveNote): string {
+  return composedKey(note) ?? note.id;
+}
+
+/**
+ * What a change to the thread brought: how many notes an older page put
+ * above the previous first note, and the notes that arrived below them as new
+ * messages (sent or received).
+ */
+function compareNotes(
+  before: LoveNote[],
+  notes: LoveNote[]
+): { olderAdded: number; arrived: LoveNote[] } {
+  const prevFirstId = before[0]?.id;
+  // An older page puts notes above the previous first note. A refresh that
+  // replaced the thread leaves no previous first note to find.
+  const olderAdded =
+    prevFirstId === undefined || notes[0]?.id === prevFirstId
+      ? 0
+      : Math.max(
+          0,
+          notes.findIndex((note) => note.id === prevFirstId)
+        );
+
+  // A new message is a note that was not there before, below any older
+  // page. Not only at the end: a refresh puts the server's page ahead of an
+  // unsent note. A confirmed send keeps its key (the committed row carries
+  // the tempId as idempotency_key) and a removal adds nothing.
+  const known = new Set<string>();
+  for (const note of before) {
+    known.add(note.id);
+    const key = composedKey(note);
+    if (key) known.add(key);
+  }
+  const arrived = notes.filter((note, index) => {
+    if (index < olderAdded || known.has(note.id)) return false;
+    const key = composedKey(note);
+    return !key || !known.has(key);
+  });
+
+  return { olderAdded, arrived };
+}
+
+const NO_KEYS: ReadonlySet<string> = new Set();
 
 /** Rows beyond the visible range within which the loader asks for more */
 const LOAD_THRESHOLD = 10;
@@ -240,6 +294,26 @@ export function MessageList({
   // Story 2.3: Track if user is at bottom and show new message indicator
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+
+  // The notes whose bubbles play their entrance (fade and rise) when their
+  // rows mount: every note when the thread appears, then the notes each change
+  // brings in as new messages. Rows also mount when scrolled into range, and
+  // an older page first renders the rows at the old offset, dropping the ones
+  // on screen, and mounts them again once the keep-place scroll lands; going
+  // by the mount alone, every note on screen faded in again. A change that
+  // brings no new note and no older page (a send being confirmed) keeps the
+  // set, so a note sent or received still animates when its row mounts after
+  // the scroll to the bottom.
+  const [entrance, setEntrance] = useState<{ notes: LoveNote[]; keys: ReadonlySet<string> }>(
+    () => ({ notes, keys: new Set(notes.map(rowKeyOf)) })
+  );
+  if (entrance.notes !== notes) {
+    const { olderAdded, arrived } = compareNotes(entrance.notes, notes);
+    let keys = entrance.keys;
+    if (arrived.length > 0) keys = new Set(arrived.map(rowKeyOf));
+    else if (olderAdded > 0) keys = NO_KEYS;
+    setEntrance({ notes, keys });
+  }
 
   // Calculate whether to show "Beginning of conversation"
   const showBeginning = !hasMore && notes.length > 0;
@@ -375,7 +449,6 @@ export function MessageList({
 
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
-    const prevFirstId = prevFirstNoteId.current;
     const before = prevNotes.current;
     const prevHeaderHeight = prevHeaderRowHeight.current;
     prevFirstNoteId.current = notes[0]?.id;
@@ -385,31 +458,8 @@ export function MessageList({
     if (notes.length === 0) hasShownEnd.current = false;
     if (!listRef.current) return;
 
-    // An older page puts notes above the previous first note. A refresh that
-    // replaced the thread leaves no previous first note to find.
-    const olderAdded =
-      prevFirstId === undefined || notes[0]?.id === prevFirstId
-        ? 0
-        : Math.max(
-            0,
-            notes.findIndex((note) => note.id === prevFirstId)
-          );
-
-    // A new message is a note that was not there before, below any older
-    // page. Not only at the end: a refresh puts the server's page ahead of an
-    // unsent note. A confirmed send keeps its key (the committed row carries
-    // the tempId as idempotency_key) and a removal adds nothing.
-    const known = new Set<string>();
-    for (const note of before) {
-      known.add(note.id);
-      const key = composedKey(note);
-      if (key) known.add(key);
-    }
-    const newMessage = notes.some((note, index) => {
-      if (index < olderAdded || known.has(note.id)) return false;
-      const key = composedKey(note);
-      return !key || !known.has(key);
-    });
+    const { olderAdded, arrived } = compareNotes(before, notes);
+    const newMessage = arrived.length > 0;
 
     if (!newMessage && olderAdded === 0) return;
 
@@ -440,6 +490,16 @@ export function MessageList({
       queueMicrotask(() => setShowNewMessageIndicator(true));
     }
   }, [listRef, notes, isAtBottom, totalRowCount, getRowHeight]);
+
+  // Rows keep their note across an older page, and a sent note its row once
+  // the server confirms it
+  const rowKey = useCallback(
+    (index: number, { notes: rowNotes }: MessageRowCustomProps) => {
+      const note = index > 0 ? rowNotes[index - 1] : undefined;
+      return note ? `note:${rowKeyOf(note)}` : `row:${index}`;
+    },
+    []
+  );
 
   // Execute scroll to bottom after render (when new message arrives)
   useEffect(() => {
@@ -504,6 +564,7 @@ export function MessageList({
     partnerName,
     onRetry,
     onRequestRemove,
+    enteringKeys: entrance.keys,
   };
 
   return (
@@ -543,6 +604,7 @@ export function MessageList({
         // and opened the thread a note or two short of the bottom.
         defaultScrollOffset={Number.MAX_SAFE_INTEGER}
         rowComponent={MessageRow}
+        rowKey={rowKey}
         rowProps={rowProps}
       >
         <div
