@@ -8,6 +8,7 @@ companions: [_bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md, _bm
 after: []
 refined: true
 risk: medium
+status: done
 ---
 
 # Settings Rework
@@ -122,3 +123,4 @@ R18 (DESIGN.md): Every Settings page and component matches DESIGN.md's tokens an
 - Source conflict: DW-416 location — the ledger entry misses parts of the date push: the tap route `date: 'home'` (`src/services/pushNotifications.ts:161`), `date_change_id` in `push_requests_source_check` (`supabase/migrations/20261031040000_push_partner_requests.sql:65-71`), the `dates` pins in `supabase/tests/database/36_push_preferences.sql:109,129,139,161`, and the regenerated `src/types/database.types.ts`. This epic removes them with the entry's own list.
 
 - Decision: 2026-11-04 story 18 is built by the loop with no phone and `hitl: false`; the phone question moves from a build gate to a merge check (owner). The owner confirms both phones run story 4's update or later before the PR to main merges, and push settings loading and saving on both phones is a hand check after the deploy, not a reason to stop the loop. Supersedes the 2026-11-02 decision that story 18 is not built until the owner confirms, and the sequencing decision's "held by its `unknown`".
+- Decision: 2026-11-04 the epic is closed and its Done when accepted as met (owner). The owner's Duo runs a shell built from main `3895b3c0`, which holds every swipe fix (`e1ba2117`, `69dfb58c`, `a9906618`), installed over the top at build number 1 on 2026-11-04; no native file changed on main after it. On it the owner ran Flows 1 and 4 and DW-425's cases 1 and 2 with a real finger, all passing (DW-425 closed). Flows 2 and 3 ran on the iPhone Duo simulator: Flow 2 as the partner fixture, Flow 3 with the test accounts so the partner's phone stayed signed in. Accepted as open: the partner's iPhone has not had the reinstall, so it lacks the native back swipe (web changes still reach it by live update) and Flow 2 never ran on it; R16 and R18 were spot-checked per story, not measured or compared page by page; DW-426, DW-429, DW-432, DW-438, DW-439 and DW-440 stay open in the ledger.
