@@ -146,7 +146,12 @@ class MainViewController: CAPBridgeViewController {
     /// A main-frame load of an app URL that is neither a reload nor a back or
     /// forward step starts a new bundle's document: the launch load, or the
     /// updater's. The policy is asked before the load commits, so the current
-    /// entry is still the one the new document's first entry will follow.
+    /// entry is still the one the new document's first entry will follow --
+    /// unless it shows the very URL being loaded: WebKit then loads the new
+    /// document into that same entry, so the entry before it is the boundary.
+    /// The updater's swap loads `capacitor://localhost/`, which is Home's URL,
+    /// so after a swap from Home the boundary was Home itself and the swipe
+    /// stayed off on every page above it.
     private func noteDocumentLoad(_ action: WKNavigationAction) {
         guard action.navigationType == .other,
               action.targetFrame?.isMainFrame ?? true,
@@ -154,7 +159,9 @@ class MainViewController: CAPBridgeViewController {
               let serverURL = bridge?.config.serverURL.absoluteString,
               url.hasPrefix(serverURL),
               let webView else { return }
-        previousDocumentEntry = webView.backForwardList.currentItem
+        let list = webView.backForwardList
+        previousDocumentEntry = list.currentItem?.url == action.request.url
+            ? list.backItem : list.currentItem
         updateBackSwipe()
     }
 
