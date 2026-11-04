@@ -304,6 +304,22 @@ describe('Settings > Dates > adding a date', () => {
         expect(window.history.length).toBe(before + 1);
       }
     );
+
+    it('is off the page before the form page is pushed, so the shell never pictures it', async () => {
+      const user = userEvent.setup();
+      await openChooser(user);
+      const push = window.history.pushState.bind(window.history);
+      const chooserAtPush: (Element | null)[] = [];
+      vi.spyOn(window.history, 'pushState').mockImplementation((...args) => {
+        chooserAtPush.push(document.querySelector('[data-testid="settings-kind-chooser"]'));
+        push(...args);
+      });
+
+      await user.click(screen.getByTestId('settings-kind-chooser-anniversary'));
+
+      expect(await heading('New anniversary')).toBeInTheDocument();
+      expect(chooserAtPush).toEqual([null]);
+    });
   });
 
   describe('the New event form', () => {
