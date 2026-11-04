@@ -17,8 +17,10 @@
  * The leading action is the back arrow, or a `Cancel` text button on a form
  * page (`leading: 'cancel'`); both run the page's `onBack`.
  *
- * It sits inside `<main>`, so it ends at the side column's edge by inheriting
- * `--dock-left`/`--dock-right`, and its z-30 keeps it under the dock (z-40).
+ * It sits inside `<main>`, so its controls end at the side column's edge by
+ * inheriting `--dock-left`/`--dock-right`; its glass reaches past them under
+ * the column to the screen's edge, as the app header's does, and its z-30
+ * keeps it under the dock (z-40).
  *
  * @component
  */
@@ -95,7 +97,7 @@ export function SettingsBar({
       {/* The glass reaches up behind the status bar: the 64px bar plus the inset. */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-x-0 top-0 h-[calc(4rem+env(safe-area-inset-top))] border-b border-line bg-glass backdrop-blur-lg transition-opacity duration-150 ${
+        className={`pointer-events-none absolute -right-(--dock-right) -left-(--dock-left) top-0 h-[calc(4rem+env(safe-area-inset-top))] border-b border-line bg-glass backdrop-blur-lg transition-opacity duration-150 ${
           collapsed ? 'opacity-100' : 'opacity-0'
         }`}
       />
