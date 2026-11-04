@@ -3,7 +3,7 @@ title: 'The unused dates push preference column is dropped'
 type: 'chore'
 ticket: '18'
 created: '2026-11-04'
-status: blocked
+status: done
 operator_actions:
   - "Before merging the PR to main, confirm both phones (the owner's iPhone Duo and the partner's iPhone) run story 5.4's update or later."
   - "Before merging the PR to main, re-read the hosted catalog for public.push_preferences read-only and confirm nothing added since 2026-11-04 depends on the dates column."
@@ -21,8 +21,6 @@ followup_review_recommended: false
 context: []
 warnings: []
 deferred: []
-blocked_at: "2026-11-04"
-blocked_reason: "awaiting operator: Before merging the PR to main, confirm both phones (the owner's iPhone Duo and the partner's iPhone) run story 5.4's update or later.; Before merging the PR to main, re-read the hosted catalog for public.push_preferences read-only and confirm nothing added since 2026-11-04 depends on the dates column.; After the deploy, confirm the hosted schema has no push_preferences.dates column.; After the deploy, on both phones open Settings > Notifications and confirm the switches load and a toggle saves."
 ---
 
 <intent-contract>
@@ -91,3 +89,19 @@ Status: awaiting-operator
 - A shell still on code older than story 5.4 fails every push-settings load and save once the hosted column is gone; only the owner's merge check covers that.
 - The hosted catalog was read on 2026-11-04 during refinement, not by this build; a dependent object added since would make the deploy's migration fail (a plain drop does not cascade), which the merge check's re-read covers.
 
+## Operator Confirmation
+
+Confirmed 2026-11-04: the external actions this story owed were carried out.
+
+- Before merging the PR to main, confirm both phones (the owner's iPhone Duo and the partner's iPhone) run story 5.4's update or later.
+- Before merging the PR to main, re-read the hosted catalog for public.push_preferences read-only and confirm nothing added since 2026-11-04 depends on the dates column.
+- After the deploy, confirm the hosted schema has no push_preferences.dates column.
+- After the deploy, on both phones open Settings > Notifications and confirm the switches load and a toggle saves.
+
+_Appended by the bmad-loop orchestrator (`bmad-loop confirm`, #335): a human confirmed these external actions out of band, and the story was advanced from `awaiting-operator` to `done`._
+How each was checked, all read-only against the hosted project:
+
+1. Hosted API logs: the owner's iPhone app stopped selecting `dates` at 2026-11-03 20:25 UTC (1,110 requests since, none naming it); the partner's iPhone app made story 5.8's linked-since read at 22:01 UTC, and 5.4's commit `ecfc3902` is an ancestor of 5.8's `0e67220c`.
+2. Hosted catalog before the merge: the only object depending on `push_preferences.dates` was its own default; no function, view or trigger named it, and the three own-row policies did not.
+3. Hosted catalog after the deploy: `push_preferences` has no `dates` column, and `20261104000000` is the last applied migration (the drop ran at 2026-11-04 19:45 UTC).
+4. Not on the phones: the Notifications page exists only in the shell, and no phone had opened it since the deploy. On the iPhone Duo simulator, with the shell built from `934663da` against a local stack whose `push_preferences` columns match the hosted ones, the page showed all six switches matching the stored row, and turning Moods off and back on each saved and survived a relaunch.
