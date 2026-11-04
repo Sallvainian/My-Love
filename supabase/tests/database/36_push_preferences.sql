@@ -1,5 +1,6 @@
 -- ============================================
--- pgTAP: push_preferences (20261031050000)
+-- pgTAP: push_preferences (20261031050000), the date reminders' switch
+-- (20261101020000) and the drop of the dates switch (20261104000000)
 --
 -- Pinned here: RLS on, the exact policy set (a policy added, renamed or
 -- dropped fails this file), the grants (select, insert and update for
@@ -106,8 +107,8 @@ select is(
      left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
     where a.attrelid = 'public.push_preferences'::regclass and a.attnum > 0 and not a.attisdropped
       and a.atttypid = 'boolean'::regtype),
-  'love_notes:true:true,moods:true:true,photos:true:true,pokes_and_kisses:true:true,dates:true:true,partner_requests:true:true,date_reminders:true:true',
-  'PUSH-PREF-009: the seven switches are boolean not null default true'
+  'love_notes:true:true,moods:true:true,photos:true:true,pokes_and_kisses:true:true,partner_requests:true:true,date_reminders:true:true',
+  'PUSH-PREF-009: the six switches are boolean not null default true'
 );
 
 select fk_ok('public', 'push_preferences', 'user_id', 'auth', 'users', 'id',
@@ -126,8 +127,8 @@ select lives_ok(
 );
 
 select results_eq(
-  $$select love_notes, moods, photos, pokes_and_kisses, dates, partner_requests, date_reminders from public.push_preferences$$,
-  $$values (true, true, true, true, true, true, true)$$,
+  $$select love_notes, moods, photos, pokes_and_kisses, partner_requests, date_reminders from public.push_preferences$$,
+  $$values (true, true, true, true, true, true)$$,
   'PUSH-PREF-013: the owner reads it back with every switch on'
 );
 
@@ -136,10 +137,10 @@ select results_eq(
       insert into public.push_preferences (user_id, date_reminders)
         select a_id, false from t_ids
         on conflict (user_id) do update set date_reminders = excluded.date_reminders
-        returning love_notes, moods, photos, pokes_and_kisses, dates, partner_requests, date_reminders
+        returning love_notes, moods, photos, pokes_and_kisses, partner_requests, date_reminders
     )
     select * from saved$$,
-  $$values (true, true, true, true, true, true, false)$$,
+  $$values (true, true, true, true, true, false)$$,
   'PUSH-PREF-027: the owner upserts date_reminders off and the other switches stay on'
 );
 
@@ -158,8 +159,8 @@ select lives_ok(
 );
 
 select results_eq(
-  $$select love_notes, moods, photos, pokes_and_kisses, dates, partner_requests from public.push_preferences$$,
-  $$values (false, false, true, true, true, true)$$,
+  $$select love_notes, moods, photos, pokes_and_kisses, partner_requests from public.push_preferences$$,
+  $$values (false, false, true, true, true)$$,
   'PUSH-PREF-016: each upsert changed only the column it sent'
 );
 
