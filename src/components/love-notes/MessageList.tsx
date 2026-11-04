@@ -369,12 +369,18 @@ export function MessageList({
     [listRef]
   );
 
+  // The header row's height as of the last commit: the last older page turns
+  // the older-page row into the beginning of the conversation
+  const prevHeaderRowHeight = useRef(getRowHeight(0));
+
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
     const prevFirstId = prevFirstNoteId.current;
     const before = prevNotes.current;
+    const prevHeaderHeight = prevHeaderRowHeight.current;
     prevFirstNoteId.current = notes[0]?.id;
     prevNotes.current = notes;
+    prevHeaderRowHeight.current = getRowHeight(0);
     // An emptied thread unmounts the list; a new one opens at its top again
     if (notes.length === 0) hasShownEnd.current = false;
     if (!listRef.current) return;
@@ -418,18 +424,22 @@ export function MessageList({
     }
 
     if (olderAdded > 0) {
-      // Keep the row the reader was on (from the old first note down) at the
-      // top; without this the list stays at the top and asks again.
-      const index = Math.min(Math.max(firstVisibleRow.current, 1) + olderAdded, totalRowCount - 1);
-      anchorRow.current = index;
-      listRef.current.scrollToRow({ index, align: 'start' });
+      // Keep what the reader sees where it was, to the pixel; without this the
+      // list stays at the top and asks again. The scroll offset has not moved,
+      // and everything from the old first note down has moved down by the rows
+      // put above it and any change in the header's height.
+      let shift = -prevHeaderHeight;
+      for (let index = 0; index <= olderAdded; index++) shift += getRowHeight(index);
+      anchorRow.current = Math.min(firstVisibleRow.current + olderAdded, totalRowCount - 1);
+      const element = listRef.current.element;
+      element?.scrollTo({ top: element.scrollTop + shift, behavior: 'instant' });
     }
 
     if (newMessage) {
       // Show "new message" indicator if user scrolled up
       queueMicrotask(() => setShowNewMessageIndicator(true));
     }
-  }, [listRef, notes, isAtBottom, totalRowCount]);
+  }, [listRef, notes, isAtBottom, totalRowCount, getRowHeight]);
 
   // Execute scroll to bottom after render (when new message arrives)
   useEffect(() => {

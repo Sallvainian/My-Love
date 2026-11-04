@@ -51,7 +51,13 @@ const view = vi.hoisted(() => ({
   visible: { startIndex: 0, stopIndex: 5 },
   rowCount: 0,
   defaultScrollOffset: undefined as number | undefined,
-  listRef: { current: { scrollToRow: vi.fn() } },
+  listRef: {
+    current: {
+      scrollToRow: vi.fn(),
+      // The scroll element: where the reader is, and the keep-place scroll
+      element: { scrollTop: 0, scrollTo: vi.fn() },
+    },
+  },
 }));
 
 vi.mock('react-window', () => ({
@@ -172,7 +178,14 @@ beforeEach(() => {
   view.rowCount = 0;
   view.defaultScrollOffset = undefined;
   view.listRef.current.scrollToRow.mockReset();
+  view.listRef.current.element.scrollTop = 0;
+  view.listRef.current.element.scrollTo.mockReset();
 });
+
+/** Every test note's row: "note n" is short text, so 76 + 48 */
+const NOTE_ROW = 124;
+/** The header row above the oldest note, while older pages remain */
+const OLDER_PAGE_ROW = 80;
 
 describe('MessageList older pages', () => {
   it('asks for nothing while the newest notes are on screen', async () => {
@@ -212,10 +225,13 @@ describe('MessageList older pages', () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the reader on the note they were at when the older page arrives', async () => {
+  it('keeps what the reader sees to the pixel when the older page arrives', async () => {
     const onLoadMore = vi.fn();
     const { rerender } = await openAtNewest(onLoadMore);
-    await showRows(rerender, onLoadMore, 0, 5);
+    // The reader is 50px into row 3 (note 53): the top of it is cut off.
+    const readerAt = OLDER_PAGE_ROW + 2 * NOTE_ROW + 50;
+    view.listRef.current.element.scrollTop = readerAt;
+    await showRows(rerender, onLoadMore, 3, 8);
     expect(onLoadMore).toHaveBeenCalledTimes(1);
 
     rerender(list(notesBetween(51, 100), onLoadMore, { isLoading: true }));
@@ -223,20 +239,42 @@ describe('MessageList older pages', () => {
     rerender(list(notesBetween(1, 100), onLoadMore));
     await settle();
 
-    // Note 51 was the first note, below the top row; 50 older notes now sit
-    // above it.
-    expect(view.listRef.current.scrollToRow).toHaveBeenCalledWith({ index: 51, align: 'start' });
-    expect(view.listRef.current.scrollToRow).not.toHaveBeenCalledWith(
-      expect.objectContaining({ align: 'end' })
-    );
+    // 50 older notes now sit above note 51; the offset moves down by exactly
+    // their height, so note 53 is still cut off by the same 50px. Scrolling
+    // its row to the top instead dropped those 50px.
+    expect(view.listRef.current.element.scrollTo).toHaveBeenCalledTimes(1);
+    expect(view.listRef.current.element.scrollTo).toHaveBeenCalledWith({
+      top: readerAt + 50 * NOTE_ROW,
+      behavior: 'instant',
+    });
+    expect(view.listRef.current.scrollToRow).not.toHaveBeenCalled();
     expect(screen.queryByTestId('new-message-indicator')).toBeNull();
     expect(onLoadMore).toHaveBeenCalledTimes(1);
 
     // The scroll lands there: still no further page.
-    view.visible = { startIndex: 51, stopIndex: 56 };
+    view.visible = { startIndex: 53, stopIndex: 58 };
     rerender(list(notesBetween(1, 100), onLoadMore));
     await settle();
     expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts the taller beginning of the conversation when the last page arrives', async () => {
+    const onLoadMore = vi.fn();
+    const { rerender } = await openAtNewest(onLoadMore);
+    // The reader is 30px down the older-page row, above every note.
+    view.listRef.current.element.scrollTop = 30;
+    await showRows(rerender, onLoadMore, 0, 5);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    // The last page: the header becomes the beginning of the conversation,
+    // 40px taller than the older-page row it replaces.
+    rerender(list(notesBetween(1, 100), onLoadMore, { hasMore: false }));
+    await settle();
+
+    expect(view.listRef.current.element.scrollTo).toHaveBeenCalledWith({
+      top: 30 + 50 * NOTE_ROW + (120 - OLDER_PAGE_ROW),
+      behavior: 'instant',
+    });
   });
 
   it('asks for nothing more before the scroll back to the reader has landed', async () => {
@@ -247,7 +285,10 @@ describe('MessageList older pages', () => {
     await settle();
     rerender(list(notesBetween(1, 100), onLoadMore));
     await settle();
-    expect(view.listRef.current.scrollToRow).toHaveBeenCalledWith({ index: 51, align: 'start' });
+    expect(view.listRef.current.element.scrollTo).toHaveBeenCalledWith({
+      top: 50 * NOTE_ROW,
+      behavior: 'instant',
+    });
 
     // The real List renders again from the old scroll offset before the scroll
     // event lands, and reports a slightly different range at the top.
