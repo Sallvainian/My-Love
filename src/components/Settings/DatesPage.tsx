@@ -98,6 +98,8 @@ export function DatesPage() {
 
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
+  /** The kind picked in the chooser, whose page opens once the chooser is off screen. */
+  const [chosen, setChosen] = useState<NewDateKind | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     // Re-armed on setup so StrictMode's cleanup/setup replay leaves the live page settled.
@@ -159,11 +161,28 @@ export function DatesPage() {
   // Stable: the dialog's focus trap re-runs on a new Escape handler.
   const cancelChoosing = useCallback(() => setChoosing(false), []);
 
-  // The chooser closes, then the kind's form page is pushed (one history entry).
+  // The chooser closes at once, with no fade, and the kind's form page is
+  // pushed (one history entry) only after a frame without it has been drawn.
+  // The iPhone shell pictures the page being left when the URL changes, and
+  // its back swipe slides that picture in, so a push while the chooser was
+  // still on screen brought the chooser back for a moment on the swipe.
   const choose = (kind: NewDateKind) => {
     setChoosing(false);
-    openSettingsPage(kind === 'event' ? 'dates/new-event' : 'dates/new-anniversary');
+    setChosen(kind);
   };
+  useEffect(() => {
+    if (chosen === null) return;
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() =>
+        openSettingsPage(chosen === 'event' ? 'dates/new-event' : 'dates/new-anniversary')
+      );
+    });
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.cancelAnimationFrame(second);
+    };
+  }, [chosen, openSettingsPage]);
 
   const now = new Date();
   const linked =
@@ -304,9 +323,12 @@ export function DatesPage() {
       </SettingsGroup>
 
       {/* Outside every card, like the other dialogs, so no card can clip it. */}
-      <AnimatePresence>
-        {choosing && <KindChooser onChoose={choose} onCancel={cancelChoosing} />}
-      </AnimatePresence>
+      {/* Unmounting the AnimatePresence itself drops the chooser with no exit fade. */}
+      {chosen === null && (
+        <AnimatePresence>
+          {choosing && <KindChooser onChoose={choose} onCancel={cancelChoosing} />}
+        </AnimatePresence>
+      )}
     </>
   );
 }

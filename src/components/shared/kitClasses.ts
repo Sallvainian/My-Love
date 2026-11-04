@@ -69,12 +69,19 @@ export const FAILURE_BOX = 'rounded-[14px] bg-dtint px-4 py-3 text-sm text-dange
  * `scheme-light-dark` lets native parts such as the date picker's icon follow
  * the OS theme instead of drawing dark on the dark field.
  *
+ * A date or date-and-time field drops the native look: on iPhone the native
+ * control keeps its own minimum width, wider than a phone's card, so it ran
+ * past the card's right edge, and it draws no ring. Without it the field is the same box as
+ * every other, with its value at the left like theirs.
+ *
  * 16px text, never smaller: iOS zooms the whole page in when a field under
  * 16px is focused and leaves it zoomed, so the page can then be dragged
  * about. Every text field in the app follows this.
  */
 export function fieldClass(hasError: boolean, multiline = false): string {
   return `w-full rounded-[14px] bg-field px-4 text-base text-ink ring-inset placeholder:text-muted focus:ring-2 focus:outline-hidden ${
-    multiline ? 'resize-none py-3' : 'h-12 scheme-light-dark'
+    multiline
+      ? 'resize-none py-3'
+      : 'h-12 scheme-light-dark [&::-webkit-date-and-time-value]:text-left [&:is([type=date],[type=datetime-local])]:appearance-none'
   } ${hasError ? 'ring-2 ring-danger focus:ring-danger' : 'ring-1 ring-line-strong focus:ring-accent'}`;
 }

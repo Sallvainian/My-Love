@@ -231,7 +231,14 @@ export function SettingsStack({ resolvePage }: SettingsStackProps) {
         : '';
 
   return (
-    <div className="overflow-x-clip" data-testid="settings-view">
+    // The clip keeps the slide off the page's sides. The view reaches under the
+    // side column and pads itself back out of it, so the clip falls at the
+    // screen's edge and the bar's glass, which runs under the column as the
+    // app header does, is not cut at the column's edge.
+    <div
+      className="-mr-(--dock-right) -ml-(--dock-left) overflow-x-clip pr-(--dock-right) pl-(--dock-left)"
+      data-testid="settings-view"
+    >
       <div key={path} ref={pageRef} className={motionClass}>
         <SettingsBar
           title={page.title}
