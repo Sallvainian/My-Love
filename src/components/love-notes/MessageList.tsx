@@ -20,7 +20,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowDown, Heart, LoaderCircle } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
@@ -40,6 +40,8 @@ interface MessageRowCustomProps {
   partnerName: string;
   onRetry?: (tempId: string) => void;
   onRequestRemove?: (note: LoveNote) => void;
+  /** Row keys of the notes whose bubbles play their entrance when they mount */
+  enteringKeys: ReadonlySet<string>;
 }
 
 /**
@@ -62,6 +64,7 @@ function MessageRow({
   partnerName,
   onRetry,
   onRequestRemove,
+  enteringKeys,
 }: {
   index: number;
   style: React.CSSProperties;
@@ -104,6 +107,7 @@ function MessageRow({
         senderName={senderName}
         onRetry={onRetry}
         onRequestRemove={onRequestRemove}
+        animateEntrance={enteringKeys.has(rowKeyOf(note))}
       />
     </div>
   );
@@ -166,6 +170,56 @@ function composedKey(note: LoveNote): string | undefined {
   return note.tempId ?? (note as LoveNote & { idempotency_key?: string }).idempotency_key;
 }
 
+/**
+ * A note's row key: the key it was composed with, which its committed row
+ * keeps, else its id. react-window keys rows by index unless given one, and
+ * an older page moves every note to a new index.
+ */
+function rowKeyOf(note: LoveNote): string {
+  return composedKey(note) ?? note.id;
+}
+
+/**
+ * What a change to the thread brought: how many notes an older page put
+ * above the previous first note, and the notes that arrived below them as new
+ * messages (sent or received).
+ */
+function compareNotes(
+  before: LoveNote[],
+  notes: LoveNote[]
+): { olderAdded: number; arrived: LoveNote[] } {
+  const prevFirstId = before[0]?.id;
+  // An older page puts notes above the previous first note. A refresh that
+  // replaced the thread leaves no previous first note to find.
+  const olderAdded =
+    prevFirstId === undefined || notes[0]?.id === prevFirstId
+      ? 0
+      : Math.max(
+          0,
+          notes.findIndex((note) => note.id === prevFirstId)
+        );
+
+  // A new message is a note that was not there before, below any older
+  // page. Not only at the end: a refresh puts the server's page ahead of an
+  // unsent note. A confirmed send keeps its key (the committed row carries
+  // the tempId as idempotency_key) and a removal adds nothing.
+  const known = new Set<string>();
+  for (const note of before) {
+    known.add(note.id);
+    const key = composedKey(note);
+    if (key) known.add(key);
+  }
+  const arrived = notes.filter((note, index) => {
+    if (index < olderAdded || known.has(note.id)) return false;
+    const key = composedKey(note);
+    return !key || !known.has(key);
+  });
+
+  return { olderAdded, arrived };
+}
+
+const NO_KEYS: ReadonlySet<string> = new Set();
+
 /** Rows beyond the visible range within which the loader asks for more */
 const LOAD_THRESHOLD = 10;
 
@@ -221,7 +275,6 @@ export function MessageList({
 }: MessageListProps): ReactNode {
   // Use react-window v2's typed ref hook for proper API access
   const listRef = useListRef(null);
-  const hasScrolledToBottom = useRef(false);
   const scrollToBottomOnNextRender = useRef(false);
   // The notes at either end as of the last commit: an older page moves the
   // first, a new message the last. Length alone cannot tell the two apart.
@@ -234,13 +287,33 @@ export function MessageList({
   // until a report shows the scroll has landed or left the top
   const anchorRow = useRef<number | null>(null);
   // Whether the list has shown its last row since the thread appeared. It
-  // opens scrolled to the newest note, but its first frame, before that
-  // scroll, reports the top; older pages wait until the end has been seen.
+  // opens scrolled to the newest note; older pages wait until the end has
+  // been seen, so a report of the top before that asks for nothing.
   const hasShownEnd = useRef(false);
 
   // Story 2.3: Track if user is at bottom and show new message indicator
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+
+  // The notes whose bubbles play their entrance (fade and rise) when their
+  // rows mount: every note when the thread appears, then the notes each change
+  // brings in as new messages. Rows also mount when scrolled into range, and
+  // an older page first renders the rows at the old offset, dropping the ones
+  // on screen, and mounts them again once the keep-place scroll lands; going
+  // by the mount alone, every note on screen faded in again. A change that
+  // brings no new note and no older page (a send being confirmed) keeps the
+  // set, so a note sent or received still animates when its row mounts after
+  // the scroll to the bottom.
+  const [entrance, setEntrance] = useState<{ notes: LoveNote[]; keys: ReadonlySet<string> }>(
+    () => ({ notes, keys: new Set(notes.map(rowKeyOf)) })
+  );
+  if (entrance.notes !== notes) {
+    const { olderAdded, arrived } = compareNotes(entrance.notes, notes);
+    let keys = entrance.keys;
+    if (arrived.length > 0) keys = new Set(arrived.map(rowKeyOf));
+    else if (olderAdded > 0) keys = NO_KEYS;
+    setEntrance({ notes, keys });
+  }
 
   // Calculate whether to show "Beginning of conversation"
   const showBeginning = !hasMore && notes.length > 0;
@@ -345,57 +418,48 @@ export function MessageList({
     [notes, hasMore]
   );
 
-  // Automatic scroll to bottom on initial load
-  useEffect(() => {
-    if (notes.length > 0 && listRef.current && !hasScrolledToBottom.current) {
-      hasScrolledToBottom.current = true;
-      // Defer scroll to next frame so react-window can complete its layout pass.
-      // Without this, scrollToRow fires before the list has measured its rows,
-      // causing the chat to stay scrolled to the top when re-entering the tab.
-      requestAnimationFrame(() => {
-        if (listRef.current) {
-          listRef.current.scrollToRow({ align: 'end', index: totalRowCount - 1 });
-          queueMicrotask(() => setIsAtBottom(true));
-        }
-      });
-    }
-  }, [listRef, notes.length, totalRowCount]);
+  // react-window sizes the thread from the rows it has worked out and an
+  // average for the rest, and starts over whenever the notes change. After an
+  // older page that average can come up short of the real end: a jump to it
+  // (the new-message button, End, one long scroll) stops there, then the rows
+  // at the end are worked out and the thread grows past the reader. Every
+  // row's height is known, so a spacer gives the thread its full height.
+  const threadHeight = useMemo(() => {
+    let height = 0;
+    for (let index = 0; index < totalRowCount; index++) height += getRowHeight(index);
+    return height;
+  }, [getRowHeight, totalRowCount]);
+
+  // A list that shrinks keeps its scroll offset, so a reader at the end loses
+  // the bottom of the newest note -- the partner row gains its "Connected"
+  // line once the feed joins, just after the thread opens. Keep them there.
+  const keepEndInView = useCallback(
+    (_size: { height: number }, prevSize: { height: number }) => {
+      const element = listRef.current?.element;
+      if (element && element.scrollHeight - element.scrollTop - prevSize.height <= 1) {
+        element.scrollTo({ top: element.scrollHeight });
+      }
+    },
+    [listRef]
+  );
+
+  // The header row's height as of the last commit: the last older page turns
+  // the older-page row into the beginning of the conversation
+  const prevHeaderRowHeight = useRef(getRowHeight(0));
 
   // Story 2.3: AC-2.3.4 - Handle new messages with conditional automatic scroll
   useEffect(() => {
-    const prevFirstId = prevFirstNoteId.current;
     const before = prevNotes.current;
+    const prevHeaderHeight = prevHeaderRowHeight.current;
     prevFirstNoteId.current = notes[0]?.id;
     prevNotes.current = notes;
+    prevHeaderRowHeight.current = getRowHeight(0);
     // An emptied thread unmounts the list; a new one opens at its top again
     if (notes.length === 0) hasShownEnd.current = false;
     if (!listRef.current) return;
 
-    // An older page puts notes above the previous first note. A refresh that
-    // replaced the thread leaves no previous first note to find.
-    const olderAdded =
-      prevFirstId === undefined || notes[0]?.id === prevFirstId
-        ? 0
-        : Math.max(
-            0,
-            notes.findIndex((note) => note.id === prevFirstId)
-          );
-
-    // A new message is a note that was not there before, below any older
-    // page. Not only at the end: a refresh puts the server's page ahead of an
-    // unsent note. A confirmed send keeps its key (the committed row carries
-    // the tempId as idempotency_key) and a removal adds nothing.
-    const known = new Set<string>();
-    for (const note of before) {
-      known.add(note.id);
-      const key = composedKey(note);
-      if (key) known.add(key);
-    }
-    const newMessage = notes.some((note, index) => {
-      if (index < olderAdded || known.has(note.id)) return false;
-      const key = composedKey(note);
-      return !key || !known.has(key);
-    });
+    const { olderAdded, arrived } = compareNotes(before, notes);
+    const newMessage = arrived.length > 0;
 
     if (!newMessage && olderAdded === 0) return;
 
@@ -410,18 +474,32 @@ export function MessageList({
     }
 
     if (olderAdded > 0) {
-      // Keep the row the reader was on (from the old first note down) at the
-      // top; without this the list stays at the top and asks again.
-      const index = Math.min(Math.max(firstVisibleRow.current, 1) + olderAdded, totalRowCount - 1);
-      anchorRow.current = index;
-      listRef.current.scrollToRow({ index, align: 'start' });
+      // Keep what the reader sees where it was, to the pixel; without this the
+      // list stays at the top and asks again. The scroll offset has not moved,
+      // and everything from the old first note down has moved down by the rows
+      // put above it and any change in the header's height.
+      let shift = -prevHeaderHeight;
+      for (let index = 0; index <= olderAdded; index++) shift += getRowHeight(index);
+      anchorRow.current = Math.min(firstVisibleRow.current + olderAdded, totalRowCount - 1);
+      const element = listRef.current.element;
+      element?.scrollTo({ top: element.scrollTop + shift, behavior: 'instant' });
     }
 
     if (newMessage) {
       // Show "new message" indicator if user scrolled up
       queueMicrotask(() => setShowNewMessageIndicator(true));
     }
-  }, [listRef, notes, isAtBottom, totalRowCount]);
+  }, [listRef, notes, isAtBottom, totalRowCount, getRowHeight]);
+
+  // Rows keep their note across an older page, and a sent note its row once
+  // the server confirms it
+  const rowKey = useCallback(
+    (index: number, { notes: rowNotes }: MessageRowCustomProps) => {
+      const note = index > 0 ? rowNotes[index - 1] : undefined;
+      return note ? `note:${rowKeyOf(note)}` : `row:${index}`;
+    },
+    []
+  );
 
   // Execute scroll to bottom after render (when new message arrives)
   useEffect(() => {
@@ -486,6 +564,7 @@ export function MessageList({
     partnerName,
     onRetry,
     onRequestRemove,
+    enteringKeys: entrance.keys,
   };
 
   return (
@@ -514,10 +593,32 @@ export function MessageList({
         rowCount={totalRowCount}
         rowHeight={getRowHeight}
         onRowsRendered={onRowsRendered}
+        onResize={keepEndInView}
         defaultHeight={600}
+        // Opens at the newest note: an offset past the end is clamped to it.
+        // react-window sizes the thread from the rows it has measured, and
+        // works out the rows for this offset before its first paint, so every
+        // row is measured and the clamp lands on the real end. The one-off
+        // scrollToRow this replaces ran a frame later, against the estimate
+        // from the top rows alone and the 600px guess at the list's height,
+        // and opened the thread a note or two short of the bottom.
+        defaultScrollOffset={Number.MAX_SAFE_INTEGER}
         rowComponent={MessageRow}
+        rowKey={rowKey}
         rowProps={rowProps}
-      />
+      >
+        <div
+          aria-hidden="true"
+          data-testid="thread-height"
+          style={{
+            position: 'absolute',
+            top: 0,
+            width: 1,
+            height: threadHeight,
+            visibility: 'hidden',
+          }}
+        />
+      </List>
     </div>
   );
 }

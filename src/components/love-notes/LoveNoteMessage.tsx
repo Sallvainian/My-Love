@@ -45,6 +45,12 @@ export interface LoveNoteMessageProps {
   onRetry?: (tempId: string) => void;
   /** Callback when the user asks to remove this message from their own history */
   onRequestRemove?: (note: LoveNote) => void;
+  /**
+   * Whether the bubble fades and rises in when it mounts. MessageList's rows
+   * also mount for notes already seen (scrolled into range, or after an older
+   * page), and it passes false for those.
+   */
+  animateEntrance?: boolean;
 }
 
 /**
@@ -66,6 +72,7 @@ function LoveNoteMessageComponent({
   senderName,
   onRetry,
   onRequestRemove,
+  animateEntrance = true,
 }: LoveNoteMessageProps): ReactElement {
   // When it was written, for a note delivered late; otherwise when it arrived.
   const displayTime = loveNoteDisplayTime(message);
@@ -295,7 +302,7 @@ function LoveNoteMessageComponent({
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={animateEntrance ? { opacity: 0, y: 10 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
         className={`mb-3 flex flex-col px-4 ${isOwnMessage ? 'items-end' : 'items-start'}`}
