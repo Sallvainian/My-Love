@@ -3640,7 +3640,8 @@ origin: story 5.1 review (epic-settings-rework), 2026-11-02
 location: tests/e2e/settings/settings-stack.spec.ts; src/components/Settings/stack/SettingsStack.tsx (top-page back arrow); src/hooks/useSideColumn.ts
 severity: low
 reason: The column form (iPhone Duo capsule) is chosen from `env(safe-area-inset-left/right)`, which a desktop Playwright browser cannot set, so the stack's column-form behaviour (no top-page back arrow, a subpage arrow, bar and cards ending at the column's edge) is proven only by unit tests that mock `useSideColumn`. The same holds for every column-form feature. Close it with a sim-driver check on the Duo simulator, or by the ship story's hand run of the Key Flows on the owner's Duo.
-status: open
+status: done 2026-11-04
+resolution: sim-driver check on the iPhone Duo simulator, 2026-11-04, shell built from main `210442c0`: folded portrait (capsule on the right, x 404-444 of 466) and folded landscapeLeft (capsule on the left, x 22-62 of 678). In both, the Settings top page has no back arrow, Profile has one, and the bar and cards stop 16pt short of the 84pt column (right form: content ends at 366, column starts at 382; left form: Back starts at 94 and cards at 113, column ends at 84).
 
 ### DW-420: No test pins that sign-out keeps the device's photo-download choice.
 origin: story 5.1 review (epic-settings-rework), 2026-11-02
@@ -3692,6 +3693,7 @@ location: ios/App/App/NativeAuth.swift (MainViewController); src/components/Dail
 source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: medium (unverified)
 reason: The Duo trial covered Settings pushes and dock views in the bottom dock and folded with the column, side not recorded. The simulator's first-entry result rests on synthesized pans that register about one time in four. Unchecked: (1) a real swipe on the session's first entry stays on the page; (2) with the column on the left edge (one folded landscape, the left pane side by side) the swipe still goes back and the capsule still taps; (3) an edge swipe that starts over Home's message card, which turns to the next message on a right drag, goes back without also turning the card. Story 15 checks all three by hand on the Duo once the Swift line is in.
+progress: 2026-11-04 Duo simulator, shell built from main `210442c0` (after story 15's `isLoading` patch, which its plan says was not re-run for cases 2 and 3): (1) on Home, the first entry after a fresh launch, `sim swipe back` exited 1 after 8 pans and Home stayed; (2) folded landscapeLeft with the capsule on the left, Settings > Profile, the swipe returned to Settings in one level (registered on the second pan) and each of the six capsule buttons opened its view; (3) the case as written no longer arises: the dock's Home now walks back to the first history entry (AGENTS.md, Home is the bottom of the history), so a swipe on Home has nothing to go back to and 8 pans starting over the message card left Home showing and the card on the same message. Still owed under a real finger on the Duo: cases 1 and 2, and whether a real edge swipe over the card on Home turns it; these are story 15's plan `operator_actions`.
 status: open
 
 ### DW-426: The anniversaries mirror still sits inside the persisted `settings` object that `settingsSlice` owns, though `datesSlice` now writes it.
@@ -3795,7 +3797,8 @@ location: _bmad-output/initiative-my-love/deferred-work.md DW-425
 source_spec: `tickets/epic-settings-rework/tickets/story-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: low
 reason: Story 15 ran the three cases on the Duo simulator: the first entry (exit 1), the column on the left edge (one level, after 17 failed synthesized pans), and Home's message card (one level). It cannot run them under a real finger, and the shell with the Swift line is not on the Duo yet. The hand checks are this plan's operator_actions. The deferred-work.md header leaves another entry's reason to the orchestrator.
-status: open
+status: done 2026-11-04
+resolution: DW-425's progress line now holds the 2026-11-04 simulator results for all three cases and names story 15's plan `operator_actions` as the hand checks still owed.
 
 ### DW-438: The AGENTS.md Settings subpage rule names `subpageAvailable(path)` for any parent page's row, but the helper is local to `Settings.tsx`, and it overclaims that the row and the page "cannot disagree".
 origin: spec-deferred (story 5.16 review, 2026-11-03)
