@@ -128,7 +128,10 @@ class MainViewController: CAPBridgeViewController {
             self.noteDocumentLoad(action)
         }
         // url changes on pushState and popstate too, before the new page
-        // draws, so the page being left is still on screen to be pictured;
+        // draws, so the page being left is still on screen to be pictured.
+        // The picture brings the screen up to date first: the last frame
+        // shown can lag the page by a frame or more, and it held the Add a
+        // date chooser after the page had already closed it.
         // canGoBack covers the first entry gaining a back item. A new
         // document's url changes when its load starts, before its entry joins
         // the back list, so the swipe stays off while a load runs, and
@@ -173,7 +176,7 @@ class MainViewController: CAPBridgeViewController {
         if current !== shownEntry {
             if let left = shownEntry,
                Date().timeIntervalSince(shownSince) >= Self.settleTime,
-               let picture = webView.snapshotView(afterScreenUpdates: false) {
+               let picture = webView.snapshotView(afterScreenUpdates: true) {
                 pagePictures[ObjectIdentifier(left)] = picture
             }
             shownEntry = current
