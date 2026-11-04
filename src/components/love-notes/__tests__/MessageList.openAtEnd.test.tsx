@@ -12,7 +12,7 @@
  * react-window's List is stood in for by one that keeps the props this checks
  * and an element whose scroll metrics the test sets.
  */
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoveNote } from '../../../types/models';
@@ -58,15 +58,17 @@ vi.mock('react-window', () => ({
     },
   }),
   List: ({
+    children,
     defaultScrollOffset,
     onResize,
   }: {
+    children?: ReactNode;
     defaultScrollOffset?: number;
     onResize?: (size: Size, prevSize: Size) => void;
   }) => {
     view.defaultScrollOffset = defaultScrollOffset;
     view.onResize = onResize;
-    return null;
+    return <>{children}</>;
   },
 }));
 
@@ -149,5 +151,30 @@ describe('MessageList opening at the newest note', () => {
     resize(0, 600);
 
     expect(view.element.scrollTop).toBe(0);
+  });
+
+  it('gives the thread the full height of its rows once an older page lands', async () => {
+    // react-window works out row heights only as far as the reader has been
+    // and averages the rest, so after an older page its height came up short
+    // and a jump to the newest note stopped that far above it
+    const older: LoveNote[] = [
+      { ...notes[0], id: 'older-long', content: 'x'.repeat(200) },
+      { ...notes[0], id: 'older-image', content: 'a photo', image_url: 'photo.jpg' },
+    ];
+    const props = { currentUserId: 'me', partnerName: 'Partner', userName: 'Me', isLoading: false };
+    const { rerender } = render(<MessageList {...props} notes={notes} hasMore />);
+    await act(async () => {});
+
+    // The older-page row (80) and 50 short notes (124 each)
+    expect(screen.getByTestId('thread-height').style.height).toBe(`${80 + 50 * 124}px`);
+
+    rerender(<MessageList {...props} notes={[...older, ...notes]} hasMore={false} />);
+    await act(async () => {});
+
+    // The beginning of the conversation (120), a long note (176), a note with
+    // a picture (380) and the 50 short notes
+    expect(screen.getByTestId('thread-height').style.height).toBe(
+      `${120 + 176 + 380 + 50 * 124}px`
+    );
   });
 });

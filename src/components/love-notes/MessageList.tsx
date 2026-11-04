@@ -20,7 +20,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowDown, Heart, LoaderCircle } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { List, useListRef } from 'react-window';
 import { useInfiniteLoader } from 'react-window-infinite-loader';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
@@ -344,6 +344,18 @@ export function MessageList({
     [notes, hasMore]
   );
 
+  // react-window sizes the thread from the rows it has worked out and an
+  // average for the rest, and starts over whenever the notes change. After an
+  // older page that average can come up short of the real end: a jump to it
+  // (the new-message button, End, one long scroll) stops there, then the rows
+  // at the end are worked out and the thread grows past the reader. Every
+  // row's height is known, so a spacer gives the thread its full height.
+  const threadHeight = useMemo(() => {
+    let height = 0;
+    for (let index = 0; index < totalRowCount; index++) height += getRowHeight(index);
+    return height;
+  }, [getRowHeight, totalRowCount]);
+
   // A list that shrinks keeps its scroll offset, so a reader at the end loses
   // the bottom of the newest note -- the partner row gains its "Connected"
   // line once the feed joins, just after the thread opens. Keep them there.
@@ -522,7 +534,19 @@ export function MessageList({
         defaultScrollOffset={Number.MAX_SAFE_INTEGER}
         rowComponent={MessageRow}
         rowProps={rowProps}
-      />
+      >
+        <div
+          aria-hidden="true"
+          data-testid="thread-height"
+          style={{
+            position: 'absolute',
+            top: 0,
+            width: 1,
+            height: threadHeight,
+            visibility: 'hidden',
+          }}
+        />
+      </List>
     </div>
   );
 }
