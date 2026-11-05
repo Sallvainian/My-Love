@@ -1,7 +1,7 @@
 ---
 type: initiative
 title: "My-Love"
-sources: ["_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md"]
+sources: ["_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md", "AGENTS.md"]
 companions: []
 after: []
 status: in-progress
@@ -22,30 +22,31 @@ Each partner has a reason to open the app every day, an open loop from the other
 
 - R1 (Decided: The daily question): each day the couple gets one this-or-that question with two options and each partner picks one option for themselves; met when both partners see the same question that day and each saved pick belongs to its picker alone.
 - R2 (Decided: The daily question): a partner's pick stays hidden from the other until the other has picked, then both picks show together (the reveal); met when nothing the app shows or receives carries the partner's pick before your own exists.
-- R3 (Decided: The daily question; Mock-up assumptions; owner 2026-11-05): each day each partner is asked "Write tomorrow's question?"; yes lets them type its two options (This / That) and it becomes the couple's next question, "No thanks, pick one for us" gives a random pool question; if both write one, the first sent is asked and the other joins the pool; met when a written question is asked of both the next day and a declined prompt yields a pool question.
+- R3 (Decided: The daily question; Mock-up assumptions; Notes, Decision 2026-11-05): each day each partner is asked "Write tomorrow's question?"; yes lets them type its two options (This / That) and it becomes the couple's next question, "No thanks, pick one for us" gives a random pool question; if both write one, the first sent is asked and the other joins the pool; met when a written question is asked of both the next day and a declined prompt yields a pool question.
 - R4 (Decided: The daily question; Mock-up assumptions): the pool, written by the coach, holds about 500 this-or-that questions; no question repeats for the couple until every pool question has been used; questions partners write join the pool; met by the pool count and by consecutive days drawing distinct questions until the pool is used up.
 - R5 (Decided: Streak; Mock-up assumptions): the couple shares one streak that goes up by one for each day both partners picked; a day without both picks is missed and holds the count, never resetting or raising it; met by the count over a sequence of done and missed days.
 - R6 (Decided: Streak): a second counter shows the current run, days in a row with no miss; it resets to zero on a miss and shows beside the held total.
 - R7 (Decided: Streak; design, After a missed day): the streak shows grey until today's question is done, fire orange once done, and blue after a missed day, staying blue through missed days in a row until both partners pick again.
 - R8 (Decided: Streak; Mock-up assumptions): after each finished day a short Duolingo-style animation shows the streak going up by one, at once for whoever picks second and on the next open for whoever picked first.
-- R9 (Decided: Streak; owner 2026-11-05): milestones every 25 days of the held total (R5), not the current run; each has a flaming-heart badge, greyed while locked and full colour once reached; reaching one shows the approved milestone screen with an emoji-style heart wrapped in flames whose flames flicker and heart beats; the flaming heart appears only on milestones, while the streak counter, the +1 animation and the dock keep the plain flame.
+- R9 (Decided: Streak; Notes, Decision 2026-11-05): milestones every 25 days of the held total (R5), not the current run; each has a flaming-heart badge, greyed while locked and full colour once reached; reaching one shows the approved milestone screen with an emoji-style heart wrapped in flames whose flames flicker and heart beats; the flaming heart appears only on milestones, while the streak counter, the +1 animation and the dock keep the plain flame.
 - R10 (Decided: Reveal and reply; design, Love Notes reply sent): the reveal's one action is Reply in Love Notes, spanning its card's full width; it opens Love Notes with the reply visibly attached to that day's question, as replying to a message in iPhone Messages, and both partners see the sent note with the question attached.
 - R11 (Decided: Partner page): the Partner page holds the streak and the past questions in place of the partner's mood card and recent-moods list; each past day is marked Same or Different with a running count ("Same pick on 9 of your 13 days").
 - R12 (Mock-up assumptions; Consequences): the Mood dock tab becomes Daily and the dock keeps five destinations.
 - R13 (Mock-up assumptions): the waiting screen has a Nudge button that sends the partner a push.
-- R14 (Mock-up assumptions; owner 2026-11-05): pushes arrive for a new question at 8 AM, the partner picked, the partner nudged you, an 8 PM reminder when nobody has answered, and both answered, each timed on the recipient's own clock, with the copy on the mock-up's notifications screen.
+- R14 (Mock-up assumptions; Notes, Decision 2026-11-05): pushes arrive for a new question at 8 AM, the partner picked, the partner nudged you, an 8 PM reminder when nobody has answered, and both answered, each timed on the recipient's own clock, with the copy on the mock-up's notifications screen.
 - R15 (Decided: The daily question; Consequences): the whole mood system is gone (the check-in with its 12 moods, note, Timeline and Calendar; the partner mood card and recent-moods list; mood realtime and mood notifications) and every stored mood is deleted, on the server and in each device's offline copies; met when no mood UI, mood row or device mood copy remains.
 - R16 (Decided: Partner page; Consequences): Poke, Kiss and Fart are gone with their interaction history, on the server and on devices.
-- R17 (owner 2026-11-05): a pick made offline is kept on the device with the time it was made and sent the moment a connection returns; it counts for the date it was made even when it reaches the server after that day's midnight, and the streak is corrected when it lands; the reveal shows only once the server has it; met when a pick made offline at 11:50 PM and sent at 12:10 AM counts for the earlier date.
-- R18 (owner 2026-11-05): an account with no linked partner sees an invitation to link on the Daily page and no question.
-- R19 (owner 2026-11-05): each new push kind has its own Settings switch, and the mood, poke and kiss switches are gone.
-- R20 (owner 2026-11-05): each partner's day runs on their own phone's local clock; the couple's day for a date counts when each partner picked during that date on their own clock, so it closes only when the later partner's midnight passes; met when partners an hour apart each pick at 11:30 PM local and the day counts.
+- R17 (Notes, Decision 2026-11-05): a pick made offline is kept on the device with the time it was made and sent the moment a connection returns; it counts for the date it was made even when it reaches the server after that day's midnight, and the streak is corrected when it lands; the reveal shows only once the server has it; met when a pick made offline at 11:50 PM and sent at 12:10 AM counts for the earlier date.
+- R18 (Notes, Decision 2026-11-05): an account with no linked partner sees an invitation to link on the Daily page and no question.
+- R19 (Notes, Decision 2026-11-05): each new push kind has its own Settings switch, and the mood, poke and kiss switches are gone.
+- R20 (Notes, Decision 2026-11-05): each partner's day runs on their own phone's local clock; the couple's day for a date counts when each partner picked during that date on their own clock, so it closes only when the later partner's midnight passes; met when partners an hour apart each pick at 11:30 PM local and the day counts.
 
 ## Constraints
 
 - C1 (Consequences): the server enforces the hidden pick, withholding the partner's pick row until the reader's own exists (RLS); hiding it in the UI alone does not meet R2.
 - C2 (Consequences): the nudge, partner-picked and both-answered build on the existing `send-push` Edge Function and Broadcast realtime, not on a new push service or channel.
 - C3 (project-context, Known pitfalls; `src/api/moodSyncService.ts`): `moodSyncService` hosts the refcounted Realtime registry that AGENTS.md routes new Realtime work through, and the `partner_linked` event that `partnerSlice` and `usePartnerLinkListener` use; removing moods keeps both working.
+- C4 (project-context, Maintained by hand; `src/services/dateReminders.ts` `reminderIdsToCancel`): every date-reminder re-plan cancels every pending local notification on the phone; if the 8 AM and 8 PM pushes are scheduled on the phone, the same change reserves their own ids and narrows that cancel, or each re-plan deletes them.
 
 ## Done when
 
@@ -83,3 +84,7 @@ Each partner has a reason to open the app every day, an open loop from the other
 - Decision: 2026-11-05 the owner confirmed a day counts only when both partners pick (R5), kept the Nudge button (R13), set milestones on the held total (R9), wants an offline pick sent on reconnect (R17), and took the PO's picks for two written questions (R3), no linked partner (R18) and push switches (R19).
 - Decision: 2026-11-05 the owner ruled out one couple time zone, since the partners are sometimes an hour apart and a streak must not end at 11 PM for one of them: each partner's day runs on their own clock (R20). The owner kept all five pushes (R14) and wants an offline pick to carry the time it was made, so it counts for that date (R17).
 - Decision: 2026-11-05 no app-wide PRD: the product exists and its code records what it does, so requirements are added feature by feature from each input (a brainstorm, a brief) when it is taken up.
+- Decision: 2026-11-05 the daily question work is sliced into epics 6 to 10 by outcome, not by module, because the site, migrations and Edge Functions deploy together through `deploy.yml`: 6 Daily Question, 7 Streak and Partner Page, 8 Daily Pushes and Nudge, 9 Reply in Love Notes, 10 Remove Moods and Poke/Kiss/Fart. The tracer path runs through 6 and ends in 7.
+- Decision: 2026-11-05 an architecture pass (`bmad-architecture`) settles the decisions epics 6, 7 and 8 share (how a day is settled across the partners' clocks, how the 8 AM and 8 PM pushes are scheduled, how questions and picks are stored) before epic 6 is refined; its spine lands beside this file and the adopting epics cite it. Declined: a decision story opening epic 6.
+- Decision: 2026-11-05 Reply in Love Notes is its own epic, not part of epic 6, which already holds about ten stories; removal goes last, so the dock never loses its second destination.
+- Unknown: the architecture spine does not exist yet; epics 6, 7 and 8 are refined only after it.
