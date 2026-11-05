@@ -3953,7 +3953,8 @@ location: tests/unit/stores/moodSlice.historyBackfill.test.ts:221; src/services/
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: AGENTS.md forbids a bare `expect(console.error).toHaveBeenCalled()`, since the bare form passed twice on an unrelated error in epic-date-reminders. `497e2515` fixed 13 such asserts and `2b5f27e7` fixed the one in PushSettings.test.tsx, but this one, `expect(errorSpy).toHaveBeenCalled()`, was missed. Fix: assert the message the code under test logs. Triage 2026-11-04: three more bare asserts on a `console.error` spy sit in `pushNotifications.test.ts` (`errorLog` at :175, :185 and :268); fix all four.
-status: open
+status: done 2026-11-04
+resolution: all four asserts now name what the code under test logs: `[MoodSlice] Error loading mood history from the server:` with the read's error in moodSlice.historyBackfill.test.ts, and `[Push] Could not record the device:` with `nope` (twice) and `[Push] Registration did not start:` with the plugin's error in pushNotifications.test.ts; a scan of every `console.error` spy in `src` and `tests` finds no other bare assert.
 
 ### DW-453: The Settings rework has three confirmation dialogs and two copies of the date delete flow.
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04

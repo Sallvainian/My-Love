@@ -218,7 +218,10 @@ describe('moodSlice', () => {
 
       expect(mockedMoodService.mergeServerMoods).not.toHaveBeenCalled();
       expect(get().moods).toBe(existing);
-      expect(errorSpy).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[MoodSlice] Error loading mood history from the server:',
+        expect.objectContaining({ message: 'Device is offline' })
+      );
     });
 
     it('changes nothing when a later page fails', async () => {
