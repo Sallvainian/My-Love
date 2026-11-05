@@ -3635,7 +3635,8 @@ origin: bmad-project-context refresh, 2026-11-02
 location: eslint.config.js; package.json (devDependencies); AGENTS.md (Known pitfalls, eslint-disable line)
 severity: low
 reason: AGENTS.md requires every `eslint-disable` directive to carry its reason after ` -- ` and says no lint rule enforces it; `eslint.config.js` sets only `reportUnusedDisableDirectives`. `@eslint-community/eslint-plugin-eslint-comments`' `require-description` would fail a directive without one (all 18 current directives comply). Needs the owner's yes for the new devDependency; once the rule is live, the AGENTS.md line goes. Triage 2026-11-04: there are 15 directives, not 18 (14 `eslint-disable-next-line`, 1 block `eslint-disable`), all with a ` -- ` reason; the plugin (4.8.1) supports ESLint 10 and flat config and is not installed yet.
-status: open
+status: done 2026-11-04
+resolution: added `@eslint-community/eslint-plugin-eslint-comments` 4.8.1 as a devDependency; `eslint.config.js` sets `require-description` to error for the disable directives (all 15 in the tree pass, and a probe directive without ` -- ` fails), and AGENTS.md's eslint-disable line no longer says no lint rule enforces it.
 decision: 2026-11-04 add-plugin — the owner approved `@eslint-community/eslint-plugin-eslint-comments` with `require-description` as a devDependency; done outside the loop in the owner's docs sitting, which also drops the AGENTS.md:91 clause.
 
 ### DW-419: The Settings page stack's column-dock form has no end-to-end check.

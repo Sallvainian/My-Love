@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
@@ -33,6 +34,18 @@ export default defineConfig(
   {
     linterOptions: {
       reportUnusedDisableDirectives: 'error',
+    },
+  },
+  // Every disable directive states its reason after ` -- `, so the next reader can judge
+  // whether the exemption still holds (DW-418). Only the disable forms are checked: an
+  // `eslint-enable` closes an exemption and has nothing to justify.
+  {
+    plugins: { '@eslint-community/eslint-comments': eslintComments },
+    rules: {
+      '@eslint-community/eslint-comments/require-description': [
+        'error',
+        { ignore: ['eslint', 'eslint-enable', 'eslint-env', 'exported', 'global', 'globals'] },
+      ],
     },
   },
   {
