@@ -44,7 +44,7 @@ test.describe('Partner Mood View', () => {
   test('[P0] 4.5-E2E-002 should display poke/kiss interaction buttons', async ({ page }) => {
     // GIVEN: User is on partner mood view with a connected partner.
     // loadPartner makes 2 sequential GET /rest/v1/users calls:
-    //   1. select=partner_id,updated_at → current user's record
+    //   1. select=partner_id → current user's record
     //   2. select=id,email,display_name → partner's record
     // Mock both with the correct shapes. The fake partner id is uuid-shaped:
     // the couple-settings refresher reuses the partner_id answer to address

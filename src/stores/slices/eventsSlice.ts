@@ -18,8 +18,11 @@
  *   something against a live server, and an online refresh resets them.
  * - `loadEvents` applies the saved copy first (only into an empty list, and
  *   only until this session has a server answer or a confirmed write), then
- *   replaces state and copy with the server's first page when online. Offline
- *   with a copy (or with this session's server data already shown) it succeeds
+ *   replaces state and copy with the server's rows when online: a refresh
+ *   re-reads as many pages per side as `Load more` has reached (one request per
+ *   side), so a reconnect does not drop them; the depth is the slice's own
+ *   closure, reset to one page whenever `eventsPagination` is gone or replaced.
+ *   Offline with a copy (or with this session's server data already shown) it succeeds
  *   without an error; offline with nothing it fails as before.
  * - The copy is filled only from a successful load or a confirmed add, edit or
  *   delete. A failed read keeps state and copy. Offline writes are refused.
@@ -178,6 +181,14 @@ export interface EventsSlice {
 
   // Actions
   loadEvents: () => Promise<EventLoadResult>;
+  /**
+   * Make sure the list holds one event, for an event page whose event lies
+   * beyond the paged window: a held event answers `success` with no request,
+   * otherwise it is read by id and added. `success` means the list holds it or
+   * the server answered that there is no such event (check the list); a
+   * failure is returned, never put in `eventsError`.
+   */
+  loadEvent: (eventId: string) => Promise<EventLoadResult>;
   loadMoreEvents: () => Promise<EventLoadResult>;
   addEvent: (input: NewEventInput) => Promise<EventWriteResult>;
   editEvent: (eventId: string, updates: EventUpdateInput) => Promise<EventWriteResult>;
@@ -300,9 +311,9 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   registerLocalCopy(EVENTS_COPY_KIND, async () => {
     // Home and the Dates list load on their own at start and on `online`; a
     // second load here would only be superseded. Settings' other pages do not
-    // load, and a load here would replace the list under an event page reached
-    // through `Load more`, so the list is marked stale: the Dates list asks at
-    // once if it is showing, else when the person comes back to it.
+    // load, and a load here would replace the list under an open event page,
+    // so the list is marked stale: the Dates list asks at once if it is
+    // showing, else when the person comes back to it.
     const view = get().currentView;
     if (view === 'home') return;
     if (view === 'settings') {
@@ -311,6 +322,14 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     }
     await get().loadEvents();
   });
+
+  /**
+   * How many pages per side the shown list was read to, counted against the
+   * `eventsPagination` object it produced. Valid only while that object is
+   * still the store's: sign-out nulls it and a test `setState`s a new one, and
+   * either leaves the depth at one page. Per slice instance, like the counters.
+   */
+  let traversal: { pagination: EventsPagination; pages: number } | null = null;
 
   const pruneCompletedMutations = () => {
     completedMutations = completedMutations.filter((mutation) =>
@@ -375,6 +394,10 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
         return { status: 'success' };
       }
     }
+    // Pages per side the list is read to: a refresh asks for as many as the
+    // traversal it replaces had reached, an append reads the next one.
+    const depth =
+      eventsPagination !== null && traversal?.pagination === eventsPagination ? traversal.pages : 1;
     const loadId = ++latestLoadId;
     activeLoads.clear();
     const activeLoad: ActiveLoad = {
@@ -398,7 +421,9 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       // The server request goes out at once, alongside the copy read below, so
       // the copy adds no latency and load sequencing is unchanged. Offline the
       // service rejects before any request.
-      const pageRequest = eventsService.getEventsPage(append ? eventsPagination : undefined);
+      const pageRequest = append
+        ? eventsService.getEventsPage(eventsPagination)
+        : eventsService.getEventsPage(undefined, depth);
       // Marked handled now: it may reject while the copy read is in flight, and
       // is awaited (or deliberately dropped) below.
       Promise.resolve(pageRequest).catch(() => {});
@@ -434,12 +459,13 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
         ? Array.from(new Map([...get().events, ...page.events].map((event) => [event.id, event])).values())
         : page.events;
       const reconciled = replayCompletedMutations(merged, activeLoad);
+      traversal = { pagination: page.pagination, pages: append ? depth + 1 : depth };
       set({
         events: reconciled,
         eventsPagination: page.pagination,
         eventsIsLoading: false,
         eventsIsLoadingMore: false,
-        // A first page from the server is the refresh the stale mark waited for.
+        // The server's rows are the refresh the stale mark waited for.
         ...(append ? {} : { eventsStale: false }),
       });
       await saveEventsCopy(requestedBy, requestedInSession);
@@ -470,9 +496,35 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   eventsHistoryError: null,
   eventsStale: false,
 
-  // A refresh resets the traversal to the nearest windows only after success.
+  // A refresh replaces the list with the server's rows, as deep as the shown
+  // traversal had reached, and swaps the cursors only after success.
   loadEvents: () => loadPage(false),
   loadMoreEvents: () => loadPage(true),
+
+  loadEvent: async (eventId: string) => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) return { status: 'stale' };
+    // A list that already holds the event has answered: no request.
+    if (get().events.some((candidate) => candidate.id === eventId)) return { status: 'success' };
+    const ownsRead = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+    try {
+      const found = await eventsService.getEvent(eventId);
+      if (!ownsRead()) return { status: 'stale' };
+      if (found) {
+        // Recorded so a load already in flight replays the row instead of
+        // replacing the list without it under the open page.
+        recordMutation({ requestedBy, requestedInSession, kind: 'upsert', event: found });
+        set((state) => ({ events: sortByDate(upsertEvent(state.events, found)) }));
+        await saveEventsCopy(requestedBy, requestedInSession);
+      }
+      return { status: 'success' };
+    } catch (error) {
+      console.error('[EventsSlice] Error loading event:', error);
+      if (!ownsRead()) return { status: 'stale' };
+      return { status: 'failure', error: messageOf(error, 'Failed to load event') };
+    }
+  },
 
   /**
    * Create an event owned by the signed-in user, then insert it in date order.

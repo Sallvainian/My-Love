@@ -20,15 +20,16 @@
  * Settings does not refresh events, so an event page whose event the store
  * does not hold loads them on mount and on each connectivity change, as the
  * Dates list does; one whose event is held asks nothing, since a load replaces
- * the list with the server's first page and would drop an event reached through
- * `Load more`. The store holds a paged window, so an event absent from it is
- * not the same as a deleted one: the page goes back to the Dates list, once per
- * mount, only after its own `loadEvents()` answered `success` and still found
- * no such event. Until then
- * (a reload before the answer) the page shows its title and nothing under the
- * bar; a `failure` or `stale` load never goes back. A delete and that fallback
- * share one once-only `leave()` (`useFallBackToDates`), since `removeEvent`
- * drops the event from the store before it resolves.
+ * the list and would drop an event added or moved beyond what the list read.
+ * The store holds a paged window, so an event absent from it is not the same as
+ * a deleted one: after its own `loadEvents()` answered `success` without the
+ * event, the page reads that one event by id (`loadEvent`), and only when that
+ * read also answers success and the event is still absent does it go back to
+ * the Dates list, once per mount. Until then (a reload before the answer) the
+ * page shows its title and nothing under the bar; a `failure` or `stale` load
+ * or by-id read never goes back. A delete and that fallback share one
+ * once-only `leave()` (`useFallBackToDates`), since `removeEvent` drops the
+ * event from the store before it resolves.
  *
  * The field pages are `OneFieldPage`s registered with `reloadsToParent`, and
  * write through `editEvent`; a partner's or unknown event gets no field.
@@ -165,12 +166,13 @@ export function EventPage({ eventId }: EventPageProps) {
   const online = useAppStore((s) => s.syncStatus.isOnline);
   const event = useAppStore((s) => s.events.find((candidate) => candidate.id === eventId));
   const loadEvents = useAppStore((s) => s.loadEvents);
+  const loadEvent = useAppStore((s) => s.loadEvent);
   const removeEvent = useAppStore((s) => s.removeEvent);
 
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  /** This page's own `loadEvents()` answered `success`: only then is an absent event really absent. */
+  /** This page's own `loadEvents()` and by-id read answered `success`: only then is an absent event really absent. */
   const [answered, setAnswered] = useState(false);
   const deletingRef = useRef(false);
   /** False once the page is left, so a late answer or delete does not set state or navigate. */
@@ -187,10 +189,11 @@ export function EventPage({ eventId }: EventPageProps) {
   // Events are not refreshed while Settings is open, so a page that does not
   // hold its event asks, as the Dates list does; either connectivity change
   // re-asks. A held event is not asked about: a load replaces the store's list
-  // with the server's first page, which would drop an event reached through
-  // `Load more` (or moved past that window by an edit) and bounce the page.
-  // Held is read through a ref, not listed as a dependency, so a delete (which
-  // removes the event) does not trigger a load.
+  // with the server's rows, which would drop an event added or moved beyond
+  // what that read reaches and bounce the page. An event the load did not
+  // return may still exist beyond the paged window, so it is read by id before
+  // the page decides it is gone. Held is read through a ref, not listed as a
+  // dependency, so a delete (which removes the event) does not trigger a load.
   const held = useRef(false);
   useEffect(() => {
     held.current = event !== undefined;
@@ -198,10 +201,14 @@ export function EventPage({ eventId }: EventPageProps) {
   useEffect(() => {
     if (!userId) return;
     if (held.current) return;
-    void loadEvents().then((result) => {
-      if (mounted.current && result.status === 'success') setAnswered(true);
-    });
-  }, [userId, authSessionVersion, online, loadEvents, eventId]);
+    void (async () => {
+      const result = await loadEvents();
+      if (!mounted.current || result.status !== 'success') return;
+      // Asks the server only when the load's list does not hold the event.
+      const byId = await loadEvent(eventId);
+      if (mounted.current && byId.status === 'success') setAnswered(true);
+    })();
+  }, [userId, authSessionVersion, online, loadEvents, loadEvent, eventId]);
 
   const leave = useFallBackToDates(answered && event === undefined);
 

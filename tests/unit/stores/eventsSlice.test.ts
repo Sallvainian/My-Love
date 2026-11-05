@@ -17,6 +17,7 @@ import { create, type StateCreator } from 'zustand';
 
 const getEvents = vi.fn();
 const getEventsPage = vi.fn();
+const getEvent = vi.fn();
 const createEvent = vi.fn();
 const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
@@ -24,7 +25,8 @@ const deleteEvent = vi.fn();
 vi.mock('../../../src/services/eventsService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/services/eventsService')>()),
   eventsService: {
-    getEventsPage: (pagination: unknown) => getEventsPage(pagination),
+    getEventsPage: (...args: unknown[]) => getEventsPage(...args),
+    getEvent: (eventId: string) => getEvent(eventId),
     createEvent: (input: unknown) => createEvent(input),
     updateEvent: (eventId: string, updates: unknown) => updateEvent(eventId, updates),
     deleteEvent: (eventId: string) => deleteEvent(eventId),
@@ -273,7 +275,7 @@ describe('eventsSlice', () => {
       refresh.resolve({ events: [event('nearest', '2026-09-12')], pagination: pagination() });
       expect(await newLoad).toEqual({ status: 'success' });
       expect(store.getState().events.map((event) => event.id)).toEqual(['nearest']);
-      expect(getEventsPage.mock.calls[1]).toEqual([undefined]);
+      expect(getEventsPage.mock.calls[1]).toEqual([undefined, 1]);
     });
 
     it('preserves a saved deep row during a failed refresh without changing its write result', async () => {
@@ -317,6 +319,235 @@ describe('eventsSlice', () => {
       pendingPage.resolve({ events: [current], pagination: pagination(false) });
       await page;
       expect(store.getState().events).toEqual([current]);
+    });
+  });
+
+  // ==========================================================================
+  // A refresh keeps the Load more depth
+  // ==========================================================================
+
+  describe('refresh depth', () => {
+    /** Every read answers an empty page that has more, with a fresh pagination object. */
+    function answerWithMore() {
+      getEventsPage.mockReset().mockImplementation(async () => ({
+        events: [],
+        pagination: pagination(),
+      }));
+    }
+
+    it('reads as many pages per side as one refresh and two Load more reached, and continues from its cursor', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      await store.getState().loadMoreEvents();
+      await store.getState().loadMoreEvents();
+      expect(getEventsPage.mock.calls.map((call) => call[1])).toEqual([1, undefined, undefined]);
+
+      expect(await store.getState().loadEvents()).toEqual({ status: 'success' });
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 3);
+
+      // The refresh's own cursors are what the next Load more continues from.
+      const refreshed = store.getState().eventsPagination;
+      await store.getState().loadMoreEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(refreshed);
+
+      // ...and the depth went on growing: the refresh after that asks for four.
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 4);
+    });
+
+    it('replaces the list with the server\'s rows at that depth', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      await store.getState().loadMoreEvents();
+      const serverRows = [event('a', '2026-08-01'), event('b', '2026-08-02'), event('c', '2026-09-13')];
+      getEventsPage.mockResolvedValueOnce({ events: serverRows, pagination: pagination() });
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 2);
+      expect(store.getState().events).toEqual(serverRows);
+    });
+
+    it('asks for one page with no traversal, on a fresh start and after sign-out nulls it', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 1);
+      await store.getState().loadMoreEvents();
+      // What signedOutState() does to the pagination.
+      store.setState({ eventsPagination: null, events: [] });
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 1);
+    });
+
+    it('asks for one page when a new pagination was set against the counted one', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      await store.getState().loadMoreEvents();
+      store.setState({ eventsPagination: pagination() });
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 1);
+    });
+
+    it('keeps rows, cursors and the depth when a refresh at depth fails', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      await store.getState().loadMoreEvents();
+      await store.getState().loadMoreEvents();
+      const rows = [event('kept', '2026-08-01')];
+      store.setState({ events: rows });
+      const cursors = store.getState().eventsPagination;
+
+      getEventsPage.mockRejectedValueOnce(new Error('refresh failed'));
+      expect(await store.getState().loadEvents()).toEqual({ status: 'failure', error: 'refresh failed' });
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 3);
+      expect(store.getState().events).toBe(rows);
+      expect(store.getState().eventsPagination).toBe(cursors);
+      expect(store.getState().eventsError).toBe('refresh failed');
+
+      // The retry reads the same depth.
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 3);
+    });
+
+    it('does not count a Load more that failed', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      getEventsPage.mockRejectedValueOnce(new Error('page failed'));
+      await store.getState().loadMoreEvents();
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 1);
+    });
+
+    it('does not count a refresh that a newer load superseded', async () => {
+      answerWithMore();
+      const store = createTestStore();
+      await store.getState().loadEvents();
+      await store.getState().loadMoreEvents();
+      const old = deferred<EventsPage>();
+      getEventsPage.mockReturnValueOnce(old.promise);
+      const superseded = store.getState().loadEvents();
+      getEventsPage.mockRejectedValueOnce(new Error('newer failed'));
+      await store.getState().loadEvents();
+      old.resolve({ events: [], pagination: pagination() });
+      expect(await superseded).toEqual({ status: 'stale' });
+      // The stale answer's cursors were never committed, so the depth still
+      // belongs to the pagination on screen.
+      await store.getState().loadEvents();
+      expect(getEventsPage).toHaveBeenLastCalledWith(undefined, 2);
+    });
+  });
+
+  // ==========================================================================
+  // loadEvent
+  // ==========================================================================
+
+  describe('loadEvent', () => {
+    it('adds a found event in date order, saves the copy, and leaves the load state alone', async () => {
+      const store = createTestStore();
+      const existing = event('later', '2026-12-25');
+      const deep = event('deep', '2024-01-01');
+      store.setState({ events: [existing] });
+      getEvent.mockResolvedValueOnce(deep);
+
+      expect(await store.getState().loadEvent('deep')).toEqual({ status: 'success' });
+      expect(getEvent).toHaveBeenCalledWith('deep');
+      expect(store.getState().events).toEqual([deep, existing]);
+      expect(store.getState().eventsError).toBeNull();
+      expect(store.getState().eventsIsLoading).toBe(false);
+      expect(savedCopies.get(`${USER_ID}|events`)).toHaveLength(2);
+    });
+
+    it('answers success with no request when the list already holds the event', async () => {
+      const store = createTestStore();
+      const rows = [event('same', '2026-09-12')];
+      store.setState({ events: rows });
+      expect(await store.getState().loadEvent('same')).toEqual({ status: 'success' });
+      expect(getEvent).not.toHaveBeenCalled();
+      expect(store.getState().events).toBe(rows);
+      expect(writeLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('holds one copy when a load lists the row it found during the read', async () => {
+      const store = createTestStore();
+      const pending = deferred<CoupleEvent | null>();
+      getEvent.mockReturnValueOnce(pending.promise);
+      const read = store.getState().loadEvent('same');
+      store.setState({ events: [event('same', '2026-09-12')] });
+      const fresh = event('same', '2026-09-12', { label: 'Renamed elsewhere' });
+      pending.resolve(fresh);
+      expect(await read).toEqual({ status: 'success' });
+      expect(store.getState().events).toEqual([fresh]);
+    });
+
+    it('answers success and changes nothing when there is no such event', async () => {
+      const store = createTestStore();
+      const rows = [event('a', '2026-09-12')];
+      store.setState({ events: rows });
+      getEvent.mockResolvedValueOnce(null);
+      expect(await store.getState().loadEvent('gone')).toEqual({ status: 'success' });
+      expect(store.getState().events).toBe(rows);
+      expect(writeLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('returns a failure without touching eventsError, the list or the copy', async () => {
+      const store = createTestStore();
+      const rows = [event('a', '2026-09-12')];
+      store.setState({ events: rows });
+      getEvent.mockRejectedValueOnce(new Error('read failed'));
+      expect(await store.getState().loadEvent('x')).toEqual({ status: 'failure', error: 'read failed' });
+      expect(store.getState().events).toBe(rows);
+      expect(store.getState().eventsError).toBeNull();
+      expect(writeLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('does nothing without a signed-in user', async () => {
+      const store = createTestStore();
+      store.setState({ userId: null });
+      expect(await store.getState().loadEvent('x')).toEqual({ status: 'stale' });
+      expect(getEvent).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['sign-out', { userId: null }],
+      ['a same-account sign-in', { authSessionVersion: 2 }],
+      ['another account', { userId: 'USER-B-ID', authSessionVersion: 2 }],
+    ] as const)('writes nothing when %s happens during the read', async (_name, change) => {
+      const store = createTestStore();
+      const pending = deferred<CoupleEvent | null>();
+      getEvent.mockReturnValueOnce(pending.promise);
+      const read = store.getState().loadEvent('deep');
+      store.setState(change);
+      pending.resolve(event('deep', '2024-01-01'));
+      expect(await read).toEqual({ status: 'stale' });
+      expect(store.getState().events).toEqual([]);
+      expect(writeLocalCopy).not.toHaveBeenCalled();
+    });
+
+    it('reports a stale result, not a failure, when the account changed during a failed read', async () => {
+      const store = createTestStore();
+      const pending = deferred<CoupleEvent | null>();
+      getEvent.mockReturnValueOnce(pending.promise);
+      const read = store.getState().loadEvent('deep');
+      store.setState({ authSessionVersion: 2 });
+      pending.reject(new Error('read failed'));
+      expect(await read).toEqual({ status: 'stale' });
+    });
+
+    it('is replayed by a load already in flight, so the open page keeps its event', async () => {
+      const store = createTestStore();
+      const pending = deferred<EventsPage>();
+      getEventsPage.mockReturnValueOnce(pending.promise);
+      const load = store.getState().loadEvents();
+      const deep = event('deep', '2024-01-01');
+      getEvent.mockResolvedValueOnce(deep);
+      await store.getState().loadEvent('deep');
+      pending.resolve({ events: [event('near', '2026-09-12')], pagination: pagination() });
+      expect(await load).toEqual({ status: 'success' });
+      expect(store.getState().events.map((e) => e.id)).toEqual(['deep', 'near']);
     });
   });
 

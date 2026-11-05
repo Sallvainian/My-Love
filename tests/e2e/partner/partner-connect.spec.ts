@@ -55,9 +55,6 @@ const REQUEST_SEND = '**/rest/v1/partner_requests*';
 const PENDING_REQUESTS = '**/rest/v1/rpc/get_my_pending_partner_requests';
 const REQUEST_ACCEPT = '**/rest/v1/rpc/accept_partner_request';
 const INTERACTION_SEND = '**/rest/v1/interactions?*';
-// The Partner tab's own read of the signed-in account's link
-// (`partnerService.getPartner`); not in reads.ts.
-const PARTNER_LOOKUP = '**/rest/v1/users?select=partner_id%2Cupdated_at*';
 
 const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
 const INTERACTIONS_SUBSCRIBED_LOG = /\[InteractionService\] Realtime subscription status: SUBSCRIBED/;
@@ -182,19 +179,28 @@ async function signIn(page: Page, account: Throwaway): Promise<void> {
 }
 
 /**
- * Sign in through the real login form and open the Partner tab, once the tab's
- * partner lookup has answered: its heading renders before that read starts.
+ * Sign in through the real login form and open the Partner tab, once a partner
+ * lookup for the account has answered successfully, so the Connect heading the
+ * callers check comes from a server answer.
+ *
+ * Waited on in the store, not the network: `partnerService.getPartner` reads
+ * `users?select=partner_id`, the same URL as `lookupPartnerId`, so no route can
+ * tell the two apart. In a fresh context `partnerKnown` is set only by a
+ * successful `loadPartner`, or by the saved copy one wrote. That answer may be
+ * the sign-in refresher's rather than the tab's own mount read, which can still
+ * be in flight here; the steps after this auto-wait on the screen, and
+ * `partnerLoadSeq` drops a read a newer `loadPartner` superseded.
  */
 async function signInToPartnerTab(page: Page, account: Throwaway): Promise<void> {
   await signIn(page, account);
-  const partnerLookup = observeOn({
-    page,
-    method: 'GET',
-    url: PARTNER_LOOKUP,
-    timeout: SECOND_CONTEXT_READ_TIMEOUT,
-  });
   await navigateTo(page, 'partner');
-  expect((await partnerLookup).status).toBe(200);
+  await recurseUntil(
+    () => storePartnerLookup(page),
+    (v) => {
+      expect(v).toEqual({ known: true, loading: false, failed: false });
+    },
+    { timeout: SECOND_CONTEXT_READ_TIMEOUT }
+  );
 }
 
 /**
@@ -345,6 +351,20 @@ async function storePartnerId(page: Page): Promise<string | null> {
     const modulePath = '/src/stores/useAppStore.ts';
     const { useAppStore } = await import(modulePath);
     return (useAppStore.getState() as AppState).partner?.id ?? null;
+  });
+}
+
+/** Whether the store holds an answer to the partner lookup, and whether it failed. */
+async function storePartnerLookup(page: Page) {
+  return page.evaluate(async () => {
+    const modulePath = '/src/stores/useAppStore.ts';
+    const { useAppStore } = await import(modulePath);
+    const state = useAppStore.getState() as AppState;
+    return {
+      known: state.partnerKnown,
+      loading: state.isLoadingPartner,
+      failed: state.partnerLoadError,
+    };
   });
 }
 

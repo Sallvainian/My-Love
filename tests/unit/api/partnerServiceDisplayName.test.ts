@@ -354,12 +354,6 @@ describe('partnerService.getPartner link date', () => {
     expect(result.status === 'linked' && result.partner.linkedSince).toBeNull();
   });
 
-  it('never takes the link date from the profile row\'s updated_at', async () => {
-    const result = await getPartner();
-
-    expect(result.status === 'linked' && result.partner.linkedSince).not.toBe('2026-01-01T00:00:00Z');
-  });
-
   it('answers error, and logs it, when the request read fails', async () => {
     requestResult = { data: null, error: { code: '500', message: 'requests down' } };
 

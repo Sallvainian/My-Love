@@ -12,7 +12,10 @@
  *   stacks the view on it, so back (the shell's edge swipe, the browser's
  *   button) from any view returns to Home, and back on Home leaves nothing
  *   behind. Each entry the app creates carries `depth`, its height above that
- *   first entry; a fresh load has no state and is depth 0.
+ *   first entry; a fresh load has no state and is depth 0. The walk down ends
+ *   on the `popstate` it causes; if none comes (a depth past the start of the
+ *   history, a page restored from the back/forward cache mid-walk) a `pageshow`
+ *   or `WALK_TIMEOUT_MS` ends it, so the dock never stays stuck (DW-441).
  *
  * Cross-slice dependencies:
  * - None (self-contained)
@@ -57,20 +60,57 @@ export function settingsPathFromRoute(routePath: string): string {
 
 /**
  * How many entries the app has stacked above the first entry of this visit.
- * A fresh load carries no state, so it reads 0.
+ * A fresh load carries no state, so it reads 0. A stored depth can outlive the
+ * entries below it, so it is capped at `history.length - 1`. That is only an
+ * upper bound: the length also counts entries below the app (another site,
+ * `about:blank`) and forward entries. A walk the cap leaves out of range gets
+ * no `popstate` and is ended by the timer; one it overshoots can leave the app.
  */
 export function historyDepth(): number {
   const depth: unknown = window.history.state?.depth;
-  return typeof depth === 'number' && depth > 0 ? depth : 0;
+  if (typeof depth !== 'number' || depth <= 0) return 0;
+  return Math.min(depth, Math.max(window.history.length - 1, 0));
 }
 
+/** How long a walk down may wait for its `popstate` before the pick lands in place. */
+export const WALK_TIMEOUT_MS = 1000;
+
+/** The route of each view, before the base path. */
+const pathMap: Record<ViewType, string> = {
+  home: '/',
+  photos: '/photos',
+  mood: '/mood',
+  partner: '/partner',
+  notes: '/notes',
+  settings: '/settings',
+};
+
 /**
- * A dock pick waiting for `history.go` to reach the first entry, and whether
- * that walk is under way, so a second tap before it lands changes the target
- * rather than walking again.
+ * A dock pick waiting for `history.go` to reach the first entry, and, while
+ * that walk is under way, the function that ends it (removes its listeners and
+ * timer and clears the pick), so a second tap before it lands changes the
+ * target rather than walking again.
  */
 let pendingView: ViewType | null = null;
-let walkingDown = false;
+let stopWalk: (() => void) | null = null;
+
+/**
+ * Make the current entry Home and put any other view on top of it. The walk
+ * lands on the first entry, but the timer path, where no `popstate` came,
+ * treats the current entry as the bottom, so entries below it can stay behind
+ * Home there.
+ */
+function stackOnFirstEntry(view: ViewType): void {
+  const homePath = withBasePath(pathMap.home);
+  // An entry that still claims a depth is not the bottom, whatever its URL.
+  if (window.location.pathname !== homePath || window.history.state?.depth !== undefined) {
+    const inApp = window.history.state?.inApp === true;
+    window.history.replaceState({ view: 'home', ...(inApp ? { inApp } : {}) }, '', homePath);
+  }
+  if (view !== 'home') {
+    window.history.pushState({ view, inApp: true, depth: 1 }, '', withBasePath(pathMap[view]));
+  }
+}
 
 export interface NavigationSlice {
   // State
@@ -132,14 +172,6 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
 
     // Update browser URL if not skipping history (prevents loops during popstate)
     if (!skipHistory) {
-      const pathMap: Record<ViewType, string> = {
-        home: '/',
-        photos: '/photos',
-        mood: '/mood',
-        partner: '/partner',
-        notes: '/notes',
-        settings: '/settings',
-      };
       const basePath = pathMap[view];
       // Respect the configured base URL (`/` on Cloudflare Workers).
       // Shared with `App`'s inverse so the round trip can be asserted at the
@@ -148,7 +180,7 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
       const depth = historyDepth();
       // Tapping the already-active tab must not stack an identical history entry —
       // it would cost one Back press per tap before the user can leave the view.
-      if (window.location.pathname === fullPath && !walkingDown) {
+      if (window.location.pathname === fullPath && !stopWalk) {
         // The entry keeps whether the app created it: Settings' back arrow
         // reads `inApp` to tell "back returns one level" from "back leaves".
         const inApp = window.history.state?.inApp === true;
@@ -157,38 +189,45 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
           '',
           fullPath
         );
-      } else if (depth > 0 || walkingDown) {
+      } else if (depth > 0 || stopWalk) {
         // Above the first entry: walk back down to it, then stack the view on
         // Home there once the walk lands (App's popstate handler runs first).
         pendingView = view;
-        if (!walkingDown) {
-          walkingDown = true;
-          window.addEventListener(
-            'popstate',
-            () => {
-              walkingDown = false;
-              const target = pendingView;
-              pendingView = null;
-              if (target) get().setView(target);
-            },
-            { once: true }
-          );
+        if (!stopWalk) {
+          const onPopstate = () => {
+            const target = pendingView;
+            stopWalk?.();
+            if (target) get().setView(target);
+          };
+          // A page restored from the back/forward cache mid-walk never gets
+          // the popstate; the next tap starts a fresh walk.
+          const onPageshow = (event: Event) => {
+            if ((event as PageTransitionEvent).persisted) stopWalk?.();
+          };
+          // Safety net: no popstate came, so land the last pick in place.
+          const timer = setTimeout(() => {
+            const target = pendingView;
+            stopWalk?.();
+            if (target) {
+              stackOnFirstEntry(target);
+              console.warn(
+                `[AppStore] Dock walk to the first entry got no popstate; landed '${target}' in place`
+              );
+            }
+          }, WALK_TIMEOUT_MS);
+          stopWalk = () => {
+            window.removeEventListener('popstate', onPopstate);
+            window.removeEventListener('pageshow', onPageshow);
+            clearTimeout(timer);
+            stopWalk = null;
+            pendingView = null;
+          };
+          window.addEventListener('popstate', onPopstate);
+          window.addEventListener('pageshow', onPageshow);
           window.history.go(-depth);
         }
       } else {
-        // The first entry: it becomes Home, and any other view goes on top.
-        const homePath = withBasePath(pathMap.home);
-        if (window.location.pathname !== homePath) {
-          const inApp = window.history.state?.inApp === true;
-          window.history.replaceState(
-            { view: 'home', ...(inApp ? { inApp } : {}) },
-            '',
-            homePath
-          );
-        }
-        if (view !== 'home') {
-          window.history.pushState({ view, inApp: true, depth: 1 }, '', fullPath);
-        }
+        stackOnFirstEntry(view);
       }
       logger.info(`[AppStore] View changed to '${view}', URL: ${fullPath}`);
     }

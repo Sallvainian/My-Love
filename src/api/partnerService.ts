@@ -113,7 +113,7 @@ class PartnerService {
       // Get user record with partner_id
       const { data: userRecord, error } = await supabase
         .from('users')
-        .select('partner_id, updated_at')
+        .select('partner_id')
         .eq('id', userId)
         .maybeSingle();
 

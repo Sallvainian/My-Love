@@ -3733,7 +3733,9 @@ location: src/api/partnerService.ts:116 (`getPartner`, `select('partner_id, upda
 source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
 severity: low
 reason: The link date moved to the accepted `partner_requests` row (`PartnerInfo.linkedSince`), so nothing reads `updated_at` from the first `users` read any more. It stays in the select because E2E routes match the URL `select=partner_id%2Cupdated_at`, and the story's "Never" list forbade changing the `users` read columns. A later change drops the column from the select together with those routes and the fixtures that fulfil `updated_at`. Triage 2026-11-04: `needs-a-connection.spec.ts` does not depend on the column; `partner-connect.spec.ts:60` is the only route that matches `%2Cupdated_at`, and without the column the Partner lookup's URL is the same as `lookupPartnerId`'s, so that spec needs another signal to wait on. The 11 fixtures that return `updated_at` are harmless after the drop; `partnerServiceDisplayName.test.ts:357` then tests nothing and changes or goes.
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-partner-lookup-drop-updated-at
+resolution-undo: 8308f83db6e5b35a306d1b0a75cb3a3ed5018f44d31442e24e30013160d3ab0d 2026-11-04 7374617475733a206f70656e
 
 ### DW-430: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker.
 origin: story 5.11 build (epic-settings-rework), 2026-11-03
@@ -3832,7 +3834,9 @@ location: src/components/Settings/DatesPage.tsx (the connectivity load and the `
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
 reason: The list asks the server again on a reconnect, and on the iPhone shell when the app comes back to the foreground (the events refresher marks it `eventsStale`). `loadEvents` answers with the first window only and replaces the list, so the older past dates `Load more` added are hidden until it is tapped again. Nothing is lost on the server. The owner chose an up-to-date list over keeping those rows (2026-11-03). It shows only with more than one window of past dates. A fix re-reads as many windows as were loaded, keeping the cursors' depth. Triage 2026-11-04: the same drop follows a return to the list after a refresh skipped while Settings showed (`DatesPage.tsx:124-128`, the `eventsStale` load). Re-reading as many rows as were loaded keeps the owner's 2026-11-03 choice of an up-to-date list and keeps the rows. It shows only past 50 past or 50 upcoming events (`eventsService.ts:267`). Build with DW-445: both change `eventsSlice`'s paging, `eventsService` and `events-history-pagination.spec.ts`.
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-events-paging-keeps-loaded-rows
+resolution-undo: e37c31e4934a00a75715488978216525ae72a53a2c0007265b77f8a977cd922a 2026-11-04 7374617475733a206f70656e
 
 ### DW-441: The dock's walk back to Home has no way out if the browser never reports the back, which can leave every dock tap doing nothing.
 origin: epic-settings-rework retrospective (diff review, findings V1 and V2), 2026-11-04
@@ -3840,7 +3844,9 @@ location: src/stores/slices/navigationSlice.ts (`setView`, the `walkingDown` wal
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: medium
 reason: A dock pick above the first history entry sets `walkingDown`, adds a one-shot `popstate` listener and calls `history.go(-depth)`. Only that `popstate` clears `walkingDown`. If it never arrives, every later `setView` just overwrites `pendingView`, so the dock stops working until a reload. That happens when the stored `depth` is larger than the real history, or when the walk crosses a reload such as the live updater's swap. The code path is confirmed; neither trigger has been reproduced. No test covers a second dock tap while a walk is under way: every `setView` test taps once and waits for it to land, so removing either `walkingDown` check fails nothing. Fix: clear the walk on a fallback (a timer, or a `depth` checked against `history.length`) and land the pending view; then test a second tap mid-walk and a walk whose `popstate` never comes. Triage 2026-11-04: `walkingDown` and `pendingView` are module variables (`navigationSlice.ts:72-73`), so any reload, the live updater's swap included, clears them, and that trigger is moot; `history.go()` past the start fires no `popstate`, and neither does a back/forward-cache restore; no normal sequence was found where the stored `depth` exceeds the real history, and any back gesture also frees a stuck walk. Widened: a dock tap just after a reload probably loses the picked view and lands on Home (reasoned from the spec, not run), which the shell meets after iOS kills the page in the background. Fix all three together: reset the walk on `pageshow` with `persisted`, clamp `depth` against `history.length`, and add a timer as the safety net. Test it in a unit test (isolate the module with `vi.resetModules()`, so a stuck walk does not leak into later tests: set a large `depth` with `replaceState`, then tap twice) and in Playwright (the same, plus a reload followed by a dock tap).
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-dock-walk-recovery
+resolution-undo: 0f35935022d8844b5fb144652561e964626cfcfa86b6a96dda3ba9a24ffcc438 2026-11-04 7374617475733a206f70656e
 decision: 2026-11-04 widen, keep medium — severity stays medium until the sweep's new test settles it; the lost pick after a reload is fixed in the same change.
 
 ### DW-442: The backlog live-update prompt story still has `hitl: true` and hands its check to a person on the owner's iPhone, though the simulator can run it.
@@ -3877,7 +3883,9 @@ location: src/components/Settings/EventPages.tsx (the load effect and `useFallBa
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: On a reload the event page holds no event, so it calls `loadEvents`, which returns the first window only. An older past event reached through `Load more` is not in it, so `answered && event === undefined` falls back to the Dates list. The code path was read but not reproduced. Fix: read the one event by id before falling back. Triage 2026-11-04: lines confirmed (`EventPages.tsx:194-206`, the fallback at 206); `eventsService` has no read by id, so the fix adds one. Anniversaries are read unpaged (`anniversariesService.ts:62-77`) and the other date pages fall back on couple or partner data, so only event pages are affected. Build with DW-440.
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-events-paging-keeps-loaded-rows
+resolution-undo: e37c31e4934a00a75715488978216525ae72a53a2c0007265b77f8a977cd922a 2026-11-04 7374617475733a206f70656e
 
 ### DW-446: No check has scheduled a reminder through a date page's Remind me switch.
 origin: epic-settings-rework retrospective (S3), 2026-11-04
@@ -3982,3 +3990,11 @@ severity: medium
 reason: The Close button is placed at `right-4` with no `--dock-right` clearance, the layout `b243a7ce` fixed in the photo viewer (`PhotoGallery/PhotoViewer.tsx`), so in the column form with the capsule on the right it probably sits under the capsule. Found by reading the code, not seen on a screen. Fix: clear the column as `b243a7ce` does for the photo viewer.
 status: open
 decision: 2026-11-04 file-and-sweep.
+
+### DW-458: The partner-mood.spec.ts comment on loadPartner's reads is stale beyond the column this change fixed.
+origin: spec-deferred 4c682ad027bb
+location: tests/e2e/partner/partner-mood.spec.ts:46
+source_spec: `plan-dw-partner-lookup-drop-updated-at.md`
+severity: low
+reason: tests/e2e/partner/partner-mood.spec.ts:46-48 says loadPartner makes 2 sequential GET /rest/v1/users calls and names the second select=id,email,display_name; getPartner also reads partner_requests (src/api/partnerService.ts:151-160) and the second users read selects id, email, display_name, birthday (src/api/partnerService.ts:137). Predates this change.
+status: open
