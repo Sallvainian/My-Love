@@ -27,7 +27,7 @@ describe('dbSchema', () => {
   const openDbs: Array<{ close: () => void }> = [];
 
   /** Open db and track for automatic cleanup */
-  async function openTestDb<T = MyLoveDBSchema>(
+  async function openTestDb(
     ...args: Parameters<typeof openDB<MyLoveDBSchema>>
   ) {
     const db = await openDB<MyLoveDBSchema>(...args);

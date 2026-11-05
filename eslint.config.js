@@ -146,12 +146,44 @@ export default defineConfig(
     rules: {
       'react-hooks/rules-of-hooks': 'off', // Test fixtures may use hooks in non-standard ways
       'no-empty-pattern': 'off', // Playwright fixtures use empty destructuring for deps
-      '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
+      // tsconfig.test.json leaves noUnusedLocals off, so this is what catches an unused
+      // import or local in a test (CodeQL alerts #171 and #172). Arguments and caught
+      // errors stay free: mocks and fixtures take parameters they do not read.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' },
+      ],
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
       'no-restricted-syntax': 'off', // Tests may inspect store state directly
       'no-restricted-properties': 'off', // Tests may inspect store state directly
       'no-console': 'off', // Test output and diagnostics use console.log intentionally
+    },
+  },
+  // tests/e2e-archive/ is frozen documentation, never repaired (AGENTS.md Policy).
+  {
+    files: ['tests/e2e-archive/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
+  // A bare `expect(console.error).toHaveBeenCalled()`, or the same on console.warn,
+  // passes on any logged line, so an
+  // unrelated error from a new mock satisfies it (retrospective A5, DW-452). Assert the
+  // message the code under test logs. Placed after the block above, which turns
+  // no-restricted-syntax off for tests, so this is the only selector tests get.
+  {
+    files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'e2e/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='toHaveBeenCalled'][callee.object.callee.name='expect'][callee.object.arguments.0.object.name='console'][callee.object.arguments.0.property.name=/^(error|warn)$/]",
+          message:
+            'Assert the message the code logs (toHaveBeenCalledWith), not a bare console.error/console.warn call.',
+        },
+      ],
     },
   },
   // src/ standardizes on the explicit zod/v4 path. Bare 'zod' resolves to the
