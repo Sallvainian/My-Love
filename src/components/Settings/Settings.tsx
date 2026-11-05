@@ -23,7 +23,6 @@
  */
 
 import {
-  CircleAlert,
   Image as ImageIcon,
   LoaderCircle,
   LogOut,
@@ -59,6 +58,7 @@ import {
   DIALOG_TITLE,
   SECONDARY_BUTTON,
 } from '../shared/kitClasses';
+import { ErrorBox } from './ErrorBox';
 import { AnniversaryFieldPage, AnniversaryPage, type AnniversaryField } from './AnniversaryPages';
 import {
   PartnerBirthdayPage,
@@ -429,15 +429,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     titleStyle: 'large',
     render: () => (
       <>
-        {error && (
-          <div
-            className="flex items-center gap-2 rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
-            role="alert"
-          >
-            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <ErrorBox message={error} />}
 
         {/* Account: the Profile row opens the display name and birthday. */}
         <SettingsGroup label="Account">

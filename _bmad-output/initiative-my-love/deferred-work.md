@@ -3973,7 +3973,8 @@ location: src/components/Settings/ (six inline Error box copies; the hand-typed 
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: Six inline Error box copies, one hand-typed and drawn slightly differently; `FIELD_CLASS` identical in 5 files, `NOTE_FIELD_CLASS` in 3 and `NOT_SET` twice; the display-name rule in two places; four private `isOnline` copies in slices while `api/errorHandlers.ts` exports one. Fix: one Error box component, shared field constants, one name rule used by both the Name page and the signup gate (this replaces DW-427's documented-twin choice), and the slices calling the exported `isOnline()`. Split from DW-447 at triage.
-status: open
+status: done 2026-11-04
+resolution: one `ErrorBox` (src/components/Settings/ErrorBox.tsx) replaces the six Settings copies, the hand-typed top-page one included; `FIELD_CLASS`, `NOTE_FIELD_CLASS` and `NOT_SET` are exported once from settingsFields.ts; the display-name rule is `displayNameRefusal` and `isDisplayNameLength` in profileService.ts, used by `saveDisplayName`, the Name page and the signup gate (`DisplayNameSetup`), replacing DW-427's documented twin; and the dates, profile, notifications and partner slices call `isOnline()` from api/errorHandlers.ts, which now answers online with no `navigator`, as their copies did. The two non-Settings boxes (LoginScreen, DisplayNameSetup) keep their own markup: they carry `aria-live` and icon test ids.
 decision: 2026-11-04 share-name-rule — one name rule in one place, replacing DW-427's documented twin.
 
 ### DW-455: The Settings test files copy shared helpers instead of importing them.

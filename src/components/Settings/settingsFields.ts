@@ -1,12 +1,20 @@
 /**
  * Settings fields -- the values and rules the Profile pages share with the
  * rows that show them: how a date reads (day, month and year on the Profile
- * and Partner rows, short on the Dates list, and as a date row's value), the earliest and latest birthday, what
- * makes a birthday or a display name worth saving, and the Together since
- * field's local date and time.
+ * and Partner rows, short on the Dates list, and as a date row's value), the
+ * earliest and latest birthday, what makes a birthday worth saving, the
+ * Together since field's local date and time, and the field classes and
+ * `Not set` the pages share. The display-name rule is `displayNameRefusal` in
+ * profileService.ts, which the signup gate uses too.
  */
 
 import { parseEventDate } from '../../services/eventsService';
+import { fieldClass } from '../shared/kitClasses';
+
+/** A Settings page's text or date field, dimmed while disabled. */
+export const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
+/** A Settings page's note field (a textarea), dimmed while disabled. */
+export const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
 
 /** A `YYYY-MM-DD` date as the Profile row reads it: "4 Apr 1995". */
 export function formatDateOnly(value: string): string {
@@ -65,8 +73,8 @@ export function formatListDate(date: Date, now: Date = new Date()): string {
   return formatDayMonthYear(date);
 }
 
-/** What a date row reads while the date is unset. */
-const NOT_SET = 'Not set';
+/** What a row reads while its value is unset. */
+export const NOT_SET = 'Not set';
 
 /**
  * A `YYYY-MM-DD` date as a yearly date ("4 Apr"); `Not set` for none, empty if
@@ -121,12 +129,6 @@ export function isValidBirthday(value: string): boolean {
   if (!parsed || value < BIRTHDAY_MIN) return false;
   const now = new Date();
   return parsed < new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-/** Trimmed, 3 to 30 characters. The account-email and `Unknown` refusals are the service's. */
-export function isValidDisplayName(value: string): boolean {
-  const length = value.trim().length;
-  return length >= 3 && length <= 30;
 }
 
 /**

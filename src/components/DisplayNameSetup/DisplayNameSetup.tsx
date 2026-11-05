@@ -6,9 +6,9 @@
  *
  * Features:
  * - Modal overlay with form
- * - Display name validation (3-30 characters); `profileService.saveDisplayName`
- *   is the twin of these rules (length, not the account email, not
- *   `SEED_FALLBACK_NAME`) for a name written outside this gate
+ * - Display name validation through `displayNameRefusal` (profileService.ts),
+ *   the rule Settings' Name page uses too: 3-30 characters, not the account
+ *   email, not `SEED_FALLBACK_NAME`
  * - Writes the name to the user's own `public.users` row
  *
  * The name is profile data, not auth identity. It used to be written to
@@ -27,8 +27,9 @@ import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 import { getUser } from '../../api/auth/sessionService';
 import { isOnline } from '../../api/errorHandlers';
-import { SEED_FALLBACK_NAME, supabase } from '../../api/supabaseClient';
+import { supabase } from '../../api/supabaseClient';
 import { offlineMessage } from '../../services/accountDataError';
+import { displayNameRefusal, isDisplayNameLength } from '../../services/profileService';
 import { logger } from '../../utils/logger';
 import {
   DIALOG_BACKDROP,
@@ -52,10 +53,6 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const validateDisplayName = (name: string): boolean => {
-    return name.length >= 3 && name.length <= 30;
-  };
-
   const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -66,8 +63,8 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
       return;
     }
 
-    if (!validateDisplayName(displayName.trim())) {
-      setError('Display name must be between 3 and 30 characters');
+    if (!isDisplayNameLength(displayName)) {
+      setError(displayNameRefusal(displayName, null));
       return;
     }
 
@@ -102,15 +99,9 @@ export const DisplayNameSetup: React.FC<DisplayNameSetupProps> = ({ isOpen, onCo
       // this returns before the update, and the outer `finally` clears the
       // loading flag.
       const trimmedName = displayName.trim();
-      const accountEmail = user.email?.trim() ?? '';
-
-      if (accountEmail !== '' && trimmedName.toLowerCase() === accountEmail.toLowerCase()) {
-        setError('Please choose a name that is different from your email address');
-        return;
-      }
-
-      if (trimmedName === SEED_FALLBACK_NAME) {
-        setError(`"${SEED_FALLBACK_NAME}" is not a name — please choose another`);
+      const refusal = displayNameRefusal(trimmedName, user.email);
+      if (refusal) {
+        setError(refusal);
         return;
       }
 

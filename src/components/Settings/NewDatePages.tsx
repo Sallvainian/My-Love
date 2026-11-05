@@ -37,7 +37,6 @@
  * @component
  */
 
-import { CircleAlert } from 'lucide-react';
 import { m as motion } from 'motion/react';
 import {
   useCallback,
@@ -59,17 +58,14 @@ import {
   CARD,
   DIALOG_BACKDROP,
   DIALOG_PANEL,
-  FAILURE_BOX,
   FIELD_LABEL,
   SECONDARY_BUTTON,
-  fieldClass,
 } from '../shared/kitClasses';
 import { DESCRIPTION_MAX_LENGTH, IconPicker, LABEL_MAX_LENGTH, codePoints } from './EventPages';
+import { FIELD_CLASS, NOTE_FIELD_CLASS } from './settingsFields';
 import { SettingsBarAction } from './stack/SettingsBarAction';
 import { useSettingsPage } from './stack/settingsPageContext';
-
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
+import { ErrorBox } from './ErrorBox';
 
 export type NewDateKind = 'event' | 'anniversary';
 
@@ -191,16 +187,7 @@ function FormShell({ testId, valid, saving, latched, error, onAdd, children }: F
           Add
         </button>
       </SettingsBarAction>
-      {error && (
-        <div
-          className={`${FAILURE_BOX} flex items-start gap-2`}
-          role="alert"
-          data-testid="settings-form-error"
-        >
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBox message={error} testId="settings-form-error" />}
       <form className={CARD} noValidate onSubmit={handleSubmit}>
         <div className="flex flex-col gap-4">{children}</div>
       </form>

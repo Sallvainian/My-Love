@@ -54,13 +54,12 @@ import {
 import type { EventWriteResult } from '../../stores/slices/eventsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
-import { fieldClass } from '../shared/kitClasses';
 import { getCalendarDaysDiff } from '../RelationshipTimers/eventCountdownHelpers';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DatePage } from './DatePages';
 import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
-import { formatListDate } from './settingsFields';
+import { FIELD_CLASS, NOTE_FIELD_CLASS, formatListDate } from './settingsFields';
 import { OneFieldPage } from './stack/OneFieldPage';
 import { ReadOnlyRow, SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
@@ -150,9 +149,6 @@ export function IconPicker({
     </div>
   );
 }
-
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
 
 export type EventField = 'name' | 'date' | 'note' | 'icon';
 

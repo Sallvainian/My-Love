@@ -29,6 +29,7 @@ import {
   writeLocalCopy,
 } from '../../services/localCopy';
 import type { AppStateCreator } from '../types';
+import { isOnline } from '../../api/errorHandlers';
 
 /** Local-copy kind for the partner profile. */
 export const PARTNER_COPY_KIND = 'partner';
@@ -92,10 +93,6 @@ let partnerLoadSeq = 0;
  * address the user has since replaced lands under the new one.
  */
 let partnerSearchSeq = 0;
-
-function isOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine;
-}
 
 export interface PartnerSlice {
   // State

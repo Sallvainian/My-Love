@@ -45,18 +45,14 @@ import { MARK_KEYS } from '../../services/dateReminders';
 import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Anniversary } from '../../types';
-import { fieldClass } from '../shared/kitClasses';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DatePage } from './DatePages';
 import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
-import { yearlyValue } from './settingsFields';
+import { FIELD_CLASS, NOTE_FIELD_CLASS, yearlyValue } from './settingsFields';
 import { OneFieldPage } from './stack/OneFieldPage';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
-
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
 
 export type AnniversaryField = 'name' | 'date' | 'note';
 

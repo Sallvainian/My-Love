@@ -26,6 +26,7 @@ import {
   pushPreferencesService,
 } from '../../services/pushPreferencesService';
 import type { AppStateCreator } from '../types';
+import { isOnline } from '../../api/errorHandlers';
 
 export interface NotificationsSlice {
   /**
@@ -52,10 +53,6 @@ export interface NotificationsSlice {
    * `AccountDataError('offline')` without a connection, and the save's error.
    */
   setPushPreference: (key: PushPreferenceKey, enabled: boolean) => Promise<void>;
-}
-
-function isOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine;
 }
 
 /** Local-copy kind for the account's push switches (the whole `PushPreferences` row). */

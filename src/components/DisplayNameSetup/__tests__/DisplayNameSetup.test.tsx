@@ -80,8 +80,8 @@ async function submit(user: UserEvent, name: string, onComplete = vi.fn()) {
 /**
  * Three characters to the input's native `minLength={3}`, so a click submits,
  * but two once trimmed, so the component's OWN length rule refuses it. A plain
- * two-character name would be refused by the platform first and leave
- * `validateDisplayName` untested.
+ * two-character name would be refused by the platform first and leave the
+ * length check (`isDisplayNameLength`) untested.
  */
 const SHORT_ONCE_TRIMMED = 'ab ';
 
