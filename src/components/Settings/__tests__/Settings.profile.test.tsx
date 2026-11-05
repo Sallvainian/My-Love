@@ -255,7 +255,7 @@ describe('Settings > Profile', () => {
       expect(nameRow()).toHaveTextContent('Name');
       expect(nameRow()).toHaveTextContent('Jessie');
       expect(birthdayRow()).toHaveTextContent('Birthday');
-      expect(birthdayRow()).toHaveTextContent('2000');
+      expect(birthdayRow()).toHaveTextContent('20 May 2000');
     });
 
     it('disables Name and Birthday, with no value, until the first answer arrives', async () => {

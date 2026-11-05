@@ -3987,7 +3987,8 @@ location: src/components/Settings/ProfilePage.tsx:125 (birthday row); src/compon
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: The Profile row shows the birthday as the long local date, the Your birthday page shows "4 Apr", and Linked since shows "February 3, 2022". The mock that EXPERIENCE.md:75 links specifies `4 Apr 1995` on the Profile row (key-settings-v2.html:416), `4 Apr` on the birthday pages (EXPERIENCE.md:230-231) and `3 Feb 2022` for Linked since. Fix: follow the mock. Split from DW-447 at triage, whose "one birthday format" would have contradicted the mock.
-status: open
+status: done 2026-11-04
+resolution: followed the mock: a new `formatDayMonthYear` ("3 Feb 2022") in settingsFields.ts backs `formatDateOnly` (the Profile birthday row, now `4 Apr 1995`), `formatInstantDate` (Linked since, now `3 Feb 2022`) and `formatListDate`'s other-year form; the birthday pages already read `4 Apr` through `yearlyValue`. Unit tests pin both forms, and partner-page.spec.ts reads `[34] Feb 2022`.
 decision: 2026-11-04 follow-the-mock — Profile row `4 Apr 1995`, birthday pages `4 Apr`, Linked since `3 Feb 2022`.
 
 ### DW-457: The love-note picture viewer's Close button probably sits under the side column on the Duo.

@@ -1,27 +1,27 @@
 /**
  * Settings fields -- the values and rules the Profile pages share with the
- * rows that show them: how a date reads (long on a page, short on the Dates
- * list, and as a date row's value), the earliest and latest birthday, what
+ * rows that show them: how a date reads (day, month and year on the Profile
+ * and Partner rows, short on the Dates list, and as a date row's value), the earliest and latest birthday, what
  * makes a birthday or a display name worth saving, and the Together since
  * field's local date and time.
  */
 
 import { parseEventDate } from '../../services/eventsService';
 
-/** A `YYYY-MM-DD` date as a long local date ("May 20, 2000"). */
+/** A `YYYY-MM-DD` date as the Profile row reads it: "4 Apr 1995". */
 export function formatDateOnly(value: string): string {
   const date = parseEventDate(value);
-  return date ? date.toLocaleDateString(undefined, { dateStyle: 'long' }) : value;
+  return date ? formatDayMonthYear(date) : value;
 }
 
 /**
- * An ISO instant (a full timestamp, such as a row's `updated_at`) as a long
- * local date ("February 3, 2022"), or `null` when it does not parse. Not for a
+ * An ISO instant (a full timestamp, such as a row's `updated_at`) as its local
+ * date, day first ("3 Feb 2022"), or `null` when it does not parse. Not for a
  * `YYYY-MM-DD` string: use `formatDateOnly`, since `new Date` reads that as UTC.
  */
 export function formatInstantDate(iso: string): string | null {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { dateStyle: 'long' });
+  return Number.isNaN(date.getTime()) ? null : formatDayMonthYear(date);
 }
 
 /** `en-US` date parts by type; `en-US` because `en-GB` prints `Sept`. */
@@ -42,6 +42,12 @@ export function formatDayMonth(date: Date): string {
   return `${day} ${month}`;
 }
 
+/** A date day first with its year: "3 Feb 2022" (the settings mock's form). */
+export function formatDayMonthYear(date: Date): string {
+  const { day, month, year } = dateParts(date, { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${day} ${month} ${year}`;
+}
+
 /**
  * A one-time date (an event, Together since, the wedding) as the Dates list
  * shows it: "Sat 14 Nov" in the current calendar year, "3 Feb 2022" in any
@@ -56,8 +62,7 @@ export function formatListDate(date: Date, now: Date = new Date()): string {
     });
     return `${weekday} ${day} ${month}`;
   }
-  const { day, month, year } = dateParts(date, { day: 'numeric', month: 'short', year: 'numeric' });
-  return `${day} ${month} ${year}`;
+  return formatDayMonthYear(date);
 }
 
 /** What a date row reads while the date is unset. */
