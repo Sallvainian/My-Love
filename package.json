@@ -62,7 +62,7 @@
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
     "@playwright/test": "^1.64.1",
-    "@seontechnologies/playwright-utils": "^4.4.2",
+    "@seontechnologies/playwright-utils": "^4.6.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
