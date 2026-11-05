@@ -6,6 +6,4 @@
  * Story 2.1: Love Notes Chat UI Foundation
  */
 
-export { LoveNoteMessage, type LoveNoteMessageProps } from './LoveNoteMessage';
 export { LoveNotes } from './LoveNotes';
-export { MessageList, type MessageListProps } from './MessageList';

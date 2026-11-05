@@ -56,12 +56,6 @@ export async function returnToSettings(page: Page): Promise<void> {
   await expect(page.getByTestId('settings-view')).toBeVisible();
 }
 
-/** Reload /settings and return once Settings is on screen. */
-export async function reloadSettings(page: Page): Promise<void> {
-  await page.reload();
-  await expect(page.getByTestId('settings-view')).toBeVisible();
-}
-
 /**
  * Open the Dates list from the Settings top page and return once the list's
  * own mount read has answered successfully. The saved copy renders before the
