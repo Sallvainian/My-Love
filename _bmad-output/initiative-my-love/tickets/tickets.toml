@@ -37,3 +37,42 @@ title = "Settings Rework"
 description = "Settings is a stack of one-line rows that each open their own page, as the Settings UX spines describe; every date is edited, deleted and reminded from its own page, reached from its Home card or the Dates list; and adding or changing a date sends no push."
 covers = []
 after = [{ epic = 2, needs = "story 2.8: the header gear and the column dock's sixth button that open Settings" }, { epic = 3, needs = "stories 3.5, 3.6, 3.7 and 3.9: the date-change push path, the push_requests source check, the push switches and the push tap routes this epic removes or moves" }, { epic = 4, needs = "stories 4.2 and 4.3: the per-date countdown marks and the Date reminders switch whose rows move onto each date's page" }]
+
+[[epic]]
+id = 6
+slug = "epic-daily-question"
+title = "Daily Question"
+description = "Daily replaces Mood in the dock; each day both partners pick one this-or-that question blind, the server withholding each pick until the other's own exists, then see the reveal and write tomorrow's question or leave it to the pool; offline picks send on reconnect, each partner's day runs on their own clock, and an unlinked account sees an invitation to link."
+covers = ["R1", "R2", "R3", "R4", "R12", "R17", "R18", "R20"]
+
+[[epic]]
+id = 7
+slug = "epic-streak-and-partner-page"
+title = "Streak and Partner Page"
+description = "The couple's shared streak and current run show on Daily and the Partner page with their colours, the +1 animation and the 25-day flaming-heart badges, and the Partner page holds the streak and the past questions marked Same or Different in place of the mood card, recent moods and Poke/Kiss/Fart tiles."
+covers = ["R5", "R6", "R7", "R8", "R9", "R11", "R17"]
+after = [{ epic = 6, needs = "the stored picks and the per-partner day rule that decide when a day is done or missed" }]
+
+[[epic]]
+id = 8
+slug = "epic-daily-pushes-and-nudge"
+title = "Daily Pushes and Nudge"
+description = "The five daily-question pushes arrive on each recipient's own clock, the waiting screen's Nudge sends the partner a push, and each new push kind has its own Settings switch."
+covers = ["R2", "R13", "R14", "R19"]
+after = [{ epic = 6, needs = "the picks and the per-partner day the pushes are timed and worded on" }, { epic = 7, needs = "the streak count the push copy quotes" }]
+
+[[epic]]
+id = 9
+slug = "epic-reply-in-love-notes"
+title = "Reply in Love Notes"
+description = "The reveal's one action, Reply in Love Notes, opens Love Notes with the reply attached to that day's question, and both partners see the sent note with the question attached."
+covers = ["R10"]
+after = [{ epic = 6, needs = "the reveal card and the stored question a reply points at" }, { epic = 7, needs = "the reveal card's +1 animation, so the two epics do not change the card at once" }, { epic = 8, needs = "its migrations and regenerated database types, and its changes to epic 6's screens, so the two epics do not change them at once" }]
+
+[[epic]]
+id = 10
+slug = "epic-remove-moods-and-interactions"
+title = "Remove Moods and Poke/Kiss/Fart"
+description = "No mood or Poke/Kiss/Fart screen, code path, push kind, Settings switch, server row or device copy remains, while the shared Realtime registry and the partner-linked signal keep working."
+covers = ["R15", "R16", "R19"]
+after = [{ epic = 6, needs = "Daily in the dock slot Mood held" }, { epic = 7, needs = "the Partner page no longer reading moods or interactions" }, { epic = 8, needs = "the new push kinds and switches beside the ones this epic deletes in send-push and the Settings notifications page" }, { epic = 9, needs = "its migrations and regenerated database types, so the two epics do not change them at once" }]

@@ -21,14 +21,15 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0?deps=iceberg-js@0.8.1';
 
+import { apiKeyFromEnv } from '../_shared/apiKeys.ts';
 import { handleUpload } from './handler.ts';
 
 Deno.serve((req) =>
   handleUpload(req, {
     createClient: (authHeader: string) => {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-      return createClient(supabaseUrl, supabaseAnonKey, {
+      const publishableKey = apiKeyFromEnv('publishable', (name) => Deno.env.get(name)).key;
+      return createClient(supabaseUrl, publishableKey, {
         global: { headers: { Authorization: authHeader } },
       });
     },

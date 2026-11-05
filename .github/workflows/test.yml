@@ -205,6 +205,7 @@ jobs:
       # resolves.
       - name: Edge Function tests
         run: |
+          deno test --no-lock supabase/functions/_shared/
           deno test --no-lock supabase/functions/upload-love-note-image/
           deno test --no-lock supabase/functions/send-push/
 
