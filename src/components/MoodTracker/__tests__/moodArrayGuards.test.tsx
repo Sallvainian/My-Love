@@ -570,8 +570,8 @@ describe('malformed element recovery at mood displays', () => {
     storeState.getMoodForDate.mockReset();
   });
 
-  const displays = ['history', 'partner', 'modal', 'calendar', 'tracker'] as const;
-  function display(kind: (typeof displays)[number], invalid = false) {
+  type Display = 'history' | 'partner' | 'modal' | 'calendar' | 'tracker';
+  function display(kind: Display, invalid = false) {
     const values = invalid ? [null, 'unknown'] : ['sad', null, 'tired', 'sad'];
     const local = { ...moodEntry(values), mood: 'unknown', note: invalid ? 'hidden note' : undefined } as unknown as MoodEntry;
     const remote = { ...moodRecord(values), mood_type: 'unknown' } as unknown as SupabaseMood;

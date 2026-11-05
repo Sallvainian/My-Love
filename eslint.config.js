@@ -146,12 +146,25 @@ export default defineConfig(
     rules: {
       'react-hooks/rules-of-hooks': 'off', // Test fixtures may use hooks in non-standard ways
       'no-empty-pattern': 'off', // Playwright fixtures use empty destructuring for deps
-      '@typescript-eslint/no-unused-vars': 'off', // Tests often have unused imports/mocks/fixtures
+      // tsconfig.test.json leaves noUnusedLocals off, so this is what catches an unused
+      // import or local in a test (CodeQL alerts #171 and #172). Arguments and caught
+      // errors stay free: mocks and fixtures take parameters they do not read.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' },
+      ],
       'no-global-assign': 'off', // Tests may mock global objects like Date
       '@typescript-eslint/no-unused-expressions': 'off', // Tests may have expressions for side effects
       'no-restricted-syntax': 'off', // Tests may inspect store state directly
       'no-restricted-properties': 'off', // Tests may inspect store state directly
       'no-console': 'off', // Test output and diagnostics use console.log intentionally
+    },
+  },
+  // tests/e2e-archive/ is frozen documentation, never repaired (AGENTS.md Policy).
+  {
+    files: ['tests/e2e-archive/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   // A bare `expect(console.error).toHaveBeenCalled()`, or the same on console.warn,
