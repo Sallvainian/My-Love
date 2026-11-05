@@ -23,7 +23,12 @@ import { navigateTo } from '../../support/helpers/navigation';
 import { EVENTS_PAGE_SIZE, localDateFromIso } from '../../support/helpers/events';
 import { listDate } from '../../support/helpers/dates-list-format';
 import { fillNewEventForm, openNewEventForm } from '../../support/helpers/new-date-forms';
-import { EVENTS_WRITE, HISTORY_PAGE_READ, UPCOMING_EVENTS_READ } from '../../support/helpers/reads';
+import {
+  EVENT_BY_ID_READ,
+  EVENTS_WRITE,
+  HISTORY_PAGE_READ,
+  UPCOMING_EVENTS_READ,
+} from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { reloadDatesList } from '../../support/helpers/settings-screen';
 
@@ -343,7 +348,7 @@ test.describe('Dates list events history pagination', () => {
     const { windowRows, specs } = tiedSpecs();
     const seeded = await coupleEvents.seed(specs);
     const expected = expectedOrder(seeded, specs);
-    // Paged first, so the store holds every row when Home re-reads its own window.
+    // Paged first, so the store holds every row when Home re-reads at that depth.
     await pageThroughTiedHistory(page, interceptNetworkCall, specs.length);
 
     const homeRead = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
@@ -355,7 +360,8 @@ test.describe('Dates list events history pagination', () => {
         count: window.__APP_STORE__!.getState().events.length,
       })),
       (v) => {
-        expect(v).toEqual({ loading: false, count: 2 * EVENTS_PAGE_SIZE });
+        // Home's load keeps the depth the Dates list paged to: every row stays.
+        expect(v).toEqual({ loading: false, count: specs.length });
       }
     );
     const cards = page.getByTestId(/^event-countdown-tied-paging-\d+$/);
@@ -363,5 +369,150 @@ test.describe('Dates list events history pagination', () => {
     await expect(cards.getByRole('heading', { level: 3 })).toHaveText(expected.filter((row) =>
       row.eventDate === seeded[windowRows].eventDate
     ).slice(0, HOME_MAX_EVENT_CARDS).map((row) => row.label));
+  });
+
+  test.describe('a refresh keeps the Load more depth', () => {
+    /**
+     * The connection drops, then returns, the way App's `online`/`offline`
+     * listeners and `isOnline()` see it. Only `navigator.onLine` moves: really
+     * cutting the context offline corrupts Playwright's trace recording, which
+     * a describe group cannot switch off (events-load-recovery.spec.ts does it
+     * for its whole file).
+     */
+    const setBrowserOnline = (page: Page, online: boolean) =>
+      page.evaluate((value) => {
+        Object.defineProperty(navigator, 'onLine', { value, configurable: true });
+        window.dispatchEvent(new Event(value ? 'online' : 'offline'));
+      }, online);
+    const dropConnection = (page: Page) => setBrowserOnline(page, false);
+    const restoreConnection = (page: Page) => setBrowserOnline(page, true);
+
+    test('[P1] a reconnect refresh keeps every row Load more reached and adds a row seeded meanwhile', async ({
+      page,
+      coupleEvents,
+      interceptNetworkCall,
+    }) => {
+      const pastRows = history(EVENTS_PAGE_SIZE + 1);
+      const seeded = await coupleEvents.seed([
+        ...pastRows,
+        { dayOffset: 7, label: 'Paging upcoming survivor' },
+      ]);
+      await openDates(page, interceptNetworkCall);
+      await expect(page.locator(ALL_ROWS)).toHaveCount(EVENTS_PAGE_SIZE + 1);
+      await loadHistory(page, interceptNetworkCall, seeded.length);
+
+      // A past row the list cannot know about yet.
+      const [late] = await coupleEvents.seed([
+        { dayOffset: -(EVENTS_PAGE_SIZE + 5), label: 'Seeded while away' },
+      ]);
+      await dropConnection(page);
+
+      const refresh = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+      await restoreConnection(page);
+      expect((await refresh).status).toBe(200);
+
+      const everyRow = seeded.length + 1;
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__!.getState().events.length),
+        (v) => {
+          expect(v).toBe(everyRow);
+        }
+      );
+      await expect(page.locator(ALL_ROWS)).toHaveCount(everyRow);
+      await expect(page.getByTestId(rowTestId(late.id))).toBeVisible();
+      for (const row of seeded) {
+        await expect(page.getByTestId(rowTestId(row.id))).toBeVisible();
+      }
+    });
+
+    test('[P1] going Back from an event page after a reconnect keeps every row Load more reached', async ({
+      page,
+      coupleEvents,
+      interceptNetworkCall,
+    }) => {
+      const pastRows = history(EVENTS_PAGE_SIZE + 1);
+      const seeded = await coupleEvents.seed([
+        ...pastRows,
+        { dayOffset: 7, label: 'Paging upcoming survivor' },
+      ]);
+      const oldest = seeded[pastRows.length - 1];
+      await openDates(page, interceptNetworkCall);
+      await loadHistory(page, interceptNetworkCall, seeded.length);
+
+      await page.getByTestId(rowTestId(oldest.id)).click();
+      await expect(page.getByTestId('settings-event-page')).toBeVisible();
+
+      // The event page holds its event, so it asks nothing; the reconnect only
+      // marks the list stale, and the Dates list asks when the person returns.
+      await dropConnection(page);
+      await restoreConnection(page);
+      await recurseUntil(
+        () => page.evaluate(() => window.__APP_STORE__!.getState().eventsStale),
+        (v) => {
+          expect(v).toBe(true);
+        }
+      );
+
+      const refresh = interceptNetworkCall({ method: 'GET', url: UPCOMING_EVENTS_READ });
+      await page.getByRole('button', { name: 'Back' }).click();
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      expect((await refresh).status).toBe(200);
+
+      await recurseUntil(
+        () => page.evaluate(() => {
+          const state = window.__APP_STORE__!.getState();
+          return { stale: state.eventsStale, loading: state.eventsIsLoading, count: state.events.length };
+        }),
+        (v) => {
+          expect(v).toEqual({ stale: false, loading: false, count: seeded.length });
+        }
+      );
+      await expect(page.locator(ALL_ROWS)).toHaveCount(seeded.length);
+      await expect(page.getByTestId(rowTestId(oldest.id))).toBeVisible();
+    });
+  });
+
+  test.describe('an event page reads its event by id', () => {
+    test('[P1] a reload of a past event beyond the first window stays on its page, and its Name field opens with the saved name', async ({
+      page,
+      coupleEvents,
+      interceptNetworkCall,
+    }) => {
+      const pastRows = history(EVENTS_PAGE_SIZE + 1);
+      const seeded = await coupleEvents.seed(pastRows);
+      const oldest = seeded[pastRows.length - 1];
+      await openDates(page, interceptNetworkCall);
+      await loadHistory(page, interceptNetworkCall, seeded.length);
+      await page.getByTestId(rowTestId(oldest.id)).click();
+      await expect(page.getByTestId('settings-event-page')).toBeVisible();
+      const eventPath = new URL(page.url()).pathname;
+      expect(eventPath).toBe(`/settings/dates/event/${oldest.id}`);
+
+      const byId = interceptNetworkCall({ method: 'GET', url: EVENT_BY_ID_READ });
+      await page.reload();
+      expect((await byId).status).toBe(200);
+
+      await expect(page.getByTestId('settings-event-page')).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`${eventPath}$`));
+      const savedName = pastRows[pastRows.length - 1].label;
+      await expect(page.getByTestId('settings-event-name')).toHaveAccessibleName(`Name, ${savedName}`);
+      await page.getByTestId('settings-event-name').click();
+      await expect(page.getByTestId('settings-event-name-field')).toHaveValue(savedName);
+    });
+
+    test('[P1] an unknown event id falls back to the Dates list', async ({
+      page,
+      coupleEvents,
+      interceptNetworkCall,
+    }) => {
+      await coupleEvents.seed(history(3));
+      const byId = interceptNetworkCall({ method: 'GET', url: EVENT_BY_ID_READ });
+      await page.goto('/settings/dates/event/00000000-0000-4000-8000-000000000000');
+      expect((await byId).status).toBe(200);
+
+      await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      await expect(page.getByTestId('settings-event-page')).toHaveCount(0);
+    });
   });
 });

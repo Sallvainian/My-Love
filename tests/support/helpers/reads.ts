@@ -34,6 +34,9 @@ export const PAST_EVENTS_READ = '**/rest/v1/events*event_date=lt.*';
 /** A load-more read: only it carries the `or=` cursor filter (`eventsService.getEventsPage`). */
 export const HISTORY_PAGE_READ = '**/rest/v1/events?*&or=*';
 
+/** One event read by id (`eventsService.getEvent`): an event page whose event lies beyond the list's window. */
+export const EVENT_BY_ID_READ = '**/rest/v1/events?*id=eq.*';
+
 /** The gallery list (`photoService.listAllPhotos`); the `select=file_size`
  * quota read has no `order=`. */
 export const PHOTOS_LIST_READ = '**/rest/v1/photos?*order=created_at.desc*';

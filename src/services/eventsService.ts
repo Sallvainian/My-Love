@@ -266,6 +266,15 @@ function toCoupleEvent(row: SupabaseEventRecord): CoupleEvent | null {
  */
 const DEFAULT_EVENTS_PAGE_SIZE = 50;
 
+/**
+ * Most pages one `getEventsPage` read may ask for per window. PostgREST caps a
+ * response at `max_rows` (1000 in `supabase/config.toml`), and a capped answer
+ * would look like a window with nothing more; 19 pages plus the lookahead row
+ * is 951 rows, so a deeper request reads this much and `Load more` goes on from
+ * the cursor.
+ */
+const MAX_EVENTS_PAGES_PER_READ = 19;
+
 /** Server values must survive Date conversion, which truncates microseconds. */
 export interface EventPageCursor {
   event_date: string;
@@ -290,13 +299,13 @@ export interface EventsPage {
   pagination: EventsPagination;
 }
 
-function windowPage(rows: SupabaseEventRecord[]) {
-  const page = rows.slice(0, DEFAULT_EVENTS_PAGE_SIZE);
+function windowPage(rows: SupabaseEventRecord[], windowSize: number) {
+  const page = rows.slice(0, windowSize);
   const last = page.at(-1);
   return {
     rows: page,
     continuation: {
-      hasMore: rows.length > DEFAULT_EVENTS_PAGE_SIZE,
+      hasMore: rows.length > windowSize,
       cursor: last
         ? { event_date: last.event_date, created_at: last.created_at, id: last.id }
         : null,
@@ -328,11 +337,25 @@ class EventsService {
    * computed before conversion or deduplication, so even an unreadable page
    * can advance. The caller commits both cursors only after both reads succeed.
    * RLS supplies own/partner visibility; no client user filter is applied.
+   *
+   * `pages` reads that many 50-row pages per window in the same single request
+   * (`pages × 50` rows plus the lookahead), so a refresh can re-read as deep as
+   * the list was loaded without one round trip per page; the cursor is the last
+   * row read, so the next page continues from there. A value that is not a
+   * finite number counts as 1, a fraction is floored, and a value above
+   * {@link MAX_EVENTS_PAGES_PER_READ} reads that many.
    */
-  async getEventsPage(pagination?: EventsPagination | null): Promise<EventsPage> {
+  async getEventsPage(
+    pagination?: EventsPagination | null,
+    pages: number = 1
+  ): Promise<EventsPage> {
     if (!isOnline()) {
       throw new Error(offlineMessage('Events', 'load'));
     }
+    const depth = Number.isFinite(pages)
+      ? Math.min(MAX_EVENTS_PAGES_PER_READ, Math.max(1, Math.floor(pages)))
+      : 1;
+    const windowSize = DEFAULT_EVENTS_PAGE_SIZE * depth;
     const todayISO = pagination?.todayISO ?? formatDateISO(new Date());
     const readWindow = async (ascending: boolean, previous?: EventWindowContinuation) => {
       if (previous && !previous.hasMore) return { rows: [], continuation: previous };
@@ -343,9 +366,9 @@ class EventsService {
         .order('event_date', { ascending })
         .order('created_at', { ascending })
         .order('id', { ascending })
-        .range(0, DEFAULT_EVENTS_PAGE_SIZE);
+        .range(0, windowSize);
       if (error) throw error;
-      return windowPage(data ?? []);
+      return windowPage(data ?? [], windowSize);
     };
 
     try {
@@ -372,6 +395,38 @@ class EventsService {
         throw handleSupabaseError(error, 'EventsService.getEventsPage');
       }
       throw networkFailure('EventsService.getEventsPage', error);
+    }
+  }
+
+  /**
+   * Read one event by id, for a page whose event lies beyond the paged window.
+   * RLS supplies own/partner visibility, so another couple's id answers `null`
+   * like an absent one. A malformed id (PostgREST `22P02`, invalid uuid text)
+   * also answers `null`: it names no event. Any other failure throws as
+   * `getEventsPage` does.
+   *
+   * @returns The event, or `null` when there is no such event (or its date
+   *   cannot be read)
+   */
+  async getEvent(eventId: string): Promise<CoupleEvent | null> {
+    if (!isOnline()) {
+      throw new Error(offlineMessage('Events', 'load'));
+    }
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? toCoupleEvent(data) : null;
+    } catch (error) {
+      if (isPostgrestError(error) && error.code === '22P02') return null;
+      logSupabaseError('EventsService.getEvent', error);
+      if (isPostgrestError(error)) {
+        throw handleSupabaseError(error, 'EventsService.getEvent');
+      }
+      throw networkFailure('EventsService.getEvent', error);
     }
   }
 

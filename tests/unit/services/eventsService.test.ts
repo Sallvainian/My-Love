@@ -262,9 +262,114 @@ describe('eventsService', () => {
       expect(retry.pagination.past.hasMore).toBe(false);
     });
 
+    it('reads `pages` pages per window in one request each, and continues from the last row read', async () => {
+      const PAGES = 3;
+      // Three full pages and a lookahead row past them, on both sides.
+      backend.rows = ['2026-09-11', '2026-09-12'].flatMap((date, side) =>
+        Array.from({ length: PAGES * PAGE_SIZE + 1 }, (_, index) => row({
+          id: `${side}-${String(index).padStart(3, '0')}`, event_date: date,
+        }))
+      );
+      const deep = await eventsService.getEventsPage(undefined, PAGES);
+      expect(backend.queries).toHaveLength(2);
+      for (const query of backend.queries) {
+        expect(query.range).toEqual({ from: 0, to: PAGES * PAGE_SIZE });
+      }
+      expect(deep.events).toHaveLength(2 * PAGES * PAGE_SIZE);
+      expect(deep.pagination.upcoming.hasMore).toBe(true);
+      expect(deep.pagination.past.hasMore).toBe(true);
+      // The cursor is the last row read, not the lookahead, so Load more
+      // continues with exactly the row after it.
+      expect(deep.pagination.upcoming.cursor?.id).toBe(`1-${String(PAGES * PAGE_SIZE - 1).padStart(3, '0')}`);
+      const next = await eventsService.getEventsPage(deep.pagination);
+      expect(next.events).toHaveLength(2);
+      expect(next.pagination.upcoming.hasMore).toBe(false);
+      expect(next.pagination.past.hasMore).toBe(false);
+    });
+
+    it('says nothing more remains when a deep read stops exactly on the last row', async () => {
+      backend.rows = Array.from({ length: 2 * PAGE_SIZE }, (_, index) => row({
+        id: `event-${String(index).padStart(3, '0')}`, event_date: '2026-09-11',
+      }));
+      const deep = await eventsService.getEventsPage(undefined, 2);
+      expect(deep.events).toHaveLength(2 * PAGE_SIZE);
+      expect(deep.pagination.past.hasMore).toBe(false);
+      expect(deep.pagination.upcoming.hasMore).toBe(false);
+    });
+
+    it.each([
+      [undefined, 1],
+      [0, 1],
+      [-4, 1],
+      [Number.NaN, 1],
+      [Number.POSITIVE_INFINITY, 1],
+      [2.9, 2],
+    ])('reads %s pages as %i per window', async (pages, expected) => {
+      await eventsService.getEventsPage(undefined, pages);
+      for (const query of backend.queries) {
+        expect(query.range).toEqual({ from: 0, to: expected * PAGE_SIZE });
+      }
+    });
+
+    it('never asks one request for more rows than PostgREST returns', async () => {
+      await eventsService.getEventsPage(undefined, 500);
+      for (const query of backend.queries) {
+        // supabase/config.toml max_rows is 1000: a capped answer would pass for a finished window.
+        expect(query.range!.to + 1).toBeLessThanOrEqual(1000);
+      }
+    });
+
     it('does not query offline', async () => {
       setOnline(false);
       await expect(eventsService.getEventsPage()).rejects.toThrow('Events need a connection to load');
+      expect(backend.fromCalls).toBe(0);
+    });
+  });
+
+  describe('getEvent', () => {
+    it('reads one row by id with no user filter and no range', async () => {
+      backend.rows = [row({ id: 'a', label: 'Other' }), row({ id: 'b', label: 'Deep one' })];
+      const found = await eventsService.getEvent('b');
+      expect(found).toMatchObject({ id: 'b', label: 'Deep one' });
+      expect(found?.date.getDate()).toBe(12);
+      expect(backend.filters).toEqual([{ column: 'id', value: 'b' }]);
+      expect(backend.queries).toHaveLength(1);
+      expect(backend.queries[0].range).toBeNull();
+    });
+
+    it('answers null when no row has the id', async () => {
+      backend.rows = [row({ id: 'a' })];
+      await expect(eventsService.getEvent('missing')).resolves.toBeNull();
+    });
+
+    it('answers null for a row whose date cannot be read', async () => {
+      backend.rows = [row({ id: 'a', event_date: 'infinity' })];
+      await expect(eventsService.getEvent('a')).resolves.toBeNull();
+    });
+
+    it('answers null for a malformed id (22P02, invalid uuid text)', async () => {
+      backend.nextError = {
+        code: '22P02',
+        message: 'invalid input syntax for type uuid: "not-a-uuid"',
+        details: '',
+        hint: '',
+      };
+      await expect(eventsService.getEvent('not-a-uuid')).resolves.toBeNull();
+    });
+
+    it('throws any other PostgREST error, as getEventsPage does', async () => {
+      backend.nextError = permissionDenied();
+      await expect(eventsService.getEvent('a')).rejects.toThrow();
+    });
+
+    it('throws a truthful network error for a failure in flight', async () => {
+      backend.nextError = new Error('socket hang up');
+      await expect(eventsService.getEvent('a')).rejects.toThrow(/Network error: socket hang up/);
+    });
+
+    it('does not query offline', async () => {
+      setOnline(false);
+      await expect(eventsService.getEvent('a')).rejects.toThrow('Events need a connection to load');
       expect(backend.fromCalls).toBe(0);
     });
   });

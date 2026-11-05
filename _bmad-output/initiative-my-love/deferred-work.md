@@ -3834,7 +3834,9 @@ location: src/components/Settings/DatesPage.tsx (the connectivity load and the `
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
 reason: The list asks the server again on a reconnect, and on the iPhone shell when the app comes back to the foreground (the events refresher marks it `eventsStale`). `loadEvents` answers with the first window only and replaces the list, so the older past dates `Load more` added are hidden until it is tapped again. Nothing is lost on the server. The owner chose an up-to-date list over keeping those rows (2026-11-03). It shows only with more than one window of past dates. A fix re-reads as many windows as were loaded, keeping the cursors' depth. Triage 2026-11-04: the same drop follows a return to the list after a refresh skipped while Settings showed (`DatesPage.tsx:124-128`, the `eventsStale` load). Re-reading as many rows as were loaded keeps the owner's 2026-11-03 choice of an up-to-date list and keeps the rows. It shows only past 50 past or 50 upcoming events (`eventsService.ts:267`). Build with DW-445: both change `eventsSlice`'s paging, `eventsService` and `events-history-pagination.spec.ts`.
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-events-paging-keeps-loaded-rows
+resolution-undo: e37c31e4934a00a75715488978216525ae72a53a2c0007265b77f8a977cd922a 2026-11-04 7374617475733a206f70656e
 
 ### DW-441: The dock's walk back to Home has no way out if the browser never reports the back, which can leave every dock tap doing nothing.
 origin: epic-settings-rework retrospective (diff review, findings V1 and V2), 2026-11-04
@@ -3879,7 +3881,9 @@ location: src/components/Settings/EventPages.tsx (the load effect and `useFallBa
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: On a reload the event page holds no event, so it calls `loadEvents`, which returns the first window only. An older past event reached through `Load more` is not in it, so `answered && event === undefined` falls back to the Dates list. The code path was read but not reproduced. Fix: read the one event by id before falling back. Triage 2026-11-04: lines confirmed (`EventPages.tsx:194-206`, the fallback at 206); `eventsService` has no read by id, so the fix adds one. Anniversaries are read unpaged (`anniversariesService.ts:62-77`) and the other date pages fall back on couple or partner data, so only event pages are affected. Build with DW-440.
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-events-paging-keeps-loaded-rows
+resolution-undo: e37c31e4934a00a75715488978216525ae72a53a2c0007265b77f8a977cd922a 2026-11-04 7374617475733a206f70656e
 
 ### DW-446: No check has scheduled a reminder through a date page's Remind me switch.
 origin: epic-settings-rework retrospective (S3), 2026-11-04

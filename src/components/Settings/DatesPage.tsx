@@ -23,8 +23,8 @@
  * rows show from the store at once, and an initial-load failure is not shown.
  * A return to the list (back from a date's page or a form) keeps the store's
  * window when it holds a server page and no refresh was skipped meanwhile
- * (`eventsStale`), so rows reached through `Load more` and a date just added
- * stay listed.
+ * (`eventsStale`), so a date just added beyond what a load reads stays listed
+ * (a load itself keeps the rows `Load more` reached).
  * `Load more` appends in place; its failure (or the offline refusal) keeps the
  * rows and shows its message in the Error box until the next `Load more` or
  * until the page is left.
@@ -113,9 +113,9 @@ export function DatesPage() {
   // does. Either connectivity change re-asks: offline settles on the saved copy,
   // reconnecting fetches. The outcome is not shown: it is not an action just tried.
   // Coming back to the list (from a date's page or a form) does not ask when the
-  // store already holds a server page: a load replaces the list with the
-  // server's first page, which would drop the rows `Load more` reached and a
-  // date just added beyond that window. A refresh skipped while the list was
+  // store already holds a server page: a load keeps the depth `Load more` had
+  // reached, but it replaces the list with the server's rows, which would drop
+  // a date just added beyond that depth. A refresh skipped while the list was
   // away (`eventsStale`) or a failed load (`eventsError`) still asks. The skip
   // holds only for the arrival's own account, session and connectivity, so
   // StrictMode's replay skips too and any later change asks as before.

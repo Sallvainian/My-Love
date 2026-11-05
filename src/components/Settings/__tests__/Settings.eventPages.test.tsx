@@ -78,6 +78,7 @@ const LINKED: Extract<CoupleSettings, { status: 'linked' }> = {
 
 const original = {
   loadEvents: useAppStore.getState().loadEvents,
+  loadEvent: useAppStore.getState().loadEvent,
   loadMoreEvents: useAppStore.getState().loadMoreEvents,
   editEvent: useAppStore.getState().editEvent,
   removeEvent: useAppStore.getState().removeEvent,
@@ -87,6 +88,7 @@ const original = {
 };
 
 const loadEvents = vi.fn<() => Promise<EventLoadResult>>();
+const loadEvent = vi.fn<(id: string) => Promise<EventLoadResult>>();
 const editEvent = vi.fn<(id: string, updates: EventUpdateInput) => Promise<EventWriteResult>>();
 const removeEvent = vi.fn<(id: string) => Promise<EventWriteResult>>();
 const setCountdownMark = vi.fn();
@@ -151,6 +153,8 @@ describe('Settings > Dates > an event\'s page', () => {
     capacitor.isPluginAvailable.mockReturnValue(true);
     backend.fetchOwnProfile.mockResolvedValue({ displayName: 'Casey', birthday: null });
     loadEvents.mockResolvedValue({ status: 'success' });
+    // The by-id read answers, but finds nothing and leaves the store alone.
+    loadEvent.mockResolvedValue({ status: 'success' });
     // The real actions move the store before they resolve; so do these.
     editEvent.mockImplementation(async (id, updates) => {
       act(() =>
@@ -190,6 +194,7 @@ describe('Settings > Dates > an event\'s page', () => {
       eventsIsLoadingMore: false,
       eventsPagination: null,
       loadEvents,
+      loadEvent,
       loadMoreEvents: vi.fn().mockResolvedValue({ status: 'success' }),
       editEvent,
       removeEvent,
@@ -477,6 +482,80 @@ describe('Settings > Dates > an event\'s page', () => {
     it('falls back to the Dates list once, under StrictMode, when the load answers without it', async () => {
       const replace = vi.spyOn(window.history, 'replaceState');
       renderAt('dates/event/event-1', true);
+
+      expect(await heading('Dates')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates');
+      expect(replacesTo(replace, '/settings/dates')).toBe(1);
+    });
+
+    it('reads the event by id when the load did not return it, then stays on the page and opens its field pages', async () => {
+      // The event lies beyond the first window: the load answers without it,
+      // the by-id read finds it (the real action upserts it into the store).
+      loadEvent.mockImplementation(async () => {
+        setEvents([makeEvent()]);
+        return { status: 'success' };
+      });
+      renderAt('dates/event/event-1', true);
+
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      expect(screen.getByTestId('settings-event-page')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates/event/event-1');
+      expect(loadEvent).toHaveBeenCalledWith('event-1');
+      expect(loadEvents).toHaveBeenCalled();
+
+      act(() => useAppStore.getState().openSettingsPage('dates/event/event-1/name'));
+      await heading('Name');
+      expect(screen.getByTestId('settings-event-name-field')).toHaveValue('Weekend trip');
+    });
+
+    it('shows the event the load returned, its by-id check answering from the list', async () => {
+      loadEvents.mockImplementation(async () => {
+        setEvents([makeEvent()]);
+        return { status: 'success' };
+      });
+      renderAt('dates/event/event-1');
+
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      // The slice answers a held event with no request (eventsSlice.test.ts).
+      expect(loadEvent).toHaveBeenCalledWith('event-1');
+      expect(window.location.pathname).toBe('/settings/dates/event/event-1');
+    });
+
+    it.each([
+      ['failure', { status: 'failure', error: 'Could not load the event' } as const],
+      ['stale', { status: 'stale' } as const],
+    ])('never falls back on a %s by-id read', async (_name, result) => {
+      loadEvent.mockResolvedValue(result);
+      renderAt('dates/event/event-1');
+      await heading('Event');
+      await act(async () => {});
+
+      expect(loadEvent).toHaveBeenCalledWith('event-1');
+      expect(window.location.pathname).toBe('/settings/dates/event/event-1');
+      expect(screen.queryByRole('heading', { level: 1, name: 'Dates' })).not.toBeInTheDocument();
+    });
+
+    it('does not read by id when its own load did not succeed', async () => {
+      loadEvents.mockResolvedValue({ status: 'failure', error: 'Could not load events' });
+      renderAt('dates/event/event-1');
+      await heading('Event');
+      await act(async () => {});
+
+      expect(loadEvent).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the Dates list once, under StrictMode, only after the by-id read also finds nothing', async () => {
+      const replace = vi.spyOn(window.history, 'replaceState');
+      const byId = deferred<EventLoadResult>();
+      loadEvent.mockReturnValue(byId.promise);
+      renderAt('dates/event/event-1', true);
+
+      expect(await heading('Event')).toBeInTheDocument();
+      await act(async () => {});
+      expect(window.location.pathname).toBe('/settings/dates/event/event-1');
+      expect(replacesTo(replace, '/settings/dates')).toBe(0);
+
+      await act(async () => byId.settle({ status: 'success' }));
 
       expect(await heading('Dates')).toBeInTheDocument();
       expect(window.location.pathname).toBe('/settings/dates');

@@ -254,6 +254,10 @@ export function eventsQuery() {
       const result = run();
       return { data: result.data?.[0] ?? null, error: result.error };
     },
+    maybeSingle: async () => {
+      const result = run();
+      return { data: result.data?.[0] ?? null, error: result.error };
+    },
     then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
       Promise.resolve().then(run).then(onFulfilled, onRejected),
   };
