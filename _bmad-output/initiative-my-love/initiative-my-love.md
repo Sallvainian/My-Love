@@ -12,7 +12,7 @@ risk: low
 
 ## Description
 
-My-Love is a progressive web app for couples: daily messages, photos, love-notes chat and dates, deployed at https://my-love.sallvain.workers.dev/. This initiative holds every epic of the product. Its Requirements come from the 2026-11-05 brainstorm, which found the Mood and Partner pages are read-only mirrors that leave nothing waiting for either partner: it replaces mood tracking and Poke/Kiss/Fart with a daily this-or-that question both answer blind, a shared streak, and a Partner page built around both. The rest of the product predates the ticket tree and has no requirements source.
+My-Love is a progressive web app for couples: daily messages, photos, love-notes chat and dates, deployed at https://my-love.sallvain.workers.dev/. This initiative holds every epic of the product. Its Requirements come from the 2026-11-05 brainstorm, which found the Mood and Partner pages are read-only mirrors that leave nothing waiting for either partner: it replaces mood tracking and Poke/Kiss/Fart with a daily this-or-that question both answer blind, a shared streak, and a Partner page built around both. The rest of the product predates the ticket tree; requirements are added feature by feature as each is taken up.
 
 ## Outcome
 
@@ -73,7 +73,6 @@ Each partner has a reason to open the app every day, an open loop from the other
 - Assumption: the pushes in R13 and R14 reach the iOS shell only, as every existing push does (epic-push-notifications); the web app gets none.
 - Assumption: a question a partner writes joins only that couple's pool, never another couple's.
 - Assumption: the phone's clock is trusted for a pick's time (R17); changing the phone's clock to rescue a streak is not guarded against.
-- Open question: the rest of the product (photos, love notes, dates, settings, messages) has no PRD; `bmad-prd` supplies one when the owner decides.
 - Decision: 2026-10-28 epic-test-review-remediation reopened with stories 10–12. Its 2026-10-03 re-reviews still report findings, and its Done when now requires the 2026-10-03 rows fixed and no Critical or High on fresh folder re-reviews, instead of zero findings, because the reviewer varies between runs.
 - Decision: 2026-10-30 epic 2 retitled "iPhone Duo Side-Column Dock" and its description rewritten: the owner's Duo shows the shell drawing web content into the side column, so the native tab bar was dropped for the app's own HTML dock in the column (see the epic's Notes). Its folder slug stays `epic-iphone-duo-native-tab-bar`.
 - Decision: 2026-10-30 after the Duo replan dropped stories 2.1 and 2.3, epic 3 waits on epic 2 only through story 3.1 on story 2.7 (its live-update simulator setup and its answer on whether the side column needs native code), and epic 4 no longer waits on epic 2: the Duo sweep and ship (2.4, 2.5) no longer share the Xcode project or a shell install. If story 2.7 finds native code is needed, 3.1 also waits on 2.2 and epic 4 gets epic 2 back (4.1 on 2.4, 4.5 on 2.5).
@@ -83,3 +82,4 @@ Each partner has a reason to open the app every day, an open loop from the other
 - Decision: 2026-11-05 the owner chose to put the daily question work from the brainstorm into this initiative as new epics, not a separate initiative, because it is part of My-Love; bmad-loop also reads one active initiative, and the work rewrites pages existing epics built.
 - Decision: 2026-11-05 the owner confirmed a day counts only when both partners pick (R5), kept the Nudge button (R13), set milestones on the held total (R9), wants an offline pick sent on reconnect (R17), and took the PO's picks for two written questions (R3), no linked partner (R18) and push switches (R19).
 - Decision: 2026-11-05 the owner ruled out one couple time zone, since the partners are sometimes an hour apart and a streak must not end at 11 PM for one of them: each partner's day runs on their own clock (R20). The owner kept all five pushes (R14) and wants an offline pick to carry the time it was made, so it counts for that date (R17).
+- Decision: 2026-11-05 no app-wide PRD: the product exists and its code records what it does, so requirements are added feature by feature from each input (a brainstorm, a brief) when it is taken up.
