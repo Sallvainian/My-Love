@@ -94,11 +94,6 @@ Device:
   rotate [N]                 Rotate a quarter turn N times: right (ax rotate),
                              or left where Device Hub has only Rotate Left.
   state                      Pose, active display and orientation (ax state).
-  reboot                     Shut the simulator down and boot it again,
-                             returning once it has booted. The simulator
-                             ignores a Mac clock change until it reboots, so
-                             run this after each sudo /bin/date. Apps do not
-                             come back running.
   screenshot PATH [--display inner|outer]
                              Save a PNG of a display (default: the active one).
 
@@ -324,6 +319,21 @@ supabase_url() {
   sed -n 's/^VITE_SUPABASE_URL=//p' $REPO/.env.test
 }
 
+# The supabase CLI the repo resolves must be .mise.toml's pin: another one
+# (Homebrew's 3.x) rejects supabase/config.toml, so supabase status prints
+# nothing and the driver would blame a stopped stack. It runs in the repo, as
+# stack_secret does, so mise's project pin applies.
+require_supabase_cli() {
+  local pin=$(sed -n 's/^supabase *= *"\(.*\)".*$/\1/p' $REPO/.mise.toml)
+  [[ -n $pin ]] || die 1 "no supabase pin in $REPO/.mise.toml"
+  local found
+  found=$(cd $REPO && supabase --version 2>/dev/null) ||
+    die 1 "no working supabase CLI in $REPO: install .mise.toml's $pin (mise install)"
+  found=${found%%$'\n'*}
+  [[ $found == $pin ]] ||
+    die 1 "supabase CLI $found in $REPO, but .mise.toml pins $pin: put mise's $pin first on PATH (mise install; mise trust)"
+}
+
 # Refuses anything but a local URL, then checks the stack answers.
 require_stack() {
   local url=$(supabase_url)
@@ -464,6 +474,7 @@ cmd_build() {
       die 1 "build: unknown revision $rev"
   fi
   require_booted
+  require_supabase_cli
   require_stack
 
   local dir id update_url=$DEAD_UPDATE_URL
@@ -580,6 +591,7 @@ stack_secret() {
 }
 
 cmd_provision() {
+  require_supabase_cli
   require_stack
   local key=$(stack_secret)
   [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
@@ -589,6 +601,7 @@ cmd_provision() {
 
 cmd_dates() {
   [[ ${1:-} == (kinds|many|clear) && $# -eq 1 ]] || die 2 "dates takes kinds, many or clear"
+  require_supabase_cli
   require_stack
   local key=$(stack_secret)
   [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
@@ -827,15 +840,6 @@ cmd_watch() {
   done
   [[ $seconds == <1-3600> ]] || die 2 "watch: --for takes whole seconds from 1 to 3600"
   notify watch $seconds ${front:+$front}
-}
-
-# shutdown, then bootstatus -b, which boots it and waits until it has.
-cmd_reboot() {
-  (( $# == 0 )) || die 2 "reboot takes nothing"
-  require_booted
-  stage simctl-shutdown xcrun simctl shutdown $UDID
-  stage simctl-boot xcrun simctl bootstatus $UDID -b
-  say "rebooted $UDID; the Mac clock reads $(print -P '%D{%Y-%m-%d %H:%M:%S}')"
 }
 
 # ax state's value for one key (pose, orientation).
@@ -1186,7 +1190,6 @@ case $cmd in
     [[ -z ${1:-} || $1 == <1-9> ]] || die 2 "rotate takes a count from 1 to 9"
     require_window; cmd_rotate ${1:-1} ;;
   state) require_window; ax state --device $UDID ;;
-  reboot) cmd_reboot "$@" ;;
   tap)
     [[ $# == 2 && $1 == <->(|.<->) && $2 == <->(|.<->) ]] || die 2 "tap takes X Y in page points"
     drive tap $1 $2 ;;
