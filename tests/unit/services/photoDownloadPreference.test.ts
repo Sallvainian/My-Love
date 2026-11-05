@@ -74,7 +74,10 @@ describe('the choice', () => {
     expect(getPhotosOverMobileData()).toBe(false);
     setPhotosOverMobileData(true);
     expect(getPhotosOverMobileData()).toBe(true);
-    expect(console.warn).toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(
+      '[photoDownloadPreference] Could not save the mobile-data choice:',
+      expect.objectContaining({ name: 'SecurityError' })
+    );
   });
 });
 

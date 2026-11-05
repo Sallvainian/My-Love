@@ -154,6 +154,25 @@ export default defineConfig(
       'no-console': 'off', // Test output and diagnostics use console.log intentionally
     },
   },
+  // A bare `expect(console.error).toHaveBeenCalled()`, or the same on console.warn,
+  // passes on any logged line, so an
+  // unrelated error from a new mock satisfies it (retrospective A5, DW-452). Assert the
+  // message the code under test logs. Placed after the block above, which turns
+  // no-restricted-syntax off for tests, so this is the only selector tests get.
+  {
+    files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'e2e/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='toHaveBeenCalled'][callee.object.callee.name='expect'][callee.object.arguments.0.object.name='console'][callee.object.arguments.0.property.name=/^(error|warn)$/]",
+          message:
+            'Assert the message the code logs (toHaveBeenCalledWith), not a bare console.error/console.warn call.',
+        },
+      ],
+    },
+  },
   // src/ standardizes on the explicit zod/v4 path. Bare 'zod' resolves to the
   // same v4 classic surface under zod 4, so this is consistency, not correctness.
   // tests/ is exempt: three tests/api specs import bare 'zod'.

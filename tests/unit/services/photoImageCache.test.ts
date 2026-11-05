@@ -163,7 +163,10 @@ describe('the fill', () => {
     expect(cached(photos[0].storage_path)).toBe(true);
     expect(cached(photos[1].storage_path)).toBe(false);
     expect(cached(photos[2].storage_path)).toBe(true);
-    expect(console.warn).toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(
+      '[photoImageCache] Skipping a photo whose image failed to download:',
+      expect.objectContaining({ message: 'Failed to fetch' })
+    );
   });
 
   it('runs once at a time: a request during a run makes it pass once more', async () => {
