@@ -3995,7 +3995,8 @@ origin: triage of epic-settings-rework deferred work (DW-448 code read), 2026-11
 location: src/components/love-notes/FullScreenImageViewer.tsx:100
 severity: medium
 reason: The Close button is placed at `right-4` with no `--dock-right` clearance, the layout `b243a7ce` fixed in the photo viewer (`PhotoGallery/PhotoViewer.tsx`), so in the column form with the capsule on the right it probably sits under the capsule. Found by reading the code, not seen on a screen. Fix: clear the column as `b243a7ce` does for the photo viewer.
-status: open
+status: done 2026-11-04
+resolution: Close now sits at `right-[calc(1rem+env(safe-area-inset-right))]`, as `b243a7ce` placed the photo viewer's controls. Checked in the DW-448 simulator sweep with the capsule on the right: Close sits left of the side column, clear of the status capsule. The sweep also found the viewer covering only its message row, fixed in the same branch by rendering it into `document.body`.
 decision: 2026-11-04 file-and-sweep.
 
 ### DW-458: The partner-mood.spec.ts comment on loadPartner's reads is stale beyond the column this change fixed.
