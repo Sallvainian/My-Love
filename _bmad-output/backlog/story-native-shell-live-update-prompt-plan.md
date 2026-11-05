@@ -3,14 +3,14 @@ title: 'The native shell shows a live update and lets the owner apply it now'
 type: 'feature'
 ticket: '1'
 created: '2026-11-04'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '11d56905b57a58c2dec244dd7c8611bbc99eecb3'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/initiative-my-love/ux-live-update-prompt/DESIGN.md'
@@ -84,6 +84,15 @@ context:
 ## Plan Change Log
 
 ## Review Triage Log
+
+Pass 1 (quick lens): high 0, medium 1, low 1, false 1, maybe-false 1.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | Confirm dialog (KitDialog, z-50 in `#root`) opens hidden under FullScreenImageViewer (z-50, portalled to body), NoteRemoveConfirmation (z-70) or PhotoViewer's delete dialog (z-60) when the z-100 ready toast is tapped over them | medium | patch | Confirmed at `FullScreenImageViewer.tsx:76-84` and `NoteRemoveConfirmation.tsx:179`; DESIGN.md puts the dialog at the front. Fix: a stacking-context wrapper above z-100 in `UpdateConfirmDialog`, no new KitDialog prop |
+| 2 | Drop-down left edge omits `--dock-left`, against both spines | false | reject | Both spines also say the list is anchored to and follows the bell, and EXPERIENCE.md's pose table puts the bell inside the 84pt left inset; the header is not padded by `--dock-left` (`App.tsx` renders `AppNavigation` outside `<main>`), so adding it would move the list 84pt off the bell. The code follows the spines' governing rule (Design Notes) |
+| 3 | The plan's simulator check of the toast above the Love Notes composer did not run, and the gap is not in the ledger | maybe-false | defer | Placement was measured in the browser only; shell launch lands on Home and `sim tap` outlasts the 6 s toast. Settled by a throttled-download simulator run; logged as DW-460 (medium, unverified) |
+| 4 | "presses nothing underneath" assertion in `NotificationsBell.test.tsx` cannot fail | low | patch | The click is dispatched on the catcher and happy-dom does no hit-testing, so `underneath` can never be called; the test's class and close assertions do still guard the catcher. Fix: drop the vacuous assertion and name the test for what it proves |
 
 ## Design Notes
 

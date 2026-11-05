@@ -4022,3 +4022,11 @@ location: tests/unit/stores/ (interactionsSlice.localCopy, eventsSlice.localCopy
 severity: low
 reason: DW-455 moved the `navigator` stubs into `tests/unit/stores/navigatorFixtures.ts` (`setOnline`, `setConnection`) and switched the Settings tests and every `setConnection` copy to it, but these 14 files each keep a local `setOnline`, against AGENTS.md's shared-helper rule. They are not all the same stub: some set `navigator.onLine` with `Object.defineProperty`, some with `vi.spyOn(navigator, 'onLine', 'get')`, so a switch must check each file's teardown. `notesSliceQueueFixture.ts` and `fakeEventsBackend.ts` export their own `setOnline` for their suites. Fix: import `setOnline` from `navigatorFixtures.ts` wherever the stub is the `defineProperty` form, and give the spy form one shared helper too if more than one file needs it.
 status: open
+
+### DW-460: The live-update toast's place above the Love Notes composer is unchecked in the native shell.
+origin: review of story-native-shell-live-update-prompt (quick lens), 2026-11-04
+location: src/components/shared/UpdateToast.tsx (bottom offset from `--composer-clearance`), src/hooks/useComposerClearance.ts
+source_spec: `_bmad-output/backlog/story-native-shell-live-update-prompt-plan.md`
+severity: medium (unverified)
+reason: R11's Love Notes half was checked only in the browser: `--composer-clearance` followed the composer as it grew and a box with the toast's classes ended 12px above it. In the shell the toast shows only at launch, which lands on Home, and `sim tap` takes about 11 s to reach Love Notes, past the ready toast's 6 s, while a local download ends too fast to catch the download toast. What would settle it: a simulator run that shows a toast on Love Notes — serve the update through a throttled server so the download toast stays up while `sim tap` opens Love Notes, then type a few lines and attach a picture and confirm the toast stays 12px above the composer's top edge.
+status: open
