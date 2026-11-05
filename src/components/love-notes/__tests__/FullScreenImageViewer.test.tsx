@@ -48,6 +48,19 @@ describe('FullScreenImageViewer', () => {
     expect(img).toHaveAttribute('src', mockImageUrl);
   });
 
+  it('renders into document.body, out of the transformed message row that opens it', () => {
+    const { container } = render(
+      <div style={{ transform: 'translateY(240px)' }}>
+        <FullScreenImageViewer imageUrl={mockImageUrl} isOpen={true} onClose={vi.fn()} />
+      </div>
+    );
+
+    const viewer = screen.getByTestId('fullscreen-image-viewer');
+    expect(viewer).toBeVisible();
+    expect(viewer.parentElement).toBe(document.body);
+    expect(container).not.toContainElement(viewer);
+  });
+
   it('shows nothing while closed', () => {
     render(<FullScreenImageViewer imageUrl={mockImageUrl} isOpen={false} onClose={vi.fn()} />);
 

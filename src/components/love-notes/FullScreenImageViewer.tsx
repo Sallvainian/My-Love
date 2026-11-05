@@ -14,6 +14,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface FullScreenImageViewerProps {
   imageUrl: string | null;
@@ -68,7 +69,11 @@ function FullScreenImageViewerComponent({
     };
   }, [isOpen, handleKeyDown]);
 
-  return (
+  // Rendered into document.body: the viewer opens from a message row, which
+  // the virtualized list positions with a transform, and a transformed
+  // ancestor becomes the containing block of `fixed inset-0`, so in place the
+  // viewer covered only that row's part of the list, clipped by its scroller.
+  return createPortal(
     <AnimatePresence>
       {isOpen && imageUrl && (
         <motion.div
@@ -121,7 +126,8 @@ function FullScreenImageViewerComponent({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 
