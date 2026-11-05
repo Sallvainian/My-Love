@@ -34,15 +34,16 @@ export const FOOTNOTE = 'px-1 text-[13px] leading-[1.4] text-muted';
 export const NOTICE = 'rounded-[14px] bg-card2 p-3';
 
 /**
- * A centred dialog's scrim, with no stacking layer of its own. The vertical
- * padding clears the notch and home indicator, which `viewport-fit=cover` lets
- * the page draw under. A dialog that opens over another overlay adds its own
+ * A centred dialog's scrim, with no stacking layer of its own. The padding
+ * clears every safe-area inset, which `viewport-fit=cover` lets the page draw
+ * under: the notch and home indicator, and on the iPhone Duo the side column,
+ * whose status capsule would otherwise sit over the panel. A dialog that opens over another overlay adds its own
  * z utility to this; the rest use `DIALOG_BACKDROP`. Appending a second z to
  * `DIALOG_BACKDROP` would not work: Tailwind resolves two z utilities in one
  * class list by their order in the CSS, not in the string.
  */
 export const DIALOG_SCRIM =
-  'fixed inset-0 flex items-center justify-center bg-black/50 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]';
+  'fixed inset-0 flex items-center justify-center bg-black/50 pt-[calc(1rem+env(safe-area-inset-top))] pr-[calc(1rem+env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))]';
 export const DIALOG_BACKDROP = `${DIALOG_SCRIM} z-50`;
 
 /**
