@@ -3626,7 +3626,8 @@ origin: bmad-project-context refresh, 2026-11-02
 location: scripts/ci-local.sh:50; .github/workflows/test.yml:208-209
 severity: low
 reason: CI runs `deno test --no-lock` on both `supabase/functions/upload-love-note-image/` and `supabase/functions/send-push/` (the second added with 08e8b562), but `scripts/ci-local.sh` still runs only the first, so a local CI pass says nothing about send-push. AGENTS.md's Deno line states the gap until it is fixed; drop that clause in the same change. Triage 2026-11-04: still present (`scripts/ci-local.sh:50-51`); send-push's 89 tests pass run the CI way, with no env or `--allow-*` flags. Outside the loop: one sitting adds send-push to ci-local and drops the `AGENTS.md:42` clause together, since a loop review would refile the AGENTS.md half.
-status: open
+status: done 2026-11-04
+resolution: `scripts/ci-local.sh` now runs `deno test --no-lock supabase/functions/send-push/` after the upload-handler tests, as `test.yml` does (89 passed), and AGENTS.md's Deno line no longer says `test:ci-local` runs only the first.
 decision: 2026-11-04 outside-the-loop — done in the owner's docs sitting together with the AGENTS.md:42 clause.
 
 ### DW-418: Enforce the eslint-disable reason rule with a lint rule.
