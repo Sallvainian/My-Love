@@ -19,19 +19,15 @@ export type ApiKeyKind = 'publishable' | 'secret';
 
 export type ApiKey = { key: string; source: 'new' | 'legacy' };
 
-const NEW_VARIABLE: Record<ApiKeyKind, string> = {
-  publishable: 'SUPABASE_PUBLISHABLE_KEYS',
-  secret: 'SUPABASE_SECRET_KEYS',
-};
-
-const LEGACY_VARIABLE: Record<ApiKeyKind, string> = {
-  publishable: 'SUPABASE_ANON_KEY',
-  secret: 'SUPABASE_SERVICE_ROLE_KEY',
-};
+/** The runtime variable holding the new keys, and the legacy variable it replaces. */
+function variablesFor(kind: ApiKeyKind): { name: string; legacyName: string } {
+  return kind === 'publishable'
+    ? { name: 'SUPABASE_PUBLISHABLE_KEYS', legacyName: 'SUPABASE_ANON_KEY' }
+    : { name: 'SUPABASE_SECRET_KEYS', legacyName: 'SUPABASE_SERVICE_ROLE_KEY' };
+}
 
 export function apiKeyFromEnv(kind: ApiKeyKind, get: (name: string) => string | undefined): ApiKey {
-  const name = NEW_VARIABLE[kind];
-  const legacyName = LEGACY_VARIABLE[kind];
+  const { name, legacyName } = variablesFor(kind);
   const keys = get(name)?.trim();
   if (keys) {
     try {
