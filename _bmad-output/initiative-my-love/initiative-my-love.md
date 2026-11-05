@@ -33,12 +33,13 @@ Each partner has a reason to open the app every day, an open loop from the other
 - R11 (Decided: Partner page): the Partner page holds the streak and the past questions in place of the partner's mood card and recent-moods list; each past day is marked Same or Different with a running count ("Same pick on 9 of your 13 days").
 - R12 (Mock-up assumptions; Consequences): the Mood dock tab becomes Daily and the dock keeps five destinations.
 - R13 (Mock-up assumptions): the waiting screen has a Nudge button that sends the partner a push.
-- R14 (Mock-up assumptions): pushes arrive for a new question at 8 AM, the partner picked, the partner nudged you, an 8 PM reminder when nobody has answered, and both answered, in the pattern "Jessie answered - answer to see it and keep your 14-day streak".
+- R14 (Mock-up assumptions; owner 2026-11-05): pushes arrive for a new question at 8 AM, the partner picked, the partner nudged you, an 8 PM reminder when nobody has answered, and both answered, each timed on the recipient's own clock, with the copy on the mock-up's notifications screen.
 - R15 (Decided: The daily question; Consequences): the whole mood system is gone (the check-in with its 12 moods, note, Timeline and Calendar; the partner mood card and recent-moods list; mood realtime and mood notifications) and every stored mood is deleted, on the server and in each device's offline copies; met when no mood UI, mood row or device mood copy remains.
 - R16 (Decided: Partner page; Consequences): Poke, Kiss and Fart are gone with their interaction history, on the server and on devices.
-- R17 (owner 2026-11-05): a pick made offline is kept on the device and sent the moment a connection returns; the reveal shows only once the server has it; met when a pick made in airplane mode reaches the server on reconnect without a second tap.
+- R17 (owner 2026-11-05): a pick made offline is kept on the device with the time it was made and sent the moment a connection returns; it counts for the date it was made even when it reaches the server after that day's midnight, and the streak is corrected when it lands; the reveal shows only once the server has it; met when a pick made offline at 11:50 PM and sent at 12:10 AM counts for the earlier date.
 - R18 (owner 2026-11-05): an account with no linked partner sees an invitation to link on the Daily page and no question.
 - R19 (owner 2026-11-05): each new push kind has its own Settings switch, and the mood, poke and kiss switches are gone.
+- R20 (owner 2026-11-05): each partner's day runs on their own phone's local clock; the couple's day for a date counts when each partner picked during that date on their own clock, so it closes only when the later partner's midnight passes; met when partners an hour apart each pick at 11:30 PM local and the day counts.
 
 ## Constraints
 
@@ -68,12 +69,10 @@ Each partner has a reason to open the app every day, an open loop from the other
 
 ## Notes
 
-- Assumption: the calls under the source's Mock-up assumptions that the owner has not confirmed are the coach's: R3's two-option form, R4's pool size, no-repeat rule and partner questions joining it, R8's timing, R12 and R14.
+- Assumption: the calls under the source's Mock-up assumptions that the owner has not confirmed are the coach's: R3's two-option form, R4's pool size, no-repeat rule and partner questions joining it, R8's timing and R12.
 - Assumption: the pushes in R13 and R14 reach the iOS shell only, as every existing push does (epic-push-notifications); the web app gets none.
 - Assumption: a question a partner writes joins only that couple's pool, never another couple's.
-- Open question: whose day? When the partners' devices sit in different time zones, which clock starts the day, the 8 AM question and the 8 PM reminder (the mock-up says the streak goes cold at midnight)? The streak and notification work wait on it.
-- Open question: does a pick queued offline before midnight that reaches the server after the day ended count for its day?
-- Open question: the owner has not yet confirmed each push kind in R14.
+- Assumption: the phone's clock is trusted for a pick's time (R17); changing the phone's clock to rescue a streak is not guarded against.
 - Open question: the rest of the product (photos, love notes, dates, settings, messages) has no PRD; `bmad-prd` supplies one when the owner decides.
 - Decision: 2026-10-28 epic-test-review-remediation reopened with stories 10–12. Its 2026-10-03 re-reviews still report findings, and its Done when now requires the 2026-10-03 rows fixed and no Critical or High on fresh folder re-reviews, instead of zero findings, because the reviewer varies between runs.
 - Decision: 2026-10-30 epic 2 retitled "iPhone Duo Side-Column Dock" and its description rewritten: the owner's Duo shows the shell drawing web content into the side column, so the native tab bar was dropped for the app's own HTML dock in the column (see the epic's Notes). Its folder slug stays `epic-iphone-duo-native-tab-bar`.
@@ -83,3 +82,4 @@ Each partner has a reason to open the app every day, an open loop from the other
 - Decision: 2026-11-02 epic 5, epic-settings-rework, added from the Settings UX run (`ux-settings-page/`), DW-399 and DW-416, as one epic (see its Notes).
 - Decision: 2026-11-05 the owner chose to put the daily question work from the brainstorm into this initiative as new epics, not a separate initiative, because it is part of My-Love; bmad-loop also reads one active initiative, and the work rewrites pages existing epics built.
 - Decision: 2026-11-05 the owner confirmed a day counts only when both partners pick (R5), kept the Nudge button (R13), set milestones on the held total (R9), wants an offline pick sent on reconnect (R17), and took the PO's picks for two written questions (R3), no linked partner (R18) and push switches (R19).
+- Decision: 2026-11-05 the owner ruled out one couple time zone, since the partners are sometimes an hour apart and a streak must not end at 11 PM for one of them: each partner's day runs on their own clock (R20). The owner kept all five pushes (R14) and wants an offline pick to carry the time it was made, so it counts for that date (R17).
