@@ -1,8 +1,9 @@
 /**
  * The kit dialog pieces, as the centred dialogs render them.
  *
- * The scrim pads clear of the notch and home indicator (`viewport-fit=cover`
- * lets the page draw under both), and the panel is capped at the scrim's
+ * The scrim pads clear of every safe-area inset (`viewport-fit=cover` lets the
+ * page draw under them): the notch, the home indicator and, on the iPhone Duo,
+ * the side column with its status capsule; and the panel is capped at the scrim's
  * padded height and scrolls, so no dialog runs off a short screen with its
  * buttons out of reach. A dialog that opens over another overlay (the note
  * removal over the chat) keeps its own layer: a second z utility in the same
@@ -46,6 +47,8 @@ import { DIALOG_BACKDROP, DIALOG_PANEL } from '../kitClasses';
 
 const SAFE_TOP = 'pt-[calc(1rem+env(safe-area-inset-top))]';
 const SAFE_BOTTOM = 'pb-[calc(1rem+env(safe-area-inset-bottom))]';
+const SAFE_LEFT = 'pl-[calc(1rem+env(safe-area-inset-left))]';
+const SAFE_RIGHT = 'pr-[calc(1rem+env(safe-area-inset-right))]';
 
 const note: LoveNote = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -60,10 +63,11 @@ function zClasses(element: HTMLElement): string[] {
   return [...element.classList].filter((name) => /^z-/.test(name));
 }
 
-/** The scrim contract: safe-area padding and no plain all-round `p-4`. */
+/** The scrim contract: safe-area padding on all four sides, and no plain `p-4` or `px-4`. */
 function expectSafeScrim(scrim: HTMLElement) {
-  expect(scrim).toHaveClass('fixed', 'inset-0', 'bg-black/50', 'px-4', SAFE_TOP, SAFE_BOTTOM);
+  expect(scrim).toHaveClass('fixed', 'inset-0', 'bg-black/50', SAFE_TOP, SAFE_BOTTOM, SAFE_LEFT, SAFE_RIGHT);
   expect(scrim).not.toHaveClass('p-4');
+  expect(scrim).not.toHaveClass('px-4');
 }
 
 beforeEach(() => {
@@ -77,8 +81,9 @@ afterEach(() => {
 describe('kit dialog class strings', () => {
   it('pads the default scrim clear of the safe areas, on the default layer', () => {
     const classes = DIALOG_BACKDROP.split(' ');
-    expect(classes).toEqual(expect.arrayContaining([SAFE_TOP, SAFE_BOTTOM, 'px-4', 'z-50']));
+    expect(classes).toEqual(expect.arrayContaining([SAFE_TOP, SAFE_BOTTOM, SAFE_LEFT, SAFE_RIGHT, 'z-50']));
     expect(classes).not.toContain('p-4');
+    expect(classes).not.toContain('px-4');
   });
 
   it('caps the panel at the scrim height and lets it scroll', () => {
