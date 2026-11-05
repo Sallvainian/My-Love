@@ -38,16 +38,13 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { couplePair, coupleSettingsService } from '../../../src/services/coupleSettingsService';
+import { setOnline } from '../stores/navigatorFixtures';
 
 const LOW = '00000000-0000-4000-8000-000000000001';
 const HIGH = '00000000-0000-4000-8000-000000000002';
 
 /** A stored couple_settings row, addressed by the ordered pair. */
 const settingsRow = (overrides: Record<string, unknown> = {}) => ({ user_a: LOW, user_b: HIGH, ...overrides });
-
-function setOnline(online: boolean) {
-  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
-}
 
 function argsOf(method: string, index = 0) {
   return calls[index].chain.filter(([name]) => name === method).map(([, args]) => args);

@@ -45,6 +45,7 @@ import {
   type EventsSlice,
   type NewEventInput,
 } from '../../../src/stores/slices/eventsSlice';
+import { setOnline } from './navigatorFixtures';
 
 const USER_A = 'USER-A-ID';
 const USER_B = 'USER-B-ID';
@@ -120,10 +121,6 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
-}
-
-function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
 /**

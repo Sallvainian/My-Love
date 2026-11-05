@@ -30,6 +30,7 @@ import {
 import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { serialized } from './serializedState';
+import { setOnline } from './navigatorFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -54,10 +55,6 @@ function deferred<T>() {
     settle = resolve;
   });
   return { promise, settle };
-}
-
-function setOnline(value: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
 async function clearCopies(): Promise<void> {

@@ -60,10 +60,7 @@ import {
   isDisplayNameLength,
   profileService,
 } from '../../../src/services/profileService';
-
-function setOnline(online: boolean) {
-  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
-}
+import { setOnline } from '../stores/navigatorFixtures';
 
 function argsOf(method: string, index = 0) {
   return calls[index].chain.filter(([name]) => name === method).map(([, args]) => args);

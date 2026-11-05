@@ -1,7 +1,9 @@
 /**
  * `navigator` stubs shared by unit tests: what the browser says about the
  * connection. Free of imports, so a service test can use them without loading
- * the store. `accountDataFixtures.ts` re-exports `setOnline`.
+ * the store. `accountDataFixtures.ts` and `services/fakeEventsBackend.ts`
+ * re-export `setOnline`. The stub is an own property that `restoreMocks` does
+ * not undo, so a file that sets it offline resets it in `beforeEach`.
  */
 
 /** Sets `navigator.onLine`. */

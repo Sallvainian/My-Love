@@ -28,15 +28,12 @@ import { AccountDataError } from '../../../src/services/accountDataError';
 import { deleteAccountCopies } from '../../../src/services/localCopy';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesService';
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { setOnline } from './navigatorFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
 
 const NOTES_OFF = { ...ALL_PUSH_PREFERENCES_ON, loveNotes: false };
-
-function setOnline(value: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
-}
 
 function state() {
   return useAppStore.getState();
