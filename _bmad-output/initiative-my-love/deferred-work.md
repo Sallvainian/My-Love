@@ -3938,7 +3938,8 @@ location: scripts/sim-driver/sim (the `swipe` command takes only `back`); Runner
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: `sim swipe back` compares the page text after the pan, so it checks where a swipe lands, not what it shows. Two of story 5.15's later bugs were in the picture: WebKit's dark or white page three levels deep (`e1ba2117`), and the Add a date chooser still in the picture (`a9906618`). An agent caught the second only with an ad hoc halfway-hold probe that never entered the driver. Fix: a swipe step that stops halfway and takes a screenshot (for example `sim swipe back --hold PATH`), documented in the README. Triage 2026-11-04: confirmed (`sim:1196-1198` and `Drive.swift:59` accept only `back`; the pan holds 0 s at `Drive.swift:75`). The loop has driven the simulator before (run 20261102-215408-6a69, story 5.15); checking that the screenshot shows the page mid-slide needs the Mac unlocked, Device Hub open and `supabase start`.
-status: open
+status: done 2026-11-04
+resolution: added `sim swipe back --hold PATH`: the runner's new `swipe back hold` step pans from the left edge to the web view's middle and holds 3 s, printing "holding" (now flushed) before the press, and the shell saves the active display to PATH 1.2 s into the hold, repeating up to 8 tries until that picture differs from one taken just before the pan; `sim help` and the README describe it. Checked on the Duo simulator on 2026-11-04 from a Settings event page with the capsule on the left: try 1 held, and the picture shows the Dates list sliding in beside the event page.
 
 ### DW-451: The Settings Touch Floor and design-token measurement of 2026-11-04 was done once by hand and kept as no test.
 origin: epic-settings-rework retrospective (P2), 2026-11-04

@@ -105,6 +105,12 @@ Page (points from the web view's top-left):
                          changes, up to 8 tries (one pan in about four
                          registers); prints the try that worked, and fails
                          when the page never changes.
+  swipe back --hold PATH Pan from the left edge to the middle, hold it there
+                         and save a PNG of the active display to PATH while
+                         it is held, to see what slides in. Repeats until the
+                         held screen differs from one taken just before the
+                         pan, up to 8 tries; then says whether the page went
+                         back or stayed after the release.
   dump                   One JSON line: the web view's frame and its elements.
   readout                The readout's lines.
 
@@ -413,6 +419,51 @@ drive() {
   local code=0
   start_step Drive "$*" || code=$?
   finish_step Drive $1 $code
+}
+
+# swipe back --hold PATH: the runner holds a pan at the middle for 3 s and
+# prints "holding" before it presses; the screenshot is taken 1.2 s later,
+# inside the hold. Only the picture shows whether a held pan registered (one
+# in about four does), so a try whose picture matches the one taken just
+# before the pan goes again. A clock tick in the status bar between the two
+# would pass a try that never moved; the picture itself shows that.
+cmd_swipe_hold() {
+  local out=$1 log=$WORK/logs/drive.log before=$WORK/logs/swipe-before.png
+  local try code tries
+  require_booted
+  ensure_runner
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 143' TERM
+  for try in {1..8}; do
+    cmd_screenshot $before
+    code=0 tries=0
+    BG=1 start_step Drive "swipe back hold"
+    until grep -q '^DRIVE holding' $log; do
+      if ! kill -0 $STEP_PID 2>/dev/null; then
+        wait $STEP_PID || code=$?
+        STEP_PID=
+        finish_step Drive swipe $(( code ? code : 1 ))
+      fi
+      if (( ++tries > 240 )); then
+        kill $STEP_PID 2>/dev/null
+        wait $STEP_PID || true
+        die 1 "the held swipe never started (log: $log)"
+      fi
+      sleep 0.25
+    done
+    sleep 1.2
+    cmd_screenshot $out
+    wait $STEP_PID || code=$?
+    STEP_PID=
+    (( code == 0 )) || finish_step Drive swipe $code
+    if ! cmp -s $before $out; then
+      finish_step Drive swipe 0
+      say "held halfway on try $try: saved $out"
+      return 0
+    fi
+  done
+  rm -f $out
+  die 1 "the screen never moved in 8 held pans: no pan registered, or nothing to go back to"
 }
 
 # ---- stage and build ---------------------------------------------------------
@@ -1197,8 +1248,12 @@ case $cmd in
     [[ ${1:-} == (up|down) ]] || die 2 "scroll takes up or down"
     drive scroll $1 ;;
   swipe)
-    [[ $# == 1 && $1 == back ]] || die 2 "swipe takes back"
-    drive swipe $1 ;;
+    if [[ $# == 3 && $1 == back && $2 == --hold ]]; then
+      cmd_swipe_hold $3
+    else
+      [[ $# == 1 && $1 == back ]] || die 2 "swipe takes back [--hold PATH]"
+      drive swipe $1
+    fi ;;
   dump) drive dump ;;
   readout) cmd_readout ;;
   background) require_window; ax control Home --device $UDID >/dev/null; say "pressed Home" ;;
