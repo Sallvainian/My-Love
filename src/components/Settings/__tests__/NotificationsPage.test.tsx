@@ -65,6 +65,7 @@ import { PUSH_PREFERENCES_COPY_KIND } from '../../../stores/slices/notifications
 import { useAppStore } from '../../../stores/useAppStore';
 import { NotificationsPage, NotificationsRow } from '../NotificationsPage';
 import { notificationsSummary, resetPushPermissionForTests } from '../notificationsStatus';
+import { setOnline } from '../../../../tests/unit/stores/accountDataFixtures';
 
 const ROWS = [
   ['settings-push-love-notes', 'Love notes', 'loveNotes'],
@@ -79,10 +80,6 @@ const REMINDERS_OFF = { ...ALL_PUSH_PREFERENCES_ON, dateReminders: false };
 const REMINDERS_FOOTNOTE = 'At 9:00 the day before, and on the day for birthdays and anniversaries.';
 
 const DENIED_NOTICE = 'Notifications are off for My Love. Turn them on in iOS Settings.';
-
-function setOnline(value: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
-}
 
 function setVisibility(state: 'visible' | 'hidden'): void {
   Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });

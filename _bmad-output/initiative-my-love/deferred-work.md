@@ -3984,7 +3984,8 @@ location: src/components/Settings/__tests__/ (`renderAt` in 4 files, `setConnect
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: `setOnline` is reimplemented in `NotificationsPage.test.tsx` and `Settings.profile.test.tsx` though `tests/unit/stores/accountDataFixtures.ts` exports it, which breaks AGENTS.md's shared-helper rule (the retro's fix-now item, never done); `renderAt` is identical in 4 test files, `setConnection` in 5 and `makeEvent` in 2. Fix: a shared Settings test kit (a `__tests__/*Kit.ts(x)` file) for `renderAt`, `setConnection` and `makeEvent`, and `setOnline` imported from `accountDataFixtures.ts`. Split from DW-447 at triage.
-status: open
+status: done 2026-11-04
+resolution: a new kit, `src/components/Settings/__tests__/settingsPageKit.tsx`, holds `renderAt` (from the 4 page test files), `makeEvent` and `daysFromToday` (the two `makeEvent` copies now keep only their file's defaults); `setConnection` moved beside `setOnline` into a new import-free `tests/unit/stores/navigatorFixtures.ts` (re-exported `setOnline` from accountDataFixtures.ts), and all five `setConnection` copies (2 in Settings, PhotoGridItem.recovery, photoDownloadPreference and photoImageCache) and the two Settings `setOnline` copies import it. The 14 `setOnline` copies outside Settings are filed as DW-459.
 
 ### DW-456: The birthday and Linked since dates do not use the mock's format.
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
@@ -4013,3 +4014,10 @@ severity: low
 reason: tests/e2e/partner/partner-mood.spec.ts:46-48 says loadPartner makes 2 sequential GET /rest/v1/users calls and names the second select=id,email,display_name; getPartner also reads partner_requests (src/api/partnerService.ts:151-160) and the second users read selects id, email, display_name, birthday (src/api/partnerService.ts:137). Predates this change.
 status: done 2026-11-04
 resolution: the comment now lists getPartner's three reads: the `partner_id` read, the partner's row with `id,email,display_name,birthday`, and the accepted `partner_requests` read for Linked since, which the spec leaves to the local stack.
+
+### DW-459: Fourteen unit test files outside Settings still define their own `setOnline`.
+origin: DW-455 fix (chore/resolve-open-dw), 2026-11-04
+location: tests/unit/stores/ (interactionsSlice.localCopy, eventsSlice.localCopy, photosSlice.localCopy, birthdaysWedding, coupleSettings, partnerSlice.localCopy, pushPreferences); tests/unit/hooks/usePhotoImage.test.ts; tests/unit/api/interactionService.test.ts; tests/unit/services/ (pushPreferencesService, photoImageCache, accountDataApis, profileService, coupleSettingsService); tests/unit/stores/navigatorFixtures.ts
+severity: low
+reason: DW-455 moved the `navigator` stubs into `tests/unit/stores/navigatorFixtures.ts` (`setOnline`, `setConnection`) and switched the Settings tests and every `setConnection` copy to it, but these 14 files each keep a local `setOnline`, against AGENTS.md's shared-helper rule. They are not all the same stub: some set `navigator.onLine` with `Object.defineProperty`, some with `vi.spyOn(navigator, 'onLine', 'get')`, so a switch must check each file's teardown. `notesSliceQueueFixture.ts` and `fakeEventsBackend.ts` export their own `setOnline` for their suites. Fix: import `setOnline` from `navigatorFixtures.ts` wherever the stub is the `defineProperty` form, and give the spy form one shared helper too if more than one file needs it.
+status: open

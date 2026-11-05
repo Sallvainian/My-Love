@@ -11,10 +11,9 @@
  * way the real ones do, so a case is about the page. Capacitor is mocked on
  * for the Remind me cases and off for the rest.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
-import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartnerInfo } from '../../../api/partnerService';
 import type { AnniversaryInput } from '../../../services/anniversariesService';
@@ -58,7 +57,7 @@ import { deferred, setOnline } from '../../../../tests/unit/stores/accountDataFi
 import { offlineMessage } from '../../../services/accountDataError';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../services/pushPreferencesService';
 import { useAppStore } from '../../../stores/useAppStore';
-import { Settings } from '../Settings';
+import { renderAt } from './settingsPageKit';
 import { yearlyValue } from '../settingsFields';
 import { onPopState } from './settingsStackKit';
 
@@ -110,13 +109,6 @@ function setAnniversaries(anniversaries: Anniversary[]) {
 }
 
 const storedAnniversaries = () => useAppStore.getState().settings?.relationship.anniversaries ?? [];
-
-/** A fresh load at `/settings/<path>`: no history state, so a page goes up by replacing it. */
-function renderAt(path: string, strict = false) {
-  window.history.replaceState(null, '', `/settings/${path}`);
-  useAppStore.setState({ settingsPath: path, settingsPushedPath: null });
-  render(strict ? <StrictMode><Settings /></StrictMode> : <Settings />);
-}
 
 /** Opens `/settings/dates` and taps the anniversary's row, so the page is pushed in the mounted stack. */
 async function openFromDates(user: UserEvent, key = 'srv-1') {
