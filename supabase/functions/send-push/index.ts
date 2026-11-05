@@ -13,13 +13,16 @@
  * Secrets (never in source): APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, and
  * optionally APNS_TOPIC (default dev.sallvain.mylove). With any of the first
  * three missing the function records the requests instead of sending them.
- * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by the runtime.
+ * SUPABASE_URL and the privileged key are injected by the runtime: the secret
+ * key from SUPABASE_SECRET_KEYS, else the legacy SUPABASE_SERVICE_ROLE_KEY
+ * (see _shared/apiKeys.ts).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.118.0?deps=iceberg-js@0.8.1';
 
 import { apnsConfigFromEnv, createApnsClient } from './apns.ts';
 import { handleSendPush, type PushDb, type PushKind } from './handler.ts';
+import { apiKeyFromEnv } from '../_shared/apiKeys.ts';
 
 /** The `push_requests` column that holds each kind's source row id. */
 const SOURCE_COLUMN: Record<PushKind, string> = {
@@ -31,7 +34,9 @@ const SOURCE_COLUMN: Record<PushKind, string> = {
   partner_accept: 'partner_accept_id',
 };
 
-const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+const secretKey = apiKeyFromEnv('secret', (name) => Deno.env.get(name)).key;
+
+const admin = createClient(Deno.env.get('SUPABASE_URL')!, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
