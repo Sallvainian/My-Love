@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Update Screens</title>
+<style>
+/*
+  Key screens for ux-live-update-prompt. Governing spine sections:
+  DESIGN.md -> Layout & Spacing, Elevation & Depth, Components;
+  EXPERIENCE.md -> Component Patterns, State Patterns, Key Flows 1-2,
+  Responsive & Platform. The spines win on any conflict with this mock.
+  Frames: 1 download toast (bottom dock), 2 ready toast + bell dot
+  (bottom dock), 3 drop-down with the Update now entry (Duo, right column),
+  4 empty drop-down (dark), 5 confirm dialog.
+*/
+:root{
+  --page:#FDF4F7;--card:#FFFFFF;--ink:#1F2430;--muted:#646B78;--accent:#C8216B;
+  --fill:#DB2777;--tint:#FCE7F3;--danger:#CF2121;--dtint:#FDECEC;--good:#15803D;
+  --line:rgba(157,23,77,.09);--glass:rgba(255,255,255,.8);
+  --float:0 10px 30px rgba(157,23,77,.16);
+}
+.dark{
+  --page:#0B0E14;--card:#141925;--ink:#F3F4F6;--muted:#9AA3B2;--accent:#F472B6;
+  --fill:#DB2777;--tint:rgba(244,114,182,.14);--danger:#F87171;--dtint:rgba(248,113,113,.12);
+  --good:#4ADE80;--line:rgba(255,255,255,.07);--glass:rgba(17,21,30,.78);
+  --float:0 10px 30px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:Inter,-apple-system,"SF Pro Text",system-ui,sans-serif;background:#ece6ea;color:#1F2430;padding:24px 16px}
+h1{font-size:20px;margin-bottom:4px}
+.lede{font-size:14px;color:#555;margin-bottom:24px;max-width:70ch}
+.frames{display:flex;flex-wrap:wrap;gap:28px}
+figure{display:flex;flex-direction:column;gap:8px}
+figcaption{font-size:13px;color:#444;max-width:300px}
+.phone{position:relative;width:300px;height:620px;border-radius:40px;overflow:hidden;background:var(--page);color:var(--ink);border:8px solid #1b1b1f}
+.phone.wide{width:560px;height:340px}
+.status{height:34px}
+.header{position:relative;display:flex;align-items:center;height:56px;padding:0 10px;background:var(--glass);border-bottom:1px solid var(--line)}
+.slot{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--muted);position:relative;flex:none}
+.slot svg{width:20px;height:20px}
+.word{flex:1;text-align:center;font-family:Lora,Georgia,serif;font-style:italic;font-weight:600;font-size:18px}
+.word span{color:var(--accent)}
+.dot{position:absolute;top:10px;right:11px;width:10px;height:10px;border-radius:50%;background:var(--fill);box-shadow:0 0 0 2px var(--glass)}
+.content{padding:16px}
+.card{background:var(--card);border-radius:20px;padding:14px;margin-bottom:12px;border:1px solid var(--line)}
+.ghost{height:10px;border-radius:5px;background:var(--line);margin:8px 0}
+.dock{position:absolute;left:16px;right:16px;bottom:20px;height:60px;border-radius:30px;background:var(--glass);box-shadow:var(--float);display:flex;align-items:center;justify-content:space-around;border:1px solid var(--line)}
+.dock i{width:22px;height:22px;border-radius:6px;background:var(--muted);opacity:.5}
+.dock i.on{background:var(--accent);opacity:1;width:64px;border-radius:14px}
+.column{position:absolute;right:22px;bottom:20px;width:40px;border-radius:20px;background:var(--glass);box-shadow:var(--float);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 0}
+.column i{width:20px;height:20px;border-radius:6px;background:var(--muted);opacity:.5}
+.column i.on{background:var(--accent);opacity:1}
+.toast{position:absolute;left:16px;right:16px;bottom:92px;max-width:384px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--float);font-size:14px;font-weight:500}
+.toast .row{display:flex;align-items:center;gap:12px}
+.toast svg{width:20px;height:20px;flex:none}
+.pct{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.track{height:6px;border-radius:3px;background:var(--tint);margin-top:8px;overflow:hidden}
+.bar{height:100%;width:62%;background:var(--fill);border-radius:3px}
+.list{position:absolute;top:94px;left:10px;width:300px;max-width:calc(100% - 20px);background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--float);padding:8px;z-index:3}
+.label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px 8px}
+.entry{display:flex;gap:12px;align-items:center;min-height:44px;padding:6px 8px;border-radius:12px}
+.tile{width:36px;height:36px;border-radius:12px;background:var(--tint);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
+.tile svg{width:18px;height:18px}
+.et{font-size:15px;font-weight:600}
+.el{font-size:13px;line-height:1.4;color:var(--muted)}
+.empty{min-height:44px;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted)}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+.dialog{width:100%;max-width:384px;background:var(--card);border-radius:20px;box-shadow:var(--float);padding:20px}
+.dialog h2{font-size:18px;font-weight:600}
+.dialog p{font-size:15px;line-height:1.45;color:var(--muted);margin-top:8px}
+.pills{display:flex;gap:12px;margin-top:16px}
+.pill{flex:1;height:48px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600}
+.no{background:var(--tint);color:var(--accent)}
+.yes{background:var(--dtint);color:var(--danger)}
+.wide .content{padding-right:96px}
+.wide .header{padding-right:94px}
+.wide .toast{bottom:16px;right:100px}
+</style>
+</head>
+<body>
+<h1>Live update prompt: key screens</h1>
+<p class="lede">These frames illustrate DESIGN.md and EXPERIENCE.md, and the spines win on any conflict. The phone frames are scaled down, and the spacing follows the spine tokens.</p>
+
+<div class="frames">
+
+<figure>
+<div class="phone">
+  <div class="status"></div>
+  <div class="header">
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+    <div class="word"><span>&#9829;</span> My Love</div>
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></div>
+  </div>
+  <div class="content"><div class="card"><div class="ghost"></div><div class="ghost" style="width:70%"></div></div><div class="card"><div class="ghost"></div><div class="ghost" style="width:50%"></div></div></div>
+  <div class="toast" style="padding:12px 16px">
+    <div class="row">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+      <span>Downloading update…</span><span class="pct">62%</span>
+    </div>
+    <div class="track"><div class="bar"></div></div>
+  </div>
+  <div class="dock"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+</div>
+<figcaption><b>1. Download toast</b>, bottom dock. The toast sits 12px above the dock's top edge (<code>--dock-top</code>) and has no X. The bell at top-left has no dot yet.</figcaption>
+</figure>
+
+<figure>
+<div class="phone">
+  <div class="status"></div>
+  <div class="header">
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot"></span></div>
+    <div class="word"><span>&#9829;</span> My Love</div>
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></div>
+  </div>
+  <div class="content"><div class="card"><div class="ghost"></div><div class="ghost" style="width:70%"></div></div><div class="card"><div class="ghost"></div><div class="ghost" style="width:50%"></div></div></div>
+  <div class="toast" style="padding:0 16px;min-height:44px;display:flex;align-items:center">
+    <div class="row">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 0 0-15-6.7L3 8M3 3v5h5M3 12a9 9 0 0 0 15 6.7l3-2.7M21 21v-5h-5"/></svg>
+      <span>Update ready — tap to restart</span>
+    </div>
+  </div>
+  <div class="dock"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+</div>
+<figcaption><b>2. Ready toast</b>, in the download toast's place. The whole toast is the tap target. It hides after 6 s, and the bell's dot stays.</figcaption>
+</figure>
+
+<figure>
+<div class="phone wide">
+  <div class="status" style="height:18px"></div>
+  <div class="header">
+    <div class="slot" style="color:var(--ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot"></span></div>
+    <div class="word"><span>&#9829;</span> My Love</div>
+    <div class="slot"></div>
+  </div>
+  <div class="list" style="top:78px">
+    <div class="label">Notifications</div>
+    <div class="entry">
+      <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 0 0-15-6.7L3 8M3 3v5h5M3 12a9 9 0 0 0 15 6.7l3-2.7M21 21v-5h-5"/></svg></div>
+      <div><div class="et">Update now</div><div class="el">A new version of My Love is ready.</div></div>
+    </div>
+  </div>
+  <div class="content"><div class="card"><div class="ghost"></div><div class="ghost" style="width:70%"></div></div></div>
+  <div class="column" style="right:22px"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+</div>
+<figcaption><b>3. Drop-down, one entry</b>, on a Duo in landscape with the right column. The bell is at top-left, and the gear-sized spacer sits on the right. The list hangs 4px below the header, with no scrim. The dot stays while the list is open.</figcaption>
+</figure>
+
+<figure>
+<div class="phone dark">
+  <div class="status"></div>
+  <div class="header">
+    <div class="slot" style="color:var(--ink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+    <div class="word"><span>&#9829;</span> My Love</div>
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></div>
+  </div>
+  <div class="list">
+    <div class="label">Notifications</div>
+    <div class="empty">No notifications</div>
+  </div>
+  <div class="content"><div class="card"><div class="ghost"></div><div class="ghost" style="width:70%"></div></div><div class="card"><div class="ghost"></div></div></div>
+  <div class="dock"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+</div>
+<figcaption><b>4. Empty drop-down</b>, in dark mode. Nothing is waiting, so the bell has no dot.</figcaption>
+</figure>
+
+<figure>
+<div class="phone">
+  <div class="status"></div>
+  <div class="header">
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot"></span></div>
+    <div class="word"><span>&#9829;</span> My Love</div>
+    <div class="slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></div>
+  </div>
+  <div class="content"><div class="card"><div class="ghost"></div><div class="ghost" style="width:70%"></div></div></div>
+  <div class="dock"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+  <div class="scrim">
+    <div class="dialog">
+      <h2>Update now?</h2>
+      <p>You may lose what you're doing.</p>
+      <div class="pills"><div class="pill no">No</div><div class="pill yes">Yes</div></div>
+    </div>
+  </div>
+</div>
+<figcaption><b>5. Confirm dialog</b>: the kit dialog, with No as the tint secondary pill and Yes as the destructive pill. The toast and the drop-down are already gone.</figcaption>
+</figure>
+
+</div>
+</body>
+</html>
