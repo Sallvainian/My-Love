@@ -4004,4 +4004,5 @@ location: tests/e2e/partner/partner-mood.spec.ts:46
 source_spec: `plan-dw-partner-lookup-drop-updated-at.md`
 severity: low
 reason: tests/e2e/partner/partner-mood.spec.ts:46-48 says loadPartner makes 2 sequential GET /rest/v1/users calls and names the second select=id,email,display_name; getPartner also reads partner_requests (src/api/partnerService.ts:151-160) and the second users read selects id, email, display_name, birthday (src/api/partnerService.ts:137). Predates this change.
-status: open
+status: done 2026-11-04
+resolution: the comment now lists getPartner's three reads: the `partner_id` read, the partner's row with `id,email,display_name,birthday`, and the accepted `partner_requests` read for Linked since, which the spec leaves to the local stack.
