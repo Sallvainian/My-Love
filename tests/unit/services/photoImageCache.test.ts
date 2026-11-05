@@ -69,7 +69,7 @@ import {
   type PhotoCacheSession,
   type PhotoImageRef,
 } from '../../../src/services/photoImageCache';
-import { setConnection } from '../stores/navigatorFixtures';
+import { setConnection, setOnline } from '../stores/navigatorFixtures';
 
 const A = 'USER-A';
 
@@ -100,10 +100,6 @@ function cached(path: string, userId = A) {
 
 function seed(path: string, userId = A) {
   cache.images.set(`${userId}|${path}`, new Blob([`SEED ${path}`]));
-}
-
-function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
 function deferred<T>() {

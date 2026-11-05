@@ -41,6 +41,7 @@ import {
   pushPreferencesService,
   type PushPreferenceKey,
 } from '../../../src/services/pushPreferencesService';
+import { setOnline } from '../stores/navigatorFixtures';
 
 const ROW = {
   love_notes: false,
@@ -50,10 +51,6 @@ const ROW = {
   partner_requests: true,
   date_reminders: true,
 };
-
-function setOnline(online: boolean) {
-  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
-}
 
 function argsOf(method: string, index = 0) {
   return calls[index].chain.filter(([name]) => name === method).map(([, args]) => args);

@@ -44,6 +44,7 @@ import {
   INTERACTIONS_COPY_KIND,
   type InteractionsSlice,
 } from '../../../src/stores/slices/interactionsSlice';
+import { setOnline } from './navigatorFixtures';
 
 const USER_A = 'USER-A-ID';
 const PARTNER = 'PARTNER-ID';
@@ -107,10 +108,6 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
-}
-
-function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
 /**

@@ -55,6 +55,7 @@ import {
   type PhotosSlice,
 } from '../../../src/stores/slices/photosSlice';
 import { createPhotoRow } from '../../support/factories/photos';
+import { setOnline } from './navigatorFixtures';
 
 const USER_A = 'USER-A-ID';
 const PARTNER = 'PARTNER-ID';
@@ -102,10 +103,6 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
-}
-
-function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
 /**

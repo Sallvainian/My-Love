@@ -144,12 +144,9 @@ vi.mock('@/api/supabaseClient', () => ({
 
 import { InteractionService } from '@/api/interactionService';
 import { isPostgrestError } from '@/api/errorHandlers';
+import { setOnline } from '../stores/navigatorFixtures';
 
 const interactionService = new InteractionService();
-
-function setOnline(online: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
-}
 
 /** The rejection reason, so its message can be compared whole. */
 async function rejection(promise: Promise<unknown>): Promise<Error | null> {
