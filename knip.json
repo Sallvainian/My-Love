@@ -2,6 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "scripts/provision-claude-bot.mjs",
+    "scripts/provision-push-fixtures.mjs",
+    "scripts/sim-driver/dates.ts",
     "scripts/sim-driver/provision.ts",
     "tests/support/harnesses/*.{ts,tsx}"
   ],

@@ -264,7 +264,7 @@ export function isoBirthdayDaysFromNow(dayOffset: number, yearsBack: number, anc
 
 /**
  * A `Date` at LOCAL midnight for a bare `"YYYY-MM-DD"`, ready for
- * `formatDateLong`.
+ * `listDate` or `dayMonth`.
  *
  * Never `new Date(isoDate)`: the date-only string form is ECMA-262's UTC-midnight
  * parse and names the previous day west of UTC — the single bug

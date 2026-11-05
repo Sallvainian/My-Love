@@ -154,17 +154,6 @@ export function formatDateISO(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * Format date for long display (e.g., "January 1, 2024")
- */
-export function formatDateLong(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 // ─── Relative Date (calendar-day) ────────────────────────────────────
 
 const relativeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
