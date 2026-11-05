@@ -37,9 +37,7 @@
  * @component
  */
 
-import { m as motion } from 'motion/react';
 import {
-  useCallback,
   useEffect,
   useId,
   useRef,
@@ -48,7 +46,6 @@ import {
   type ReactNode,
 } from 'react';
 import { isOnline } from '../../api/errorHandlers';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate, type EventIcon } from '../../services/eventsService';
@@ -56,12 +53,11 @@ import type { EventWriteResult } from '../../stores/slices/eventsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import {
   CARD,
-  DIALOG_BACKDROP,
-  DIALOG_PANEL,
   FIELD_LABEL,
   SECONDARY_BUTTON,
 } from '../shared/kitClasses';
 import { DESCRIPTION_MAX_LENGTH, IconPicker, LABEL_MAX_LENGTH, codePoints } from './EventPages';
+import { KitDialog } from './ConfirmDialog';
 import { FIELD_CLASS, NOTE_FIELD_CLASS } from './settingsFields';
 import { SettingsBarAction } from './stack/SettingsBarAction';
 import { useSettingsPage } from './stack/settingsPageContext';
@@ -76,80 +72,49 @@ interface KindChooserProps {
 }
 
 /**
- * The Kind chooser: the kit dialog asking Event or Anniversary. Focus is
- * trapped and starts on Cancel; Escape or a tap on the scrim cancels. Like
- * `ConfirmDialog`, `onCancel` need not be stable, and it renders inside
+ * The Kind chooser: the kit dialog (`KitDialog`) asking Event or Anniversary.
+ * Focus is trapped and starts on Cancel; Escape or a tap on the scrim cancels.
+ * Like `ConfirmDialog`, `onCancel` need not be stable, and it renders inside
  * `AnimatePresence` for the exit.
  */
 export function KindChooser({ onChoose, onCancel }: KindChooserProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
-  const onCancelRef = useRef(onCancel);
-  useEffect(() => {
-    onCancelRef.current = onCancel;
-  }, [onCancel]);
-  const cancel = useCallback(() => onCancelRef.current(), []);
-
-  useFocusTrap(panelRef, true, {
-    onEscape: cancel,
-    initialFocusRef: cancelButtonRef,
-  });
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) cancel();
-  };
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className={DIALOG_BACKDROP}
-      onClick={handleBackdropClick}
-      data-testid="settings-kind-chooser"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Add a date"
+    <KitDialog
+      onCancel={onCancel}
+      initialFocusRef={cancelButtonRef}
+      testId="settings-kind-chooser"
+      label="Add a date"
     >
-      <motion.div
-        ref={panelRef}
-        tabIndex={-1}
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className={`${DIALOG_PANEL} max-w-sm`}
-      >
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => onChoose('event')}
-            className={SECONDARY_BUTTON}
-            data-testid="settings-kind-chooser-event"
-          >
-            Event
-          </button>
-          <button
-            type="button"
-            onClick={() => onChoose('anniversary')}
-            className={SECONDARY_BUTTON}
-            data-testid="settings-kind-chooser-anniversary"
-          >
-            Anniversary
-          </button>
-        </div>
+      <div className="flex gap-3">
         <button
-          ref={cancelButtonRef}
           type="button"
-          onClick={cancel}
-          className="mt-3 flex h-12 w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
-          data-testid="settings-kind-chooser-cancel"
+          onClick={() => onChoose('event')}
+          className={SECONDARY_BUTTON}
+          data-testid="settings-kind-chooser-event"
         >
-          Cancel
+          Event
         </button>
-      </motion.div>
-    </motion.div>
+        <button
+          type="button"
+          onClick={() => onChoose('anniversary')}
+          className={SECONDARY_BUTTON}
+          data-testid="settings-kind-chooser-anniversary"
+        >
+          Anniversary
+        </button>
+      </div>
+      <button
+        ref={cancelButtonRef}
+        type="button"
+        onClick={onCancel}
+        className="mt-3 flex h-12 w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+        data-testid="settings-kind-chooser-cancel"
+      >
+        Cancel
+      </button>
+    </KitDialog>
   );
 }
 

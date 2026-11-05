@@ -3965,7 +3965,8 @@ location: src/components/Settings/ConfirmDialog.tsx; src/components/Settings/Set
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: `ConfirmDialog`, `SignOutEverywhereConfirmation` and `KindChooser` each draw a dialog, and `KindChooser` copies the focus trap and backdrop; the event and anniversary pages repeat the same delete flow. Fix: one dialog component the three use, and one delete flow both pages call. Split from DW-447 at triage so each part fits one story's budget.
-status: open
+status: done 2026-11-04
+resolution: `KitDialog` (ConfirmDialog.tsx) is the one dialog frame: the kit scrim and panel, the focus trap starting on Cancel, Escape and a scrim tap cancelling, and the stable cancel. `ConfirmDialog` and the Kind chooser draw on it, and Log out of all devices is now a `ConfirmDialog` (its buttons' test ids became `settings-sign-out-everywhere-confirmation-cancel`/`-confirm`; nothing read the old ones). The event and anniversary pages' delete runs through one hook, `useDateDelete`, with the same refusals, messages and test ids. Settings unit tests (442) pass unchanged.
 
 ### DW-454: The Settings pages copy the Error box, the field constants, the display-name rule and the online check.
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
