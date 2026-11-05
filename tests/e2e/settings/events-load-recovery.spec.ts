@@ -109,7 +109,7 @@ test.afterEach(async ({ supabaseAdmin }) => {
 test.describe('A failed Dates list events load recovers on reconnect (DE.5-COMP-003)', () => {
   test(
     '[P2] DE.5-COMP-003 restoring the connection re-fires the load and the rows appear, with no reload',
-    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
+    async ({ page, supabaseAdmin }) => {
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
       await clearPairEvents(supabaseAdmin, userId, partnerId);
 
@@ -174,11 +174,12 @@ test.describe('A failed Dates list events load recovers on reconnect (DE.5-COMP-
       // Declared before the trigger, so a re-fire cannot be missed. This is the
       // first of the three layers: the request itself, then the store's list,
       // then the UI (AGENTS.md, "Running and verifying").
-      const recoveryLoad = interceptNetworkCall({
-        method: 'GET',
-        url: '**/rest/v1/events*',
-        timeout: 15000,
-      });
+      // playwright-utils deviation: observe mode takes the first matching request and throws when it fails; postgrest-js retries a failed GET up to 3 times (1 s, 2 s, 4 s), so the reads aborted above are still retrying here, and one that goes out before the connection is back fails, so this waits for the first successful read.
+      const recoveryLoad = page.waitForResponse(
+        (res) =>
+          res.request().method() === 'GET' && res.url().includes('/rest/v1/events?') && res.ok(),
+        { timeout: 15000 }
+      );
 
       await page.unroute('**/rest/v1/events*');
       await page.context().setOffline(false);
@@ -187,8 +188,7 @@ test.describe('A failed Dates list events load recovers on reconnect (DE.5-COMP-
       // There is deliberately no page.reload() anywhere in this test: a reload
       // is precisely the workaround DW-27 described before reconnect recovery
       // was implemented.
-      const { status } = await recoveryLoad;
-      expect(status).toBe(200);
+      expect((await recoveryLoad).status()).toBe(200);
 
       const row = rowFor(page, RECOVERY_LABEL);
       await expect(row).toBeVisible();
