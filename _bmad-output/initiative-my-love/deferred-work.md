@@ -3733,7 +3733,9 @@ location: src/api/partnerService.ts:116 (`getPartner`, `select('partner_id, upda
 source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
 severity: low
 reason: The link date moved to the accepted `partner_requests` row (`PartnerInfo.linkedSince`), so nothing reads `updated_at` from the first `users` read any more. It stays in the select because E2E routes match the URL `select=partner_id%2Cupdated_at`, and the story's "Never" list forbade changing the `users` read columns. A later change drops the column from the select together with those routes and the fixtures that fulfil `updated_at`. Triage 2026-11-04: `needs-a-connection.spec.ts` does not depend on the column; `partner-connect.spec.ts:60` is the only route that matches `%2Cupdated_at`, and without the column the Partner lookup's URL is the same as `lookupPartnerId`'s, so that spec needs another signal to wait on. The 11 fixtures that return `updated_at` are harmless after the drop; `partnerServiceDisplayName.test.ts:357` then tests nothing and changes or goes.
-status: open
+status: done 2026-11-04
+resolution: resolved by sweep bundle dw-partner-lookup-drop-updated-at
+resolution-undo: 8308f83db6e5b35a306d1b0a75cb3a3ed5018f44d31442e24e30013160d3ab0d 2026-11-04 7374617475733a206f70656e
 
 ### DW-430: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker.
 origin: story 5.11 build (epic-settings-rework), 2026-11-03
@@ -3982,3 +3984,11 @@ severity: medium
 reason: The Close button is placed at `right-4` with no `--dock-right` clearance, the layout `b243a7ce` fixed in the photo viewer (`PhotoGallery/PhotoViewer.tsx`), so in the column form with the capsule on the right it probably sits under the capsule. Found by reading the code, not seen on a screen. Fix: clear the column as `b243a7ce` does for the photo viewer.
 status: open
 decision: 2026-11-04 file-and-sweep.
+
+### DW-458: The partner-mood.spec.ts comment on loadPartner's reads is stale beyond the column this change fixed.
+origin: spec-deferred 4c682ad027bb
+location: tests/e2e/partner/partner-mood.spec.ts:46
+source_spec: `plan-dw-partner-lookup-drop-updated-at.md`
+severity: low
+reason: tests/e2e/partner/partner-mood.spec.ts:46-48 says loadPartner makes 2 sequential GET /rest/v1/users calls and names the second select=id,email,display_name; getPartner also reads partner_requests (src/api/partnerService.ts:151-160) and the second users read selects id, email, display_name, birthday (src/api/partnerService.ts:137). Predates this change.
+status: open
