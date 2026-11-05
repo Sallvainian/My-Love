@@ -259,13 +259,15 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
             data-testid="photo-upload-backdrop"
           />
 
-          {/* Modal */}
+          {/* Modal. Its padding clears every safe-area inset, so on the iPhone
+              Duo the panel and its Close stay out of the side column, whose
+              status capsule covered Close. */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', duration: 0.3 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center pt-[calc(1rem+env(safe-area-inset-top))] pr-[calc(1rem+env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))]"
             onClick={handleBackdropClick}
             data-testid="photo-upload-overlay"
           >
@@ -275,7 +277,7 @@ export function PhotoUpload({ isOpen, onClose, fallbackFocusRef }: PhotoUploadPr
               // tab stop, so the uploading and success steps -- which render no
               // focusable control -- still hold focus where the trap listens.
               tabIndex={-1}
-              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[20px] bg-card shadow-float"
+              className="max-h-full w-full max-w-2xl overflow-y-auto rounded-[20px] bg-card shadow-float"
               data-testid="photo-upload-modal"
               role="dialog"
               aria-modal="true"

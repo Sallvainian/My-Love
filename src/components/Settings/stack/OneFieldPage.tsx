@@ -19,12 +19,12 @@
  * @component
  */
 
-import { CircleAlert } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { isOnline } from '../../../api/errorHandlers';
-import { CARD, FAILURE_BOX } from '../../shared/kitClasses';
+import { CARD } from '../../shared/kitClasses';
 import { SettingsBarAction } from './SettingsBarAction';
 import { useSettingsPage } from './settingsPageContext';
+import { ErrorBox } from '../ErrorBox';
 
 interface FieldProps {
   /** The field's `id`, which its sr-only label points at. */
@@ -121,16 +121,7 @@ export function OneFieldPage({
           Save
         </button>
       </SettingsBarAction>
-      {error && (
-        <div
-          className={`${FAILURE_BOX} flex items-start gap-2`}
-          role="alert"
-          data-testid="settings-field-error"
-        >
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBox message={error} testId="settings-field-error" />}
       <form
         className={CARD}
         noValidate

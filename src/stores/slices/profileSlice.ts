@@ -25,6 +25,7 @@ import { toDateOnlyOrNull } from '../../services/eventsService';
 import { readLocalCopy, registerLocalCopy, writeLocalCopy } from '../../services/localCopy';
 import { type OwnProfile, profileService } from '../../services/profileService';
 import type { AppStateCreator } from '../types';
+import { isOnline } from '../../api/errorHandlers';
 
 export interface ProfileSlice {
   /**
@@ -83,10 +84,6 @@ function parseSavedOwnProfile(value: unknown): OwnProfile | null {
     displayName: typeof v.displayName === 'string' && v.displayName.trim() ? v.displayName : null,
     birthday: typeof v.birthday === 'string' ? toDateOnlyOrNull(v.birthday) : null,
   };
-}
-
-function isOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine;
 }
 
 /** The saved own-profile copy for `userId`, or `null` (absent, failed or malformed). */

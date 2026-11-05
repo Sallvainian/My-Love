@@ -39,12 +39,13 @@ class SupabaseServiceError extends Error {
 
 /**
  * Check if the device is currently online
- * Uses navigator.onLine for network detection
+ * Uses navigator.onLine for network detection; with no `navigator` at all
+ * (no browser), it answers online, so a write is tried rather than refused.
  *
  * @returns true if device has network connection
  */
 export const isOnline = (): boolean => {
-  return navigator.onLine;
+  return typeof navigator === 'undefined' || navigator.onLine;
 };
 
 /**

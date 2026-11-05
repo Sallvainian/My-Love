@@ -3,16 +3,13 @@
  * choice (default off) and the connection reading the photo fill relies on.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setConnection } from '../stores/navigatorFixtures';
 
 const KEY = 'my-love-photos-over-mobile-data';
 
 async function freshModule() {
   vi.resetModules();
   return import('../../../src/services/photoDownloadPreference');
-}
-
-function setConnection(connection: object | undefined) {
-  Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
 }
 
 /**

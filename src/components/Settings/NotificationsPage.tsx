@@ -31,7 +31,6 @@
 
 import {
   Bell,
-  CircleAlert,
   Hand,
   Image as ImageIcon,
   MessageCircleHeart,
@@ -45,10 +44,11 @@ import { offlineMessage } from '../../services/accountDataError';
 import { hasNativeReminders } from '../../services/dateReminders';
 import type { PushPreferenceKey } from '../../services/pushPreferencesService';
 import { useAppStore } from '../../stores/useAppStore';
-import { FAILURE_BOX, FOOTNOTE, NOTICE } from '../shared/kitClasses';
+import { FOOTNOTE, NOTICE } from '../shared/kitClasses';
 import { notificationsSummary, usePushPermission } from './notificationsStatus';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { SwitchRow } from './SwitchRow';
+import { ErrorBox } from './ErrorBox';
 
 interface PushRow {
   key: PushPreferenceKey;
@@ -142,16 +142,7 @@ export function NotificationsPage() {
 
   return (
     <div className="flex flex-col gap-4" data-testid="settings-notifications">
-      {error && (
-        <div
-          className={`${FAILURE_BOX} flex items-start gap-2`}
-          role="alert"
-          data-testid="settings-notifications-error"
-        >
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBox message={error} testId="settings-notifications-error" />}
       {permission === 'denied' && (
         <p className={NOTICE} data-testid="settings-push-permission-off">
           {PERMISSION_OFF}

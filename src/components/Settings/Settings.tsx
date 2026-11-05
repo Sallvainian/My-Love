@@ -23,14 +23,13 @@
  */
 
 import {
-  CircleAlert,
   Image as ImageIcon,
   LoaderCircle,
   LogOut,
   MonitorSmartphone,
   RotateCcw,
 } from 'lucide-react';
-import { AnimatePresence, m as motion } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import {
   useCallback,
   useEffect,
@@ -50,15 +49,9 @@ import {
   subscribePhotosOverMobileData,
 } from '../../services/photoDownloadPreference';
 import { useAppStore } from '../../stores/useAppStore';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { logger } from '../../utils/logger';
-import {
-  DESTRUCTIVE_BUTTON,
-  DIALOG_BACKDROP,
-  DIALOG_PANEL,
-  DIALOG_TITLE,
-  SECONDARY_BUTTON,
-} from '../shared/kitClasses';
+import { ConfirmDialog } from './ConfirmDialog';
+import { ErrorBox } from './ErrorBox';
 import { AnniversaryFieldPage, AnniversaryPage, type AnniversaryField } from './AnniversaryPages';
 import {
   PartnerBirthdayPage,
@@ -87,77 +80,6 @@ import { ROW_BUTTON } from './SwitchRow';
  */
 const PARTIAL_SIGN_OUT_NOTICE =
   "You're logged out on this device, but your other devices could not be logged out. Sign in again when you're online and try Log out of all devices once more.";
-
-interface SignOutEverywhereConfirmationProps {
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-/**
- * Asks before ending every session. Cancel takes initial focus, as in
- * `EventDeleteConfirmation`: the action signs the person out of every device.
- */
-function SignOutEverywhereConfirmation({ onCancel, onConfirm }: SignOutEverywhereConfirmationProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const titleId = 'settings-sign-out-everywhere-title';
-
-  useFocusTrap(panelRef, true, {
-    onEscape: onCancel,
-    initialFocusRef: cancelButtonRef,
-  });
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onCancel();
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className={DIALOG_BACKDROP}
-      onClick={handleBackdropClick}
-      data-testid="settings-sign-out-everywhere-confirmation"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-    >
-      <motion.div
-        ref={panelRef}
-        tabIndex={-1}
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className={`${DIALOG_PANEL} max-w-sm`}
-      >
-        <h3 id={titleId} className={`${DIALOG_TITLE} mb-5`}>
-          Log out on every device? You'll need to sign in again on each one.
-        </h3>
-        <div className="flex gap-3">
-          <button
-            ref={cancelButtonRef}
-            type="button"
-            onClick={onCancel}
-            data-testid="settings-sign-out-everywhere-cancel"
-            className={SECONDARY_BUTTON}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            data-testid="settings-sign-out-everywhere-confirm"
-            className={DESTRUCTIVE_BUTTON}
-          >
-            Log out everywhere
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 /** Settings' subpages by path under /settings; the top page is built in `Settings`. */
 const SUBPAGES = new Map<string, SettingsPageSpec>([
@@ -429,15 +351,7 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
     titleStyle: 'large',
     render: () => (
       <>
-        {error && (
-          <div
-            className="flex items-center gap-2 rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger"
-            role="alert"
-          >
-            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <ErrorBox message={error} />}
 
         {/* Account: the Profile row opens the display name and birthday. */}
         <SettingsGroup label="Account">
@@ -528,9 +442,12 @@ export const Settings: React.FC<SettingsProps> = ({ onShowWelcome }) => {
         {/* Outside every card, like the other dialogs, so no card can clip it. */}
         <AnimatePresence>
           {confirmingEverywhere && (
-            <SignOutEverywhereConfirmation
+            <ConfirmDialog
+              question="Log out on every device? You'll need to sign in again on each one."
+              confirmLabel="Log out everywhere"
               onCancel={handleCancelEverywhere}
               onConfirm={handleConfirmEverywhere}
+              testId="settings-sign-out-everywhere-confirmation"
             />
           )}
         </AnimatePresence>

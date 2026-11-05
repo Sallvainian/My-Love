@@ -9,10 +9,9 @@
  * are stubs that move the store the way the real ones do, so a case is about
  * the page. Capacitor is mocked on for the Remind me cases and off for the rest.
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
-import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartnerInfo } from '../../../api/partnerService';
 import type { CoupleEvent, EventUpdateInput } from '../../../services/eventsService';
@@ -58,7 +57,7 @@ import { parseEventDate } from '../../../services/eventsService';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../services/pushPreferencesService';
 import { useAppStore } from '../../../stores/useAppStore';
 import { formatDateISO } from '../../../utils/dateUtils';
-import { Settings } from '../Settings';
+import { daysFromToday, makeEvent as eventRow, renderAt } from './settingsPageKit';
 import { formatListDate } from '../settingsFields';
 import { onPopState } from './settingsStackKit';
 
@@ -96,34 +95,13 @@ const setCountdownMark = vi.fn();
 let accountCounter = 0;
 const USER = () => `user-self-${accountCounter}`;
 
-/** A local date `offset` calendar days from today, at local midnight. */
-function daysFromToday(offset: number): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-}
-
+/** An event of this file's own account: `eventRow` with `userId` filled in. */
 function makeEvent(overrides: Partial<CoupleEvent> = {}): CoupleEvent {
-  return {
-    id: 'event-1',
-    userId: USER(),
-    label: 'Weekend trip',
-    date: daysFromToday(10),
-    createdAt: new Date('2026-01-01T00:00:00Z'),
-    description: 'Bring the camera',
-    icon: 'plane',
-    ...overrides,
-  };
+  return eventRow({ userId: USER(), ...overrides });
 }
 
 function setEvents(events: CoupleEvent[]) {
   act(() => useAppStore.setState({ events }));
-}
-
-/** A fresh load at `/settings/<path>`: no history state, so a page goes up by replacing it. */
-function renderAt(path: string, strict = false) {
-  window.history.replaceState(null, '', `/settings/${path}`);
-  useAppStore.setState({ settingsPath: path, settingsPushedPath: null });
-  render(strict ? <StrictMode><Settings /></StrictMode> : <Settings />);
 }
 
 /** Opens `/settings/dates` and taps the event's row, so the page is pushed in the mounted stack. */

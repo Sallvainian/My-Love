@@ -461,9 +461,8 @@ final class Notify: XCTestCase {
         return true
     }
 
-    // The Mac's time, which a simulator process reads too: after a clock
-    // jump it is the notification scheduler that lags until sim reboot, not
-    // this clock. POSIX, so a 12-hour setting cannot rewrite HH.
+    // The Mac's time, which a simulator process reads too, as it has no clock
+    // of its own. POSIX, so a 12-hour setting cannot rewrite HH.
     func clock() -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")

@@ -98,14 +98,11 @@ import { PROFILE_COPY_KIND } from '../../../stores/slices/profileSlice';
 import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
 import { onPopState } from './settingsStackKit';
+import { setOnline } from '../../../../tests/unit/stores/accountDataFixtures';
 
 const EMAIL = 'person@example.com';
 const OFFLINE_NAME = 'You are offline. Name changes need a connection to save.';
 const OFFLINE_PROFILE = 'You are offline. Profile changes need a connection to save.';
-
-function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
-}
 
 let accountCounter = 0;
 
@@ -255,7 +252,7 @@ describe('Settings > Profile', () => {
       expect(nameRow()).toHaveTextContent('Name');
       expect(nameRow()).toHaveTextContent('Jessie');
       expect(birthdayRow()).toHaveTextContent('Birthday');
-      expect(birthdayRow()).toHaveTextContent('2000');
+      expect(birthdayRow()).toHaveTextContent('20 May 2000');
     });
 
     it('disables Name and Birthday, with no value, until the first answer arrives', async () => {

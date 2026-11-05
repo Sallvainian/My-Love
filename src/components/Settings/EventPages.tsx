@@ -10,8 +10,8 @@
  * read-only Icon row does, and its page is
  * `IconPicker`, the New event form's three tiles), then Remind me while the event is upcoming (today counts as upcoming,
  * as on the Dates list), then `Delete event` centered and danger, alone in its
- * own card. It asks first (`ConfirmDialog`); offline it refuses before the
- * dialog, with `offlineMessage('Events', 'delete')` in the page's Error box,
+ * own card. It asks first (`useDateDelete`, shared with the anniversary
+ * page); offline it refuses before the dialog, with `offlineMessage('Events', 'delete')` in the page's Error box,
  * and a delete that fails shows its message there and re-enables the row. A
  * partner's event is read-only (Date, Note and Icon rows without chevrons, no
  * Delete, no footnote) and still has Remind me while upcoming. Past events
@@ -40,9 +40,7 @@
  */
 
 import { Calendar, Gem, Plane, type LucideIcon } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { isOnline } from '../../api/errorHandlers';
+import { useEffect, useId, useRef, useState } from 'react';
 import { offlineMessage } from '../../services/accountDataError';
 import { MARK_KEYS } from '../../services/dateReminders';
 import {
@@ -54,16 +52,15 @@ import {
 import type { EventWriteResult } from '../../stores/slices/eventsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
-import { fieldClass } from '../shared/kitClasses';
 import { getCalendarDaysDiff } from '../RelationshipTimers/eventCountdownHelpers';
-import { ConfirmDialog } from './ConfirmDialog';
 import { DatePage } from './DatePages';
 import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
-import { formatListDate } from './settingsFields';
+import { FIELD_CLASS, NOTE_FIELD_CLASS, formatListDate } from './settingsFields';
 import { OneFieldPage } from './stack/OneFieldPage';
 import { ReadOnlyRow, SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
+import { useDateDelete } from './useDateDelete';
 
 /** The table's CHECK limits, counted in code points as the database does. */
 export const LABEL_MAX_LENGTH = 100;
@@ -151,9 +148,6 @@ export function IconPicker({
   );
 }
 
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
-
 export type EventField = 'name' | 'date' | 'note' | 'icon';
 
 interface EventPageProps {
@@ -170,11 +164,8 @@ export function EventPage({ eventId }: EventPageProps) {
   const removeEvent = useAppStore((s) => s.removeEvent);
 
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   /** This page's own `loadEvents()` and by-id read answered `success`: only then is an absent event really absent. */
   const [answered, setAnswered] = useState(false);
-  const deletingRef = useRef(false);
   /** False once the page is left, so a late answer or delete does not set state or navigate. */
   const mounted = useRef(false);
 
@@ -212,8 +203,18 @@ export function EventPage({ eventId }: EventPageProps) {
 
   const leave = useFallBackToDates(answered && event === undefined);
 
-  // Stable: the dialog's focus trap re-runs on a new Escape handler.
-  const cancelDelete = useCallback(() => setConfirming(false), []);
+  const { deleting, requestDelete, confirmation } = useDateDelete({
+    noun: 'event',
+    what: 'Events',
+    logTag: '[EventPage]',
+    remove: async () => {
+      const result = await removeEvent(eventId);
+      return result.success ? null : result.error;
+    },
+    onDeleted: leave,
+    setError,
+    mounted,
+  });
 
   if (!event) return null;
 
@@ -221,43 +222,6 @@ export function EventPage({ eventId }: EventPageProps) {
   const own = event.userId === userId;
   const upcoming = getCalendarDaysDiff(event.date, now) >= 0;
   const target = (field: EventField) => `dates/event/${event.id}/${field}`;
-
-  const requestDelete = () => {
-    setError(null);
-    // Refused before the dialog: the person is never asked to confirm what cannot go through.
-    if (!isOnline()) {
-      setError(offlineMessage('Events', 'delete'));
-      return;
-    }
-    setConfirming(true);
-  };
-
-  const confirmDelete = async () => {
-    setConfirming(false);
-    if (deletingRef.current) return;
-    if (!isOnline()) {
-      setError(offlineMessage('Events', 'delete'));
-      return;
-    }
-    deletingRef.current = true;
-    setDeleting(true);
-    let result: EventWriteResult;
-    try {
-      result = await removeEvent(event.id);
-    } catch (caught) {
-      console.error('[EventPage] Could not delete the event:', caught);
-      result = {
-        success: false,
-        code: 'transport',
-        error: caught instanceof Error ? caught.message : 'Could not delete the event.',
-      };
-    }
-    deletingRef.current = false;
-    if (!mounted.current) return;
-    setDeleting(false);
-    if (result.success) leave();
-    else setError(result.error);
-  };
 
   return (
     <DatePage testId="settings-event-page" error={error}>
@@ -337,18 +301,7 @@ export function EventPage({ eventId }: EventPageProps) {
         </SettingsGroup>
       )}
 
-      {/* Outside every card, like the other dialogs, so no card can clip it. */}
-      <AnimatePresence>
-        {confirming && (
-          <ConfirmDialog
-            question="Delete this event?"
-            confirmLabel="Delete"
-            onCancel={cancelDelete}
-            onConfirm={() => void confirmDelete()}
-            testId="settings-event-delete-confirmation"
-          />
-        )}
-      </AnimatePresence>
+      {confirmation}
     </DatePage>
   );
 }

@@ -69,6 +69,7 @@ import {
   type PhotoCacheSession,
   type PhotoImageRef,
 } from '../../../src/services/photoImageCache';
+import { setConnection } from '../stores/navigatorFixtures';
 
 const A = 'USER-A';
 
@@ -515,10 +516,6 @@ class FakeConnection extends EventTarget {
     this.type = type;
     this.dispatchEvent(new Event('change'));
   }
-}
-
-function setConnection(connection: FakeConnection | undefined) {
-  Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
 }
 
 describe('mobile data', () => {

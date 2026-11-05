@@ -55,7 +55,11 @@ vi.mock('../../../src/api/supabaseClient', async (importOriginal) => {
 });
 
 import { AccountDataError } from '../../../src/services/accountDataError';
-import { profileService } from '../../../src/services/profileService';
+import {
+  displayNameRefusal,
+  isDisplayNameLength,
+  profileService,
+} from '../../../src/services/profileService';
 
 function setOnline(online: boolean) {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
@@ -70,6 +74,28 @@ beforeEach(() => {
   results.length = 0;
   session.user = { id: 'SELF-ID', email: 'self@example.test' };
   setOnline(true);
+});
+
+describe('the display-name rule', () => {
+  it('counts 3 to 30 characters once trimmed', () => {
+    expect(isDisplayNameLength('  Ab  ')).toBe(false);
+    expect(isDisplayNameLength(' Abc ')).toBe(true);
+    expect(isDisplayNameLength('a'.repeat(30))).toBe(true);
+    expect(isDisplayNameLength('a'.repeat(31))).toBe(false);
+  });
+
+  it('refuses a short name, the account email in any case, and the seed name', () => {
+    expect(displayNameRefusal('Ab', null)).toBe('Display name must be between 3 and 30 characters');
+    expect(displayNameRefusal(' SELF@example.test ', 'self@example.test')).toBe(
+      'Please choose a name that is different from your email address'
+    );
+    expect(displayNameRefusal('Unknown', null)).toBe('"Unknown" is not a name — please choose another');
+  });
+
+  it('allows a name that breaks none of them, and skips the email check with no email', () => {
+    expect(displayNameRefusal(' Casey ', 'self@example.test')).toBeNull();
+    expect(displayNameRefusal('self@example.test', null)).toBeNull();
+  });
 });
 
 describe('fetchOwnProfile', () => {

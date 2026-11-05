@@ -12,7 +12,8 @@
  * (20260912030000_profile_name_email_ownership.sql,
  * 20260924000000_birthdays_wedding_date.sql) open no other column. The signup
  * gate keeps its own name writer (`DisplayNameSetup`); `saveDisplayName` is the
- * one Settings uses, and applies the same refusals.
+ * one Settings uses. Both refuse a name through `displayNameRefusal`, the one
+ * copy of the display-name rule.
  *
  * `birthday` is a plain `date` and crosses this boundary as `YYYY-MM-DD`; parse
  * it with `parseEventDate`, never `new Date(string)`.
@@ -37,6 +38,36 @@ const WHAT = 'Profile changes';
 
 const NAME_MIN = 3;
 const NAME_MAX = 30;
+
+/** Whether a display name is 3 to 30 characters once trimmed: what the Name page's Save waits for. */
+export function isDisplayNameLength(name: string): boolean {
+  const length = name.trim().length;
+  return length >= NAME_MIN && length <= NAME_MAX;
+}
+
+/**
+ * The display-name rule, the one copy every name writer uses (Settings through
+ * `saveDisplayName`, and the signup gate, `DisplayNameSetup`): why `name`
+ * cannot be saved for the account whose email is `email`, or `null` when it
+ * can. Trimmed, 3 to 30 characters, not the account's email in any case, and
+ * not `SEED_FALLBACK_NAME`: the read side (`isSeedFallbackName`) counts either
+ * of those as no name chosen, so saving one would bring the gate back on every
+ * read. A null `email` checks everything but the email.
+ */
+export function displayNameRefusal(name: string, email: string | null | undefined): string | null {
+  const trimmed = name.trim();
+  if (!isDisplayNameLength(trimmed)) {
+    return `Display name must be between ${NAME_MIN} and ${NAME_MAX} characters`;
+  }
+  const account = email?.trim() ?? '';
+  if (account !== '' && trimmed.toLowerCase() === account.toLowerCase()) {
+    return 'Please choose a name that is different from your email address';
+  }
+  if (trimmed === SEED_FALLBACK_NAME) {
+    return `"${SEED_FALLBACK_NAME}" is not a name — please choose another`;
+  }
+  return null;
+}
 
 /** A row in the app's shape, applying the seed rule to the name. */
 function toOwnProfile(
@@ -119,27 +150,13 @@ export const profileService = {
   async saveDisplayName(name: string): Promise<OwnProfile> {
     requireOnline('Name changes');
     const trimmed = name.trim();
-    if (trimmed.length < NAME_MIN || trimmed.length > NAME_MAX) {
-      throw new AccountDataError(
-        'invalid-response',
-        `Display name must be between ${NAME_MIN} and ${NAME_MAX} characters`
-      );
+    if (!isDisplayNameLength(trimmed)) {
+      throw new AccountDataError('invalid-response', displayNameRefusal(trimmed, null) ?? '');
     }
     try {
       const user = await requireSessionUser();
-      const email = user.email?.trim() ?? '';
-      if (email !== '' && trimmed.toLowerCase() === email.toLowerCase()) {
-        throw new AccountDataError(
-          'invalid-response',
-          'Please choose a name that is different from your email address'
-        );
-      }
-      if (trimmed === SEED_FALLBACK_NAME) {
-        throw new AccountDataError(
-          'invalid-response',
-          `"${SEED_FALLBACK_NAME}" is not a name — please choose another`
-        );
-      }
+      const refusal = displayNameRefusal(trimmed, user.email);
+      if (refusal) throw new AccountDataError('invalid-response', refusal);
       // A plain update, not an upsert: the row exists from signup, and an upsert
       // would have to name `id`, which `authenticated` holds no UPDATE on.
       const { data, error } = await supabase

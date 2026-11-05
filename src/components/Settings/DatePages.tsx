@@ -28,17 +28,17 @@
  * @component
  */
 
-import { CircleAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { isOnline } from '../../api/errorHandlers';
 import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
 import { MARK_KEYS } from '../../services/dateReminders';
 import { useAppStore } from '../../stores/useAppStore';
-import { FAILURE_BOX, FOOTNOTE, fieldClass } from '../shared/kitClasses';
+import { FOOTNOTE } from '../shared/kitClasses';
 import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
 import {
+  FIELD_CLASS,
   coupleValue,
   fromLocalDateTime,
   isValidTogetherSince,
@@ -50,8 +50,7 @@ import { OneFieldPage } from './stack/OneFieldPage';
 import { ReadOnlyRow, SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { useSettingsPage } from './stack/settingsPageContext';
 import { ROW_BUTTON } from './SwitchRow';
-
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
+import { ErrorBox } from './ErrorBox';
 
 /**
  * Whether the server has confirmed there is no partner: the couple settings
@@ -77,16 +76,7 @@ interface DatePageProps {
 export function DatePage({ testId, error, children }: DatePageProps) {
   return (
     <div className="flex flex-col gap-4" data-testid={testId}>
-      {error && (
-        <div
-          className={`${FAILURE_BOX} flex items-start gap-2`}
-          role="alert"
-          data-testid="settings-date-error"
-        >
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBox message={error} testId="settings-date-error" />}
       {children}
     </div>
   );

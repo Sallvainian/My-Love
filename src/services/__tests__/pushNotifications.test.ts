@@ -172,7 +172,9 @@ describe('startPushRegistration', () => {
 
     handlerFor('registration')({ value: 'abc123' });
 
-    await vi.waitFor(() => expect(errorLog).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(errorLog).toHaveBeenCalledWith('[Push] Could not record the device:', 'nope')
+    );
     errorLog.mockRestore();
   });
 
@@ -182,7 +184,10 @@ describe('startPushRegistration', () => {
     const { startPushRegistration } = await freshModule();
 
     await expect(startPushRegistration()).resolves.toBe('unavailable');
-    expect(errorLog).toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      '[Push] Registration did not start:',
+      expect.objectContaining({ message: 'boom' })
+    );
     errorLog.mockRestore();
   });
 });
@@ -265,7 +270,9 @@ describe('startPushRenewalOnForeground', () => {
     // No 12-hour wait: the outgoing account's pushes still reach the device.
     returnToForeground();
     await vi.waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(errorLog).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(errorLog).toHaveBeenCalledWith('[Push] Could not record the device:', 'nope')
+    );
     expect(local.removeAllDeliveredNotifications).toHaveBeenCalledTimes(1);
 
     returnToForeground();

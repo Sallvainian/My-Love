@@ -197,10 +197,8 @@ describe('Settings > Partner', () => {
       expect(email).toHaveTextContent('Email');
       expect(email).toHaveTextContent('harper@example.com');
       expect(since).toHaveTextContent('Linked since');
-      expect(since).toHaveTextContent(
-        new Date(PARTNER.linkedSince as string).toLocaleDateString(undefined, { dateStyle: 'long' })
-      );
-      expect(since).toHaveTextContent('2022');
+      // 12:00 UTC is 3 Feb from UTC-12 to UTC+11, and 4 Feb east of that.
+      expect(since).toHaveTextContent(/[34] Feb 2022/);
     });
 
     it('draws the three rows as plain rows: no button, no chevron', async () => {

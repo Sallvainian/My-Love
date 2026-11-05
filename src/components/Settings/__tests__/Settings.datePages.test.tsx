@@ -57,6 +57,7 @@ import { AccountDataError, offlineMessage } from '../../../services/accountDataE
 import { ALL_PUSH_PREFERENCES_ON } from '../../../services/pushPreferencesService';
 import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
+import { renderAt } from './settingsPageKit';
 import { formatDayMonth, formatListDate, toLocalDateTime } from '../settingsFields';
 import { onPopState } from './settingsStackKit';
 
@@ -127,13 +128,6 @@ function setDates(state: {
       ...rest,
     });
   });
-}
-
-/** A fresh load at `/settings/<path>`: no history state, so a page goes up by replacing it. */
-function renderAt(path: string) {
-  window.history.replaceState(null, '', `/settings/${path}`);
-  useAppStore.setState({ settingsPath: path, settingsPushedPath: null });
-  render(<Settings />);
 }
 
 /** Opens `/settings/dates` and taps one of its rows, so the page is pushed in the mounted stack. */

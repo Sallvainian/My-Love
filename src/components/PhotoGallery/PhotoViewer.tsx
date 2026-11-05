@@ -720,13 +720,13 @@ export function PhotoViewer({
         {/* AC 6.4.10: Delete confirmation dialog */}
         {showDeleteDialog && (
           <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/50"
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 pr-[calc(1rem+env(safe-area-inset-right))] pl-[calc(1rem+env(safe-area-inset-left))]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="photo-viewer-delete-title"
           >
             <motion.div
-              className="mx-4 w-full max-w-md rounded-[20px] bg-card shadow-float"
+              className="w-full max-w-md rounded-[20px] bg-card shadow-float"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
             >

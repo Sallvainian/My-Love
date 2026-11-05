@@ -1,27 +1,35 @@
 /**
  * Settings fields -- the values and rules the Profile pages share with the
- * rows that show them: how a date reads (long on a page, short on the Dates
- * list, and as a date row's value), the earliest and latest birthday, what
- * makes a birthday or a display name worth saving, and the Together since
- * field's local date and time.
+ * rows that show them: how a date reads (day, month and year on the Profile
+ * and Partner rows, short on the Dates list, and as a date row's value), the
+ * earliest and latest birthday, what makes a birthday worth saving, the
+ * Together since field's local date and time, and the field classes and
+ * `Not set` the pages share. The display-name rule is `displayNameRefusal` in
+ * profileService.ts, which the signup gate uses too.
  */
 
 import { parseEventDate } from '../../services/eventsService';
+import { fieldClass } from '../shared/kitClasses';
 
-/** A `YYYY-MM-DD` date as a long local date ("May 20, 2000"). */
+/** A Settings page's text or date field, dimmed while disabled. */
+export const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
+/** A Settings page's note field (a textarea), dimmed while disabled. */
+export const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
+
+/** A `YYYY-MM-DD` date as the Profile row reads it: "4 Apr 1995". */
 export function formatDateOnly(value: string): string {
   const date = parseEventDate(value);
-  return date ? date.toLocaleDateString(undefined, { dateStyle: 'long' }) : value;
+  return date ? formatDayMonthYear(date) : value;
 }
 
 /**
- * An ISO instant (a full timestamp, such as a row's `updated_at`) as a long
- * local date ("February 3, 2022"), or `null` when it does not parse. Not for a
+ * An ISO instant (a full timestamp, such as a row's `updated_at`) as its local
+ * date, day first ("3 Feb 2022"), or `null` when it does not parse. Not for a
  * `YYYY-MM-DD` string: use `formatDateOnly`, since `new Date` reads that as UTC.
  */
 export function formatInstantDate(iso: string): string | null {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { dateStyle: 'long' });
+  return Number.isNaN(date.getTime()) ? null : formatDayMonthYear(date);
 }
 
 /** `en-US` date parts by type; `en-US` because `en-GB` prints `Sept`. */
@@ -42,6 +50,12 @@ export function formatDayMonth(date: Date): string {
   return `${day} ${month}`;
 }
 
+/** A date day first with its year: "3 Feb 2022" (the settings mock's form). */
+export function formatDayMonthYear(date: Date): string {
+  const { day, month, year } = dateParts(date, { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${day} ${month} ${year}`;
+}
+
 /**
  * A one-time date (an event, Together since, the wedding) as the Dates list
  * shows it: "Sat 14 Nov" in the current calendar year, "3 Feb 2022" in any
@@ -56,12 +70,11 @@ export function formatListDate(date: Date, now: Date = new Date()): string {
     });
     return `${weekday} ${day} ${month}`;
   }
-  const { day, month, year } = dateParts(date, { day: 'numeric', month: 'short', year: 'numeric' });
-  return `${day} ${month} ${year}`;
+  return formatDayMonthYear(date);
 }
 
-/** What a date row reads while the date is unset. */
-const NOT_SET = 'Not set';
+/** What a row reads while its value is unset. */
+export const NOT_SET = 'Not set';
 
 /**
  * A `YYYY-MM-DD` date as a yearly date ("4 Apr"); `Not set` for none, empty if
@@ -116,12 +129,6 @@ export function isValidBirthday(value: string): boolean {
   if (!parsed || value < BIRTHDAY_MIN) return false;
   const now = new Date();
   return parsed < new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-/** Trimmed, 3 to 30 characters. The account-email and `Unknown` refusals are the service's. */
-export function isValidDisplayName(value: string): boolean {
-  const length = value.trim().length;
-  return length >= 3 && length <= 30;
 }
 
 /**

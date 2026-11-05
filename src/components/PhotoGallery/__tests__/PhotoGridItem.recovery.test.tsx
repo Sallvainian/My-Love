@@ -52,6 +52,7 @@ import { setPhotosOverMobileData } from '../../../services/photoDownloadPreferen
 import { requestPhotoImageFill } from '../../../services/photoImageCache';
 import type { PhotoWithUrls } from '../../../services/photoService';
 import { PhotoGridItem } from '../PhotoGridItem';
+import { setConnection } from '../../../../tests/unit/stores/navigatorFixtures';
 
 const PHOTO: PhotoWithUrls = createPhotoWithUrls({
   id: PHOTO_ID,
@@ -79,10 +80,6 @@ const originalObserver = window.IntersectionObserver;
 let urlCount = 0;
 /** Sessions die with their test, so a held fill is never resumed by a later one. */
 let alive = true;
-
-function setConnection(connection: object | undefined) {
-  Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
-}
 
 function renderTile() {
   render(

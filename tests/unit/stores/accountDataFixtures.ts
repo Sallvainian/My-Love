@@ -30,6 +30,4 @@ export function setAnniversaries(list: Anniversary[]) {
 
 export const offline = () => new AccountDataError('offline', 'You are offline. Anniversaries need a connection to save.');
 
-export function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
-}
+export { setOnline } from './navigatorFixtures';

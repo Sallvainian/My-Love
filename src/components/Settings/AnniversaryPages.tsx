@@ -11,7 +11,7 @@
  * anniversary has no icon), then Remind me while the anniversary has a
  * `serverId` (an anniversary recurs, so there is no past one), then
  * `Delete anniversary` centered and danger, alone in its own card. It asks
- * first (`ConfirmDialog`); offline it refuses before the dialog, with
+ * first (`useDateDelete`, the flow the event page shares); offline it refuses before the dialog, with
  * `offlineMessage('Anniversaries', 'delete')` in the page's Error box, and a
  * delete that fails shows its message there and re-enables the row. Anniversaries
  * are private to their creator, so the page only ever shows the reader's own.
@@ -36,27 +36,21 @@
  * @component
  */
 
-import { AnimatePresence } from 'motion/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { isOnline } from '../../api/errorHandlers';
+import { useEffect, useRef, useState } from 'react';
 import { offlineMessage } from '../../services/accountDataError';
 import type { AnniversaryInput } from '../../services/anniversariesService';
 import { MARK_KEYS } from '../../services/dateReminders';
 import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { Anniversary } from '../../types';
-import { fieldClass } from '../shared/kitClasses';
-import { ConfirmDialog } from './ConfirmDialog';
 import { DatePage } from './DatePages';
 import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
-import { yearlyValue } from './settingsFields';
+import { FIELD_CLASS, NOTE_FIELD_CLASS, yearlyValue } from './settingsFields';
 import { OneFieldPage } from './stack/OneFieldPage';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
-
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
+import { useDateDelete } from './useDateDelete';
 
 export type AnniversaryField = 'name' | 'date' | 'note';
 
@@ -83,11 +77,8 @@ export function AnniversaryPage({ anniversaryKey }: AnniversaryPageProps) {
   const removeAnniversary = useAppStore((s) => s.removeAnniversary);
 
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   /** This page's own load answered `true`: only then is an absent anniversary really absent. */
   const [answered, setAnswered] = useState(false);
-  const deletingRef = useRef(false);
   /** False once the page is left, so a late answer or delete does not set state or navigate. */
   const mounted = useRef(false);
 
@@ -117,45 +108,22 @@ export function AnniversaryPage({ anniversaryKey }: AnniversaryPageProps) {
 
   const leave = useFallBackToDates(answered && anniversary === undefined);
 
-  // Stable: the dialog's focus trap re-runs on a new Escape handler.
-  const cancelDelete = useCallback(() => setConfirming(false), []);
+  const { deleting, requestDelete, confirmation } = useDateDelete({
+    noun: 'anniversary',
+    what: 'Anniversaries',
+    logTag: '[AnniversaryPage]',
+    remove: async () => {
+      if (anniversary) await removeAnniversary(anniversary.id);
+      return null;
+    },
+    onDeleted: leave,
+    setError,
+    mounted,
+  });
 
   if (!anniversary) return null;
 
   const target = (field: AnniversaryField) => `dates/anniversary/${anniversaryKey}/${field}`;
-
-  const requestDelete = () => {
-    setError(null);
-    // Refused before the dialog: the person is never asked to confirm what cannot go through.
-    if (!isOnline()) {
-      setError(offlineMessage('Anniversaries', 'delete'));
-      return;
-    }
-    setConfirming(true);
-  };
-
-  const confirmDelete = async () => {
-    setConfirming(false);
-    if (deletingRef.current) return;
-    if (!isOnline()) {
-      setError(offlineMessage('Anniversaries', 'delete'));
-      return;
-    }
-    deletingRef.current = true;
-    setDeleting(true);
-    let failure: string | null = null;
-    try {
-      await removeAnniversary(anniversary.id);
-    } catch (caught) {
-      console.error('[AnniversaryPage] Could not delete the anniversary:', caught);
-      failure = caught instanceof Error ? caught.message : 'Could not delete the anniversary.';
-    }
-    deletingRef.current = false;
-    if (!mounted.current) return;
-    setDeleting(false);
-    if (failure === null) leave();
-    else setError(failure);
-  };
 
   return (
     <DatePage testId="settings-anniversary-page" error={error}>
@@ -203,18 +171,7 @@ export function AnniversaryPage({ anniversaryKey }: AnniversaryPageProps) {
         </button>
       </SettingsGroup>
 
-      {/* Outside every card, like the other dialogs, so no card can clip it. */}
-      <AnimatePresence>
-        {confirming && (
-          <ConfirmDialog
-            question="Delete this anniversary?"
-            confirmLabel="Delete"
-            onCancel={cancelDelete}
-            onConfirm={() => void confirmDelete()}
-            testId="settings-anniversary-delete-confirmation"
-          />
-        )}
-      </AnimatePresence>
+      {confirmation}
     </DatePage>
   );
 }

@@ -94,11 +94,6 @@ Device:
   rotate [N]                 Rotate a quarter turn N times: right (ax rotate),
                              or left where Device Hub has only Rotate Left.
   state                      Pose, active display and orientation (ax state).
-  reboot                     Shut the simulator down and boot it again,
-                             returning once it has booted. The simulator
-                             ignores a Mac clock change until it reboots, so
-                             run this after each sudo /bin/date. Apps do not
-                             come back running.
   screenshot PATH [--display inner|outer]
                              Save a PNG of a display (default: the active one).
 
@@ -110,6 +105,12 @@ Page (points from the web view's top-left):
                          changes, up to 8 tries (one pan in about four
                          registers); prints the try that worked, and fails
                          when the page never changes.
+  swipe back --hold PATH Pan from the left edge to the middle, hold it there
+                         and save a PNG of the active display to PATH while
+                         it is held, to see what slides in. Repeats until the
+                         held screen differs from one taken just before the
+                         pan, up to 8 tries; then says whether the page went
+                         back or stayed after the release.
   dump                   One JSON line: the web view's frame and its elements.
   readout                The readout's lines.
 
@@ -324,6 +325,21 @@ supabase_url() {
   sed -n 's/^VITE_SUPABASE_URL=//p' $REPO/.env.test
 }
 
+# The supabase CLI the repo resolves must be .mise.toml's pin: another one
+# (Homebrew's 3.x) rejects supabase/config.toml, so supabase status prints
+# nothing and the driver would blame a stopped stack. It runs in the repo, as
+# stack_secret does, so mise's project pin applies.
+require_supabase_cli() {
+  local pin=$(sed -n 's/^supabase *= *"\(.*\)".*$/\1/p' $REPO/.mise.toml)
+  [[ -n $pin ]] || die 1 "no supabase pin in $REPO/.mise.toml"
+  local found
+  found=$(cd $REPO && supabase --version 2>/dev/null) ||
+    die 1 "no working supabase CLI in $REPO: install .mise.toml's $pin (mise install)"
+  found=${found%%$'\n'*}
+  [[ $found == $pin ]] ||
+    die 1 "supabase CLI $found in $REPO, but .mise.toml pins $pin: put mise's $pin first on PATH (mise install; mise trust)"
+}
+
 # Refuses anything but a local URL, then checks the stack answers.
 require_stack() {
   local url=$(supabase_url)
@@ -405,6 +421,51 @@ drive() {
   finish_step Drive $1 $code
 }
 
+# swipe back --hold PATH: the runner holds a pan at the middle for 3 s and
+# prints "holding" before it presses; the screenshot is taken 1.2 s later,
+# inside the hold. Only the picture shows whether a held pan registered (one
+# in about four does), so a try whose picture matches the one taken just
+# before the pan goes again. A clock tick in the status bar between the two
+# would pass a try that never moved; the picture itself shows that.
+cmd_swipe_hold() {
+  local out=$1 log=$WORK/logs/drive.log before=$WORK/logs/swipe-before.png
+  local try code tries
+  require_booted
+  ensure_runner
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT
+  trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 143' TERM
+  for try in {1..8}; do
+    cmd_screenshot $before
+    code=0 tries=0
+    BG=1 start_step Drive "swipe back hold"
+    until grep -q '^DRIVE holding' $log; do
+      if ! kill -0 $STEP_PID 2>/dev/null; then
+        wait $STEP_PID || code=$?
+        STEP_PID=
+        finish_step Drive swipe $(( code ? code : 1 ))
+      fi
+      if (( ++tries > 240 )); then
+        kill $STEP_PID 2>/dev/null
+        wait $STEP_PID || true
+        die 1 "the held swipe never started (log: $log)"
+      fi
+      sleep 0.25
+    done
+    sleep 1.2
+    cmd_screenshot $out
+    wait $STEP_PID || code=$?
+    STEP_PID=
+    (( code == 0 )) || finish_step Drive swipe $code
+    if ! cmp -s $before $out; then
+      finish_step Drive swipe 0
+      say "held halfway on try $try: saved $out"
+      return 0
+    fi
+  done
+  rm -f $out
+  die 1 "the screen never moved in 8 held pans: no pan registered, or nothing to go back to"
+}
+
 # ---- stage and build ---------------------------------------------------------
 
 # Fills a stage with the working tree (no REV) or REV, keeping its
@@ -464,6 +525,7 @@ cmd_build() {
       die 1 "build: unknown revision $rev"
   fi
   require_booted
+  require_supabase_cli
   require_stack
 
   local dir id update_url=$DEAD_UPDATE_URL
@@ -580,6 +642,7 @@ stack_secret() {
 }
 
 cmd_provision() {
+  require_supabase_cli
   require_stack
   local key=$(stack_secret)
   [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
@@ -589,6 +652,7 @@ cmd_provision() {
 
 cmd_dates() {
   [[ ${1:-} == (kinds|many|clear) && $# -eq 1 ]] || die 2 "dates takes kinds, many or clear"
+  require_supabase_cli
   require_stack
   local key=$(stack_secret)
   [[ -n $key ]] || die 1 "supabase status gave no SECRET_KEY: run supabase start"
@@ -827,15 +891,6 @@ cmd_watch() {
   done
   [[ $seconds == <1-3600> ]] || die 2 "watch: --for takes whole seconds from 1 to 3600"
   notify watch $seconds ${front:+$front}
-}
-
-# shutdown, then bootstatus -b, which boots it and waits until it has.
-cmd_reboot() {
-  (( $# == 0 )) || die 2 "reboot takes nothing"
-  require_booted
-  stage simctl-shutdown xcrun simctl shutdown $UDID
-  stage simctl-boot xcrun simctl bootstatus $UDID -b
-  say "rebooted $UDID; the Mac clock reads $(print -P '%D{%Y-%m-%d %H:%M:%S}')"
 }
 
 # ax state's value for one key (pose, orientation).
@@ -1186,7 +1241,6 @@ case $cmd in
     [[ -z ${1:-} || $1 == <1-9> ]] || die 2 "rotate takes a count from 1 to 9"
     require_window; cmd_rotate ${1:-1} ;;
   state) require_window; ax state --device $UDID ;;
-  reboot) cmd_reboot "$@" ;;
   tap)
     [[ $# == 2 && $1 == <->(|.<->) && $2 == <->(|.<->) ]] || die 2 "tap takes X Y in page points"
     drive tap $1 $2 ;;
@@ -1194,8 +1248,12 @@ case $cmd in
     [[ ${1:-} == (up|down) ]] || die 2 "scroll takes up or down"
     drive scroll $1 ;;
   swipe)
-    [[ $# == 1 && $1 == back ]] || die 2 "swipe takes back"
-    drive swipe $1 ;;
+    if [[ $# == 3 && $1 == back && $2 == --hold ]]; then
+      cmd_swipe_hold $3
+    else
+      [[ $# == 1 && $1 == back ]] || die 2 "swipe takes back [--hold PATH]"
+      drive swipe $1
+    fi ;;
   dump) drive dump ;;
   readout) cmd_readout ;;
   background) require_window; ax control Home --device $UDID >/dev/null; say "pressed Home" ;;

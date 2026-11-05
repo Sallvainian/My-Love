@@ -37,10 +37,7 @@
  * @component
  */
 
-import { CircleAlert } from 'lucide-react';
-import { m as motion } from 'motion/react';
 import {
-  useCallback,
   useEffect,
   useId,
   useRef,
@@ -49,7 +46,6 @@ import {
   type ReactNode,
 } from 'react';
 import { isOnline } from '../../api/errorHandlers';
-import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useSubmitKey } from '../../hooks/useSubmitKey';
 import { offlineMessage } from '../../services/accountDataError';
 import { parseEventDate, type EventIcon } from '../../services/eventsService';
@@ -57,19 +53,15 @@ import type { EventWriteResult } from '../../stores/slices/eventsSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import {
   CARD,
-  DIALOG_BACKDROP,
-  DIALOG_PANEL,
-  FAILURE_BOX,
   FIELD_LABEL,
   SECONDARY_BUTTON,
-  fieldClass,
 } from '../shared/kitClasses';
 import { DESCRIPTION_MAX_LENGTH, IconPicker, LABEL_MAX_LENGTH, codePoints } from './EventPages';
+import { KitDialog } from './ConfirmDialog';
+import { FIELD_CLASS, NOTE_FIELD_CLASS } from './settingsFields';
 import { SettingsBarAction } from './stack/SettingsBarAction';
 import { useSettingsPage } from './stack/settingsPageContext';
-
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-const NOTE_FIELD_CLASS = `${fieldClass(false, true)} disabled:cursor-not-allowed disabled:opacity-60`;
+import { ErrorBox } from './ErrorBox';
 
 export type NewDateKind = 'event' | 'anniversary';
 
@@ -80,80 +72,49 @@ interface KindChooserProps {
 }
 
 /**
- * The Kind chooser: the kit dialog asking Event or Anniversary. Focus is
- * trapped and starts on Cancel; Escape or a tap on the scrim cancels. Like
- * `ConfirmDialog`, `onCancel` need not be stable, and it renders inside
+ * The Kind chooser: the kit dialog (`KitDialog`) asking Event or Anniversary.
+ * Focus is trapped and starts on Cancel; Escape or a tap on the scrim cancels.
+ * Like `ConfirmDialog`, `onCancel` need not be stable, and it renders inside
  * `AnimatePresence` for the exit.
  */
 export function KindChooser({ onChoose, onCancel }: KindChooserProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
-  const onCancelRef = useRef(onCancel);
-  useEffect(() => {
-    onCancelRef.current = onCancel;
-  }, [onCancel]);
-  const cancel = useCallback(() => onCancelRef.current(), []);
-
-  useFocusTrap(panelRef, true, {
-    onEscape: cancel,
-    initialFocusRef: cancelButtonRef,
-  });
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) cancel();
-  };
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className={DIALOG_BACKDROP}
-      onClick={handleBackdropClick}
-      data-testid="settings-kind-chooser"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Add a date"
+    <KitDialog
+      onCancel={onCancel}
+      initialFocusRef={cancelButtonRef}
+      testId="settings-kind-chooser"
+      label="Add a date"
     >
-      <motion.div
-        ref={panelRef}
-        tabIndex={-1}
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className={`${DIALOG_PANEL} max-w-sm`}
-      >
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => onChoose('event')}
-            className={SECONDARY_BUTTON}
-            data-testid="settings-kind-chooser-event"
-          >
-            Event
-          </button>
-          <button
-            type="button"
-            onClick={() => onChoose('anniversary')}
-            className={SECONDARY_BUTTON}
-            data-testid="settings-kind-chooser-anniversary"
-          >
-            Anniversary
-          </button>
-        </div>
+      <div className="flex gap-3">
         <button
-          ref={cancelButtonRef}
           type="button"
-          onClick={cancel}
-          className="mt-3 flex h-12 w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
-          data-testid="settings-kind-chooser-cancel"
+          onClick={() => onChoose('event')}
+          className={SECONDARY_BUTTON}
+          data-testid="settings-kind-chooser-event"
         >
-          Cancel
+          Event
         </button>
-      </motion.div>
-    </motion.div>
+        <button
+          type="button"
+          onClick={() => onChoose('anniversary')}
+          className={SECONDARY_BUTTON}
+          data-testid="settings-kind-chooser-anniversary"
+        >
+          Anniversary
+        </button>
+      </div>
+      <button
+        ref={cancelButtonRef}
+        type="button"
+        onClick={onCancel}
+        className="mt-3 flex h-12 w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+        data-testid="settings-kind-chooser-cancel"
+      >
+        Cancel
+      </button>
+    </KitDialog>
   );
 }
 
@@ -191,16 +152,7 @@ function FormShell({ testId, valid, saving, latched, error, onAdd, children }: F
           Add
         </button>
       </SettingsBarAction>
-      {error && (
-        <div
-          className={`${FAILURE_BOX} flex items-start gap-2`}
-          role="alert"
-          data-testid="settings-form-error"
-        >
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBox message={error} testId="settings-form-error" />}
       <form className={CARD} noValidate onSubmit={handleSubmit}>
         <div className="flex flex-col gap-4">{children}</div>
       </form>

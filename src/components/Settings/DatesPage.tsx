@@ -45,7 +45,6 @@ import {
   Cake,
   Calendar,
   CalendarHeart,
-  CircleAlert,
   Gem,
   Heart,
   Plane,
@@ -56,7 +55,7 @@ import { AnimatePresence } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseEventDate, type EventIcon } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
-import { ADD_BUTTON, FAILURE_BOX } from '../shared/kitClasses';
+import { ADD_BUTTON } from '../shared/kitClasses';
 import { getCalendarDaysDiff } from '../RelationshipTimers/eventCountdownHelpers';
 import { KindChooser, type NewDateKind } from './NewDatePages';
 import { coupleValue, formatListDate, parseInstant, yearlyValue } from './settingsFields';
@@ -64,6 +63,7 @@ import { SettingsBarAction } from './stack/SettingsBarAction';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { useSettingsPage } from './stack/settingsPageContext';
 import { ROW_BUTTON } from './SwitchRow';
+import { ErrorBox } from './ErrorBox';
 
 /** An event's tile, the same three icons as `EventCountdown`. */
 const EVENT_ICONS: Record<EventIcon, LucideIcon> = {
@@ -215,16 +215,7 @@ export function DatesPage() {
         </button>
       </SettingsBarAction>
 
-      {loadMoreError && (
-        <div
-          className={`${FAILURE_BOX} flex items-start gap-2`}
-          role="alert"
-          data-testid="settings-dates-error"
-        >
-          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{loadMoreError}</span>
-        </div>
-      )}
+      {loadMoreError && <ErrorBox message={loadMoreError} testId="settings-dates-error" />}
 
       {linked && (
         <SettingsGroup label="Together" testId="settings-dates-together">

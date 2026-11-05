@@ -63,6 +63,7 @@ import type { Anniversary, Settings } from '../../types';
 import { createValidationError, isZodError } from '../../validation/errorMessages';
 import { AnniversarySchema } from '../../validation/schemas';
 import type { AppStateCreator } from '../types';
+import { isOnline } from '../../api/errorHandlers';
 
 export interface DatesSlice {
   // State
@@ -193,10 +194,6 @@ function isFresh(userId: string, authSessionVersion: number): boolean {
     anniversariesFreshFor?.userId === userId &&
     anniversariesFreshFor.authSessionVersion === authSessionVersion
   );
-}
-
-function isOnline(): boolean {
-  return typeof navigator === 'undefined' || navigator.onLine;
 }
 
 /** The saved copy's valid entries; anything malformed is dropped, not shown. */

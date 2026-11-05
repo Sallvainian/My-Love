@@ -3626,7 +3626,8 @@ origin: bmad-project-context refresh, 2026-11-02
 location: scripts/ci-local.sh:50; .github/workflows/test.yml:208-209
 severity: low
 reason: CI runs `deno test --no-lock` on both `supabase/functions/upload-love-note-image/` and `supabase/functions/send-push/` (the second added with 08e8b562), but `scripts/ci-local.sh` still runs only the first, so a local CI pass says nothing about send-push. AGENTS.md's Deno line states the gap until it is fixed; drop that clause in the same change. Triage 2026-11-04: still present (`scripts/ci-local.sh:50-51`); send-push's 89 tests pass run the CI way, with no env or `--allow-*` flags. Outside the loop: one sitting adds send-push to ci-local and drops the `AGENTS.md:42` clause together, since a loop review would refile the AGENTS.md half.
-status: open
+status: done 2026-11-04
+resolution: `scripts/ci-local.sh` now runs `deno test --no-lock supabase/functions/send-push/` after the upload-handler tests, as `test.yml` does (89 passed), and AGENTS.md's Deno line no longer says `test:ci-local` runs only the first.
 decision: 2026-11-04 outside-the-loop — done in the owner's docs sitting together with the AGENTS.md:42 clause.
 
 ### DW-418: Enforce the eslint-disable reason rule with a lint rule.
@@ -3634,7 +3635,8 @@ origin: bmad-project-context refresh, 2026-11-02
 location: eslint.config.js; package.json (devDependencies); AGENTS.md (Known pitfalls, eslint-disable line)
 severity: low
 reason: AGENTS.md requires every `eslint-disable` directive to carry its reason after ` -- ` and says no lint rule enforces it; `eslint.config.js` sets only `reportUnusedDisableDirectives`. `@eslint-community/eslint-plugin-eslint-comments`' `require-description` would fail a directive without one (all 18 current directives comply). Needs the owner's yes for the new devDependency; once the rule is live, the AGENTS.md line goes. Triage 2026-11-04: there are 15 directives, not 18 (14 `eslint-disable-next-line`, 1 block `eslint-disable`), all with a ` -- ` reason; the plugin (4.8.1) supports ESLint 10 and flat config and is not installed yet.
-status: open
+status: done 2026-11-04
+resolution: added `@eslint-community/eslint-plugin-eslint-comments` 4.8.1 as a devDependency; `eslint.config.js` sets `require-description` to error for the disable directives (all 15 in the tree pass, and a probe directive without ` -- ` fails), and AGENTS.md's eslint-disable line no longer says no lint rule enforces it.
 decision: 2026-11-04 add-plugin — the owner approved `@eslint-community/eslint-plugin-eslint-comments` with `require-description` as a devDependency; done outside the loop in the owner's docs sitting, which also drops the AGENTS.md:91 clause.
 
 ### DW-419: The Settings page stack's column-dock form has no end-to-end check.
@@ -3816,7 +3818,8 @@ location: AGENTS.md (Where things are, Settings subpage rule); src/components/Se
 source_spec: `tickets/epic-settings-rework/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: Story 5.16 added `subpageAvailable(path)`, a non-exported function in `Settings.tsx`, and an AGENTS.md clause telling a subpage's row on its parent page to use it. Parent pages other than the top page live in their own files (`DatesPage.tsx`, `NotificationsPage.tsx` and others), so a row there cannot follow the rule without exporting the helper. Today only top-page rows have pages with `available`, so nothing is wrong yet. The clause also says the row and page "cannot disagree", but a path missing from `SUBPAGES` counts as available and the path string is separate from the row's `target`; the code comment was corrected in story 5.16, the AGENTS.md wording was not, because the review routes agent-context edits to the orchestrator. Fix: say "a top-page row" (or export the helper) and drop "cannot disagree". Absorbs DW-439 (the same story 5.16 deferral, re-filed by the engine). Triage 2026-11-04: still present (`AGENTS.md:28` says "cannot disagree"; `subpageAvailable` is unexported at `Settings.tsx:312`; only the top page's `notifications` and `photos` have `available`). Replacement clause: "a top-page row whose page has `available` is gated with `subpageAvailable(path)`, which reads that page's own `available` from `SUBPAGES` (the helper is local to `Settings.tsx`, so a row on another parent page needs it exported first, and it counts a path missing from `SUBPAGES` as available and never checks the path against the row's `target`)".
-status: open
+status: done 2026-11-04
+resolution: AGENTS.md's Settings subpage rule now carries the recorded replacement clause: it gates a top-page row with `subpageAvailable(path)`, says the helper is local to `Settings.tsx` and must be exported for a row on another parent page, and drops "cannot disagree" for what the helper does not check.
 decision: 2026-11-04 outside-the-loop — the owner's docs sitting rewords AGENTS.md:28 with the replacement clause.
 
 ### DW-439: The AGENTS.md Settings subpage rule names `subpageAvailable(path)` for any parent page's row, but the helper is local to `Settings.tsx`, and it overclaims that the row and the page "cannot disagree"
@@ -3855,7 +3858,8 @@ location: _bmad-output/backlog/story-native-shell-live-update-prompt.md (frontma
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: medium
 reason: AGENTS.md (Maintained by hand, hand checks) orders checks Playwright, then the simulator, then a real phone, and forbids `hitl` for a check a machine can run. This story says "A person checks the flow on the owner's iPhone after a deploy" and asks for two deploys in a row on that phone. `sim build --update-port` and `sim serve-update` already apply a downloaded update on the simulator, and the DW-424 re-check of 2026-11-04 used them. Fix: set `hitl: false`, move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the simulator, and keep a phone step only for something the simulator cannot show, saying why. Triage 2026-11-04: still `hitl: true` (line 9) with the phone check at lines 17 and 100; nothing in it needs a phone (`sim build --update-port`, `sim serve-update`, `sim background` and `sim launch`). `52b71747` already shipped the update toast ("Downloading update…", then a Refresh button), so the story's requirements 1-4 describe a different design, and the refine may close it as superseded.
-status: open
+status: done 2026-11-04
+resolution: the backlog story now has `hitl: false`; its Description and the 2026-10-30 risk Decision move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the Duo simulator through `sim build --update-port`, `sim serve-update`, `sim background` and `sim launch`, with no phone step, since nothing in it needs one. Whether `52b71747`'s shipped toast supersedes the story is left to its refine.
 decision: 2026-11-04 po-refine — outside the loop: the PO refines the backlog story (a ticket edit).
 
 ### DW-443: The simulator driver tells the reader to run `sudo /bin/date`, which moves the Mac's clock.
@@ -3864,7 +3868,8 @@ location: scripts/sim-driver/README.md:5 (the `sudo /bin/date` and `sim reboot` 
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: high
 reason: An iOS simulator has no clock of its own: it reads the Mac's clock. So the README's step, `sudo /bin/date` followed by `sim reboot` so the simulator sees the change, moves the Mac's clock. AGENTS.md forbids changing the date or time on any of the owner's devices, the Mac included, and forbids writing a step that asks for it (corrected on main in `5013b869`, "a simulator has no clock of its own to move"). Moving the iPhone's clock already broke its Watch pairing. Fix: remove the `sudo /bin/date` and `sim reboot` steps from scripts/sim-driver/README.md, and the matching text in `sim help`. Test time-based behaviour three ways instead: fake time in unit tests for the reminder planning; `sim pending` for what the shell has scheduled and when; a notification scheduled a minute or two ahead with `sim watch`, for delivery. History, not templates: these date-reminders files still move a clock, and each now carries a note saying so: `tickets/epic-date-reminders/epic-date-reminders.md` (Done when 1, the 2026-10-30 story 8 decision); its `tickets/tickets.toml` (stories 8 and 5); `story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md` (`sudo date` on the Mac); `story-date-reminders-ship-to-the-owner-s-iphone-plan.md` (the iPhone's clock, Set Automatically); `plan-dw-375-376-sim-reboot-and-watch.md` (the reboot after a Mac clock jump). Triage 2026-11-04: `cmd_reboot` itself (it prints "the Mac clock reads"), its dispatch and the `Notify.swift` comment carry the same assumption; nothing else calls `sim reboot`, which existed only for the clock jump, so the command goes too. The app's reminders fire only at 9:00, so delivery is proven with a host-app notification scheduled a minute ahead (`sim schedule`, then `sim watch --host`), as AGENTS.md says since `32b748e9`. All five history notes are present (`6014a0a8`). The close supersedes DW-375 and DW-385, which added the reboot step. Build with DW-449 (same script).
-status: open
+status: done 2026-11-04
+resolution: removed `sim reboot` (its `sim help` entry, `cmd_reboot` and its dispatch), the README's `sudo /bin/date` and `sim reboot` advice and the clock-jump comment in `Notify.swift`; the README now says a simulator reads the Mac's clock and points time checks at `sim pending` and at `sim schedule` with `sim watch --host`. Supersedes the reboot step DW-375 and DW-385 added.
 decision: 2026-11-04 remove-sim-reboot — remove the command, not only its clock advice.
 
 ### DW-444: A failed Linked since read fails the whole partner lookup.
@@ -3893,7 +3898,8 @@ location: src/components/Settings/RemindMe.tsx; scripts/sim-driver (`sim pending
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: Stories 5.10 to 5.12's verify lines ask for Remind me to schedule the month and week reminders on the simulator, and each plan lists that as not run. Flow 2 on the simulator checked the footnote and that the setting survived a relaunch, not what was scheduled. Fix: on the simulator, turn on Remind me on a date page and confirm with `sim pending` that the month and week reminders are scheduled. Triage 2026-11-04: each link is unit-tested (the date pages' switch calls `setCountdownMark`; `countdownMarks.test.ts:222` writes the saved copy; `dateRemindersAtLaunch.test.ts:829` schedules In a month and In a week through the LocalNotifications mock), and story 4.2 passed the chain on the simulator through the old switch, so only the new `RemindMe` in the real shell is unchecked. `sim dates kinds` sets dates 3-8 days out, so the check needs a date more than a month ahead.
-status: open
+status: done 2026-11-04
+resolution: checked on the iPhone Duo simulator on 2026-11-04 (shell built from this branch): turning on Remind me on the Cooking class event page (Tue 22 Dec, 48 days out) added two requests to `sim pending`, "In a month: Cooking class" at 2026-11-22 09:00 and "In a week: Cooking class" at 2026-12-15 09:00, beside the six "Tomorrow" ones already there.
 decision: 2026-11-04 sim-check-in-DW-448-session — outside the loop: run `sim pending` after turning on Remind me on a date page in the DW-448 simulator session, then close.
 
 ### DW-447: The Settings rework solved the same problems several ways across its pages and test files.
@@ -3912,7 +3918,8 @@ location: every view in src/components (Home, Love Notes, Mood, Photos and the p
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: medium
 reason: In story 5.17's checks the owner found Love Notes not opening at the bottom and the photo viewer's buttons under the column icons. Both were from before this epic (`db5bfb2b`, `0ffa2caf`), and neither view had a column-form test. DW-419's simulator check covered the Settings stack alone, and its own text says the same holds for every column-form feature. Desktop Playwright cannot set `env(safe-area-inset-*)`. Fix: one simulator sweep of every view in both column forms (capsule left and right), with a screenshot of each, fixing what it finds. After that, each epic sweeps the views it changes. Triage 2026-11-04: outside the loop: about 22 screens in both capsule positions (about 44 screenshots to judge), an unmeasured estimate of 2-3 hours plus fixes; only the dock, the Settings stack, `UpdateToast` and `useSideColumn` have column-form tests. DW-446's `sim pending` check runs in the same session, and DW-457 (the love-note picture viewer's Close) is one likely escape already filed.
-status: open
+status: done 2026-11-04
+resolution: swept on the iPhone Duo simulator on 2026-11-04, 46 screenshots: capsule on the right (folded portrait) and on the left (folded landscapeLeft) across Home, Mood (Log, Timeline, Calendar, mood detail), Love Notes and its picture viewer, Photos (grid, viewer, delete confirm, upload), Partner and Interaction History, and Settings (top page, Dates, an event page, a field page, Add a date, Log out of all devices). Fixed what it showed, each its own commit: the note picture viewer covered only its message row (`99519f9f`, rendered into `document.body`); the photo upload modal put Close under the status capsule, and centred dialogs spread across the column (`c70bce9a`, every safe-area inset padded); a view opened at the scroll the last one left (`ce22c999`, reproduced in Chromium); and DW-457's Close (`372d39f7`). Rechecked after a rebuild with the capsule on the right; the left-capsule pass ran on that build.
 decision: 2026-11-04 outside-the-loop — one simulator session after the sweep, with DW-446.
 
 ### DW-449: The simulator driver checks none of its prerequisites up front.
@@ -3921,7 +3928,8 @@ location: scripts/sim-driver/sim (header needs at lines 24-25; `resolve_device`,
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: During the epic, non-interactive shells got Homebrew's Supabase CLI 3.0.0, which rejects the repo's config, and stories 5.1 and 5.4 worked around it with a shim. The fix then made mise refuse the driver's staged copy until `trusted_config_paths` covered it. `sim` lists its needs but checks them only inside each command, so a wrong environment fails partway through a build. Fix: a `sim doctor` preflight, run before `sim build`. It checks the Supabase CLI on PATH against the `.mise.toml` pin, that mise trusts the staged path, Xcode and Device Hub, and the local stack's health. Triage 2026-11-04: the real cost was a misleading message: with the wrong Supabase CLI the driver says "run supabase start" (`sim:585`). Buildable and testable with stub scripts, no simulator. Build with DW-443.
-status: open
+status: done 2026-11-04
+resolution: `sim build`, `sim provision` and `sim dates` now run `require_supabase_cli`, which compares `supabase --version` in the repo with `.mise.toml`'s pin and stops naming both versions (or no working CLI) instead of "run supabase start"; `zsh scripts/sim-driver/test-supabase-pin.zsh` covers pinned, 3.0.0, older and broken CLIs with a stub. No full `sim doctor`, per the decision.
 decision: 2026-11-04 narrow-version-check — check the Supabase CLI on PATH against the `.mise.toml` pin before `sim build` and name the mismatch; no full `sim doctor`.
 
 ### DW-450: The simulator driver cannot hold a back swipe halfway, so it cannot see the picture that slides in.
@@ -3930,7 +3938,8 @@ location: scripts/sim-driver/sim (the `swipe` command takes only `back`); Runner
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: `sim swipe back` compares the page text after the pan, so it checks where a swipe lands, not what it shows. Two of story 5.15's later bugs were in the picture: WebKit's dark or white page three levels deep (`e1ba2117`), and the Add a date chooser still in the picture (`a9906618`). An agent caught the second only with an ad hoc halfway-hold probe that never entered the driver. Fix: a swipe step that stops halfway and takes a screenshot (for example `sim swipe back --hold PATH`), documented in the README. Triage 2026-11-04: confirmed (`sim:1196-1198` and `Drive.swift:59` accept only `back`; the pan holds 0 s at `Drive.swift:75`). The loop has driven the simulator before (run 20261102-215408-6a69, story 5.15); checking that the screenshot shows the page mid-slide needs the Mac unlocked, Device Hub open and `supabase start`.
-status: open
+status: done 2026-11-04
+resolution: added `sim swipe back --hold PATH`: the runner's new `swipe back hold` step pans from the left edge to the web view's middle and holds 3 s, printing "holding" (now flushed) before the press, and the shell saves the active display to PATH 1.2 s into the hold, repeating up to 8 tries until that picture differs from one taken just before the pan; `sim help` and the README describe it. Checked on the Duo simulator on 2026-11-04 from a Settings event page with the capsule on the left: try 1 held, and the picture shows the Dates list sliding in beside the event page.
 
 ### DW-451: The Settings Touch Floor and design-token measurement of 2026-11-04 was done once by hand and kept as no test.
 origin: epic-settings-rework retrospective (P2), 2026-11-04
@@ -3938,7 +3947,8 @@ location: tests/e2e/settings/ (no spec measures hit areas, field font size or co
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: R16 (44pt targets, 16px fields) and R18 (DESIGN.md tokens) were "delivered by each story" according to tickets.toml, but no story measured them. The measurement recorded in the epic's Notes on 2026-11-04 walked 25 pages in Playwright, light and dark, and passed, but nothing keeps it. Fix: an E2E spec that walks those pages and asserts every target's hit area is at least 44pt, every field is 16px, and every colour is a DESIGN.md token. Absorbs DW-432 (no E2E axe scan of the Settings pages since `events-accessibility.spec.ts` was deleted): add an axe scan limited to the `color-contrast` rule over the same pages, bringing back `@axe-core/playwright`, because `whiteOnColorContrast.test.ts` covers only white text on colour and the token check proves which colours appear, not which pairs sit together. Triage 2026-11-04: the measurement's scripts are kept outside the repo at `~/.local/share/my-love/r16-probe/` (`measure.mjs`, `analyse.py`, and `seed-extra.mjs`, which seeds the partner event and the past event that `measure.mjs` opens, after `sim provision`). DESIGN.md's front matter lists every colour, type style, radius and the 44px size, so the spec can read them at run time (`js-yaml` is only an `overrides` pin: declare it or parse the front matter directly). Traps: a sr-only radio's hit area is its label, not the 1x1 input; the dialog scrim's colour comes back as `oklab(0 0 0 / 0.5)` and must be read as the 50% black scrim; sr-only text reads as black and must be skipped; Photos shows only when `navigator.connection.type` is stubbed (for example `'wifi'`); Notifications exists only in the shell, so measure it on the simulator.
-status: open
+status: done 2026-11-04
+resolution: new `tests/e2e/settings/settings-touch-floor.spec.ts` walks 25 Settings states (the top page, Log out of all devices, Profile with Name and Birthday, Partner, Photos with `navigator.connection.type` stubbed to `wifi`, Dates, the Kind chooser, New event, New anniversary, an own event with its Date, Note and Icon pages and Delete confirm, a partner's event, a past event, an anniversary, Together since and its Date page, Wedding, Your birthday and the partner's birthday), each in light and dark, and asserts every target outside the dock hits 44px both ways (a sr-only radio counts its label), every field is at least 16px, and every colour is a DESIGN.md token read from its front matter at run time (or the 50% black scrim, which reads as `oklab(0 0 0 / 0.5)`); `@axe-core/playwright` is back as a devDependency for a `color-contrast`-only scan of the same states (DW-432). It passes on the local stack in 37 s, and fails as it should on an injected 20px button, a 12px field and an off-palette, low-contrast colour. Notifications (shell only) is left out.
 decision: 2026-11-04 build — keep the measurement as a spec, with DW-432's contrast-only axe scan.
 
 ### DW-452: A unit test still asserts a bare `console.error` call.
@@ -3947,7 +3957,8 @@ location: tests/unit/stores/moodSlice.historyBackfill.test.ts:221; src/services/
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: AGENTS.md forbids a bare `expect(console.error).toHaveBeenCalled()`, since the bare form passed twice on an unrelated error in epic-date-reminders. `497e2515` fixed 13 such asserts and `2b5f27e7` fixed the one in PushSettings.test.tsx, but this one, `expect(errorSpy).toHaveBeenCalled()`, was missed. Fix: assert the message the code under test logs. Triage 2026-11-04: three more bare asserts on a `console.error` spy sit in `pushNotifications.test.ts` (`errorLog` at :175, :185 and :268); fix all four.
-status: open
+status: done 2026-11-04
+resolution: all four asserts now name what the code under test logs: `[MoodSlice] Error loading mood history from the server:` with the read's error in moodSlice.historyBackfill.test.ts, and `[Push] Could not record the device:` with `nope` (twice) and `[Push] Registration did not start:` with the plugin's error in pushNotifications.test.ts; a scan of every `console.error` spy in `src` and `tests` finds no other bare assert.
 
 ### DW-453: The Settings rework has three confirmation dialogs and two copies of the date delete flow.
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
@@ -3955,7 +3966,8 @@ location: src/components/Settings/ConfirmDialog.tsx; src/components/Settings/Set
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: `ConfirmDialog`, `SignOutEverywhereConfirmation` and `KindChooser` each draw a dialog, and `KindChooser` copies the focus trap and backdrop; the event and anniversary pages repeat the same delete flow. Fix: one dialog component the three use, and one delete flow both pages call. Split from DW-447 at triage so each part fits one story's budget.
-status: open
+status: done 2026-11-04
+resolution: `KitDialog` (ConfirmDialog.tsx) is the one dialog frame: the kit scrim and panel, the focus trap starting on Cancel, Escape and a scrim tap cancelling, and the stable cancel. `ConfirmDialog` and the Kind chooser draw on it, and Log out of all devices is now a `ConfirmDialog` (its buttons' test ids became `settings-sign-out-everywhere-confirmation-cancel`/`-confirm`; nothing read the old ones). The event and anniversary pages' delete runs through one hook, `useDateDelete`, with the same refusals, messages and test ids. Settings unit tests (442) pass unchanged.
 
 ### DW-454: The Settings pages copy the Error box, the field constants, the display-name rule and the online check.
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
@@ -3963,7 +3975,8 @@ location: src/components/Settings/ (six inline Error box copies; the hand-typed 
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: Six inline Error box copies, one hand-typed and drawn slightly differently; `FIELD_CLASS` identical in 5 files, `NOTE_FIELD_CLASS` in 3 and `NOT_SET` twice; the display-name rule in two places; four private `isOnline` copies in slices while `api/errorHandlers.ts` exports one. Fix: one Error box component, shared field constants, one name rule used by both the Name page and the signup gate (this replaces DW-427's documented-twin choice), and the slices calling the exported `isOnline()`. Split from DW-447 at triage.
-status: open
+status: done 2026-11-04
+resolution: one `ErrorBox` (src/components/Settings/ErrorBox.tsx) replaces the six Settings copies, the hand-typed top-page one included; `FIELD_CLASS`, `NOTE_FIELD_CLASS` and `NOT_SET` are exported once from settingsFields.ts; the display-name rule is `displayNameRefusal` and `isDisplayNameLength` in profileService.ts, used by `saveDisplayName`, the Name page and the signup gate (`DisplayNameSetup`), replacing DW-427's documented twin; and the dates, profile, notifications and partner slices call `isOnline()` from api/errorHandlers.ts, which now answers online with no `navigator`, as their copies did. The two non-Settings boxes (LoginScreen, DisplayNameSetup) keep their own markup: they carry `aria-live` and icon test ids.
 decision: 2026-11-04 share-name-rule — one name rule in one place, replacing DW-427's documented twin.
 
 ### DW-455: The Settings test files copy shared helpers instead of importing them.
@@ -3972,7 +3985,8 @@ location: src/components/Settings/__tests__/ (`renderAt` in 4 files, `setConnect
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: `setOnline` is reimplemented in `NotificationsPage.test.tsx` and `Settings.profile.test.tsx` though `tests/unit/stores/accountDataFixtures.ts` exports it, which breaks AGENTS.md's shared-helper rule (the retro's fix-now item, never done); `renderAt` is identical in 4 test files, `setConnection` in 5 and `makeEvent` in 2. Fix: a shared Settings test kit (a `__tests__/*Kit.ts(x)` file) for `renderAt`, `setConnection` and `makeEvent`, and `setOnline` imported from `accountDataFixtures.ts`. Split from DW-447 at triage.
-status: open
+status: done 2026-11-04
+resolution: a new kit, `src/components/Settings/__tests__/settingsPageKit.tsx`, holds `renderAt` (from the 4 page test files), `makeEvent` and `daysFromToday` (the two `makeEvent` copies now keep only their file's defaults); `setConnection` moved beside `setOnline` into a new import-free `tests/unit/stores/navigatorFixtures.ts` (re-exported `setOnline` from accountDataFixtures.ts), and all five `setConnection` copies (2 in Settings, PhotoGridItem.recovery, photoDownloadPreference and photoImageCache) and the two Settings `setOnline` copies import it. The 14 `setOnline` copies outside Settings are filed as DW-459.
 
 ### DW-456: The birthday and Linked since dates do not use the mock's format.
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
@@ -3980,7 +3994,8 @@ location: src/components/Settings/ProfilePage.tsx:125 (birthday row); src/compon
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
 reason: The Profile row shows the birthday as the long local date, the Your birthday page shows "4 Apr", and Linked since shows "February 3, 2022". The mock that EXPERIENCE.md:75 links specifies `4 Apr 1995` on the Profile row (key-settings-v2.html:416), `4 Apr` on the birthday pages (EXPERIENCE.md:230-231) and `3 Feb 2022` for Linked since. Fix: follow the mock. Split from DW-447 at triage, whose "one birthday format" would have contradicted the mock.
-status: open
+status: done 2026-11-04
+resolution: followed the mock: a new `formatDayMonthYear` ("3 Feb 2022") in settingsFields.ts backs `formatDateOnly` (the Profile birthday row, now `4 Apr 1995`), `formatInstantDate` (Linked since, now `3 Feb 2022`) and `formatListDate`'s other-year form; the birthday pages already read `4 Apr` through `yearlyValue`. Unit tests pin both forms, and partner-page.spec.ts reads `[34] Feb 2022`.
 decision: 2026-11-04 follow-the-mock — Profile row `4 Apr 1995`, birthday pages `4 Apr`, Linked since `3 Feb 2022`.
 
 ### DW-457: The love-note picture viewer's Close button probably sits under the side column on the Duo.
@@ -3988,7 +4003,8 @@ origin: triage of epic-settings-rework deferred work (DW-448 code read), 2026-11
 location: src/components/love-notes/FullScreenImageViewer.tsx:100
 severity: medium
 reason: The Close button is placed at `right-4` with no `--dock-right` clearance, the layout `b243a7ce` fixed in the photo viewer (`PhotoGallery/PhotoViewer.tsx`), so in the column form with the capsule on the right it probably sits under the capsule. Found by reading the code, not seen on a screen. Fix: clear the column as `b243a7ce` does for the photo viewer.
-status: open
+status: done 2026-11-04
+resolution: Close now sits at `right-[calc(1rem+env(safe-area-inset-right))]`, as `b243a7ce` placed the photo viewer's controls. Checked in the DW-448 simulator sweep with the capsule on the right: Close sits left of the side column, clear of the status capsule. The sweep also found the viewer covering only its message row, fixed in the same branch by rendering it into `document.body`.
 decision: 2026-11-04 file-and-sweep.
 
 ### DW-458: The partner-mood.spec.ts comment on loadPartner's reads is stale beyond the column this change fixed.
@@ -3997,4 +4013,12 @@ location: tests/e2e/partner/partner-mood.spec.ts:46
 source_spec: `plan-dw-partner-lookup-drop-updated-at.md`
 severity: low
 reason: tests/e2e/partner/partner-mood.spec.ts:46-48 says loadPartner makes 2 sequential GET /rest/v1/users calls and names the second select=id,email,display_name; getPartner also reads partner_requests (src/api/partnerService.ts:151-160) and the second users read selects id, email, display_name, birthday (src/api/partnerService.ts:137). Predates this change.
+status: done 2026-11-04
+resolution: the comment now lists getPartner's three reads: the `partner_id` read, the partner's row with `id,email,display_name,birthday`, and the accepted `partner_requests` read for Linked since, which the spec leaves to the local stack.
+
+### DW-459: Fourteen unit test files outside Settings still define their own `setOnline`.
+origin: DW-455 fix (chore/resolve-open-dw), 2026-11-04
+location: tests/unit/stores/ (interactionsSlice.localCopy, eventsSlice.localCopy, photosSlice.localCopy, birthdaysWedding, coupleSettings, partnerSlice.localCopy, pushPreferences); tests/unit/hooks/usePhotoImage.test.ts; tests/unit/api/interactionService.test.ts; tests/unit/services/ (pushPreferencesService, photoImageCache, accountDataApis, profileService, coupleSettingsService); tests/unit/stores/navigatorFixtures.ts
+severity: low
+reason: DW-455 moved the `navigator` stubs into `tests/unit/stores/navigatorFixtures.ts` (`setOnline`, `setConnection`) and switched the Settings tests and every `setConnection` copy to it, but these 14 files each keep a local `setOnline`, against AGENTS.md's shared-helper rule. They are not all the same stub: some set `navigator.onLine` with `Object.defineProperty`, some with `vi.spyOn(navigator, 'onLine', 'get')`, so a switch must check each file's teardown. `notesSliceQueueFixture.ts` and `fakeEventsBackend.ts` export their own `setOnline` for their suites. Fix: import `setOnline` from `navigatorFixtures.ts` wherever the stub is the `defineProperty` form, and give the spy form one shared helper too if more than one file needs it.
 status: open

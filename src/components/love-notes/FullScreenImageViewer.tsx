@@ -14,6 +14,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface FullScreenImageViewerProps {
   imageUrl: string | null;
@@ -68,7 +69,11 @@ function FullScreenImageViewerComponent({
     };
   }, [isOpen, handleKeyDown]);
 
-  return (
+  // Rendered into document.body: the viewer opens from a message row, which
+  // the virtualized list positions with a transform, and a transformed
+  // ancestor becomes the containing block of `fixed inset-0`, so in place the
+  // viewer covered only that row's part of the list, clipped by its scroller.
+  return createPortal(
     <AnimatePresence>
       {isOpen && imageUrl && (
         <motion.div
@@ -93,11 +98,13 @@ function FullScreenImageViewerComponent({
             data-testid="fullscreen-image-backdrop"
           />
 
-          {/* Close button */}
+          {/* Close button. The viewer covers the whole screen, so Close keeps
+              clear of the right inset as of the top one: on the iPhone Duo the
+              side column holds the capsule there, as in the photo viewer. */}
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-card text-ink focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-[calc(1rem+env(safe-area-inset-right))] z-10 flex h-11 w-11 items-center justify-center rounded-full bg-card text-ink focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Close image viewer"
           >
             <X size={20} aria-hidden="true" />
@@ -121,7 +128,8 @@ function FullScreenImageViewerComponent({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

@@ -43,10 +43,14 @@ test.describe('Partner Mood View', () => {
 
   test('[P0] 4.5-E2E-002 should display poke/kiss interaction buttons', async ({ page }) => {
     // GIVEN: User is on partner mood view with a connected partner.
-    // loadPartner makes 2 sequential GET /rest/v1/users calls:
-    //   1. select=partner_id → current user's record
-    //   2. select=id,email,display_name → partner's record
-    // Mock both with the correct shapes. The fake partner id is uuid-shaped:
+    // loadPartner's getPartner makes 3 sequential GETs:
+    //   1. /rest/v1/users select=partner_id → current user's record
+    //   2. /rest/v1/users select=id,email,display_name,birthday → partner's record
+    //   3. /rest/v1/partner_requests select=updated_at → the accepted request
+    //      Linked since comes from
+    // The first two are mocked with the correct shapes; the third is left to
+    // the local stack, which has no request for the fake pair and answers no
+    // row, so Linked since is unknown. The fake partner id is uuid-shaped:
     // the couple-settings refresher reuses the partner_id answer to address
     // `couple_settings`, and a non-uuid id is a 400 there (RLS answers a
     // well-formed stranger's pair with no row).

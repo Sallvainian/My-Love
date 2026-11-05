@@ -1,12 +1,16 @@
 /**
  * The Dates list's date forms (`formatListDate`, `formatDayMonth`): day first,
- * `en-US` month names, and the year shown only outside the current one.
+ * `en-US` month names, and the year shown only outside the current one; and
+ * the Profile and Partner rows' forms (`formatDateOnly`, `formatInstantDate`),
+ * day first with the year, as the settings mock shows them.
  * Dates are built from local components, as `parseEventDate` does. Also the
  * Together since field's local date and time rules.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatDateOnly,
   formatDayMonth,
+  formatInstantDate,
   formatListDate,
   fromLocalDateTime,
   isValidTogetherSince,
@@ -40,6 +44,27 @@ describe('formatDayMonth', () => {
   it('reads day and month with no year', () => {
     expect(formatDayMonth(new Date(1990, 3, 4))).toBe('4 Apr');
     expect(formatDayMonth(new Date(2000, 8, 30))).toBe('30 Sep');
+  });
+});
+
+describe('formatDateOnly', () => {
+  it('reads a birthday day first with its year', () => {
+    expect(formatDateOnly('1995-04-04')).toBe('4 Apr 1995');
+    expect(formatDateOnly('2000-09-20')).toBe('20 Sep 2000');
+  });
+
+  it('gives back a value that does not parse', () => {
+    expect(formatDateOnly('not a date')).toBe('not a date');
+  });
+});
+
+describe('formatInstantDate', () => {
+  it('reads an instant as its local date, day first with its year', () => {
+    expect(formatInstantDate(new Date(2022, 1, 3, 12).toISOString())).toBe('3 Feb 2022');
+  });
+
+  it('answers null for an instant that does not parse', () => {
+    expect(formatInstantDate('not a date')).toBeNull();
   });
 });
 

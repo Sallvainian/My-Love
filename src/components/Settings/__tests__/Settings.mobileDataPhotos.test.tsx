@@ -51,12 +51,9 @@ import {
 import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
 import { onPopState } from './settingsStackKit';
+import { setConnection } from '../../../../tests/unit/stores/navigatorFixtures';
 
 let accountCounter = 0;
-
-function setConnection(connection: object | undefined) {
-  Object.defineProperty(navigator, 'connection', { value: connection, configurable: true });
-}
 
 /**
  * Renders Settings and waits for the profile read to settle (an answer, or a

@@ -63,7 +63,7 @@ test.describe('Settings > Partner', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
   });
 
-  test('[P1] should show Linked since as a long date when the accepted request is known', async ({
+  test('[P1] should show Linked since as day, month and year when the accepted request is known', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -78,9 +78,10 @@ test.describe('Settings > Partner', () => {
     // WHEN: the Partner page opens
     await page.getByTestId('settings-partner-row').click();
 
-    // THEN: the row reads the date in the long local form
+    // THEN: the row reads the local date as the mock does, day first with the
+    // year (12:00 UTC is 3 Feb from UTC-12 to UTC+11, and 4 Feb east of that)
     await expect(page.getByTestId('settings-partner-linked-since')).toContainText('Linked since');
-    await expect(page.getByTestId('settings-partner-linked-since')).toContainText(/February [34], 2022/);
+    await expect(page.getByTestId('settings-partner-linked-since')).toContainText(/[34] Feb 2022/);
   });
 
   test('[P1] should read Not linked and open the Partner view from Go to Partner when the server says unlinked', async ({

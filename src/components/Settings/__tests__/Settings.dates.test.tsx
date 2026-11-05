@@ -37,6 +37,7 @@ vi.mock('../../../utils/logger', () => ({
 import { offlineMessage } from '../../../services/accountDataError';
 import { useAppStore } from '../../../stores/useAppStore';
 import { Settings } from '../Settings';
+import { daysFromToday, makeEvent as eventRow } from './settingsPageKit';
 import { formatListDate } from '../settingsFields';
 import { onPopState } from './settingsStackKit';
 
@@ -63,23 +64,16 @@ const pagination = (past: boolean, upcoming = false): EventsPagination => ({
   past: { hasMore: past, cursor: null },
 });
 
-/** A local-calendar date `days` from today. */
-function dayFromToday(days: number): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-}
-
 function makeEvent(id: string, overrides: Partial<CoupleEvent> = {}): CoupleEvent {
-  return {
+  return eventRow({
     id,
     userId: selfId,
     label: `Event ${id}`,
-    date: dayFromToday(10),
     createdAt: new Date(2026, 0, 1),
     description: null,
     icon: 'calendar',
     ...overrides,
-  };
+  });
 }
 
 let accountCounter = 0;
@@ -251,10 +245,10 @@ describe('Settings > Dates', () => {
         // The store keeps events soonest first.
         events: [
           makeEvent('p-old', { label: 'Old trip', date: new Date(2022, 1, 3) }),
-          makeEvent('p-new', { label: 'Recent', date: dayFromToday(-4) }),
-          makeEvent('e-soon', { label: 'Dinner', icon: 'calendar', date: dayFromToday(3) }),
-          makeEvent('e-ring', { label: 'Vows', icon: 'ring', date: dayFromToday(20) }),
-          makeEvent('e-far', { label: 'Trip', icon: 'plane', date: dayFromToday(40) }),
+          makeEvent('p-new', { label: 'Recent', date: daysFromToday(-4) }),
+          makeEvent('e-soon', { label: 'Dinner', icon: 'calendar', date: daysFromToday(3) }),
+          makeEvent('e-ring', { label: 'Vows', icon: 'ring', date: daysFromToday(20) }),
+          makeEvent('e-far', { label: 'Trip', icon: 'plane', date: daysFromToday(40) }),
         ],
         anniversaries: [
           { id: 1, date: '2020-09-09', label: 'First date', serverId: 'srv-1' },
@@ -309,7 +303,7 @@ describe('Settings > Dates', () => {
         'settings-dates-event-e-ring',
         'settings-dates-event-e-far',
       ]);
-      expect(rows[0]).toHaveAccessibleName(`Dinner, ${formatListDate(dayFromToday(3))}`);
+      expect(rows[0]).toHaveAccessibleName(`Dinner, ${formatListDate(daysFromToday(3))}`);
       expect(targetOf('event-e-soon')).toBe('dates/event/e-soon');
       expect(targetOf('event-e-far')).toBe('dates/event/e-far');
     });
@@ -412,8 +406,8 @@ describe('Settings > Dates', () => {
         events: [
           makeEvent('mine', { userId: selfId, label: 'Mine' }),
           makeEvent('theirs', { userId: 'partner-1', label: 'Theirs' }),
-          makeEvent('mine-past', { userId: selfId, label: 'Mine past', date: dayFromToday(-3) }),
-          makeEvent('theirs-past', { userId: 'partner-1', label: 'Theirs past', date: dayFromToday(-2) }),
+          makeEvent('mine-past', { userId: selfId, label: 'Mine past', date: daysFromToday(-3) }),
+          makeEvent('theirs-past', { userId: 'partner-1', label: 'Theirs past', date: daysFromToday(-2) }),
         ],
       });
       await renderSettings();
@@ -487,7 +481,7 @@ describe('Settings > Dates', () => {
 
     it('counts an event dated today as upcoming, not past', async () => {
       const user = userEvent.setup();
-      setDates({ events: [makeEvent('today', { date: dayFromToday(0) })] });
+      setDates({ events: [makeEvent('today', { date: daysFromToday(0) })] });
       await renderSettings();
       await openDates(user);
 
@@ -499,7 +493,7 @@ describe('Settings > Dates', () => {
 
     it('counts an event dated yesterday as past', async () => {
       const user = userEvent.setup();
-      setDates({ events: [makeEvent('yesterday', { date: dayFromToday(-1) })] });
+      setDates({ events: [makeEvent('yesterday', { date: daysFromToday(-1) })] });
       await renderSettings();
       await openDates(user);
 
@@ -590,7 +584,7 @@ describe('Settings > Dates', () => {
 
       it('keeps the loaded rows and asks nothing when the store holds a server page', async () => {
         const user = userEvent.setup();
-        setDates({ events: [makeEvent('kept'), makeEvent('reached-by-load-more', { date: dayFromToday(-400) })] });
+        setDates({ events: [makeEvent('kept'), makeEvent('reached-by-load-more', { date: daysFromToday(-400) })] });
 
         const opened = await openEventAndComeBack(user);
 
@@ -669,7 +663,7 @@ describe('Settings > Dates', () => {
   describe('Load more', () => {
     async function openWithMore(user: ReturnType<typeof userEvent.setup>) {
       setDates({
-        events: [makeEvent('p-1', { label: 'Newer', date: dayFromToday(-5) })],
+        events: [makeEvent('p-1', { label: 'Newer', date: daysFromToday(-5) })],
         eventsPagination: pagination(true),
       });
       await renderSettings();
@@ -714,7 +708,7 @@ describe('Settings > Dates', () => {
         act(() => {
           useAppStore.setState({
             events: [
-              makeEvent('p-2', { label: 'Older', date: dayFromToday(-50) }),
+              makeEvent('p-2', { label: 'Older', date: daysFromToday(-50) }),
               ...useAppStore.getState().events,
             ],
             eventsPagination: pagination(false),

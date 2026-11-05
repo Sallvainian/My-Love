@@ -10,6 +10,11 @@ import XCTest
 //   swipe back              pan from the web view's left edge to past its
 //                           middle, the iOS back gesture, repeated until the
 //                           page changes; fails after 8 tries with no change
+//   swipe back hold         one pan from the left edge to the web view's
+//                           middle, held there 3 s; prints "holding" before
+//                           the press, so `sim swipe back --hold` can take a
+//                           screenshot mid-slide, and whether the page went
+//                           back after the release
 //   dump                    print the web view's elements as one JSON line,
 //                           frames in the same page points `tap` takes
 //   signin EMAIL PASSWORD [decline-push]
@@ -26,7 +31,12 @@ import XCTest
 final class Drive: XCTestCase {
     let app = XCUIApplication(bundleIdentifier: "dev.sallvain.mylove")
 
-    func say(_ s: String) { print("DRIVE " + s) }
+    // Flushed: `sim swipe back --hold` reads "holding" from the log while the
+    // step still runs, and a redirected stdout is block-buffered.
+    func say(_ s: String) {
+        print("DRIVE " + s)
+        fflush(stdout)
+    }
 
     func webView() -> XCUIElement {
         let web = app.webViews.firstMatch
@@ -79,6 +89,22 @@ final class Drive: XCTestCase {
                 }
             }
             XCTFail("page unchanged after 8 pans: no pan registered, or nothing to go back to")
+        case ("swipe", 3) where words[1] == "back" && words[2] == "hold":
+            // The same fast edge pan as `swipe back`, stopped at the middle
+            // and held while the shell takes its screenshot. One try only:
+            // the shell repeats it, since only a screenshot shows whether a
+            // held pan registered. iOS may finish or cancel a pan let go at
+            // the middle, so the page is read again after the release.
+            let web = webView()
+            let origin = web.coordinate(withNormalizedOffset: .zero)
+            let midY = web.frame.height / 2
+            let from = origin.withOffset(CGVector(dx: 2, dy: midY))
+            let to = origin.withOffset(CGVector(dx: web.frame.width * 0.5, dy: midY))
+            let before = pageSignature(web)
+            say("holding")
+            from.press(forDuration: 0.01, thenDragTo: to, withVelocity: XCUIGestureVelocity(1500), thenHoldForDuration: 3)
+            sleep(1)
+            say(pageSignature(web) != before ? "released: the page went back" : "released: the page stayed")
         case ("dump", 1):
             say(try dump(webView()))
         case ("signin", 3):

@@ -19,18 +19,18 @@ import { useEffect, useState } from 'react';
 import { authService } from '../../api/authService';
 import { offlineMessage } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
-import { GROUP_ROW, fieldClass } from '../shared/kitClasses';
+import { GROUP_ROW } from '../shared/kitClasses';
+import { isDisplayNameLength } from '../../services/profileService';
 import {
   BIRTHDAY_MIN,
+  FIELD_CLASS,
+  NOT_SET,
   formatDateOnly,
   isValidBirthday,
-  isValidDisplayName,
   latestBirthday,
 } from './settingsFields';
 import { OneFieldPage } from './stack/OneFieldPage';
 import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
-
-const NOT_SET = 'Not set';
 
 /** The top page's Account row: the display name on the right. */
 export function ProfileRow() {
@@ -135,8 +135,6 @@ export function ProfilePage() {
   );
 }
 
-const FIELD_CLASS = `${fieldClass(false)} disabled:cursor-not-allowed disabled:opacity-60`;
-
 export function NamePage() {
   const saved = useAppStore((s) => s.ownProfile?.displayName ?? '');
   const setDisplayName = useAppStore((s) => s.setDisplayName);
@@ -145,7 +143,7 @@ export function NamePage() {
     <OneFieldPage
       label="Name"
       saved={saved}
-      isValid={isValidDisplayName}
+      isValid={isDisplayNameLength}
       save={setDisplayName}
       offlineRefusal={offlineMessage('Name changes', 'save')}
       testId="settings-name-page"
