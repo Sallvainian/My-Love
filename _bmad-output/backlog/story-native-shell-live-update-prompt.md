@@ -6,7 +6,7 @@ parent:
 covers: []
 after: []
 refined: false
-hitl: true
+hitl: false
 risk: high
 ---
 
@@ -14,7 +14,7 @@ risk: high
 
 ## Description
 
-In the native iOS shell a newer web build is announced instead of swapped in silently: a toast while it downloads, a toast when it is ready, and a confirm dialog that applies it at once. A ready update also waits as an entry on a new notifications page, opened from a new button at the header's top-left, so an ignored or declined toast still leaves a way to apply it. The silent swap when the app is next backgrounded stays as the fallback. A person checks the flow on the owner's iPhone after a deploy.
+In the native iOS shell a newer web build is announced instead of swapped in silently: a toast while it downloads, a toast when it is ready, and a confirm dialog that applies it at once. A ready update also waits as an entry on a new notifications page, opened from a new button at the header's top-left, so an ignored or declined toast still leaves a way to apply it. The silent swap when the app is next backgrounded stays as the fallback. The flow is checked on the iPhone Duo simulator with `scripts/sim-driver/sim`: `sim build --update-port`, `sim serve-update`, `sim background` and `sim launch` publish, download and apply a live update there.
 
 ## Requirements
 
@@ -97,7 +97,7 @@ In the native iOS shell a newer web build is announced instead of swapped in sil
 - Decision: 2026-10-30 the "Update now" entry appears as soon as an update is ready, not only after No, so an ignored toast still leaves a way to apply it.
 - Decision: 2026-10-30 the header button and the notifications page exist in the native shell only.
 - Decision: 2026-10-30 the header button shows a dot while an update waits.
-- Decision: 2026-10-30 risk high: live update is the only way to fix web code on installed shells, and a flow that breaks it costs both phones an Xcode reinstall. Check beyond the criteria: on the owner's iPhone, deploy twice in a row; the build carrying this flow applies by Yes, and the next deploy still arrives and applies by the background swap.
+- Decision: 2026-10-30 risk high: live update is the only way to fix web code on installed shells, and a flow that breaks it costs both phones an Xcode reinstall. Check beyond the criteria, on the simulator: serve two updates in a row (`sim build --update-port N`, then `sim serve-update --port N` twice, rebuilding the served tree between them); the build carrying this flow shows its toast and applies by Yes, and the next one still arrives and applies by the background swap (`sim background`, `sim launch`). No phone step: nothing here needs a real finger, a real push or a reinstall on the owner's phone (2026-11-04, DW-442; the check was the owner's iPhone until then).
 - Decision: 2026-10-30 the Safari and Home Screen web app update is out of this ticket; it is recorded as bug 2 in this folder.
 - Decision: 2026-10-30 no `bmad-ux` pass; layout: the toasts sit above the dock and reserve `--dock-clearance`; the confirm is a modal dialog like the app's other confirms; the header button matches the gear's size and style, with the dot at its top-right corner.
 - Decision: 2026-10-30 kept as one story: the notifications page exists only to hold the update entry.

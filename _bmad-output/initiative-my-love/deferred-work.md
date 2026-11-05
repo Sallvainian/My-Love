@@ -3858,7 +3858,8 @@ location: _bmad-output/backlog/story-native-shell-live-update-prompt.md (frontma
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: medium
 reason: AGENTS.md (Maintained by hand, hand checks) orders checks Playwright, then the simulator, then a real phone, and forbids `hitl` for a check a machine can run. This story says "A person checks the flow on the owner's iPhone after a deploy" and asks for two deploys in a row on that phone. `sim build --update-port` and `sim serve-update` already apply a downloaded update on the simulator, and the DW-424 re-check of 2026-11-04 used them. Fix: set `hitl: false`, move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the simulator, and keep a phone step only for something the simulator cannot show, saying why. Triage 2026-11-04: still `hitl: true` (line 9) with the phone check at lines 17 and 100; nothing in it needs a phone (`sim build --update-port`, `sim serve-update`, `sim background` and `sim launch`). `52b71747` already shipped the update toast ("Downloading update…", then a Refresh button), so the story's requirements 1-4 describe a different design, and the refine may close it as superseded.
-status: open
+status: done 2026-11-04
+resolution: the backlog story now has `hitl: false`; its Description and the 2026-10-30 risk Decision move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the Duo simulator through `sim build --update-port`, `sim serve-update`, `sim background` and `sim launch`, with no phone step, since nothing in it needs one. Whether `52b71747`'s shipped toast supersedes the story is left to its refine.
 decision: 2026-11-04 po-refine — outside the loop: the PO refines the backlog story (a ticket edit).
 
 ### DW-443: The simulator driver tells the reader to run `sudo /bin/date`, which moves the Mac's clock.
