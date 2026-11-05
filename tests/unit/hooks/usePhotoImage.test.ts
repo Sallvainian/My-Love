@@ -55,6 +55,7 @@ vi.mock('@/stores/useAppStore', async () => {
 import { ERROR_RETRY_DELAYS_MS, usePhotoImage } from '@/hooks/usePhotoImage';
 import type { PhotoCacheSession } from '@/services/photoImageCache';
 import { useAppStore } from '@/stores/useAppStore';
+import { setOnline } from '../stores/navigatorFixtures';
 
 /**
  * Twenty times the whole automatic-retry schedule (840 s today, never less
@@ -62,10 +63,6 @@ import { useAppStore } from '@/stores/useAppStore';
  * timer would have fired, and it grows with `ERROR_RETRY_DELAYS_MS`.
  */
 const PAST_EVERY_RETRY_MS = 20 * ERROR_RETRY_DELAYS_MS.reduce((total, delay) => total + delay, 0);
-
-function setOnline(value: boolean) {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
-}
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};

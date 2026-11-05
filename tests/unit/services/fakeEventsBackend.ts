@@ -264,6 +264,4 @@ export function eventsQuery() {
   return builder;
 }
 
-export function setOnline(online: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
-}
+export { setOnline } from '../stores/navigatorFixtures';

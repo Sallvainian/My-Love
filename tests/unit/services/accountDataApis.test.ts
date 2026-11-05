@@ -49,12 +49,9 @@ import {
   hashText,
   messageFavoritesApi,
 } from '../../../src/services/messageFavoritesApi';
+import { setOnline } from '../stores/navigatorFixtures';
 
 const A = 'USER-A-ID';
-
-function setOnline(online: boolean) {
-  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
-}
 
 function methods(index = 0) {
   return calls[index].chain.map(([method]) => method);

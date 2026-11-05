@@ -46,6 +46,7 @@ import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { COUPLE_SETTINGS_COPY_KIND } from '../../../src/stores/slices/datesSlice';
 import { PROFILE_COPY_KIND } from '../../../src/stores/slices/profileSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { setOnline } from './navigatorFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -63,10 +64,6 @@ const SAVED_COUPLE = {
 
 /** `lookupPartnerId`'s answer for a linked account. */
 const LINKED_LOOKUP = { status: 'linked', partnerId: P } as const;
-
-function setOnline(value: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
-}
 
 async function clearCopies(): Promise<void> {
   const db = await openMyLoveDB();

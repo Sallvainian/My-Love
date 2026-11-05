@@ -53,6 +53,7 @@ import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { COUPLE_SETTINGS_COPY_KIND, type CoupleSettings } from '../../../src/stores/slices/datesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
+import { setOnline } from './navigatorFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -82,10 +83,6 @@ function deferred<T>() {
     settle = resolve;
   });
   return { promise, settle };
-}
-
-function setOnline(value: boolean): void {
-  Object.defineProperty(navigator, 'onLine', { value, configurable: true });
 }
 
 async function clearCopies(): Promise<void> {
