@@ -94,6 +94,8 @@ Pass 1 (quick lens): high 0, medium 1, low 1, false 1, maybe-false 1.
 | 3 | The plan's simulator check of the toast above the Love Notes composer did not run, and the gap is not in the ledger | maybe-false | defer | Placement was measured in the browser only; shell launch lands on Home and `sim tap` outlasts the 6 s toast. Settled by a throttled-download simulator run; logged as DW-460 (medium, unverified) |
 | 4 | "presses nothing underneath" assertion in `NotificationsBell.test.tsx` cannot fail | low | patch | The click is dispatched on the catcher and happy-dom does no hit-testing, so `underneath` can never be called; the test's class and close assertions do still guard the catcher. Fix: drop the vacuous assertion and name the test for what it proves |
 
+Owner decision, 2026-11-04: row 3 is dropped. The toast's place above the composer is web layout, and a web layout that passes in Chrome and Safari is done; the check was re-run in WebKit (iPhone 15 profile, local stack): the toast-classed box ended 12px above the composer at 64px and at 130px tall, and 12px above the dock on Home, so DW-460 was removed from the ledger. Row 2 stands: the drop-down stays lined up with the bell.
+
 ## Design Notes
 
 - Drop-down left edge: DESIGN.md says "header's 12px inset plus `--dock-left`", but the header is not offset by `--dock-left` (EXPERIENCE.md puts the bell "inside the 84pt left inset" in column-left). Both spines say the list is anchored to and follows the bell, so it lines up with the bell at `left: 12px` in every pose.
