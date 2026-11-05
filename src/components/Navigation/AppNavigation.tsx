@@ -34,6 +34,9 @@
  * the top page and every subpage, so the gear is only ever shown where it can
  * be tapped and carries no active state.
  *
+ * In the native shell the header's left slot holds the Notifications bell
+ * (`NotificationsBell`); the website keeps the empty slot there.
+ *
  * A Settings page opened from Home (a date card, Add) keeps Home lit: while
  * `settingsFromHome` is set, the active destination is `home` in both forms,
  * and the column's Settings button is not active. The header stays hidden,
@@ -56,9 +59,11 @@ import {
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useLayoutEffect } from 'react';
 import { useSideColumn } from '../../hooks/useSideColumn';
 import type { ViewType } from '../../stores/slices/navigationSlice';
+import { NotificationsBell } from './NotificationsBell';
 
 interface Destination {
   view: ViewType;
@@ -138,9 +143,14 @@ export function AppNavigation({
       {!isSettings && (
         <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
           <div className="flex h-16 items-center gap-2 px-3">
-            {/* Balances the gear so the wordmark stays optically centred; also
-                the slot a future notifications button takes. */}
-            <span aria-hidden="true" className="min-h-11 min-w-11" />
+            {/* The native shell's Notifications bell; on the website, an empty
+                span that balances the gear so the wordmark stays optically
+                centred. */}
+            {Capacitor.isNativePlatform() ? (
+              <NotificationsBell currentView={currentView} />
+            ) : (
+              <span aria-hidden="true" className="min-h-11 min-w-11" />
+            )}
 
             {/* The app name rather than the active destination, and a span rather
                 than a heading: Mood, Notes, Partner and Settings each render

@@ -20,6 +20,10 @@ vi.mock('../../../hooks/useSideColumn', () => ({
   useSideColumn: () => sideColumn.current,
 }));
 
+// The bell is the native shell's alone; each test says which one it renders in.
+const isNativePlatform = vi.hoisted(() => vi.fn(() => false));
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform } }));
+
 const DOCK_DESTINATIONS: ViewType[] = ['home', 'mood', 'notes', 'photos', 'partner'];
 const ALL_DESTINATIONS: ViewType[] = [...DOCK_DESTINATIONS, 'settings'];
 
@@ -46,6 +50,7 @@ describe('AppNavigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sideColumn.current = null;
+    isNativePlatform.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -92,6 +97,69 @@ describe('AppNavigation', () => {
       // 'Logout' was the retired control's exact accessible name.
       expect(screen.queryByLabelText('Logout')).not.toBeInTheDocument();
       expect(screen.queryByText(/sign out/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Notifications bell', () => {
+    it('keeps the empty left slot and no bell on the website', () => {
+      renderNavigation();
+
+      const row = screen.getByTestId('app-header').firstElementChild as HTMLElement;
+      const slot = row.firstElementChild as HTMLElement;
+      expect(slot.tagName).toBe('SPAN');
+      expect(slot).toHaveAttribute('aria-hidden', 'true');
+      expect(slot).toHaveClass('min-h-11', 'min-w-11');
+      expect(slot).toBeEmptyDOMElement();
+      expect(screen.queryByTestId('nav-notifications')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
+    });
+
+    it('puts the bell in the left slot in the native shell, the gear still on the right', () => {
+      isNativePlatform.mockReturnValue(true);
+      renderNavigation();
+
+      const header = screen.getByTestId('app-header');
+      const row = header.firstElementChild as HTMLElement;
+      const bell = screen.getByRole('button', { name: 'Notifications' });
+      expect(row.firstElementChild).toBe(bell);
+      expect(within(header).getAllByRole('button')).toEqual([
+        bell,
+        screen.getByTestId('nav-settings'),
+      ]);
+      // Sized and coloured like the gear.
+      expect(bell).toHaveClass('min-h-11', 'min-w-11', 'rounded-full', 'text-muted');
+      expect(screen.getByTestId('nav-settings')).toHaveClass('min-h-11', 'min-w-11', 'text-muted');
+    });
+
+    it('keeps the bell at the left and the gear-sized spacer on the right in the column form', () => {
+      isNativePlatform.mockReturnValue(true);
+      sideColumn.current = 'left';
+      renderNavigation();
+
+      const row = screen.getByTestId('app-header').firstElementChild as HTMLElement;
+      expect(row.firstElementChild).toBe(screen.getByRole('button', { name: 'Notifications' }));
+      const spacer = row.lastElementChild as HTMLElement;
+      expect(spacer.tagName).toBe('SPAN');
+      expect(spacer).toHaveClass('min-h-11', 'min-w-11');
+      expect(within(screen.getByTestId('app-header')).getAllByRole('button')).toHaveLength(1);
+    });
+
+    it('shows no bell on Settings, which has no app header', () => {
+      isNativePlatform.mockReturnValue(true);
+      renderNavigation({ currentView: 'settings' });
+
+      expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
+    });
+
+    it('leaves the dock and its five destinations as they are', () => {
+      isNativePlatform.mockReturnValue(true);
+      renderNavigation();
+
+      const dock = screen.getByTestId('nav-dock');
+      expect(within(dock).getAllByRole('button').map((button) => button.dataset.testid)).toEqual(
+        DOCK_DESTINATIONS.map((view) => `nav-${view}`)
+      );
     });
   });
 
