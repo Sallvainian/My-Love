@@ -1,5 +1,5 @@
 import { Heart, Plus } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DailyMessage } from './components/DailyMessage/DailyMessage';
 import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { AppNavigation } from './components/Navigation/AppNavigation';
@@ -627,6 +627,17 @@ function App() {
     // when nothing was ever saved; a failed refresh never blanks the last-good
     // list (eventsSlice).
   }, [authUserId, authSessionVersion, currentView, isOnline, loadEvents]);
+
+  // A view opens at its top. Every view but Love Notes scrolls the document
+  // itself, so without this a view kept the scroll the one before it left,
+  // clamped to its own height, and Mood or Home opened mid-page. The first
+  // render is left alone, so a reload keeps the browser's own restore.
+  const shownView = useRef(currentView);
+  useLayoutEffect(() => {
+    if (shownView.current === currentView) return;
+    shownView.current = currentView;
+    window.scrollTo?.(0, 0);
+  }, [currentView]);
 
   // Bumped when a card retires itself at local midnight, purely to re-run the
   // filter and slot decision below. Not a timer of its own: it rides the

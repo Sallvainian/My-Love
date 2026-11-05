@@ -117,6 +117,24 @@ test.describe('Bottom Dock', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
+  test('[P1] should open each view at its top, not at the scroll the last one left', async ({
+    page,
+  }) => {
+    // Short enough that Mood and Partner both scroll at phone width.
+    await page.setViewportSize({ width: PHONE_VIEWPORT.width, height: 600 });
+    await page.goto('/mood');
+    await expect(VIEW_WITNESS.mood(page)).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 400));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+    await page.getByTestId('nav-dock').getByTestId('nav-partner').click();
+    await expect(VIEW_WITNESS.partner(page)).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight))
+      .toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
   test('[P1] should put the Photos Upload button in the page header, not floating', async ({
     page,
     interceptNetworkCall,
