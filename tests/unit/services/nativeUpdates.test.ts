@@ -258,29 +258,62 @@ describe('applyUpdate', () => {
     stubFetch(LATEST);
     const updates = await runAndLoad();
 
-    await updates.applyUpdate();
+    await expect(updates.applyUpdate()).resolves.toBe(true);
 
     expect(updater.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('does nothing while no build is ready', async () => {
+  it('does nothing and resolves false while no build is ready', async () => {
     stubFetch({ ...LATEST, version: 'test-build' });
     const updates = await runAndLoad();
 
-    await updates.applyUpdate();
+    await expect(updates.applyUpdate()).resolves.toBe(false);
 
     expect(updater.reload).not.toHaveBeenCalled();
   });
 
-  it('never throws when the reload fails', async () => {
+  it('never throws, resolves false and stays ready when the reload fails', async () => {
     stubFetch(LATEST);
     const updates = await runAndLoad();
     updater.reload.mockRejectedValue(new Error('reload failed'));
 
-    await expect(updates.applyUpdate()).resolves.toBeUndefined();
+    await expect(updates.applyUpdate()).resolves.toBe(false);
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining('Applying the update failed'),
       expect.any(Error)
     );
+    // Still queued, so the bell keeps its dot and entry for the background swap.
+    expect(updates.getUpdateStatus()).toEqual({ state: 'ready' });
+  });
+});
+
+describe('update confirm store', () => {
+  it('starts closed, opens and closes, and tells each subscriber once per change', async () => {
+    const updates = await import('../../../src/services/nativeUpdates');
+    const seen: boolean[] = [];
+    const unsubscribe = updates.subscribeUpdateConfirm(() =>
+      seen.push(updates.getUpdateConfirmOpen())
+    );
+
+    expect(updates.getUpdateConfirmOpen()).toBe(false);
+    updates.openUpdateConfirm();
+    updates.openUpdateConfirm();
+    updates.closeUpdateConfirm();
+    updates.closeUpdateConfirm();
+
+    expect(seen).toEqual([true, false]);
+    unsubscribe();
+    updates.openUpdateConfirm();
+    expect(seen).toEqual([true, false]);
+    expect(updates.getUpdateConfirmOpen()).toBe(true);
+  });
+
+  it('never loads the updater', async () => {
+    const updates = await import('../../../src/services/nativeUpdates');
+
+    updates.openUpdateConfirm();
+    updates.closeUpdateConfirm();
+
+    expect(loadUpdater).not.toHaveBeenCalled();
   });
 });

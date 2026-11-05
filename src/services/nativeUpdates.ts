@@ -8,10 +8,13 @@
  * backgrounded or relaunched, never mid-use. A bundle that fails to start rolls
  * back to the last good one by itself.
  *
- * The check also publishes its progress (`getUpdateStatus`), which
- * UpdateToast shows: the download's percent, then a prompt whose Refresh
- * applies the queued build at once (`applyUpdate`) instead of waiting for the
- * next background.
+ * The check also publishes its progress (`getUpdateStatus`), which the shell's
+ * update UI reads: UpdateToast shows the download's percent, then a ready
+ * toast, and the header's NotificationsBell carries a dot and an "Update now"
+ * entry while the status is `ready`. A tap on either opens the one confirm
+ * dialog through the store below (`openUpdateConfirm`), and its Yes applies the
+ * queued build at once (`applyUpdate`) instead of waiting for the next
+ * background; No leaves the background swap to apply it.
  *
  * On the web this does nothing, and the updater plugin is never loaded.
  */
@@ -20,7 +23,7 @@ import { logger } from '../utils/logger';
 
 const DEFAULT_UPDATE_URL = 'https://my-love.sallvain.workers.dev/updates/latest.json';
 
-/** What the update check is doing, for UpdateToast. */
+/** What the update check is doing, for UpdateToast and NotificationsBell. */
 export type UpdateStatus =
   | { state: 'idle' }
   /** `percent` is null until the plugin reports the first progress. */
@@ -51,17 +54,55 @@ export function subscribeUpdateStatus(onChange: () => void): () => void {
 
 /**
  * Restarts the app on the queued build now. `next()` already queued it, so the
- * plugin's reload swaps it in; nothing after this runs. A failed reload leaves
- * the build queued for the background swap.
+ * plugin's reload swaps it in; nothing after a successful reload runs. Resolves
+ * `false`, and never throws, when no build is ready or the reload fails, which
+ * leaves the build queued for the background swap.
  */
-export async function applyUpdate(): Promise<void> {
-  if (status.state !== 'ready') return;
+export async function applyUpdate(): Promise<boolean> {
+  if (status.state !== 'ready') return false;
   try {
     const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
     await CapacitorUpdater.reload();
+    return true;
   } catch (error) {
     console.warn('[NativeUpdates] Applying the update failed:', error);
+    return false;
   }
+}
+
+// Whether the update confirm dialog is open. The ready toast and the bell's
+// "Update now" entry both open it, and UpdateConfirmDialog, mounted once beside
+// UpdateToast, renders it.
+let confirmOpen = false;
+const confirmListeners = new Set<() => void>();
+
+function setConfirmOpen(next: boolean): void {
+  if (confirmOpen === next) return;
+  confirmOpen = next;
+  confirmListeners.forEach((listener) => listener());
+}
+
+/** Opens the update confirm dialog. */
+export function openUpdateConfirm(): void {
+  setConfirmOpen(true);
+}
+
+/** Closes the update confirm dialog. */
+export function closeUpdateConfirm(): void {
+  setConfirmOpen(false);
+}
+
+/** For `useSyncExternalStore`: whether the update confirm dialog is open. */
+export function getUpdateConfirmOpen(): boolean {
+  return confirmOpen;
+}
+
+/** For `useSyncExternalStore`: calls `onChange` whenever the dialog opens or closes. */
+export function subscribeUpdateConfirm(onChange: () => void): () => void {
+  confirmListeners.add(onChange);
+  return () => {
+    confirmListeners.delete(onChange);
+  };
 }
 
 interface LatestBundle {

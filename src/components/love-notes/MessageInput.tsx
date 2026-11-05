@@ -19,6 +19,7 @@
 import { AnimatePresence } from 'motion/react';
 import { ImageIcon, LoaderCircle, Send } from 'lucide-react';
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useComposerClearance } from '../../hooks/useComposerClearance';
 import { useLoveNotes } from '../../hooks/useLoveNotes';
 import { useVibration } from '../../hooks/useVibration';
 import { imageCompressionService } from '../../services/imageCompressionService';
@@ -45,6 +46,9 @@ export function MessageInput() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Keeps the native shell's update toast above the composer, not over it.
+  const composerRef = useRef<HTMLDivElement>(null);
+  useComposerClearance(composerRef);
 
   // autoFetch=false: the LoveNotes container owns the initial fetch and the
   // realtime subscription (useLoveNotes gates both on this flag).
@@ -214,6 +218,7 @@ export function MessageInput() {
     // Transparent over the page ground, as the kit artboard draws it: the
     // composer is a row of kit controls, not a bar of its own.
     <div
+      ref={composerRef}
       className="relative z-10 flex shrink-0 flex-col gap-2 px-4 pt-2 pb-3"
       data-testid="message-composer"
     >

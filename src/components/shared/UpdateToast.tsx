@@ -1,48 +1,80 @@
 /**
  * UpdateToast
  *
- * The native shell's live update, shown: while a newer build downloads, a
- * toast with its progress; once it is queued, "Refresh app for update?" with a
- * Refresh button that restarts onto it at once. Either can be closed; closing
- * the prompt leaves the build queued, and the plugin still swaps it in on the
- * next background.
+ * The native shell's live update, shown at the bottom of the screen: while a
+ * newer build downloads, a toast with its progress; once it is queued, "Update
+ * ready — tap to restart", which takes the download toast's place. Neither can
+ * be closed. The ready toast is one tap target: a tap hides it and opens the
+ * update confirm dialog (`openUpdateConfirm`, UpdateConfirmDialog). It hides by
+ * itself after 6 seconds, and once hidden, by either, or by the dialog opening
+ * from the bell's entry, it stays hidden for the rest of this launch: this
+ * component mounts once (main.tsx), and a restart or the background swap reloads
+ * the web view. The header bell's dot and entry stay the way back to it.
  *
  * It reads `nativeUpdates`' status, which stays idle on the web, so it renders
- * nothing there. It sits at the top, centred, just below iOS's status
- * (`env(safe-area-inset-top)`), over the header and above SyncToast, which
- * starts 5rem down; `--dock-left`/`--dock-right` (index.css) keep it clear of
- * the side column.
+ * nothing there. Its bottom edge sits 12px above `--dock-top` (index.css), the
+ * dock's top edge, or on Love Notes above the composer's top edge,
+ * `--composer-clearance` (useComposerClearance), and `--dock-left`/`--dock-right`
+ * keep it clear of the side column. z-100 keeps it above the dock and header.
  */
-import { AnimatePresence, m as motion } from 'motion/react';
-import { Download, RefreshCw, X } from 'lucide-react';
-import { useState, useSyncExternalStore } from 'react';
+import { AnimatePresence, m as motion, useReducedMotion } from 'motion/react';
+import { Download, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
-  applyUpdate,
+  getUpdateConfirmOpen,
   getUpdateStatus,
+  openUpdateConfirm,
+  subscribeUpdateConfirm,
   subscribeUpdateStatus,
-  type UpdateStatus,
 } from '../../services/nativeUpdates';
+
+/** How long the ready toast stays before it hides by itself. */
+export const READY_TOAST_MS = 6000;
 
 export function UpdateToast() {
   const status = useSyncExternalStore(subscribeUpdateStatus, getUpdateStatus);
-  // The state whose toast was dismissed. It covers the header, so each state
-  // can be closed; closing the progress still lets the Refresh prompt appear
-  // when the download ends.
-  const [dismissed, setDismissed] = useState<UpdateStatus['state'] | null>(null);
+  const reduceMotion = useReducedMotion();
+  // Set once the ready toast has hidden, by its timer, a tap or the dialog
+  // opening from the bell; it never shows again this launch.
+  const [readyHidden, setReadyHidden] = useState(false);
 
-  const showDownloading = status.state === 'downloading' && dismissed !== 'downloading';
-  const showReady = status.state === 'ready' && dismissed !== 'ready';
+  const showReady = status.state === 'ready' && !readyHidden;
+  const showDownloading = status.state === 'downloading';
+
+  // One overlay at a time: the dialog opened from the bell's entry hides the
+  // toast too, and No does not bring it back.
+  useEffect(
+    () =>
+      subscribeUpdateConfirm(() => {
+        if (getUpdateConfirmOpen()) setReadyHidden(true);
+      }),
+    []
+  );
+
+  useEffect(() => {
+    if (!showReady) return;
+    const timer = setTimeout(() => setReadyHidden(true), READY_TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [showReady]);
+
+  const handleReadyTap = () => {
+    setReadyHidden(true);
+    openUpdateConfirm();
+  };
 
   return (
     <AnimatePresence>
       {(showDownloading || showReady) && (
         <motion.div
           key="update-toast"
-          initial={{ opacity: 0, y: -40, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.95 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className="fixed right-[calc(var(--dock-right)+1rem)] top-[calc(env(safe-area-inset-top)+0.5rem)] left-[calc(var(--dock-left)+1rem)] z-100 mx-auto max-w-sm overflow-hidden rounded-[20px] border border-line bg-card shadow-float"
+          // The shipped spring, mirrored for the bottom edge; Reduce Motion fades only.
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 40, scale: 0.95 }}
+          animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.95 }}
+          transition={
+            reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 500, damping: 30 }
+          }
+          className="fixed right-[calc(var(--dock-right)+1rem)] bottom-[calc(var(--composer-clearance,var(--dock-top))+12px)] left-[calc(var(--dock-left)+1rem)] z-100 mx-auto max-w-sm overflow-hidden rounded-[20px] border border-line bg-card shadow-float"
           role="status"
           aria-live="polite"
           data-testid="update-toast"
@@ -61,14 +93,6 @@ export function UpdateToast() {
                     {Math.round(status.percent)}%
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setDismissed('downloading')}
-                  className="-my-3 -mr-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
-                  aria-label="Hide download progress"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </button>
               </div>
               <div
                 className="relative h-1.5 overflow-hidden rounded-full bg-tint"
@@ -98,26 +122,18 @@ export function UpdateToast() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3 py-1.5 pr-1.5 pl-4">
+            // The whole toast is the tap target: one 44px-high line.
+            <button
+              type="button"
+              onClick={handleReadyTap}
+              className="flex min-h-11 w-full items-center gap-3 px-4 text-left transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+              data-testid="update-toast-ready"
+            >
               <RefreshCw className="h-5 w-5 shrink-0 text-good" aria-hidden="true" />
-              <span className="flex-1 text-sm font-medium text-ink">Refresh app for update?</span>
-              <button
-                type="button"
-                onClick={() => void applyUpdate()}
-                className="flex min-h-11 shrink-0 items-center rounded-full bg-fill px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
-                data-testid="update-toast-refresh"
-              >
-                Refresh
-              </button>
-              <button
-                type="button"
-                onClick={() => setDismissed('ready')}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
-                aria-label="Dismiss update"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
+              <span className="flex-1 text-sm font-medium text-ink">
+                Update ready — tap to restart
+              </span>
+            </button>
           )}
         </motion.div>
       )}
