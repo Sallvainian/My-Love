@@ -58,41 +58,47 @@ function UpdateConfirmPanel() {
   };
 
   return (
-    <KitDialog
-      onCancel={cancel}
-      initialFocusRef={noButtonRef}
-      testId="update-confirm"
-      labelledBy={titleId}
-    >
-      <div ref={contentRef} tabIndex={-1} className="outline-hidden">
-        <h3 id={titleId} className={DIALOG_TITLE}>
-          Update now?
-        </h3>
-        <p className="mt-2 text-[15px] leading-[1.45] text-muted">
-          You may lose what you&apos;re doing.
-        </p>
-        <div className="mt-4 flex gap-3">
-          <button
-            ref={noButtonRef}
-            type="button"
-            onClick={cancel}
-            disabled={busy}
-            data-testid="update-confirm-no"
-            className={SECONDARY_BUTTON}
-          >
-            No
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleYes()}
-            disabled={busy}
-            data-testid="update-confirm-yes"
-            className={DESTRUCTIVE_BUTTON}
-          >
-            Yes
-          </button>
+    // The front of the stack: a stacking context above every other overlay
+    // (the image viewer, note and photo deletes at z-50 to z-70), the toast
+    // (z-100) and the bell's drop-down (z-110), which DIALOG_BACKDROP's z-50
+    // alone would sit under.
+    <div className="relative z-120" data-testid="update-confirm-layer">
+      <KitDialog
+        onCancel={cancel}
+        initialFocusRef={noButtonRef}
+        testId="update-confirm"
+        labelledBy={titleId}
+      >
+        <div ref={contentRef} tabIndex={-1} className="outline-hidden">
+          <h3 id={titleId} className={DIALOG_TITLE}>
+            Update now?
+          </h3>
+          <p className="mt-2 text-[15px] leading-[1.45] text-muted">
+            You may lose what you&apos;re doing.
+          </p>
+          <div className="mt-4 flex gap-3">
+            <button
+              ref={noButtonRef}
+              type="button"
+              onClick={cancel}
+              disabled={busy}
+              data-testid="update-confirm-no"
+              className={SECONDARY_BUTTON}
+            >
+              No
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleYes()}
+              disabled={busy}
+              data-testid="update-confirm-yes"
+              className={DESTRUCTIVE_BUTTON}
+            >
+              Yes
+            </button>
+          </div>
         </div>
-      </div>
-    </KitDialog>
+      </KitDialog>
+    </div>
   );
 }

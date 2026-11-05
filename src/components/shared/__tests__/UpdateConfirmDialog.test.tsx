@@ -68,6 +68,17 @@ describe('UpdateConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'No' })).toHaveFocus();
   });
 
+  it('paints above every other overlay, the toast (z-100) and the drop-down (z-110)', () => {
+    renderOpen();
+
+    const layer = screen.getByTestId('update-confirm-layer');
+    // A positioned element with a z-index forms the stacking context the
+    // kit scrim (z-50) paints inside, so the layer's z is what counts.
+    expect(layer).toHaveClass('relative', 'z-120');
+    expect(layer).toContainElement(screen.getByTestId('update-confirm'));
+    expect([...layer.classList].filter((name) => /^z-/.test(name))).toEqual(['z-120']);
+  });
+
   it('closes on No without applying the update', async () => {
     renderOpen();
 

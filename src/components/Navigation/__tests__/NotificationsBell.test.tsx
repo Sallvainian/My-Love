@@ -68,18 +68,7 @@ const bell = () => screen.getByRole('button', { name: 'Notifications' });
 const list = () => screen.queryByTestId('notifications-list');
 
 function renderBell(currentView: ViewType = 'home') {
-  // A control under where the drop-down's catcher spreads, to prove an outside
-  // tap presses nothing.
-  const underneath = vi.fn();
-  const utils = render(
-    <>
-      <NotificationsBell currentView={currentView} />
-      <button type="button" onClick={underneath}>
-        Underneath
-      </button>
-    </>
-  );
-  return { ...utils, underneath };
+  return render(<NotificationsBell currentView={currentView} />);
 }
 
 function setVisibility(state: DocumentVisibilityState) {
@@ -169,17 +158,19 @@ describe('NotificationsBell', () => {
     expect(bell()).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('closes on a tap outside, which presses nothing underneath', async () => {
-    const { underneath } = renderBell();
+  it('covers the screen above the header and below the list with a catcher whose tap closes the list', async () => {
+    renderBell();
     await userEvent.click(bell());
 
+    // Above the header's z-40 and below the list's z-110, over the whole screen.
     const catcher = screen.getByTestId('notifications-catcher');
     expect(catcher).toHaveClass('fixed', 'inset-0', 'z-105');
+    expect(catcher.parentElement).toBe(document.body);
+    expect(list()).toHaveClass('z-110');
     await userEvent.click(catcher);
 
     expect(list()).not.toBeInTheDocument();
     expect(screen.queryByTestId('notifications-catcher')).not.toBeInTheDocument();
-    expect(underneath).not.toHaveBeenCalled();
   });
 
   it('hangs from <body> above the catcher, outside the header', async () => {
