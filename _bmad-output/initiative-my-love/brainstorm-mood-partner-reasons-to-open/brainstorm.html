@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Reasons to Open</title>
+<style>
+:root{
+  --bg:#fbf4ee; --paper:#fffaf6; --ink:#2a1c22; --muted:#6e5961; --line:#e8d7cf;
+  --accent:#d6455f; --accent-soft:#ffe1e6; --plum:#6d3fc4; --gold:#b57a0c;
+  --mirror-a:#dfe6ee; --mirror-b:#f7f9fc; --mirror-ink:#4d5862;
+  --fail-bg:#eceef0; --fail-ink:#59626a; --fail-rule:#d5d9dd;
+  --inv-bg:#ffe3e7; --inv-ink:#5a1627;
+  --news:#f3eee2; --news-ink:#1f1c17; --news-rule:#2b2720;
+  --stage:#2a1636; --stage-ink:#f6eaf3; --bubble:#fff; --bubble-ink:#2a1c22;
+  --felt:#1d5a4a; --felt-2:#14463a; --cardface:#fffdf8; --cardink:#2a1c22; --suit:#c8324d;
+  --climax:#1b0f1f; --climax-ink:#fbeef3; --climax-muted:#cbb2c0; --climax-line:#3d2a42;
+  --s:#d6455f; --c:#e07a1f; --a:#b8920a; --m:#2f9a5c; --p:#2a85c4; --e:#6d3fc4; --r:#c43f9e;
+  --shadow:0 1px 2px rgba(60,30,40,.08),0 6px 20px rgba(60,30,40,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151017; --paper:#1f1820; --ink:#f3e7ec; --muted:#b9a3ae; --line:#3a2d36;
+    --accent:#ff7d93; --accent-soft:#4a1d2a; --plum:#b690ff; --gold:#f0b545;
+    --mirror-a:#262d36; --mirror-b:#353e4a; --mirror-ink:#b8c3cd;
+    --fail-bg:#24282d; --fail-ink:#a9b2ba; --fail-rule:#343a41;
+    --inv-bg:#47202b; --inv-ink:#ffe0e6;
+    --news:#211e19; --news-ink:#ece4d3; --news-rule:#cfc4ae;
+    --stage:#120a18; --stage-ink:#f6eaf3; --bubble:#2c2230; --bubble-ink:#f6eaf3;
+    --felt:#123b31; --felt-2:#0c2b23; --cardface:#26202a; --cardink:#f3e7ec; --suit:#ff7d93;
+    --climax:#0d0710; --climax-ink:#fbeef3; --climax-muted:#c3a9b8; --climax-line:#35233a;
+    --s:#ff7d93; --c:#ff9f4f; --a:#e8c341; --m:#5fd08d; --p:#62b5f0; --e:#b690ff; --r:#f07ccc;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151017; --paper:#1f1820; --ink:#f3e7ec; --muted:#b9a3ae; --line:#3a2d36;
+  --accent:#ff7d93; --accent-soft:#4a1d2a; --plum:#b690ff; --gold:#f0b545;
+  --mirror-a:#262d36; --mirror-b:#353e4a; --mirror-ink:#b8c3cd;
+  --fail-bg:#24282d; --fail-ink:#a9b2ba; --fail-rule:#343a41;
+  --inv-bg:#47202b; --inv-ink:#ffe0e6;
+  --news:#211e19; --news-ink:#ece4d3; --news-rule:#cfc4ae;
+  --stage:#120a18; --stage-ink:#f6eaf3; --bubble:#2c2230; --bubble-ink:#f6eaf3;
+  --felt:#123b31; --felt-2:#0c2b23; --cardface:#26202a; --cardink:#f3e7ec; --suit:#ff7d93;
+  --climax:#0d0710; --climax-ink:#fbeef3; --climax-muted:#c3a9b8; --climax-line:#35233a;
+  --s:#ff7d93; --c:#ff9f4f; --a:#e8c341; --m:#5fd08d; --p:#62b5f0; --e:#b690ff; --r:#f07ccc;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+.serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
+h1,h2,h3{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;line-height:1.15;margin:0}
+p{margin:0}
+.wrap{max-width:1000px;margin:0 auto;padding:0 16px}
+section{padding:72px 0;overflow:clip}
+.kicker{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:60ch;margin-top:12px}
+button{font:inherit;color:inherit;cursor:pointer}
+.pill-btn{border:1.5px solid currentColor;background:transparent;border-radius:999px;padding:8px 16px;font-weight:600;font-size:14px}
+.pill-btn:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.theme-toggle{position:absolute;top:12px;right:12px;z-index:5;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;box-shadow:var(--shadow)}
+
+/* ---------- hero ---------- */
+.hero{padding:88px 0 56px;position:relative}
+.hero h1{font-size:clamp(44px,11vw,104px);letter-spacing:-.02em}
+.hero h1 .env{display:inline-block;color:var(--accent);font-style:italic}
+.hero .topic{font-size:clamp(18px,3.6vw,24px);margin-top:18px;max-width:30ch}
+.goal{margin-top:22px;font-size:clamp(20px,4.4vw,30px)}
+.goal .pull{color:var(--accent);font-weight:700}
+.goal s{color:var(--muted);text-decoration-thickness:3px;text-decoration-color:var(--accent)}
+.stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:36px}
+.stat b{display:block;font:700 clamp(30px,7vw,44px)/1 "Iowan Old Style",Georgia,serif}
+.stat span{font-size:13px;color:var(--muted)}
+.shape{margin-top:40px}
+.shape-bar{display:flex;height:22px;border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.shape-bar i{display:block;height:100%}
+.shape-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px;color:var(--muted)}
+.shape-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--sw);vertical-align:-1px}
+.meta{margin-top:26px;font-size:13px;color:var(--muted)}
+
+/* ---------- prologue: mirrors ---------- */
+.mirrors{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px;margin-top:28px}
+.mirror{position:relative;border-radius:120px 120px 18px 18px;padding:56px 24px 26px;background:linear-gradient(160deg,var(--mirror-b),var(--mirror-a) 60%,var(--mirror-b));color:var(--mirror-ink);border:6px solid var(--paper);box-shadow:var(--shadow),inset 0 0 0 1px var(--line);overflow:hidden}
+.mirror::after{content:"";position:absolute;top:-40%;left:-60%;width:40%;height:180%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);transform:rotate(18deg);animation:sheen 7s ease-in-out infinite}
+@keyframes sheen{0%,60%{left:-60%}100%{left:140%}}
+.mirror h3{font-size:24px;text-align:center;color:var(--ink)}
+.mirror ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+.mirror li{font-size:14.5px;padding-left:18px;position:relative}
+.mirror li::before{content:"";position:absolute;left:0;top:.6em;width:8px;height:8px;border-radius:50%;border:1.5px solid currentColor}
+.verdict{margin-top:24px;font-size:clamp(19px,3.6vw,24px);max-width:36ch}
+.verdict em{color:var(--accent)}
+.decision{margin-top:22px;border-left:3px solid var(--plum);padding:10px 16px;background:var(--paper);border-radius:0 12px 12px 0;font-size:14.5px;max-width:70ch}
+.decision b{color:var(--plum)}
+
+/* ---------- section headers ---------- */
+.tech-head{display:grid;gap:10px;margin-bottom:28px}
+.tech-head h2{font-size:clamp(32px,7vw,56px)}
+.tech-head .q{font-size:clamp(17px,3.4vw,21px);font-style:italic;max-width:46ch}
+.count-badge{display:inline-flex;align-items:baseline;gap:6px;font-size:13px;color:var(--muted)}
+.count-badge b{font:700 22px/1 Georgia,serif;color:var(--ink)}
+
+/* ---------- 1. reverse: flip cards ---------- */
+#reverse h2 .flipword{display:inline-block;transform:scaleY(-1);color:var(--muted)}
+.rev-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:22px}
+.rev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:16px}
+.flip{perspective:1100px;background:none;border:0;padding:0;text-align:left;width:100%}
+.flip-inner{display:grid;transition:transform .7s cubic-bezier(.3,1.4,.5,1);transform-style:preserve-3d;height:100%}
+.flip.on .flip-inner{transform:rotateY(180deg)}
+.face{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:14px;padding:16px 16px 18px;min-height:130px;display:flex;flex-direction:column;gap:10px}
+.face.fail{background:var(--fail-bg);color:var(--fail-ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;background-image:repeating-linear-gradient(transparent 0 27px,var(--fail-rule) 27px 28px);border:1px solid var(--fail-rule)}
+.face.inv{background:var(--inv-bg);color:var(--inv-ink);transform:rotateY(180deg);font-family:"Iowan Old Style",Georgia,serif;font-size:16px;box-shadow:var(--shadow)}
+.stamp{align-self:flex-start;font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;padding:5px 8px;border:2px solid currentColor;border-radius:4px;transform:rotate(-3deg)}
+.face.fail .stamp{color:#9a4a4a}
+.face.inv .stamp{color:var(--accent);transform:rotate(2deg)}
+.face .hint{margin-top:auto;font-size:11px;opacity:.7;font-family:system-ui,sans-serif}
+.face.fail .formrow{display:flex;justify-content:space-between;font-size:11px;opacity:.75;border-top:1px dashed var(--fail-rule);padding-top:6px;margin-top:auto}
+
+/* ---------- 2. SCAMPER ---------- */
+.scamper-letters{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;margin:8px 0 6px}
+.sl{border:0;background:none;padding:0;display:grid;justify-items:center;gap:6px}
+.sl .bar{width:70%;max-width:46px;border-radius:8px 8px 3px 3px;background:var(--col);opacity:.25;transition:opacity .25s,transform .25s;transform-origin:bottom}
+.sl .ltr{font:700 clamp(30px,9vw,64px)/1 "Iowan Old Style",Georgia,serif;color:var(--col);transition:transform .25s}
+.sl .n{font-size:12px;color:var(--muted)}
+.sl[aria-pressed="true"] .bar{opacity:1}
+.sl[aria-pressed="true"] .ltr{transform:translateY(-4px) scale(1.08)}
+.scamper-word{font-size:13px;color:var(--muted);text-align:center;margin-bottom:22px;min-height:1.5em}
+.scamper-word b{color:var(--ink)}
+.scamper-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:12px}
+.sc-card{background:var(--paper);border-radius:14px;padding:14px 16px 16px;border-top:5px solid var(--col);box-shadow:var(--shadow);animation:pop .35s ease both}
+.sc-card .verb{font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;color:var(--col)}
+.sc-card .tag{display:inline-block;margin-left:6px;font:600 11px/1 system-ui;padding:3px 7px;border-radius:999px;background:color-mix(in srgb,var(--col) 18%,transparent);color:var(--ink)}
+.sc-card p{margin-top:9px;font-size:15px}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ---------- 3. JTBD: classifieds ---------- */
+.paper{background:var(--news);color:var(--news-ink);border-radius:6px;padding:22px 18px 26px;box-shadow:var(--shadow);font-family:"Iowan Old Style",Georgia,serif}
+.masthead{text-align:center;border-bottom:3px double var(--news-rule);padding-bottom:12px}
+.masthead .title{font:900 clamp(28px,7.5vw,58px)/1 "Iowan Old Style",Georgia,serif;letter-spacing:-.01em}
+.masthead .dateline{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;font:600 11px/1.4 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;margin-top:10px;border-top:1px solid var(--news-rule);padding-top:6px}
+.headline{text-align:center;margin:20px auto 6px;max-width:24ch;font-size:clamp(24px,5.6vw,40px);font-weight:800;line-height:1.1}
+.subhead{text-align:center;font-style:italic;font-size:15px;opacity:.8}
+.leads{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;margin:20px 0 22px}
+.lead{border:2px solid var(--news-rule);padding:12px 14px;text-align:center}
+.lead small{display:block;font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.2em}
+.lead b{display:block;font-size:19px;margin-top:6px;line-height:1.25}
+.hw{font:900 13px/1 ui-monospace,Menlo,monospace;letter-spacing:.3em;text-align:center;border-top:1px solid var(--news-rule);border-bottom:1px solid var(--news-rule);padding:7px 0;margin-bottom:16px}
+.ads{columns:3 220px;column-gap:22px;column-rule:1px solid color-mix(in srgb,var(--news-rule) 35%,transparent)}
+.ad{break-inside:avoid;margin:0 0 16px;font-size:14.5px;line-height:1.45}
+.ad h4{margin:0 0 4px;font:800 13px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase}
+.ad h4::before{content:"WANTED: ";color:var(--accent)}
+.ad .apply{display:block;margin-top:4px;font:italic 12px/1.3 Georgia,serif;opacity:.7}
+
+/* ---------- 4. role playing: stage ---------- */
+.stage{background:var(--stage);color:var(--stage-ink);border-radius:24px;padding:28px 16px 36px;position:relative;overflow:hidden}
+.stage::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(255,220,160,.22),transparent 70%);pointer-events:none}
+.curtain{display:flex;justify-content:space-between;pointer-events:none;position:absolute;inset:0 0 auto 0;height:28px}
+.curtain i{flex:1;background:repeating-linear-gradient(90deg,#7b1f35 0 14px,#5e1428 14px 28px);border-radius:0 0 50% 50%/0 0 100% 100%}
+.stage .tech-head{position:relative}
+.stage .tech-head .kicker,.stage .count-badge{color:#d9bfd0}
+.stage .count-badge b{color:var(--stage-ink)}
+.cast{position:relative;display:grid;gap:18px;margin-top:8px}
+.line{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start;max-width:720px}
+.line.r{grid-template-columns:1fr 52px;margin-left:auto}
+.line.r .who{order:2}
+.who{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font:700 15px/1 Georgia,serif;color:#fff;background:var(--av);box-shadow:0 0 0 3px rgba(255,255,255,.12)}
+.speech{display:grid;gap:6px}
+.line.r .speech{justify-items:end}
+.line.r .rolename{text-align:right}
+.rolename{font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#d9bfd0}
+.bubble{background:var(--bubble);color:var(--bubble-ink);padding:10px 14px;border-radius:18px 18px 18px 4px;font-family:"Iowan Old Style",Georgia,serif;font-size:17px;font-style:italic;max-width:46ch;justify-self:start}
+.line.r .bubble{justify-self:end}
+.line.r .bubble{border-radius:18px 18px 4px 18px}
+.direction{font-size:14.5px;color:var(--stage-ink);opacity:.92;max-width:58ch}
+.direction::before{content:"[enter idea] ";font:600 11px ui-monospace,Menlo,monospace;color:#f3b9c8;letter-spacing:.06em}
+
+/* ---------- 5. wildcards: a suit of hearts ---------- */
+.felt{background:radial-gradient(ellipse at 50% 30%,var(--felt),var(--felt-2));color:#eef7f2;border-radius:28px;padding:30px 16px 34px;overflow:hidden}
+.felt .tech-head .kicker,.felt .count-badge{color:#b9dccd}
+.felt .count-badge b{color:#fff}
+.felt .lede{color:#cfe8dc}
+.draw-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:22px}
+.hand{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));gap:14px}
+.pcard{position:relative;background:var(--cardface);color:var(--cardink);border-radius:12px;padding:30px 16px 30px;min-height:170px;box-shadow:0 2px 0 rgba(0,0,0,.15),0 10px 22px rgba(0,0,0,.28);transform:rotate(var(--rot));transition:transform .35s,box-shadow .35s;font-size:14.5px;border:0;text-align:left;width:100%}
+.pcard:hover,.pcard.drawn{transform:rotate(0) translateY(-6px) scale(1.03);z-index:2}
+.pcard.drawn{box-shadow:0 0 0 3px var(--gold),0 14px 30px rgba(0,0,0,.4)}
+.pcard .corner{position:absolute;font:700 15px/1 Georgia,serif;color:var(--suit);text-align:center;font-variant-emoji:text}
+.pcard .tl{top:8px;left:10px}
+.pcard .br{bottom:8px;right:10px;transform:rotate(180deg)}
+.pcard .pip{position:absolute;right:12px;top:8px;font-size:34px;color:var(--suit);opacity:.12;font-variant-emoji:text}
+
+/* ---------- climax ---------- */
+.climax{background:var(--climax);color:var(--climax-ink);padding:84px 0 96px;--accent:#ff7d93;--plum:#b690ff;--gold:#f0b545;--m:#5fd08d;--a:#e8c341}
+.climax .kicker{color:var(--climax-muted)}
+.climax h2{font-size:clamp(36px,8.5vw,72px)}
+.act{margin-top:72px;display:grid;gap:18px}
+.act-n{font:700 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.2em;color:var(--accent)}
+.act h3{font-size:clamp(26px,5.4vw,40px)}
+.quote{font-family:"Iowan Old Style",Georgia,serif;font-size:clamp(18px,3.4vw,22px);max-width:60ch;color:var(--climax-ink);border-left:3px solid var(--accent);padding-left:16px}
+.panel{background:rgba(255,255,255,.04);border:1px solid var(--climax-line);border-radius:20px;padding:18px}
+.duo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.duo figure{margin:0}
+.duo figcaption{font-size:13px;color:var(--climax-muted);margin-top:8px;text-align:center}
+svg{max-width:100%;height:auto;display:block}
+.svgtxt{font:700 15px Georgia,serif;fill:var(--climax-ink)}
+.svgsm{font:12px system-ui,sans-serif;fill:var(--climax-muted)}
+.bounce{stroke-dasharray:4 5;animation:dash 1.6s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-18}}
+
+.merge{display:grid;gap:14px;justify-items:center;text-align:center}
+.sources{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.chip{border:1px solid var(--climax-line);background:rgba(255,255,255,.06);border-radius:999px;padding:7px 13px;font-size:14px}
+.funnel{width:min(100%,360px);height:40px}
+.merged{background:var(--accent);color:#1b0f1f;font-weight:700;border-radius:999px;padding:10px 20px;font-size:16px}
+
+.reveal-demo{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.rcard{width:132px;height:170px;perspective:800px}
+.rcard .in{position:relative;width:100%;height:100%;transition:transform .8s cubic-bezier(.3,1.3,.5,1);transform-style:preserve-3d}
+.reveal-demo.open .rcard .in{transform:rotateY(180deg)}
+.rcard .f,.rcard .b{position:absolute;inset:0;border-radius:14px;display:grid;place-items:center;text-align:center;padding:10px;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.rcard .f{background:repeating-linear-gradient(45deg,#3a2342 0 10px,#2d1b33 10px 20px);border:2px solid var(--climax-line);font:700 44px Georgia,serif;color:var(--climax-muted)}
+.rcard .b{background:var(--climax-ink);color:var(--climax);transform:rotateY(180deg);font-family:Georgia,serif}
+.rcard .b b{display:block;font-size:20px}
+.rcard .b small{font-size:12px}
+.rcard .nm{font:600 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-align:center;margin-top:8px;color:var(--climax-muted)}
+
+.rd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;font-family:"Iowan Old Style",Georgia,serif;font-size:clamp(20px,4.4vw,30px)}
+.rd .from{color:var(--climax-muted);text-decoration:line-through;text-decoration-color:var(--accent)}
+.rd .to{color:var(--accent);font-weight:700}
+
+.dock{display:flex;gap:8px;justify-content:center;background:rgba(255,255,255,.06);border:1px solid var(--climax-line);border-radius:22px;padding:10px;max-width:420px;margin:0 auto;position:relative}
+.slot{flex:1;min-width:0;height:58px;border-radius:14px;display:grid;place-items:center;font-size:13px;font-weight:600;background:rgba(255,255,255,.08);transition:all .6s cubic-bezier(.3,1.3,.5,1)}
+.slot.k{background:var(--plum);color:#fff}
+.slot.k2{background:var(--accent);color:#1b0f1f}
+.dock .us{display:none}
+.dock.merged-state .k,.dock.merged-state .k2{display:none}
+.dock.merged-state .us{display:grid;background:linear-gradient(90deg,var(--plum),var(--accent));color:#fff;flex:1}
+.dock.merged-state .free{display:grid}
+.slot.free{display:none;background:transparent;border:2px dashed var(--accent);color:var(--accent)}
+.dock-cap{text-align:center;font-size:13px;color:var(--climax-muted);margin-top:8px}
+
+.balance{position:relative;max-width:560px;margin:0 auto;padding-top:8px}
+.beam{height:6px;background:var(--climax-ink);border-radius:3px;margin:0 6%;position:relative;transform-origin:center;animation:teeter 5s ease-in-out infinite}
+@keyframes teeter{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+.fulcrum{width:0;height:0;margin:0 auto;border-left:22px solid transparent;border-right:22px solid transparent;border-bottom:34px solid var(--accent)}
+.pans{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+.pan{text-align:center;font-size:14px}
+.pan b{display:block;font:700 15px Georgia,serif}
+.pan i{color:var(--climax-muted)}
+.weights{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-top:18px}
+.weight{border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.06);border:1px solid var(--climax-line);font-size:14.5px}
+.weight::before{content:"";display:block;width:26px;height:4px;border-radius:2px;background:var(--gold);margin-bottom:8px}
+
+.envelope-wrap{display:grid;justify-items:center;gap:14px}
+.envelope{position:relative;width:min(100%,360px);aspect-ratio:3/2;background:#e9d6c3;border-radius:6px;border:0;padding:0;box-shadow:0 14px 34px rgba(0,0,0,.45);overflow:visible}
+.envelope .letter{position:absolute;left:6%;right:6%;bottom:8%;top:8%;background:#fffaf2;color:#2a1c22;border-radius:4px;padding:14px;font:15px/1.45 Georgia,serif;text-align:left;transition:transform .8s cubic-bezier(.3,1.2,.5,1);z-index:1;overflow:hidden}
+.envelope .front{position:absolute;inset:0;border-radius:6px;background:linear-gradient(to top right,#dcc4ad 50%,transparent 50%) left/50.5% 100% no-repeat,linear-gradient(to top left,#d4bba3 50%,transparent 50%) right/50.5% 100% no-repeat;z-index:2;pointer-events:none}
+.envelope .flap{position:absolute;left:0;right:0;top:0;height:58%;background:#cdb197;clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:top;transition:transform .6s;z-index:3}
+.envelope .seal{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;background:var(--accent);z-index:4;display:grid;place-items:center;color:#fff;font:700 18px Georgia,serif;transition:opacity .3s;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.envelope .addr{position:absolute;bottom:10%;left:0;right:0;text-align:center;z-index:3;font:italic 15px Georgia,serif;color:#5a3d2a;pointer-events:none}
+.envelope.open .flap{transform:rotateX(180deg);z-index:0}
+.envelope.open .seal,.envelope.open .addr{opacity:0}
+.envelope.open .letter{transform:translateY(-45%)}
+.env-space{height:0;transition:height .8s}
+.env-text{opacity:.35;transition:opacity .8s}
+.envelope-wrap.open .env-text{opacity:1}
+.envelope-wrap.open .env-space{height:70px}
+
+.stairs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:end}
+.step{border-radius:14px 14px 4px 4px;padding:12px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;font-size:13.5px;color:#1b0f1f}
+.step b{font:700 16px/1.2 Georgia,serif}
+.step.s1{background:var(--m);min-height:150px}
+.step.s2{background:var(--a);min-height:200px}
+.step.s3{background:var(--accent);min-height:250px}
+.exists{font-size:14px;color:var(--climax-muted);margin-top:10px}
+.exists b{color:var(--climax-ink)}
+@media (max-width:520px){
+  .stairs{grid-template-columns:1fr}
+  .step.s1,.step.s2,.step.s3{min-height:0}
+  .step.s1{margin-right:30%}.step.s2{margin-right:15%}
+}
+
+.finale{margin-top:88px;text-align:center}
+.finale h3{font-size:clamp(30px,7vw,58px)}
+.finale .sub{color:var(--climax-muted);margin-top:10px}
+.dirs{display:grid;gap:18px;margin-top:34px;text-align:left}
+.dir{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02));border:1px solid var(--climax-line);border-radius:22px;padding:20px 18px}
+.dir .num{font:900 clamp(48px,12vw,88px)/.8 "Iowan Old Style",Georgia,serif;color:var(--accent)}
+.dir:nth-child(2) .num{color:var(--plum)}
+.dir:nth-child(3) .num{color:var(--gold)}
+.dir h4{margin:0;font:700 clamp(19px,3.8vw,25px)/1.25 Georgia,serif}
+.dir p{margin-top:8px;color:var(--climax-muted);font-size:15px}
+.cuts{margin-top:14px;border-top:1px dashed var(--climax-line);padding-top:12px}
+.cuts small{font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;color:var(--gold)}
+.cuts ul{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}
+.cuts li{position:relative;color:var(--climax-ink)}
+.cuts li.x::after{content:"";position:absolute;left:-2px;right:-2px;top:52%;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .5s}
+.cuts.seen li.x::after{transform:scaleX(1)}
+.cuts.seen li.x:nth-child(2)::after{transition-delay:.15s}
+.cuts.seen li.x:nth-child(3)::after{transition-delay:.3s}
+.cuts.seen li.x:nth-child(4)::after{transition-delay:.45s}
+.cuts.seen li.x:nth-child(5)::after{transition-delay:.6s}
+.cuts li.rename b{color:var(--accent)}
+.closing{margin-top:72px;text-align:center;font-family:"Iowan Old Style",Georgia,serif;font-size:clamp(22px,5vw,36px);max-width:26ch;margin-left:auto;margin-right:auto}
+.closing em{color:var(--accent)}
+.colophon{margin-top:28px;text-align:center;font-size:12px;color:var(--climax-muted)}
+
+.btn-light{color:var(--climax-ink)}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" type="button" aria-label="Change colour scheme">Theme: auto</button>
+
+<!-- ============ HERO ============ -->
+<header class="hero wrap">
+  <div class="kicker">Brainstorm keepsake &middot; My Love</div>
+  <h1>Reasons<br>to <span class="env">Open</span></h1>
+  <p class="topic serif">Mood check-in (<em>How are you feeling?</em>) and partner pages</p>
+  <p class="goal serif">Give a couple a real reason to open these pages &mdash; <span class="pull">pull</span>, not <s>duty</s>.</p>
+  <div class="stats">
+    <div class="stat"><b>115</b><span>ideas</span></div>
+    <div class="stat"><b>5</b><span>techniques</span></div>
+    <div class="stat"><b>10</b><span>insights</span></div>
+    <div class="stat"><b>3</b><span>directions</span></div>
+  </div>
+  <div class="shape" aria-label="Ideas per technique">
+    <div class="shape-bar" id="shapeBar"></div>
+    <div class="shape-legend" id="shapeLegend"></div>
+  </div>
+  <p class="meta">Mode: autonomous, the coach ideating &middot; status: complete &middot; updated 2026-11-05 02:23</p>
+</header>
+
+<!-- ============ PROLOGUE ============ -->
+<section class="wrap" id="prologue" style="padding-top:24px">
+  <div class="kicker">Prologue &middot; the baseline, read from code</div>
+  <h2 style="font-size:clamp(30px,6.5vw,50px);margin-top:10px">Two mirrors</h2>
+  <div class="mirrors">
+    <div class="mirror">
+      <h3>The Mood view</h3>
+      <ul>
+        <li>12 chips (6 Positive / 6 Challenging)</li>
+        <li>optional 200-char note</li>
+        <li>one entry per day</li>
+        <li>Log / Timeline / Calendar tabs</li>
+        <li>partner's latest mood card on top</li>
+      </ul>
+    </div>
+    <div class="mirror">
+      <h3>The Partner view</h3>
+      <ul>
+        <li>name + Connected dot + Refresh</li>
+        <li>Feeling right now card</li>
+        <li>Poke / Kiss / Fart tiles with cooldowns + history</li>
+        <li>Recent moods list</li>
+      </ul>
+    </div>
+  </div>
+  <p class="verdict serif">Both pages are read-only mirrors: <em>nothing done on one asks anything of the other person.</em></p>
+  <p class="decision"><b>Decision.</b> Ideate-for-me batch: Reverse Brainstorming, SCAMPER, Job to Be Done, Role Playing. A parallel Creative Partner session on the same topic lives in <code>brainstorm-mood-and-partner-pages</code>; left untouched.</p>
+</section>
+
+<!-- ============ 1. REVERSE ============ -->
+<section class="wrap" id="reverse">
+  <div class="tech-head">
+    <div class="kicker">Technique 1 &middot; Reverse Brainstorming</div>
+    <h2>Turn it <span class="flipword">upside</span> down</h2>
+    <p class="q serif">How would we guarantee nobody ever opens these pages? Then invert each failure.</p>
+    <span class="count-badge"><b>22</b> failures, each flipped into an invitation</span>
+  </div>
+  <div class="rev-tools">
+    <button class="pill-btn" id="flipAll" type="button" style="color:var(--accent)">Invert all 22</button>
+    <span style="font-size:13px;color:var(--muted)">or tap any form to flip it</span>
+  </div>
+  <div class="rev-grid" id="revGrid"></div>
+</section>
+
+<!-- ============ 2. SCAMPER ============ -->
+<section class="wrap" id="scamper">
+  <div class="tech-head">
+    <div class="kicker">Technique 2 &middot; SCAMPER</div>
+    <h2>Seven levers on the check-in</h2>
+    <p class="q serif">Substitute, Combine, Adapt, Modify, Put to other use, Eliminate, Reverse &mdash; pulled against the check-in and the partner page.</p>
+    <span class="count-badge"><b>39</b> ideas &middot; tap a letter</span>
+  </div>
+  <div class="scamper-letters" id="scLetters" role="group" aria-label="Filter by SCAMPER letter"></div>
+  <div class="scamper-word" id="scWord">Showing all seven</div>
+  <div class="scamper-grid" id="scGrid"></div>
+</section>
+
+<!-- ============ 3. JTBD ============ -->
+<section class="wrap" id="jtbd">
+  <div class="tech-head">
+    <div class="kicker">Technique 3 &middot; Job to Be Done</div>
+    <h2>Help wanted</h2>
+    <p class="q serif">What is a couple actually hiring these pages to do?</p>
+    <span class="count-badge"><b>20</b> jobs posted</span>
+  </div>
+  <article class="paper">
+    <div class="masthead">
+      <div class="title">The Two-Person Gazette</div>
+      <div class="dateline"><span>Vol. 1 &middot; Classifieds</span><span>2026-11-05</span><span>Circulation: 2</span></div>
+    </div>
+    <h3 class="headline">Nobody hires a mood tracker to track moods.</h3>
+    <p class="subhead">Core job reframe. The jobs are:</p>
+    <div class="leads">
+      <div class="lead"><small>Job 1</small><b>Tell my partner how I am without having to say it out loud</b></div>
+      <div class="lead"><small>Job 2</small><b>Know how to show up for them</b></div>
+      <div class="lead"><small>Job 3</small><b>Feel close during the day apart</b></div>
+    </div>
+    <div class="hw">&#9472; HELP WANTED &#9472;</div>
+    <div class="ads" id="ads"></div>
+  </article>
+</section>
+
+<!-- ============ 4. ROLE PLAYING ============ -->
+<section class="wrap" id="roles">
+  <div class="stage">
+    <div class="curtain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="tech-head" style="margin-top:22px">
+      <div class="kicker">Technique 4 &middot; Role Playing</div>
+      <h2>Each stakeholder speaks</h2>
+      <p class="q serif">Partners, a therapist, a skeptic, a lock screen, a watch, a dog, grandma &mdash; and the two people who matter.</p>
+      <span class="count-badge"><b>21</b> lines from the cast</span>
+    </div>
+    <div class="cast" id="cast"></div>
+  </div>
+</section>
+
+<!-- ============ 5. WILDCARDS ============ -->
+<section class="wrap" id="wild">
+  <div class="felt">
+    <div class="tech-head">
+      <div class="kicker">Technique 5 &middot; Wildcards</div>
+      <h2>A full suit of hearts</h2>
+      <p class="lede">One more domain shift past the batch to get beyond 100. Thirteen wildcards &mdash; exactly one suit, ace to king.</p>
+      <span class="count-badge"><b>13</b> cards dealt</span>
+    </div>
+    <div class="draw-row">
+      <button class="pill-btn" id="drawBtn" type="button" style="color:#fff">Draw a wildcard</button>
+      <span id="drawn" style="font-size:13px;color:#cfe8dc" aria-live="polite"></span>
+    </div>
+    <div class="hand" id="hand"></div>
+  </div>
+</section>
+
+<!-- ============ CLIMAX: SYNTHESIS ============ -->
+<section class="climax" id="synthesis">
+  <div class="wrap">
+    <div class="kicker">The synthesis</div>
+    <h2>From mirror<br>to <span style="color:var(--accent);font-style:italic">open loop</span></h2>
+
+    <!-- Act I -->
+    <div class="act">
+      <div class="act-n">I &middot; ROOT CAUSE</div>
+      <h3>Both pages are mirrors.</h3>
+      <div class="duo">
+        <figure class="panel">
+          <svg viewBox="0 0 320 180" role="img" aria-label="Mirror: each person's check-in bounces back to themselves">
+            <rect x="152" y="22" width="16" height="136" rx="6" fill="var(--climax-line)"/>
+            <rect x="156" y="30" width="3" height="60" rx="1.5" fill="var(--climax-muted)" opacity=".5"/>
+            <circle cx="62" cy="90" r="28" fill="var(--plum)"/><text x="62" y="96" text-anchor="middle" class="svgtxt" style="fill:#fff">C</text>
+            <circle cx="258" cy="90" r="28" fill="var(--accent)"/><text x="258" y="96" text-anchor="middle" class="svgtxt" style="fill:#1b0f1f">J</text>
+            <path class="bounce" d="M92 80 L146 80 M146 100 L92 100" stroke="var(--climax-muted)" stroke-width="2" fill="none"/>
+            <path class="bounce" d="M228 80 L174 80 M174 100 L228 100" stroke="var(--climax-muted)" stroke-width="2" fill="none"/>
+            <text x="62" y="140" text-anchor="middle" class="svgsm">Casey</text>
+            <text x="258" y="140" text-anchor="middle" class="svgsm">Jessie</text>
+            <text x="160" y="176" text-anchor="middle" class="svgsm">logs into a void</text>
+          </svg>
+          <figcaption>Before: you log into a void and read their log</figcaption>
+        </figure>
+        <figure class="panel">
+          <svg viewBox="0 0 320 180" role="img" aria-label="Open loop: something travels between Casey and Jessie and waits for an answer">
+            <path d="M70 90 C 110 20, 210 20, 250 90 C 210 160, 110 160, 70 90" fill="none" stroke="var(--climax-line)" stroke-width="3"/>
+            <circle cx="62" cy="90" r="28" fill="var(--plum)"/><text x="62" y="96" text-anchor="middle" class="svgtxt" style="fill:#fff">C</text>
+            <circle cx="258" cy="90" r="28" fill="var(--accent)"/><text x="258" y="96" text-anchor="middle" class="svgtxt" style="fill:#1b0f1f">J</text>
+            <circle r="6" fill="var(--gold)"><animateMotion dur="4.5s" repeatCount="indefinite" path="M70 90 C 110 20, 210 20, 250 90 C 210 160, 110 160, 70 90"/></circle>
+            <circle r="6" fill="var(--climax-ink)"><animateMotion dur="4.5s" begin="-2.25s" repeatCount="indefinite" path="M70 90 C 110 20, 210 20, 250 90 C 210 160, 110 160, 70 90"/></circle>
+            <text x="160" y="16" text-anchor="middle" class="svgsm">a reaction, a question</text>
+            <text x="160" y="176" text-anchor="middle" class="svgsm">a reveal, a claim on your need</text>
+          </svg>
+          <figcaption>After: there is always something waiting for you</figcaption>
+        </figure>
+      </div>
+      <p class="quote">You log into a void and read their log; nothing asks anything of the other person, so there is never something waiting for you. The reason to open is an open loop from your partner: a reaction to your mood, a question, a reveal, a claim on your need.</p>
+    </div>
+
+    <!-- Act II -->
+    <div class="act">
+      <div class="act-n">II &middot; ONE MECHANIC</div>
+      <h3>Answer blind, reveal together.</h3>
+      <div class="panel merge">
+        <div class="sources">
+          <span class="chip">mutual reveal (Wordle)</span>
+          <span class="chip">the daily question for two</span>
+          <span class="chip">the weekly How are WE?</span>
+        </div>
+        <svg class="funnel" viewBox="0 0 360 40" aria-hidden="true"><path d="M60 2 Q 180 10 180 38 M180 2 L180 38 M300 2 Q 180 10 180 38" stroke="var(--accent)" stroke-width="2" fill="none"/></svg>
+        <span class="merged">the blind-then-reveal ritual &mdash; built once, used daily and weekly</span>
+        <div class="reveal-demo" id="revealDemo">
+          <div><div class="rcard"><div class="in"><div class="f">?</div><div class="b"><div><b>Casey</b><small>answered blind</small></div></div></div></div><div class="nm">CASEY</div></div>
+          <div><div class="rcard"><div class="in"><div class="f">?</div><div class="b"><div><b>Jessie</b><small>answered blind</small></div></div></div></div><div class="nm">JESSIE</div></div>
+        </div>
+        <button class="pill-btn btn-light" id="revealBtn" type="button">Both answered &mdash; reveal together</button>
+      </div>
+    </div>
+
+    <!-- Act III -->
+    <div class="act">
+      <div class="act-n">III &middot; NEEDS BEAT MOODS</div>
+      <h3>One layer that makes the partner act.</h3>
+      <div class="panel merge">
+        <div class="sources">
+          <span class="chip">the what-I-need row</span>
+          <span class="chip">the craving slot the partner claims with <b>I got this</b></span>
+          <span class="chip">the how-to-love-me card</span>
+          <span class="chip">the care path for challenging moods</span>
+        </div>
+        <svg class="funnel" viewBox="0 0 360 40" aria-hidden="true"><path d="M30 2 Q 180 10 180 38 M130 2 Q 180 14 180 38 M230 2 Q 180 14 180 38 M330 2 Q 180 10 180 38" stroke="var(--gold)" stroke-width="2" fill="none"/></svg>
+        <div class="rd"><span class="from">reading</span><span aria-hidden="true">&rarr;</span><span class="to">doing</span></div>
+        <p style="color:var(--climax-muted);max-width:52ch">It turns the partner page from reading into doing, and gives the partner a concrete reason to open it.</p>
+      </div>
+    </div>
+
+    <!-- Act IV -->
+    <div class="act">
+      <div class="act-n">IV &middot; MERGE, DO NOT ADD</div>
+      <h3>One feed of both people.</h3>
+      <p class="quote">The single Us surface plus the partner page leading with the newest thing from Casey is one feed of both people. The bottom dock is full at five destinations, so merging Mood and Partner frees a slot rather than needing a sixth.</p>
+      <div class="panel">
+        <div class="dock" id="dock" aria-live="polite">
+          <div class="slot">&middot;</div>
+          <div class="slot k">Mood</div>
+          <div class="slot k2">Partner</div>
+          <div class="slot us">Us</div>
+          <div class="slot free">free</div>
+          <div class="slot">&middot;</div>
+          <div class="slot">&middot;</div>
+        </div>
+        <p class="dock-cap">The dock: five destinations, full. (Other three left unlabelled.)</p>
+        <div style="text-align:center;margin-top:12px"><button class="pill-btn btn-light" id="mergeBtn" type="button">Merge Mood + Partner</button></div>
+      </div>
+    </div>
+
+    <!-- Act V -->
+    <div class="act">
+      <div class="act-n">V &middot; A TENSION, RESOLVED</div>
+      <h3>The skeptic and the worrier, in balance.</h3>
+      <div class="panel">
+        <div class="balance">
+          <div class="pans">
+            <div class="pan"><b>privacy-skeptic</b><i>"this feels like being monitored"</i></div>
+            <div class="pan"><b>anxious partner</b><i>"when they go quiet I spiral"</i></div>
+          </div>
+          <div class="beam"></div>
+          <div class="fulcrum"></div>
+        </div>
+        <div class="weights">
+          <div class="weight">No read receipts or last-seen by default</div>
+          <div class="weight">Seen shown only as a positive (<em>Jessie saw this</em>)</div>
+          <div class="weight">A chosen busy-until status that answers silence</div>
+          <div class="weight">A mood with no note counted as complete</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Act VI -->
+    <div class="act">
+      <div class="act-n">VI &middot; THE SLEEPER BREAKTHROUGH</div>
+      <h3>Surprises the builder writes.</h3>
+      <div class="envelope-wrap" id="envWrap">
+        <div class="env-space"></div>
+        <button class="envelope" id="envelope" type="button" aria-label="Open the envelope">
+          <span class="letter"><b style="display:block;font-size:20px;margin-bottom:6px">Owner-authored surprises</b>mood mail, opened at the moment it matters</span>
+          <span class="front"></span>
+          <span class="flap"></span>
+          <span class="seal">C</span>
+          <span class="addr">open when you are lonely</span>
+        </button>
+        <span id="envHint" style="font-size:13px;color:var(--climax-muted)">tap the seal</span>
+        <p class="quote env-text">Owner-authored surprises: open-when-you-are-lonely mood mail, a note that unlocks when the partner logs Sad. The builder writes content the partner discovers at the moment it matters; it reuses love notes and the mood the partner already logs.</p>
+      </div>
+    </div>
+
+    <!-- Act VII -->
+    <div class="act">
+      <div class="act-n">VII &middot; FEASIBILITY, FROM THE CODE</div>
+      <h3>How high each idea climbs.</h3>
+      <div class="panel">
+        <div class="stairs">
+          <div class="step s1"><b>Web plus a table</b>reactions, the your-turn push, inline replies</div>
+          <div class="step s2"><b>The server (RLS)</b>a real blind reveal: withhold the partner's row until yours exists, not just the UI</div>
+          <div class="step s3"><b>Native, needs a reinstall</b>widgets, Watch, actionable notifications, Live Activities</div>
+        </div>
+        <p class="exists"><b>Already exist:</b> push (send-push) and Broadcast realtime.</p>
+      </div>
+    </div>
+
+    <!-- FINALE -->
+    <div class="finale">
+      <div class="kicker">Recommended directions</div>
+      <h3>Three loops to close</h3>
+      <p class="sub">with the cheap cuts shipped alongside the first</p>
+      <div class="dirs">
+        <div class="dir">
+          <div class="num">1</div>
+          <div>
+            <h4>Close the loop</h4>
+            <p>Responses on mood cards, <em>Jessie saw this</em>, and a your-turn push.</p>
+            <div class="cuts" id="cuts">
+              <small>SHIP ALONGSIDE: THE ELIMINATE CUTS &middot; copy and layout only, no new data</small>
+              <ul>
+                <li class="x">the Connected dot</li>
+                <li class="x">the Refresh button</li>
+                <li class="x">the visible cooldown timers</li>
+                <li class="x">the Positive/Challenging headings</li>
+                <li class="x">the Online/pending row</li>
+                <li class="rename">rename Log Mood &rarr; <b>Tell &lt;name&gt;</b></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="dir">
+          <div class="num">2</div>
+          <div>
+            <h4>The daily blind-then-reveal ritual</h4>
+            <p>Mood plus one question.</p>
+          </div>
+        </div>
+        <div class="dir">
+          <div class="num">3</div>
+          <div>
+            <h4>The needs layer</h4>
+            <p>With <em>I got this</em>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="closing">The reason to open is <em>an open loop from your partner.</em></p>
+    <p class="colophon">Brainstorm: mood check-in and partner pages &middot; 115 ideas &middot; 10 insights &middot; status complete, 2026-11-05</p>
+  </div>
+</section>
+
+<script>
+(function(){
+  // ---------- helpers ----------
+  function el(tag, cls, text){ var n=document.createElement(tag); if(cls) n.className=cls; if(text!=null) n.textContent=text; return n; }
+  function pretty(s){ return s.replace(/ - /g,' — ').replace(/->/g,'→'); }
+
+  // ---------- theme toggle ----------
+  var root=document.documentElement, btn=document.getElementById('themeBtn');
+  var modes=['auto','light','dark'], mode='auto';
+  try{ var saved=localStorage.getItem('brainstorm-theme'); if(saved && modes.indexOf(saved)>-1) mode=saved; }catch(e){}
+  function applyTheme(){ if(mode==='auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',mode); btn.textContent='Theme: '+mode; }
+  applyTheme();
+  btn.addEventListener('click',function(){ mode=modes[(modes.indexOf(mode)+1)%3]; applyTheme(); try{ localStorage.setItem('brainstorm-theme',mode); }catch(e){} });
+
+  // ---------- hero shape ----------
+  var shape=[['Reverse Brainstorming',22,'var(--s)'],['SCAMPER',39,'var(--p)'],['Job to Be Done',20,'var(--a)'],['Role Playing',21,'var(--e)'],['Wildcards',13,'var(--m)']];
+  var bar=document.getElementById('shapeBar'), leg=document.getElementById('shapeLegend');
+  shape.forEach(function(s){ var i=el('i'); i.style.width=(s[1]/115*100)+'%'; i.style.background=s[2]; i.title=s[0]+': '+s[1]; bar.appendChild(i); var l=el('span',null,s[0]+' '+s[1]); l.style.setProperty('--sw',s[2]); leg.appendChild(l); });
+
+  // ---------- 1. reverse ----------
+  var rev=[
+    ["make it a timesheet (form, Submit, 'Mood logged successfully!')","the check-in is a message to a person - button reads 'Tell Jessie', confirmation reads 'Jessie will see this'"],
+    ["nothing happens after you log","logging opens a loop that only closes when the partner responds - your entry shows 'waiting for Jessie' until they react"],
+    ["show the partner's mood with no way to answer it","every partner mood card carries one-tap responses - 'sending a hug', 'want to talk tonight?', 'on my way home', 'proud of you'"],
+    ["the page looks identical every day","a daily-changing top section (today's question, today's shared colour, today's reveal) so there is always something new above the fold"],
+    ["the same 12 clinical words forever","couple-made moods - each couple adds their own private vocabulary ('hangry', 'need cuddles', 'peopled out', 'gremlin mode')"],
+    ["never ask at the right moment","'Jessie just checked in - your turn?' push sent when the partner logs, so the second check-in rides on the first"],
+    ["hard days get broadcast with no softness","a 'heads-up, not about you' tag so a rough mood reads as information, not accusation"],
+    ["the calendar is a graveyard nobody revisits","'On this day' - a year ago you were both Excited, the note said 'flights booked'"],
+    ["lead the partner page with infrastructure (Connected dot, Refresh)","lead with the person - their face, their mood colour, how long since they checked in, what they asked for"],
+    ["guilt streaks ('you broke your 12-day streak')","cooperative, non-punishing count - 'you both checked in 5 days this week' and no number shown when it is low"],
+    ["treat Anxious exactly like Happy","challenging moods open a care path for the partner - 'Casey is anxious. Last time, this helped: a call, not a text'"],
+    ["a blank 200-char box","rotating micro-prompts above the note - 'one good thing', 'what would help tonight', 'what is on your mind that you have not said'"],
+    ["cooldown timers that ration affection","replace m:ss cooldowns with a playful daily supply (5 kisses a day, refills at midnight) or combos when both tap within a minute"],
+    ["split 'how am I' and 'how are they' across two dock tabs","one 'Us' surface - two halves of the same screen, you on one side, them on the other"],
+    ["a 9-hour-old mood looks as fresh as a 2-minute-old one","moods fade visually with age, and a stale one shows 'ask how they are now?'"],
+    ["you can never ask your partner anything","'How are you?' button that sends a gentle push asking them to check in - a bid, not a demand"],
+    ["to reply you must leave for Love Notes","reply inline on the mood card; the reply also lands in the Love Notes thread quoting the mood"],
+    ["force one crisp feeling","blends and intensity - a little Tired, very Grateful - drawn as a mixed colour swatch"],
+    ["mood without need","a 'what I need' row next to mood - space, company, food, distraction, to vent, to be fixed, to be listened to"],
+    ["no surprise ever","hidden reactions and easter eggs that unlock (both log Loved on the same day -> a heart animation only you two see)"],
+    ["one check-in per day, overwritten","allow a morning and an evening check-in so the day has an arc you can both watch"],
+    ["partner page empty state says 'No moods yet - try refreshing'","empty state invites action - 'Jessie has not checked in today. Send a poke that says I'm curious'"]
+  ];
+  var revGrid=document.getElementById('revGrid');
+  rev.forEach(function(p,i){
+    var b=el('button','flip'); b.type='button'; b.setAttribute('aria-pressed','false');
+    var inner=el('div','flip-inner');
+    var f=el('div','face fail'); f.appendChild(el('span','stamp','FAIL #'+String(i+1).padStart(2,'0'))); f.appendChild(el('div',null,pretty(p[0])));
+    var row=el('div','formrow'); row.appendChild(el('span',null,'[ Submit ]')); row.appendChild(el('span',null,'tap to invert')); f.appendChild(row);
+    var v=el('div','face inv'); v.appendChild(el('span','stamp','INVERT')); v.appendChild(el('div',null,pretty(p[1]))); v.appendChild(el('span','hint','tap to flip back'));
+    inner.appendChild(f); inner.appendChild(v); b.appendChild(inner);
+    b.addEventListener('click',function(){ var on=b.classList.toggle('on'); b.setAttribute('aria-pressed',String(on)); });
+    revGrid.appendChild(b);
+  });
+  var allOn=false, flipAll=document.getElementById('flipAll');
+  flipAll.addEventListener('click',function(){ allOn=!allOn; var cards=revGrid.querySelectorAll('.flip'); cards.forEach(function(c,i){ setTimeout(function(){ c.classList.toggle('on',allOn); c.setAttribute('aria-pressed',String(allOn)); }, i*45); }); flipAll.textContent=allOn?'Back to the failures':'Invert all 22'; });
+
+  // ---------- 2. SCAMPER ----------
+  var L={S:['Substitute','var(--s)'],C:['Combine','var(--c)'],A:['Adapt','var(--a)'],M:['Modify / Magnify / Minify','var(--m)'],P:['Put to other use','var(--p)'],E:['Eliminate','var(--e)'],R:['Reverse / Rearrange','var(--r)']};
+  var sc=[
+    ['S','SUBSTITUTE','',"replace 12 words with a 2D mood meter - drag one dot on energy x pleasantness; the colour of that spot is your mood"],
+    ['S','SUBSTITUTE','',"mood as weather - sunny, foggy, stormy, rainbow-after-rain; partner page reads like a forecast 'Jessie: clearing up by evening'"],
+    ['S','SUBSTITUTE','',"a 5-second voice note or a quick front-camera selfie as the check-in instead of chips"],
+    ['S','SUBSTITUTE','',"replace 'Log Mood' with 'Send' and treat it exactly like a love note in tone and feedback"],
+    ['S','SUBSTITUTE','',"replace the partner-page Refresh button with a presence line - 'Jessie is in the app now' / 'last here 20 min ago'"],
+    ['C','COMBINE','',"logging Lonely or Sad offers the partner a one-tap kiss or poke right from the push notification"],
+    ['C','COMBINE','',"mood + date reminders - the day before an anniversary or a hard event, the check-in asks 'how are you feeling about tomorrow?'"],
+    ['C','COMBINE','',"the daily message is picked to fit the partner's latest mood - a comforting one when they logged Sad, a celebratory one after Excited"],
+    ['C','COMBINE','',"attach a photo to a check-in; the mood calendar turns into a photo calendar of both your days"],
+    ['C','COMBINE','',"one shared calendar with two-tone days - each cell split diagonally, your colour and theirs - the relationship's weather map"],
+    ['C','COMBINE','',"a home-screen and lock-screen widget showing the partner's current mood colour and last note line"],
+    ['C','COMBINE','',"Apple Watch complication - partner's mood colour on the wrist; a tap sends a kiss as a haptic"],
+    ['A','ADAPT','Wordle',"mutual reveal - you cannot see today's partner mood until you have logged yours, then both cards flip together"],
+    ['A','ADAPT','Wrapped',"monthly 'Us, in feelings' recap - most common moods, best day, the note you each wrote that the other reacted to most"],
+    ['A','ADAPT','Tamagotchi',"a shared plant or creature on the Us page that grows when both check in and droops - gently, never dies - when you both go quiet"],
+    ['A','ADAPT','Locket',"partner's latest check-in photo or mood appears on your home screen without opening the app, with a tap-through to respond"],
+    ['A','ADAPT','Gottman bids',"count 'turning toward' - each time a partner responds to a mood, it is noted; weekly 'you answered each other 9 times'"],
+    ['A','ADAPT','dinner ritual',"rose / bud / thorn check-in mode for the evening - one good, one hopeful, one hard"],
+    ['A','ADAPT','Duolingo voice',"playful app-voice push copy - 'Jessie said Tired. A snack delivery would be legendary right now.'"],
+    ['M','MAGNIFY','',"the partner page background takes on the partner's current mood colour full-bleed, so opening it is like walking into their room"],
+    ['M','MINIFY','',"check in from the push notification itself (actionable notification with 3 mood buttons) - the reason to open becomes seeing the reply"],
+    ['M','MAGNIFY','',"a 'want to talk about it?' flag on the note that turns the partner's card into a gentle red-thread prompt"],
+    ['M','MODIFY','',"the timeline becomes swipeable 'stories' of each other's last few days, tap to advance, hold to react"],
+    ['M','MODIFY','',"the mood chips animate into the partner's card in real time while they are watching - you see each other's choices land live"],
+    ['P','PUT TO OTHER USE','',"mood history drives date suggestions - 'you have both been Tired 4 days running - night in, takeout, no plans?'"],
+    ['P','PUT TO OTHER USE','',"a scope tag on challenging moods - about work / about me / about us - so 'frustrated with us' becomes a safe opener rather than a silent sulk"],
+    ['P','PUT TO OTHER USE','',"anniversary auto-builds 'the year in feelings' - a scrollable love letter from a year of check-ins"],
+    ['P','PUT TO OTHER USE','',"a 'how to love me' card each partner writes once - what helps when I am sad, anxious, angry - shown next to their mood when it matters"],
+    ['P','PUT TO OTHER USE','',"pattern nudges for the partner - three Tired days -> 'maybe bring coffee tomorrow'"],
+    ['E','ELIMINATE','',"drop the Positive / Challenging headings - they grade feelings; group by energy or just show one warm grid"],
+    ['E','ELIMINATE','',"drop the Submit step - tapping a mood sends it, tapping again changes it, the last state at bedtime is the day's"],
+    ['E','ELIMINATE','',"drop 'Connected / Disconnected' from the partner header - nobody opens an app to read a socket status"],
+    ['E','ELIMINATE','',"drop the visible m:ss cooldown under Poke/Kiss/Fart"],
+    ['E','ELIMINATE','',"drop the 'Online / pending sync' row from the check-in; show sync only when it fails"],
+    ['R','REVERSE','',"guess first - 'How do you think Jessie feels today?' then reveal; a running 'you read each other' score"],
+    ['R','REVERSE','',"the partner logs a mood for you - 'You seem tired today' - and you confirm or correct it; being noticed is the reward"],
+    ['R','REVERSE','',"the partner page leads with 'what Jessie needs from you today' and puts the mood second"],
+    ['R','REVERSE','',"ask 'How are WE?' once a week - one shared relationship temperature both answer blind, then compare"],
+    ['R','REARRANGE','',"write tomorrow's hope at night ('tomorrow I want to feel...'), and the morning check-in shows it back to you and your partner"]
+  ];
+  var counts={}; sc.forEach(function(x){ counts[x[0]]=(counts[x[0]]||0)+1; });
+  var max=Math.max.apply(null,Object.keys(counts).map(function(k){return counts[k];}));
+  var lettersEl=document.getElementById('scLetters'), scGrid=document.getElementById('scGrid'), scWord=document.getElementById('scWord');
+  var active=null, letterBtns={};
+  Object.keys(L).forEach(function(k){
+    var b=el('button','sl'); b.type='button'; b.style.setProperty('--col',L[k][1]); b.setAttribute('aria-pressed','true'); b.setAttribute('aria-label',L[k][0]+', '+counts[k]+' ideas');
+    var bar=el('span','bar'); bar.style.height=(14+counts[k]/max*60)+'px';
+    b.appendChild(bar); b.appendChild(el('span','ltr',k)); b.appendChild(el('span','n',String(counts[k])));
+    b.addEventListener('click',function(){ active = active===k ? null : k; renderSc(); });
+    letterBtns[k]=b; lettersEl.appendChild(b);
+  });
+  function renderSc(){
+    Object.keys(letterBtns).forEach(function(k){ letterBtns[k].setAttribute('aria-pressed', String(!active || active===k)); });
+    scWord.textContent='';
+    if(active){ scWord.appendChild(el('b',null,L[active][0])); scWord.appendChild(document.createTextNode(' · '+counts[active]+' ideas · tap again for all')); }
+    else scWord.textContent='Showing all seven';
+    scGrid.textContent='';
+    sc.forEach(function(x,i){
+      if(active && x[0]!==active) return;
+      var c=el('div','sc-card'); c.style.setProperty('--col',L[x[0]][1]); c.style.animationDelay=(Math.min(i,12)*18)+'ms';
+      var h=el('div'); h.appendChild(el('span','verb',x[1])); if(x[2]) h.appendChild(el('span','tag',x[2]));
+      c.appendChild(h); c.appendChild(el('p',null,pretty(x[3]))); scGrid.appendChild(c);
+    });
+  }
+  renderSc();
+
+  // ---------- 3. JTBD ----------
+  var jobs=[
+    ['tell-without-saying',"a 'heads-up before I get home' check-in - 'arriving cranky, need 20 min, not about you' - with an ETA-style card on the partner side"],
+    ['feel-close-apart',"an ambient 'thinking of you' pulse - press and hold the partner's face, they feel a soft haptic, no words needed"],
+    ['feel-seen',"an 'I see you' acknowledgement - your entry shows 'Jessie saw this' with the reaction they left; the lack of one is never shown as a negative"],
+    ['know-how-to-show-up',"suggested actions under each partner mood, drawn from their own 'how to love me' card, not generic advice"],
+    ['avoid-landmines',"a 'handle with care today' flag that tints the partner card and quietly suppresses the fart button for the day"],
+    ['process-my-own-day',"a private 'just for me' check-in that never reaches the partner, so the page is also a journal"],
+    ['keep-a-record-of-us',"favourite a check-in pair (your mood + theirs on a memorable day) into a 'days we will remember' shelf"],
+    ['play-together',"silly moods unlocked on weekends - 'feral', 'cozy potato', 'main character' - because the Fart button proves this couple likes play"],
+    ['ask-without-asking',"a 'craving' slot - tacos, a hug, a walk, alone time, a movie - that the partner can claim with 'I got this'"],
+    ['celebrate-wins',"a 'good news!' check-in that sends confetti to the partner's screen and asks them to celebrate back"],
+    ['repair-after-a-fight',"'I'm ready to talk' / 'I need 30 more minutes' - a repair status with a visible countdown so waiting is not ambiguous"],
+    ['coordinate-the-evening',"a social-battery meter (10-100%) both set after work; the page suggests 'quiet night' or 'go out' when both are known"],
+    ['make-sure-they-are-ok',"if the partner has not checked in by their usual time, the page offers 'send a soft how are you?' rather than pinging automatically"],
+    ['understand-them-over-time',"private-to-you insights about your partner - 'Jessie tends to log Anxious on Sunday nights' - so you can show up before they ask"],
+    ['feel-like-a-team',"a monthly shared goal - both check in 20 days -> unlock a date idea or a sealed love note from the app"],
+    ['long-distance-time',"show the partner's local time and day phase ('it is 11pm for Jessie, winding down') beside their mood"],
+    ['share-the-small-stuff',"a one-line 'today in one word' alongside the mood, shown big on the partner page, so the card says something human"],
+    ['be-reminded-why',"when both log Loved the same day, the app pins it and replays it on a hard day later ('remember March 3rd')"],
+    ['get-comfort-fast',"logging Sad offers 'ask Jessie for a call' - one tap sends a priority push with the mood attached"],
+    ['end-the-day-together',"a bedtime 'goodnight' check-in that both send, then the page shows both moons side by side"]
+  ];
+  var ads=document.getElementById('ads');
+  jobs.forEach(function(j,i){ var a=el('div','ad'); a.appendChild(el('h4',null,j[0].replace(/-/g,' '))); a.appendChild(el('p',null,pretty(j[1]))); a.appendChild(el('span','apply','Ref. JTBD-'+String(i+1).padStart(2,'0')+' · apply within')); ads.appendChild(a); });
+
+  // ---------- 4. roles ----------
+  var avs=['#8a3fd1','#c8324d','#d97a1f','#2f8f5a','#2a7fc0','#b8316f','#6a6f2a','#4a5bd0'];
+  var roles=[
+    ['partner-who-only-opens-on-a-buzz',"I come when it buzzes.","every push must carry a hook only the app can finish - 'Casey sent a mood and a question for you'"],
+    ['partner-on-a-bad-day',"do not make me pick from 12 words or write a paragraph","one big 'rough day' tile and a single need chip, done in two taps"],
+    ['partner-on-a-great-day',"I want them to make a fuss","'big news' check-in that pins to the top of the partner page until they react"],
+    ['couples-therapist',"the response matters more than the mood","the page measures and celebrates answers to bids, never the number of check-ins"],
+    ['couples-therapist',null,"a weekly 'state of us' ritual - 3 prompts (what went well, what I need next week, one appreciation) answered blind and revealed together"],
+    ['privacy-skeptic',"this feels like being monitored","per-entry share level (share mood only / mood + note / just me) and no read receipts unless both turn them on"],
+    ['privacy-skeptic',null,"no 'last seen' or 'usually checks in at' shown to the partner unless the person chose to show it"],
+    ['future-selves-on-10th-anniversary',"we want to read this later","a 'letter to future us' attachable to any check-in, sealed until a chosen date"],
+    ['the-lock-screen',"they look at me 80 times a day","a Live Activity or widget for 'Jessie is having a rough day' that stays until it is answered"],
+    ['the-apple-watch',"I am on their wrist all day","partner's mood change taps the wrist with a distinct haptic pattern per mood family"],
+    ['instagram-competing-for-the-thumb',"I win with novelty and a social reward","a daily question for two ('what did you want to be at 8?') answered blind, revealed together"],
+    ['the-kid-at-heart',"make it a game","mood bingo card for the month, a line completes when both of you hit the moods in a row"],
+    ['anxious-attachment-partner',"when they go quiet I spiral","a set-and-forget 'busy until 6pm' status that answers the silence for them"],
+    ['avoidant partner',"do not make me talk","a mood with no note is a complete, respected check-in; the partner UI never shows 'why?' prompts on it"],
+    ['the-dog / the-household',null,"shared 'house mood' - a third avatar for the home (chaos, cozy, guests over) both can set"],
+    ['the-app-as-character',null,"a tiny mascot on the Us page that reacts to both moods and delivers the daily question"],
+    ['the-builder-owner (Casey)',"I built it; I want my partner to want to open it","partner-facing surprises the owner can author: hidden messages that unlock on a mood ('if Jessie logs Sad, show this note from Casey')"],
+    ['the-partner (Jessie)',"show me something new from Casey","the partner page leads with whatever Casey last made for them - a mood, a reaction, a note, a poke - newest first, one feed"],
+    ['the-partner (Jessie)',"I want to know they thought of me","'Casey checked on you 3 times today' warm counter of pokes, kisses and reactions"],
+    ['grandma-reading-over-their-shoulder',"what are those little buttons?","plain human labels everywhere ('Tell Jessie', 'Send a hug'), no app jargon"],
+    ['the-skeptical-reviewer',"two people, 12 moods, 365 days - where is the story?","a 'this month' line chart of both moods that reads as a story, annotated with notes"]
+  ];
+  function mono(name){
+    if(/\(Casey\)/.test(name)) return 'C'; if(/\(Jessie\)/.test(name)) return 'J';
+    var w=name.split(/[- \/]+/).filter(function(x){ return x && x!=='the'; }); return (w[0][0]+(w[1]?w[1][0]:'')).toUpperCase();
+  }
+  var cast=document.getElementById('cast'), colorOf={}, ci=0;
+  roles.forEach(function(r,i){
+    var key=r[0]; if(!(key in colorOf)) colorOf[key]=avs[ci++%avs.length];
+    if(/\(Casey\)/.test(key)) colorOf[key]='var(--plum)'; if(/\(Jessie\)/.test(key)) colorOf[key]='var(--accent)';
+    var line=el('div','line'+(i%2?' r':''));
+    var who=el('div','who',mono(key)); who.style.setProperty('--av',colorOf[key]); who.setAttribute('aria-hidden','true');
+    var sp=el('div','speech'); sp.appendChild(el('span','rolename',key.replace(/-/g,' ')));
+    if(r[1]) sp.appendChild(el('div','bubble','“'+pretty(r[1])+'”'));
+    sp.appendChild(el('div','direction',pretty(r[2])));
+    line.appendChild(who); line.appendChild(sp); cast.appendChild(line);
+  });
+
+  // ---------- 5. wildcards ----------
+  var wild=[
+    "shared playlist moods - each check-in can attach a song; the partner page plays a 15-second preview",
+    "mood-matched love-note templates - after logging Anxious, the partner sees 3 ready-to-send reassurances they can edit",
+    "'mood mail' - write a note that only opens when the partner next logs a specific mood ('open when you are lonely')",
+    "physical bridge - partner's Excited check-in changes the colour of a smart bulb at home",
+    "'sync moment' - when both log within 5 minutes of each other, a special shared animation and the moment is saved",
+    "seasonal skins for the check-in grid (autumn leaves, snow) so the page itself changes through the year",
+    "a 'today we' line both co-write - one word each, building a tiny shared sentence over the day",
+    "the poke becomes a question - 'poke: coffee?' 'poke: you ok?' 'poke: miss you' - chosen with a long press",
+    "emoji-free couple stickers drawn from their own photos (cutouts) as reactions to moods",
+    "mood-triggered memory - logging Sad surfaces a random happy photo of the two of you from the gallery",
+    "'kiss back' with a counter-kiss animation that collides with the original on both screens if sent within 10 seconds",
+    "a jar of gratitude - every Grateful check-in note drops a marble into a shared jar you can open and read on anniversaries",
+    "a tiny weekly 'mood forecast' card each sends on Sunday ('busy Tuesday, excited Friday') that the partner can annotate"
+  ];
+  var ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'], rots=[-3,2,-1.5,3,-2,1,-3,2.5,-1,2,-2.5,1.5,-1];
+  var hand=document.getElementById('hand'), cards=[];
+  wild.forEach(function(w,i){
+    var c=el('button','pcard'); c.type='button'; c.style.setProperty('--rot',rots[i]+'deg');
+    var tl=el('span','corner tl'); tl.appendChild(document.createTextNode(ranks[i])); tl.appendChild(el('br')); tl.appendChild(document.createTextNode('♥︎'));
+    var br=tl.cloneNode(true); br.className='corner br';
+    c.appendChild(tl); c.appendChild(el('span','pip','♥︎')); c.appendChild(el('div',null,pretty(w))); c.appendChild(br);
+    c.setAttribute('aria-label',ranks[i]+' of hearts: '+pretty(w));
+    c.addEventListener('click',function(){ pick(i); });
+    cards.push(c); hand.appendChild(c);
+  });
+  var drawnEl=document.getElementById('drawn'), last=-1;
+  function pick(i){ cards.forEach(function(c){ c.classList.remove('drawn'); }); cards[i].classList.add('drawn'); last=i; drawnEl.textContent='You drew the '+({A:'ace',J:'jack',Q:'queen',K:'king'}[ranks[i]]||ranks[i])+' of hearts.'; }
+  document.getElementById('drawBtn').addEventListener('click',function(){ var i; do{ i=Math.floor(Math.random()*13); }while(i===last); pick(i); cards[i].scrollIntoView({block:'nearest',behavior:'smooth'}); });
+
+  // ---------- synthesis interactions ----------
+  var rd=document.getElementById('revealDemo'), rb=document.getElementById('revealBtn');
+  rb.addEventListener('click',function(){ var o=rd.classList.toggle('open'); rb.textContent=o?'Hide again':'Both answered — reveal together'; });
+  var dock=document.getElementById('dock'), mb=document.getElementById('mergeBtn');
+  mb.addEventListener('click',function(){ var m=dock.classList.toggle('merged-state'); mb.textContent=m?'Split them again':'Merge Mood + Partner'; });
+  var env=document.getElementById('envelope'), envWrap=document.getElementById('envWrap');
+  env.addEventListener('click',function(){ var o=env.classList.toggle('open'); envWrap.classList.toggle('open',o); env.setAttribute('aria-label',o?'Close the envelope':'Open the envelope'); document.getElementById('envHint').textContent=o?'tap to seal it again':'tap the seal'; });
+  var cuts=document.getElementById('cuts');
+  if('IntersectionObserver' in window){ var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ cuts.classList.add('seen'); io.disconnect(); } }); },{threshold:.3}); io.observe(cuts); }
+  else cuts.classList.add('seen');
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){ document.querySelectorAll('#synthesis svg').forEach(function(s){ if(s.pauseAnimations) s.pauseAnimations(); }); }
+})();
+</script>
+</body>
+</html>
