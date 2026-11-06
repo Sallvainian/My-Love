@@ -182,7 +182,7 @@ select ok(
   'FN-GRANT-016: unregister_all_push_devices is executable by authenticated'
 );
 
--- 20261105010000, same shape: Daily fetches its day and writes its pick through
+-- 20261105030000, same shape: Daily fetches its day and writes its pick through
 -- these two, so without the grants every call answers 42501.
 select ok(
   has_function_privilege('authenticated', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE'),

@@ -1,5 +1,5 @@
 -- ============================================
--- pgTAP: the Daily Question gate (20261105010000)
+-- pgTAP: the Daily Question gate (20261105030000)
 --
 -- The AD-5 file of architecture-daily-question. Pinned here:
 --   * RLS on and zero policies on daily_questions, couple_days and

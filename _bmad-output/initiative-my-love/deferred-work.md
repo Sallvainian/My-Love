@@ -4056,4 +4056,5 @@ location: supabase/migrations/20261105010000_daily_question_days_and_picks.sql
 source_spec: `tickets/epic-daily-question/tickets/story-each-partner-s-day-runs-on-their-own-clock-plan.md`
 severity: high
 reason: `git ls-tree --name-only origin/main supabase/migrations/` lists `20261105010000_push_added_dates.sql` (and `20261105020000_remind_me_on_by_default.sql`); this epic's story 6.1 added `20261105010000_daily_question_days_and_picks.sql`. The migration history keys on the version alone, so whichever lands second is recorded as applied without running. Renaming an applied migration is outside this story; the epic PR must renumber the daily one past every main version before merging.
-status: open
+status: done 2026-11-06
+resolution: renumbered to `20261105030000_daily_question_days_and_picks.sql`, after main's `20261105020000` and before this epic's `20261105210000_daily_question_own_clocks.sql`, which builds on it; the two pgTAP header comments that named the version follow, and the shared local stack's `schema_migrations` row was renamed to match. Done on `loop/integration` between stories 6.2 and the next, with the run stopped.
