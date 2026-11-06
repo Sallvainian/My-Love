@@ -25,6 +25,15 @@ vi.mock('../../../src/services/dateReminders', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/services/dateReminders')>()),
   cancelDateReminders: cancelSpy,
 }));
+// Call-through spies on the sign-out deletes, so afterEach can wait for them.
+vi.mock('../../../src/services/localCopy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/localCopy')>();
+  return { ...actual, deleteAccountCopies: vi.fn(actual.deleteAccountCopies) };
+});
+vi.mock('../../../src/services/imageCache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/imageCache')>();
+  return { ...actual, deleteAccountImages: vi.fn(actual.deleteAccountImages) };
+});
 vi.mock('../../../src/services/countdownMarksService', () => ({
   countdownMarksService: {
     fetchRemindersOff: (...args: unknown[]) => fetchRemindersOff(...args),
@@ -35,10 +44,17 @@ vi.mock('../../../src/services/countdownMarksService', () => ({
 import { Capacitor } from '@capacitor/core';
 import { AccountDataError, offlineMessage } from '../../../src/services/accountDataError';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
-import { readLocalCopy, refreshLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
+import { deleteAccountImages } from '../../../src/services/imageCache';
+import {
+  deleteAccountCopies,
+  readLocalCopy,
+  refreshLocalCopy,
+  writeLocalCopy,
+} from '../../../src/services/localCopy';
+import { moodService } from '../../../src/services/moodService';
 import { REMINDERS_OFF_COPY_KIND } from '../../../src/stores/slices/datesSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { deferred, setOnline } from './accountDataFixtures';
+import { accountDeletesSettled, deferred, setOnline } from './accountDataFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -64,6 +80,7 @@ beforeEach(async () => {
   vi.spyOn(Capacitor, 'isPluginAvailable').mockReturnValue(true);
   vi.spyOn(console, 'error').mockImplementation(() => {});
   cancelSpy.mockResolvedValue(undefined);
+  vi.spyOn(moodService, 'deleteSyncedForUser');
   setOnline(true);
   state().clearAuth();
   state().setAuthUser(A);
@@ -73,7 +90,11 @@ beforeEach(async () => {
 
 afterEach(async () => {
   // Lets the sign-out deletes a test started finish before the file can end.
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await accountDeletesSettled(
+    vi.mocked(deleteAccountCopies),
+    vi.mocked(deleteAccountImages),
+    vi.mocked(moodService.deleteSyncedForUser)
+  );
   vi.restoreAllMocks();
   await clearCopies();
 });

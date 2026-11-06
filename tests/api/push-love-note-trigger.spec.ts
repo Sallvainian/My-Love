@@ -1,29 +1,17 @@
 /**
- * Story 3.1: a love note becomes a push request, over the wire against the
- * local stack. Story 3.4 adds a second `describe`: a mood, a photo, a poke and
- * a kiss do too (`{kind, id}` through `notify_push`). It lives in this file, not
- * a new one, because the "sender is down" test rewrites the one
- * `push_sender_settings` row and a parallel file's triggers would miss the sender.
- * Story 3.5 added a third: an event, the wedding date, the date the couple got
- * together and a birthday each pushed the partner. Story 5.4 removed that push;
- * since 2026-11-05 an added event or anniversary pushes again
- * (`{kind: 'event' | 'anniversary', id}` through `notify_push`), so the third
- * describe asserts an added event and anniversary record on the partner's
- * devices, while their edits, the wedding date, the start date and a birthday
- * record nothing; the trigger set is pinned by
- * `supabase/tests/database/35_push_devices.sql`.
- * Story 3.6 adds a fourth: a partner request records on the asked person's
- * devices and its acceptance on the asker's (`{kind: 'partner_request' |
- * 'partner_accept', id}` through `notify_push`); a decline records nothing.
- * Story 3.7 adds a fifth: the receiver's `push_preferences` switch. With the
- * partner's `love_notes` off a note records nothing on any of their devices,
- * and with it back on the next note records on both; one account cannot read or
- * write another's row.
- * Story 3.8 adds a sixth: every push carries the recipient's unread love-note
- * count as `aps.badge`, counted from the partner's `love_notes_read_markers`
- * row, which only `mark_love_notes_read()` writes. The other describes assert
- * only that the badge is a number, since their recipients' markers are not
- * theirs to set.
+ * Push triggers for the user's own writes, over the wire against the local
+ * stack. Story 3.1: a love note becomes a push request, one per recipient
+ * device; a retried upsert sends no second push; a token moves to the account
+ * that registers it last; story 3.2's sign-out RPC, unregister_push_device,
+ * removes only the caller's row; and a sender that is down leaves the insert
+ * fast and committed. Story 3.7: the receiver's `push_preferences` switch. With
+ * the partner's `love_notes` off a note records nothing on any of their
+ * devices, and with it back on the next note records on both; one account
+ * cannot read or write another's row. Story 3.8: every push carries the
+ * recipient's unread love-note count as `aps.badge`, counted from the
+ * partner's `love_notes_read_markers` row, which only `mark_love_notes_read()`
+ * writes. The mood, photo, poke, kiss, added-date and partner-request pushes
+ * are in `push-partner-activity-trigger.spec.ts`.
  *
  * Path under test: register_push_device (RPC, real user JWTs) -> the
  * `love_notes` AFTER INSERT trigger -> pg_net -> Kong -> the `send-push` Edge
@@ -31,67 +19,34 @@
  * APNs key and records the request it would have sent (delivery `recorded`);
  * these cases read those rows. `supabase/functions/send-push/*.test.ts` proves
  * the payload and host rules; this file proves the trigger reaches the sender
- * and the sender reaches the right devices. Story 3.2 adds the sign-out
- * RPC, unregister_push_device, over the same real JWTs.
+ * and the sender reaches the right devices.
+ *
+ * The "sender is down" test rewrites the one `push_sender_settings` row, and a
+ * trigger that fires meanwhile in any other file would miss the sender. The
+ * `api` Playwright project runs one worker (`workers: 1` in
+ * `playwright.config.ts`), so no other api file runs beside this one, and the
+ * describes here run in order (serial mode).
  *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI) and `supabase/seed.sql` applied, which holds
  * the local sender URL and secret in `push_sender_settings`.
  *
- * The first three describes and the fifth use this worker's own pair (the
- * sender is its own account, the recipient its linked partner); every note,
- * device token and switch row they create is removed at the end, and nothing
- * links, unlinks or resets that pair. The fourth uses throwaway accounts: it links two of them through
- * `accept_partner_request` and deletes all four at the end.
+ * Every describe uses this worker's own pair (the sender is its own account,
+ * the recipient its linked partner); every note, device token, switch row and
+ * read marker it creates is removed at the end, and nothing links, unlinks or
+ * resets that pair.
  */
 import { randomUUID } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../../src/types/database.types';
-import type { TypedSupabaseClient } from '../support/factories';
 import { resolveOwnPair } from '../support/helpers/events';
-import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
-import { getUserAccessToken } from '../support/helpers/supabase';
+import {
+  clientFor,
+  newToken,
+  postToSender,
+  recordedAps,
+  requestsFor,
+  uniqueMoodTime,
+} from '../support/helpers/push-requests';
 import { test, expect } from '../support/merged-fixtures';
-
-/** The `push_requests` column that holds each kind of source row's id. */
-type SourceColumn =
-  | 'note_id'
-  | 'mood_id'
-  | 'photo_id'
-  | 'interaction_id'
-  | 'partner_request_id'
-  | 'partner_accept_id'
-  | 'event_id'
-  | 'anniversary_id';
-
-/** Rows the sender records for a note (or another source row), ordered by token. */
-async function requestsFor(
-  supabaseAdmin: TypedSupabaseClient,
-  sourceId: string,
-  column: SourceColumn = 'note_id'
-) {
-  const { data, error } = await supabaseAdmin
-    .from('push_requests')
-    .select('token, environment, delivery, payload')
-    .eq(column, sourceId)
-    .order('token');
-  if (error) throw new Error(`Failed to read push_requests: ${error.message}`);
-  return data ?? [];
-}
-
-/** A client speaking as `userId` with a real JWT, so RLS and grants apply. */
-async function clientFor(
-  supabaseAdmin: TypedSupabaseClient,
-  userId: string
-): Promise<TypedSupabaseClient> {
-  const accessToken = await getUserAccessToken(supabaseAdmin, userId);
-  return createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-  });
-}
-
-const newToken = () => `test-${randomUUID().replace(/-/g, '')}`;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -242,10 +197,8 @@ test.describe('Love note push trigger', () => {
     expect(await replay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 1 });
     expect(await requestsFor(supabaseAdmin, noteId)).toHaveLength(1);
 
-    // The trigger's call is asynchronous, so give a (wrongly) fired second one
-    // time to land before asserting that none did.
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-    expect(await requestsFor(supabaseAdmin, noteId)).toHaveLength(1);
+    // The retry inserted no row (its data is empty above), so the AFTER INSERT
+    // trigger had nothing to fire for: one row, and one request.
     const { count } = await supabaseAdmin
       .from('love_notes')
       .select('id', { count: 'exact', head: true })
@@ -358,503 +311,6 @@ test.describe('Love note push trigger', () => {
   });
 });
 
-/** The R7 text each partner-activity push carries, and the `kind` the tap routes on (story 3.9). */
-const partnerPayload = (kind: string, title: string, body: string) => ({
-  kind,
-  aps: { alert: { title, body }, 'thread-id': 'partner-activity', badge: expect.any(Number) },
-});
-
-/** Posts `{kind, id}` to the sender as the trigger does, with the secret from the settings row. */
-async function postToSender(supabaseAdmin: TypedSupabaseClient, body: Record<string, unknown>) {
-  const { data: settings, error } = await supabaseAdmin
-    .from('push_sender_settings')
-    .select('sender_secret')
-    .single();
-  expect(error).toBeNull();
-  return fetch(`${process.env.SUPABASE_URL}/functions/v1/send-push`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-push-secret': settings!.sender_secret },
-    body: JSON.stringify(body),
-  });
-}
-
-/** A moods.created_at no other run reuses (the table is unique on user and created_at). */
-const uniqueMoodTime = () => new Date(Date.now() - 86_400_000 - Math.floor(Math.random() * 1e9)).toISOString();
-
-test.describe('Mood, photo, poke and kiss push', () => {
-  test('[P0] a mood records the labels for the partner\'s devices only, and a re-send adds none', async ({
-    supabaseAdmin,
-    supabaseAsUser,
-    cleanup,
-  }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const partner = await clientFor(supabaseAdmin, partnerId);
-    const [phone, tablet, senderPhone] = [newToken(), newToken(), newToken()];
-    const createdAt = uniqueMoodTime();
-    cleanup.defer('remove push devices and mood', async () => {
-      await supabaseAdmin.from('push_devices').delete().in('token', [phone, tablet, senderPhone]);
-      await supabaseAdmin.from('moods').delete().eq('user_id', userId).eq('created_at', createdAt);
-    });
-    expect((await partner.rpc('register_push_device', { p_token: phone, p_environment: 'sandbox' })).error).toBeNull();
-    expect((await partner.rpc('register_push_device', { p_token: tablet, p_environment: 'production' })).error).toBeNull();
-    expect(
-      (await supabaseAsUser.rpc('register_push_device', { p_token: senderPhone, p_environment: 'sandbox' })).error
-    ).toBeNull();
-
-    const { data: sender } = await supabaseAdmin.from('users').select('display_name').eq('id', userId).single();
-    const title = sender?.display_name?.trim() || 'Your partner';
-
-    const { data: mood, error } = await supabaseAsUser
-      .from('moods')
-      .upsert(
-        { user_id: userId, mood_type: 'happy', mood_types: ['happy', 'grateful'], note: 'a private note', created_at: createdAt },
-        { onConflict: 'user_id,created_at' }
-      )
-      .select('id')
-      .single();
-    expect(error).toBeNull();
-
-    await expect
-      .poll(async () => (await requestsFor(supabaseAdmin, mood!.id, 'mood_id')).length, {
-        message: 'the sender records a request for each of the partner\'s devices',
-        timeout: 20_000,
-      })
-      .toBe(2);
-    const rows = await requestsFor(supabaseAdmin, mood!.id, 'mood_id');
-    expect(rows.map((r) => [r.token, r.environment, r.delivery]).sort()).toEqual(
-      [
-        [phone, 'sandbox', 'recorded'],
-        [tablet, 'production', 'recorded'],
-      ].sort()
-    );
-    for (const row of rows) {
-      expect(row.payload).toEqual(partnerPayload('mood', title, 'Logged a mood: Happy, Grateful'));
-    }
-
-    // The same (user_id, created_at) sent again is merged into the row: no INSERT, no push.
-    const resent = await supabaseAsUser
-      .from('moods')
-      .upsert(
-        { user_id: userId, mood_type: 'sad', mood_types: ['sad'], created_at: createdAt },
-        { onConflict: 'user_id,created_at' }
-      )
-      .select('id');
-    expect(resent.error).toBeNull();
-    expect(resent.data).toEqual([{ id: mood!.id }]);
-
-    // The trigger's call is asynchronous, so give a (wrongly) fired one time to land.
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-    const after = await requestsFor(supabaseAdmin, mood!.id, 'mood_id');
-    expect(after).toEqual(rows);
-    const { count } = await supabaseAdmin
-      .from('moods')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('created_at', createdAt);
-    expect(count).toBe(1);
-
-    // A replay of the trigger's own call is skipped per device, nothing recorded.
-    const replay = await postToSender(supabaseAdmin, { kind: 'mood', id: mood!.id });
-    expect(replay.status).toBe(200);
-    expect(await replay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 2 });
-    expect(await requestsFor(supabaseAdmin, mood!.id, 'mood_id')).toEqual(rows);
-  });
-
-  test('[P0] a photo records "Added a photo" for the partner, and a retry ignored on storage_path adds none', async ({
-    supabaseAdmin,
-    supabaseAsUser,
-    cleanup,
-  }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const partner = await clientFor(supabaseAdmin, partnerId);
-    const [token, senderPhone] = [newToken(), newToken()];
-    const storagePath = `${userId}/${randomUUID()}.jpg`;
-    cleanup.defer('remove push devices and photo', async () => {
-      await supabaseAdmin.from('push_devices').delete().in('token', [token, senderPhone]);
-      await supabaseAdmin.from('photos').delete().eq('storage_path', storagePath);
-    });
-    expect((await partner.rpc('register_push_device', { p_token: token, p_environment: 'sandbox' })).error).toBeNull();
-    expect(
-      (await supabaseAsUser.rpc('register_push_device', { p_token: senderPhone, p_environment: 'sandbox' })).error
-    ).toBeNull();
-    const { data: sender } = await supabaseAdmin.from('users').select('display_name').eq('id', userId).single();
-
-    const send = () =>
-      supabaseAsUser
-        .from('photos')
-        .upsert(
-          { user_id: userId, storage_path: storagePath, filename: 'p.jpg', file_size: 1000, width: 10, height: 10 },
-          { onConflict: 'storage_path', ignoreDuplicates: true }
-        )
-        .select('id');
-    const first = await send();
-    expect(first.error).toBeNull();
-    expect(first.data).toHaveLength(1);
-    const photoId = first.data![0].id;
-
-    await expect
-      .poll(async () => (await requestsFor(supabaseAdmin, photoId, 'photo_id')).length, { timeout: 20_000 })
-      .toBe(1);
-    const [row] = await requestsFor(supabaseAdmin, photoId, 'photo_id');
-    expect(row.token).toBe(token);
-    expect(row.payload).toEqual(partnerPayload('photo', sender?.display_name?.trim() || 'Your partner', 'Added a photo'));
-
-    const retry = await send();
-    expect(retry.error).toBeNull();
-    expect(retry.data).toHaveLength(0);
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-    expect(await requestsFor(supabaseAdmin, photoId, 'photo_id')).toHaveLength(1);
-  });
-
-  test('[P0] a poke and a kiss each record their text for the partner', async ({
-    supabaseAdmin,
-    supabaseAsUser,
-    cleanup,
-  }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const partner = await clientFor(supabaseAdmin, partnerId);
-    const [token, senderPhone] = [newToken(), newToken()];
-    const interactionIds: string[] = [];
-    cleanup.defer('remove push devices and interactions', async () => {
-      await supabaseAdmin.from('push_devices').delete().in('token', [token, senderPhone]);
-      if (interactionIds.length > 0) await supabaseAdmin.from('interactions').delete().in('id', interactionIds);
-    });
-    expect((await partner.rpc('register_push_device', { p_token: token, p_environment: 'sandbox' })).error).toBeNull();
-    expect(
-      (await supabaseAsUser.rpc('register_push_device', { p_token: senderPhone, p_environment: 'sandbox' })).error
-    ).toBeNull();
-    const { data: sender } = await supabaseAdmin.from('users').select('display_name').eq('id', userId).single();
-    const title = sender?.display_name?.trim() || 'Your partner';
-
-    for (const [type, body] of [
-      ['poke', 'Poked you'],
-      ['kiss', 'Sent you a kiss'],
-    ] as const) {
-      const { data: interaction, error } = await supabaseAsUser
-        .from('interactions')
-        .insert({ from_user_id: userId, to_user_id: partnerId, type, viewed: false })
-        .select('id')
-        .single();
-      expect(error).toBeNull();
-      interactionIds.push(interaction!.id);
-
-      await expect
-        .poll(async () => (await requestsFor(supabaseAdmin, interaction!.id, 'interaction_id')).length, {
-          message: `the sender records a ${type}`,
-          timeout: 20_000,
-        })
-        .toBe(1);
-      const [row] = await requestsFor(supabaseAdmin, interaction!.id, 'interaction_id');
-      expect(row.token).toBe(token);
-      expect(row.payload).toEqual(partnerPayload('interaction', title, body));
-
-      // The same {kind, id} posted again is skipped.
-      const replay = await postToSender(supabaseAdmin, { kind: 'interaction', id: interaction!.id });
-      expect(replay.status).toBe(200);
-      expect(await replay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 1 });
-      expect(await requestsFor(supabaseAdmin, interaction!.id, 'interaction_id')).toHaveLength(1);
-    }
-  });
-
-  test('[P1] the sender refuses an unknown kind and a non-uuid id, and finds no row for a missing one', async ({
-    supabaseAdmin,
-  }) => {
-    const unknownKind = await postToSender(supabaseAdmin, { kind: 'dance', id: randomUUID() });
-    expect(unknownKind.status).toBe(400);
-    const badId = await postToSender(supabaseAdmin, { kind: 'mood', id: 'not-a-uuid' });
-    expect(badId.status).toBe(400);
-    // Story 5.4 removed the date kind: a post from an older trigger is refused like any unknown kind.
-    const oldDate = await postToSender(supabaseAdmin, { kind: 'date', id: randomUUID() });
-    expect(oldDate.status).toBe(400);
-    for (const kind of ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept', 'event', 'anniversary']) {
-      const missing = await postToSender(supabaseAdmin, { kind, id: randomUUID() });
-      expect(missing.status, kind).toBe(404);
-    }
-  });
-});
-
-test.describe('Added dates push, date changes do not', () => {
-  test('[P0] an added event and anniversary record for the partner; their edits, the wedding date, the start date and a birthday record none', async ({
-    supabaseAdmin,
-    supabaseAsUser,
-    cleanup,
-  }) => {
-    const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const partner = await clientFor(supabaseAdmin, partnerId);
-    const [phone, tablet] = [newToken(), newToken()];
-    const createdAt = uniqueMoodTime();
-    let eventId: string | null = null;
-    let anniversaryId: string | null = null;
-    const [userA, userB] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
-    const [{ data: original, error: originalError }, { data: sender, error: senderError }] = await Promise.all([
-      supabaseAdmin
-        .from('couple_settings')
-        .select('relationship_start, wedding_date')
-        .eq('user_a', userA)
-        .eq('user_b', userB)
-        .maybeSingle(),
-      supabaseAdmin.from('users').select('birthday').eq('id', userId).single(),
-    ]);
-    expect(originalError).toBeNull();
-    expect(senderError).toBeNull();
-    cleanup.defer('remove push devices, event and mood, restore the dates', async () => {
-      await supabaseAdmin.from('push_devices').delete().in('token', [phone, tablet]);
-      await supabaseAdmin.from('moods').delete().eq('user_id', userId).eq('created_at', createdAt);
-      if (eventId) await supabaseAdmin.from('events').delete().eq('id', eventId);
-      if (anniversaryId) await supabaseAdmin.from('anniversaries').delete().eq('id', anniversaryId);
-      if (original) {
-        await supabaseAdmin.from('couple_settings').update(original).eq('user_a', userA).eq('user_b', userB);
-      } else {
-        await supabaseAdmin.from('couple_settings').delete().eq('user_a', userA).eq('user_b', userB);
-      }
-      await supabaseAdmin.from('users').update({ birthday: sender?.birthday ?? null }).eq('id', userId);
-    });
-
-    expect((await partner.rpc('register_push_device', { p_token: phone, p_environment: 'sandbox' })).error).toBeNull();
-    expect((await partner.rpc('register_push_device', { p_token: tablet, p_environment: 'production' })).error).toBeNull();
-
-    // Both dates start empty, so each write below is a first set and then a change.
-    const { error: resetError } = await supabaseAdmin
-      .from('couple_settings')
-      .upsert(
-        { user_a: userA, user_b: userB, relationship_start: null, wedding_date: null },
-        { onConflict: 'user_a,user_b' }
-      );
-    expect(resetError).toBeNull();
-    expect((await supabaseAdmin.from('users').update({ birthday: null }).eq('id', userId)).error).toBeNull();
-
-    // The user's own writes, as the app makes them.
-    const { data: event, error: eventError } = await supabaseAsUser
-      .from('events')
-      .insert({ user_id: userId, label: 'Paris trip', event_date: '2027-05-01' })
-      .select('id')
-      .single();
-    expect(eventError).toBeNull();
-    eventId = event!.id;
-    expect((await supabaseAsUser.from('events').update({ event_date: '2027-05-02' }).eq('id', eventId)).error).toBeNull();
-
-    const { data: anniversary, error: anniversaryError } = await supabaseAsUser
-      .from('anniversaries')
-      .insert({ user_id: userId, label: 'First date', event_date: '2020-02-14' })
-      .select('id')
-      .single();
-    expect(anniversaryError).toBeNull();
-    anniversaryId = anniversary!.id;
-    expect(
-      // The date, not the name: the sender reads the row when pg_net's call
-      // lands, so a renamed row could already carry the new name.
-      (await supabaseAsUser.from('anniversaries').update({ event_date: '2020-02-15' }).eq('id', anniversaryId)).error
-    ).toBeNull();
-
-    const own = await clientFor(supabaseAdmin, userId);
-    const writeDates = (dates: { wedding_date?: string; relationship_start?: string }) =>
-      own.from('couple_settings').upsert({ user_a: userA, user_b: userB, ...dates }, { onConflict: 'user_a,user_b' });
-    expect((await writeDates({ wedding_date: '2027-06-12' })).error).toBeNull();
-    expect((await writeDates({ wedding_date: '2027-06-13' })).error).toBeNull();
-    expect((await writeDates({ relationship_start: '2026-01-01T00:00:00Z' })).error).toBeNull();
-    expect((await writeDates({ relationship_start: '2026-02-02T00:00:00Z' })).error).toBeNull();
-
-    expect((await own.from('users').update({ birthday: '1990-05-01' }).eq('id', userId)).error).toBeNull();
-    expect((await own.from('users').update({ birthday: '1990-05-02' }).eq('id', userId)).error).toBeNull();
-
-    // The added event and anniversary each record a request per partner device,
-    // titled with the sender and naming the date as it was added.
-    for (const [column, id, body] of [
-      ['event_id', eventId, 'Added an event: Paris trip'],
-      ['anniversary_id', anniversaryId, 'Added an anniversary: First date'],
-    ] as const) {
-      await expect
-        .poll(async () => (await requestsFor(supabaseAdmin, id!, column)).length, {
-          message: `the sender records a request for each of the partner's devices (${column})`,
-          timeout: 20_000,
-        })
-        .toBe(2);
-      for (const row of await requestsFor(supabaseAdmin, id!, column)) {
-        const payload = row.payload as { kind: string; aps: { alert: { body: string } } };
-        expect(payload.aps.alert.body).toBe(body);
-        expect(payload.kind).toBe(column === 'event_id' ? 'event' : 'anniversary');
-      }
-    }
-
-    // The control: a mood after those writes still records a request per device.
-    // Once it has, every row on the partner's devices is the event's, the
-    // anniversary's or the mood's: no edit and no couple date or birthday added
-    // one (the triggers are pinned by 35_push_devices.sql, PUSH-DB-060, 064-068).
-    const { data: mood, error: moodError } = await supabaseAsUser
-      .from('moods')
-      .upsert(
-        { user_id: userId, mood_type: 'happy', mood_types: ['happy'], created_at: createdAt },
-        { onConflict: 'user_id,created_at' }
-      )
-      .select('id')
-      .single();
-    expect(moodError).toBeNull();
-    await expect
-      .poll(async () => (await requestsFor(supabaseAdmin, mood!.id, 'mood_id')).length, {
-        message: 'the sender records a request for each of the partner\'s devices',
-        timeout: 20_000,
-      })
-      .toBe(2);
-
-    const { data: all, error } = await supabaseAdmin
-      .from('push_requests')
-      .select('token, mood_id, event_id, anniversary_id')
-      .in('token', [phone, tablet]);
-    expect(error).toBeNull();
-    expect(all).toHaveLength(6);
-    const sources = (all ?? []).map((row) => row.mood_id ?? row.event_id ?? row.anniversary_id).sort();
-    expect(sources).toEqual([mood!.id, mood!.id, eventId!, eventId!, anniversaryId!, anniversaryId!].sort());
-  });
-});
-
-test.describe('Partner request push', () => {
-  /** A throwaway account with a display name; the cascade from `auth.users` removes everything it owns. */
-  async function createParty(
-    supabaseAdmin: TypedSupabaseClient,
-    cleanup: { defer: (name: string, fn: () => Promise<unknown>) => void },
-    role: string
-  ) {
-    const account = await createOutsiderClient(supabaseAdmin, `pushreq-${role}`);
-    cleanup.defer(`delete throwaway account ${role}`, () => deleteOutsider(account));
-    const name = `Push ${role.toUpperCase()} ${randomUUID().slice(0, 6)}`;
-    const { error } = await account.client
-      .from('users')
-      .update({ display_name: name, updated_at: new Date().toISOString() })
-      .eq('id', account.userId);
-    expect(error, `name ${role}`).toBeNull();
-    return { ...account, name };
-  }
-
-  type Party = Awaited<ReturnType<typeof createParty>>;
-
-  async function registerDevice(party: Party, environment: 'sandbox' | 'production') {
-    const token = newToken();
-    const { error } = await party.client.rpc('register_push_device', { p_token: token, p_environment: environment });
-    expect(error).toBeNull();
-    return token;
-  }
-
-  /** A pending request from `from` to `to`, sent as `from` itself; returns its id. */
-  async function sendRequest(from: Party, to: Party): Promise<string> {
-    const { data, error } = await from.client
-      .from('partner_requests')
-      .insert({ from_user_id: from.userId, to_user_id: to.userId, status: 'pending' })
-      .select('id')
-      .single();
-    expect(error).toBeNull();
-    return data!.id;
-  }
-
-  async function awaitRequests(
-    supabaseAdmin: TypedSupabaseClient,
-    requestId: string,
-    column: SourceColumn,
-    count: number
-  ) {
-    await expect
-      .poll(async () => (await requestsFor(supabaseAdmin, requestId, column)).length, {
-        message: `the sender records ${count} request(s) in ${column}`,
-        timeout: 20_000,
-      })
-      .toBe(count);
-    return requestsFor(supabaseAdmin, requestId, column);
-  }
-
-  const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
-
-  test('[P0] a request records on the asked person\'s devices only, and its acceptance on the asker\'s only; a decline and the auto-declined requests record none', async ({
-    supabaseAdmin,
-    cleanup,
-  }) => {
-    const asker = await createParty(supabaseAdmin, cleanup, 'a');
-    const asked = await createParty(supabaseAdmin, cleanup, 'b');
-    const rival = await createParty(supabaseAdmin, cleanup, 'c');
-    const decliner = await createParty(supabaseAdmin, cleanup, 'd');
-    const askerPhone = await registerDevice(asker, 'sandbox');
-    const [phone, tablet] = [await registerDevice(asked, 'sandbox'), await registerDevice(asked, 'production')];
-    const rivalPhone = await registerDevice(rival, 'sandbox');
-    const declinerPhone = await registerDevice(decliner, 'sandbox');
-
-    // ---- the request goes to the asked person's devices ----
-    const accepted = await sendRequest(asker, asked);
-    const requestRows = await awaitRequests(supabaseAdmin, accepted, 'partner_request_id', 2);
-    expect(requestRows.map((r) => [r.token, r.environment, r.delivery]).sort()).toEqual(
-      [
-        [phone, 'sandbox', 'recorded'],
-        [tablet, 'production', 'recorded'],
-      ].sort()
-    );
-    for (const row of requestRows) {
-      expect(row.payload).toEqual(partnerPayload('partner_request', asker.name, 'Sent you a partner request'));
-    }
-    expect(await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).toEqual([]);
-
-    // A second asker, and a request to another person that will be declined.
-    const autoDeclined = await sendRequest(rival, asked);
-    expect(await awaitRequests(supabaseAdmin, autoDeclined, 'partner_request_id', 2)).toHaveLength(2);
-    const declined = await sendRequest(rival, decliner);
-    const declinedRows = await awaitRequests(supabaseAdmin, declined, 'partner_request_id', 1);
-    expect(declinedRows[0].token).toBe(declinerPhone);
-
-    // A replayed request post is skipped for every device.
-    const replay = await postToSender(supabaseAdmin, { kind: 'partner_request', id: accepted });
-    expect(replay.status).toBe(200);
-    expect(await replay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 2 });
-
-    // A forged accept for a request that is still pending answers all zeros and claims nothing.
-    const forged = await postToSender(supabaseAdmin, { kind: 'partner_accept', id: accepted });
-    expect(forged.status).toBe(200);
-    expect(await forged.json()).toEqual(zeros);
-    expect(await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).toEqual([]);
-
-    // ---- the acceptance goes to the asker's devices ----
-    const accept = await asked.client.rpc('accept_partner_request', { p_request_id: accepted });
-    expect(accept.error).toBeNull();
-    const acceptRows = await awaitRequests(supabaseAdmin, accepted, 'partner_accept_id', 1);
-    expect(acceptRows.map((r) => [r.token, r.environment, r.delivery])).toEqual([[askerPhone, 'sandbox', 'recorded']]);
-    expect(acceptRows[0].payload).toEqual(partnerPayload('partner_accept', asked.name, 'Accepted your partner request'));
-
-    // A replayed acceptance is skipped.
-    const acceptReplay = await postToSender(supabaseAdmin, { kind: 'partner_accept', id: accepted });
-    expect(acceptReplay.status).toBe(200);
-    expect(await acceptReplay.json()).toMatchObject({ recorded: 0, sent: 0, skipped: 1 });
-
-    // ---- a decline, and the request the accept declined, push nothing ----
-    const decline = await decliner.client.rpc('decline_partner_request', { p_request_id: declined });
-    expect(decline.error).toBeNull();
-    const states = await supabaseAdmin
-      .from('partner_requests')
-      .select('id, status')
-      .in('id', [accepted, autoDeclined, declined]);
-    expect(states.error).toBeNull();
-    expect(Object.fromEntries(states.data!.map((r) => [r.id, r.status]))).toEqual({
-      [accepted]: 'accepted',
-      [autoDeclined]: 'declined',
-      [declined]: 'declined',
-    });
-
-    // The trigger's call is asynchronous, so give a (wrongly) fired one time to land.
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
-    expect(await requestsFor(supabaseAdmin, autoDeclined, 'partner_accept_id')).toEqual([]);
-    expect(await requestsFor(supabaseAdmin, declined, 'partner_accept_id')).toEqual([]);
-    expect((await requestsFor(supabaseAdmin, accepted, 'partner_accept_id')).map((r) => r.token)).toEqual([askerPhone]);
-
-    // A forged accept for a declined request is refused too, and the rival's device stays empty.
-    for (const id of [autoDeclined, declined]) {
-      const refused = await postToSender(supabaseAdmin, { kind: 'partner_accept', id });
-      expect(refused.status).toBe(200);
-      expect(await refused.json()).toEqual(zeros);
-    }
-    expect(await requestsFor(supabaseAdmin, autoDeclined, 'partner_accept_id')).toEqual([]);
-    expect(await requestsFor(supabaseAdmin, declined, 'partner_accept_id')).toEqual([]);
-    const { data: rivalRows } = await supabaseAdmin
-      .from('push_requests')
-      .select('id')
-      .eq('token', rivalPhone);
-    expect(rivalRows).toEqual([]);
-  });
-});
-
 test.describe('Push switches', () => {
   test('[P0] a switch off stops the push on every device, and on restores it; no one else can touch the row', async ({
     supabaseAdmin,
@@ -865,10 +321,12 @@ test.describe('Push switches', () => {
     const partner = await clientFor(supabaseAdmin, partnerId);
     const [phone, tablet] = [newToken(), newToken()];
     const noteKeys = [randomUUID(), randomUUID(), randomUUID()];
-    cleanup.defer('remove push devices, notes and the partner\'s switches', async () => {
+    const pokeIds: string[] = [];
+    cleanup.defer('remove push devices, notes, the poke and the partner\'s switches', async () => {
       await supabaseAdmin.from('push_preferences').delete().eq('user_id', partnerId);
       await supabaseAdmin.from('push_devices').delete().in('token', [phone, tablet]);
       await supabaseAdmin.from('love_notes').delete().in('idempotency_key', noteKeys);
+      if (pokeIds.length > 0) await supabaseAdmin.from('interactions').delete().in('id', pokeIds);
     });
 
     expect((await partner.rpc('register_push_device', { p_token: phone, p_environment: 'sandbox' })).error).toBeNull();
@@ -904,8 +362,21 @@ test.describe('Push switches', () => {
 
     // ---- off: a note records nothing on any of their devices ----
     const silenced = await sendNote(noteKeys[0]);
-    // The trigger's call is asynchronous, so give a (wrongly) recorded one time to land.
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    // A poke sent after it (pokes and kisses stay on) is the barrier: once the
+    // sender has recorded the poke, a request for the note would have landed too.
+    const { data: poke, error: pokeError } = await supabaseAsUser
+      .from('interactions')
+      .insert({ from_user_id: userId, to_user_id: partnerId, type: 'poke', viewed: false })
+      .select('id')
+      .single();
+    expect(pokeError).toBeNull();
+    pokeIds.push(poke!.id);
+    await expect
+      .poll(async () => (await requestsFor(supabaseAdmin, poke!.id, 'interaction_id')).length, {
+        message: 'the sender records the poke sent after the silenced note',
+        timeout: 20_000,
+      })
+      .toBe(2);
     expect(await requestsFor(supabaseAdmin, silenced)).toEqual([]);
 
     const direct = await postToSender(supabaseAdmin, { note_id: silenced });
@@ -967,13 +438,6 @@ test.describe('Push switches', () => {
       .toBe(2);
   });
 });
-
-/** What the sender recorded as the first row's `aps.badge` and `aps['thread-id']`. */
-async function recordedAps(supabaseAdmin: TypedSupabaseClient, sourceId: string, column: SourceColumn) {
-  const [row] = await requestsFor(supabaseAdmin, sourceId, column);
-  const { badge, 'thread-id': threadId } = (row.payload as { aps: { badge: number; 'thread-id': string } }).aps;
-  return { badge, threadId };
-}
 
 test.describe('Badge', () => {
   test('[P0] every push carries the partner\'s unread love notes, and opening Love Notes resets the count', async ({

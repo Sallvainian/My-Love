@@ -154,6 +154,10 @@ export default defineConfig({
     {
       name: 'api',
       testDir: './tests/api',
+      // One worker: push-love-note-trigger.spec.ts's "sender is down" test
+      // rewrites the one global push_sender_settings row, and a push trigger
+      // that another api file fires meanwhile would miss the sender.
+      workers: 1,
       use: {
         baseURL: process.env.SUPABASE_URL,
         extraHTTPHeaders: {

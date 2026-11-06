@@ -1,6 +1,7 @@
 /**
- * Shared, mock-free helpers for the accountDataSlices test files
- * (`accountDataSlices.test.ts` and `accountDataSlices.anniversaries.test.ts`).
+ * Shared, mock-free helpers for the store test files that sign accounts in and
+ * out (`accountDataSlices.test.ts`, `accountDataSlices.anniversaries.test.ts`,
+ * `countdownMarks.test.ts`, `pushPreferencesCopy.test.ts` and others).
  * Each of those files keeps its own server fakes, `vi.mock`s and `beforeEach`.
  */
 import { AccountDataError } from '../../../src/services/accountDataError';
@@ -31,3 +32,19 @@ export function setAnniversaries(list: Anniversary[]) {
 export const offline = () => new AccountDataError('offline', 'You are offline. Anniversaries need a connection to save.');
 
 export { setOnline } from './navigatorFixtures';
+
+/** A call-through `vi.fn`/`vi.spyOn`: only its recorded results are read. */
+type CallThroughSpy = { mock: { results: { value: unknown }[] } };
+
+/**
+ * Waits for the deletes `deleteAccountData` (`authSlice.ts`) starts
+ * fire-and-forget on every sign-out and account switch, so none of them logs
+ * after the file ends, which Vitest reports as an `EnvironmentTeardownError`.
+ * Pass the file's call-through spies on `deleteAccountCopies`,
+ * `deleteAccountImages` and `moodService.deleteSyncedForUser`, plus
+ * `cancelDateReminders` where it runs for real, and call it before
+ * `vi.restoreAllMocks()`, which would drop a `vi.spyOn`'s results.
+ */
+export async function accountDeletesSettled(...spies: CallThroughSpy[]): Promise<void> {
+  await Promise.allSettled(spies.flatMap((spy) => spy.mock.results.map((result) => result.value)));
+}
