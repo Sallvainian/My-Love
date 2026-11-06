@@ -160,13 +160,6 @@ export default defineConfig(
       'no-console': 'off', // Test output and diagnostics use console.log intentionally
     },
   },
-  // tests/e2e-archive/ is frozen documentation, never repaired (AGENTS.md Policy).
-  {
-    files: ['tests/e2e-archive/**/*.{ts,tsx}'],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
-    },
-  },
   // A bare `expect(console.error).toHaveBeenCalled()`, or the same on console.warn,
   // passes on any logged line, so an
   // unrelated error from a new mock satisfies it (retrospective A5, DW-452). Assert the

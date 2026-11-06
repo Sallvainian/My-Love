@@ -165,7 +165,6 @@ My-Love/
 │   ├── integration/              # Playwright integration specs
 │   ├── unit/                     # Vitest unit tests
 │   ├── api/                      # API contract tests
-│   ├── e2e-archive/              # Frozen old specs; not run
 │   └── support/                  # Fixtures, factories, helpers
 ├── supabase/
 │   ├── config.toml

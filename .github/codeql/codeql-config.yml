@@ -19,12 +19,6 @@ paths-ignore:
   # Deno edge functions use CDN imports (https://esm.sh/) and Deno-specific globals
   # that CodeQL's TypeScript extractor cannot parse. Exclude to eliminate parse warnings.
   - 'supabase/functions/**'
-  # Archived, non-executing E2E specs. Already excluded from tsc
-  # (tsconfig.test.json / tsconfig.tsr.json) and from every Playwright project
-  # (testDir is ./tests/e2e|api|integration); their relative imports no longer even
-  # resolve. ESLint likewise disables no-unused-vars under tests/**. Retained only
-  # as documentation — see tests/e2e-archive/README.md.
-  - 'tests/e2e-archive/**'
 
 queries:
   - uses: security-extended

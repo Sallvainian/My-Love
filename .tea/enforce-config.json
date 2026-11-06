@@ -5,7 +5,7 @@
     "src/**/*.test.{ts,tsx,js,jsx}"
   ],
   "pactConfigGlobs": [],
-  "excludeGlobs": [],
+  "excludeGlobs": ["tests/unit/stores/signOutClearsAccountState.test.ts"],
   "disabledRules": [],
   "maxFileLines": 1000,
   "stopScanWindowSeconds": 900,

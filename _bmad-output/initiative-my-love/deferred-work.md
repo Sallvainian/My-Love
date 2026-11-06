@@ -4083,3 +4083,10 @@ location: H1 hard waits (`await new Promise((resolve) => setTimeout(resolve, N))
 severity: low
 reason: The hook's `--pre` blocks only violations a write adds, so these files can still be edited. But `--post` reports the whole file after every edit, and `--stop` sweeps each test file the turn touched and exits 2, so an agent that edits one of them is told to fix the old violations and gets one extra turn before it can stop. That includes a loop session working on something else. Each hard wait should become a wait on the thing it waits for, such as a fake timer, `vi.waitFor` or a polled assertion. Each oversize file should be split by subject. Counts come from running the hook's own `scanFile` over every file its `testGlobs` match.
 status: open
+
+### DW-480: The date-copy refresh tests still hard-wait 20 ms through `settleMs`, which the H1 regex cannot see.
+origin: DW-466 fix (fix/dw-466-tea-hook-findings), 2026-11-06
+location: tests/unit/stores/dateRemindersAtLaunchFixture.ts (`settleMs`); tests/unit/stores/dateRemindersAtLaunch.triggers.test.ts (14 calls); tests/unit/stores/dateRemindersAtLaunch.test.ts (1 call)
+severity: low
+reason: `settleMs = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms))` waits a fixed time, either before a negative assertion ("runs no refresher", "does nothing for a sign-in") or in an `afterEach` to let a run end. `.claude/hooks/tea-enforce.cjs`'s H1 pattern matches only a literal delay, so it does not flag the variable `ms`, and DW-466 replaced only the waits the hook flags. Fix as DW-466 did the others: the triggers decide before their first await, so a negative step can `mockClear()` `readLocalCopySpy` or a refresher spy and assert at once; the token-renewal cases defer by `setTimeout(0)`, so they need a scoped fake timer, as `MoodTracker.partnerLink.test.tsx` uses; a drain is `await replanDateReminders()`.
+status: open
