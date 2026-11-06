@@ -6,8 +6,8 @@
 --     daily_picks; no anon or authenticated privilege on any of them (SELECT
 --     included); service_role holds column SELECT on every daily_picks column
 --     except `choice` and no table privilege.
---   * The six internal functions are denied to anon and authenticated; the two
---     client RPCs are granted to authenticated only.
+--   * The seven internal functions are denied to anon and authenticated; the
+--     three client RPCs are granted to authenticated only.
 --   * Every client RPC called as the second partner BEFORE their own pick
 --     returns no choice, Same/Different mark or count for that day, and a
 --     direct select on daily_picks is denied. Every new client RPC is added
@@ -25,6 +25,11 @@
 --     now on tomorrow's date is refused by its date check, so the second-day
 --     picks go through record_daily_pick with instants on that date. The window,
 --     date and zone cases live in 41_daily_question_own_clocks.sql.
+--   * Story 6.3 (20261106000000) added record_written_question (the seventh
+--     internal function) and the client RPC submit_written_question (the
+--     third), which B calls before their own pick like the others. The turns,
+--     the next-day question and the refusals live in
+--     42_daily_question_written_questions.sql.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -34,7 +39,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(100);
+select plan(102);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -149,11 +154,12 @@ select is(
    from unnest(array['effective_zone(text, integer)', 'assign_couple_day(uuid, uuid, date)',
                      'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)',
                      'record_user_time_zone(uuid, text, integer, timestamptz, timestamptz)',
-                     'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)']) as f(sig),
+                     'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)',
+                     'record_written_question(uuid, uuid, text, text, timestamptz)']) as f(sig),
         unnest(array['anon', 'authenticated']) as r(rolename)
    where has_function_privilege(r.rolename, 'public.' || f.sig, 'EXECUTE')),
   0,
-  'DAILY-012: the six internal functions are executable by neither anon nor authenticated'
+  'DAILY-012: the seven internal functions are executable by neither anon nor authenticated'
 );
 
 select is(
@@ -161,22 +167,25 @@ select is(
    from unnest(array['effective_zone(text, integer)', 'assign_couple_day(uuid, uuid, date)',
                      'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)',
                      'record_user_time_zone(uuid, text, integer, timestamptz, timestamptz)',
-                     'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)']) as f(sig)
+                     'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)',
+                     'record_written_question(uuid, uuid, text, text, timestamptz)']) as f(sig)
    where has_function_privilege('service_role', 'public.' || f.sig, 'EXECUTE')),
-  6,
-  'DAILY-013: service_role keeps EXECUTE on the six internal functions'
+  7,
+  'DAILY-013: service_role keeps EXECUTE on the seven internal functions'
 );
 
 select ok(
   has_function_privilege('authenticated', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE')
-  and has_function_privilege('authenticated', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE'),
-  'DAILY-014: the two client RPCs are executable by authenticated'
+  and has_function_privilege('authenticated', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.submit_written_question(uuid, text, text)', 'EXECUTE'),
+  'DAILY-014: the three client RPCs are executable by authenticated'
 );
 
 select ok(
   not has_function_privilege('anon', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE'),
-  'DAILY-015: the two client RPCs are not executable by anon'
+  and not has_function_privilege('anon', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.submit_written_question(uuid, text, text)', 'EXECUTE'),
+  'DAILY-015: the three client RPCs are not executable by anon'
 );
 
 -- ============================================
@@ -377,7 +386,17 @@ select throws_ok(
   $$select * from public.couple_days$$,
   '42501', null, 'DAILY-045: B cannot select couple_days directly'
 );
+select throws_ok(
+  format($$select public.submit_written_question(%L, 'Beach', 'Mountains')$$, current_setting('tests.day')),
+  'DQ005', null, 'DAILY-101: B cannot submit a written question before their own pick'
+);
 reset role;
+
+select is(
+  (select count(*)::int from public.daily_questions where source_day_id = current_setting('tests.day')::uuid),
+  0,
+  'DAILY-102: and no question was written from that day'
+);
 
 select is(
   current_setting('tests.b_before')::jsonb #>> '{snapshot,state}',

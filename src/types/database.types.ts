@@ -1060,6 +1060,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_written_question: {
+        Args: {
+          at: string
+          day_id: string
+          that_text: string
+          this_text: string
+          viewer: string
+        }
+        Returns: Json
+      }
       register_push_device: {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
@@ -1072,6 +1082,10 @@ export type Database = {
           time_zone: string
           utc_offset_minutes: number
         }
+        Returns: Json
+      }
+      submit_written_question: {
+        Args: { day_id: string; that_text: string; this_text: string }
         Returns: Json
       }
       unread_love_note_count: { Args: { p_user_id: string }; Returns: number }
