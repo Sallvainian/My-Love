@@ -1022,6 +1022,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_daily_day_by_id: { Args: { day_id: string }; Returns: Json }
       get_my_partner_id: { Args: Record<PropertyKey, never>; Returns: string }
       get_my_pending_partner_requests: {
         Args: Record<PropertyKey, never>

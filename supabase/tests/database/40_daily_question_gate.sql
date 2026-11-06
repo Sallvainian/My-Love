@@ -30,6 +30,10 @@
 --     third), which B calls before their own pick like the others. The turns,
 --     the next-day question and the refusals live in
 --     42_daily_question_written_questions.sql.
+--   * Story 6.6 (20261106010000) added the client RPC get_daily_day_by_id (the
+--     fourth), which B calls before and after their own pick; a partnered
+--     outsider, an unlinked user, a day id no row has and a re-linked B on the
+--     old pair's day get P0002 from it, and a NULL auth.uid() is refused.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -39,7 +43,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(102);
+select plan(111);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -177,15 +181,17 @@ select is(
 select ok(
   has_function_privilege('authenticated', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
-  and has_function_privilege('authenticated', 'public.submit_written_question(uuid, text, text)', 'EXECUTE'),
-  'DAILY-014: the three client RPCs are executable by authenticated'
+  and has_function_privilege('authenticated', 'public.submit_written_question(uuid, text, text)', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.get_daily_day_by_id(uuid)', 'EXECUTE'),
+  'DAILY-014: the four client RPCs are executable by authenticated'
 );
 
 select ok(
   not has_function_privilege('anon', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.submit_written_question(uuid, text, text)', 'EXECUTE'),
-  'DAILY-015: the three client RPCs are not executable by anon'
+  and not has_function_privilege('anon', 'public.submit_written_question(uuid, text, text)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.get_daily_day_by_id(uuid)', 'EXECUTE'),
+  'DAILY-015: the four client RPCs are not executable by anon'
 );
 
 -- ============================================
@@ -273,6 +279,11 @@ select throws_ok(
   $$select public.submit_daily_pick(gen_random_uuid(), 'this', now(), 'UTC', 0)$$,
   'Authentication required',
   'DAILY-031: submit_daily_pick rejects a NULL auth.uid()'
+);
+select throws_ok(
+  $$select public.get_daily_day_by_id(gen_random_uuid())$$,
+  'Authentication required',
+  'DAILY-109: get_daily_day_by_id rejects a NULL auth.uid()'
 );
 
 -- ============================================
@@ -370,6 +381,7 @@ select is(
 -- Everything B can call before B's own pick.
 select tests.authenticate_as((select b_id from t_ids));
 select set_config('tests.b_before', public.get_daily_day('UTC', 0, now())::text, false);
+select set_config('tests.b_by_id', public.get_daily_day_by_id(current_setting('tests.day')::uuid)::text, false);
 select throws_ok(
   $$select * from public.daily_picks$$,
   '42501', null, 'DAILY-042: B cannot select daily_picks directly before picking'
@@ -418,6 +430,25 @@ select ok(
   'DAILY-048: no "this" or "that" value appears anywhere in B''s answer'
 );
 select is(
+  current_setting('tests.b_by_id')::jsonb ->> 'state',
+  'partner',
+  'DAILY-103: B''s by-id answer, before B''s own pick, shows that the partner picked'
+);
+select is(
+  (current_setting('tests.b_by_id')::jsonb -> 'my_choice')::text || '/'
+    || (current_setting('tests.b_by_id')::jsonb -> 'partner_choice')::text || '/'
+    || (current_setting('tests.b_by_id')::jsonb -> 'same')::text,
+  'null/null/null',
+  'DAILY-104: and my_choice, partner_choice and same are all null'
+);
+select ok(
+  not jsonb_path_exists(
+    current_setting('tests.b_by_id')::jsonb,
+    '$.** ? (@ == "this" || @ == "that")'
+  ),
+  'DAILY-105: and no "this" or "that" value appears anywhere in it'
+);
+select is(
   (select count(*)::int from public.visible_daily_picks((select b_id from t_ids), now())),
   0,
   'DAILY-049: the gate returns B nothing before B''s own pick'
@@ -448,6 +479,25 @@ select throws_ok(
   format($$select public.submit_daily_pick(%L, 'this', now(), 'UTC', 0)$$, current_setting('tests.day')),
   'P0002', 'Day not found',
   'DAILY-053: an unlinked outsider cannot pick on another couple''s day'
+);
+select throws_ok(
+  format($$select public.get_daily_day_by_id(%L)$$, current_setting('tests.day')),
+  'P0002', 'Day not found',
+  'DAILY-107: an unlinked user cannot read another couple''s day by id'
+);
+reset role;
+select tests.authenticate_as((select o_id from t_ids));
+select throws_ok(
+  format($$select public.get_daily_day_by_id(%L)$$, current_setting('tests.day')),
+  'P0002', 'Day not found',
+  'DAILY-108: a partnered outsider cannot read another couple''s day by id'
+);
+reset role;
+select tests.authenticate_as((select a_id from t_ids));
+select throws_ok(
+  $$select public.get_daily_day_by_id(gen_random_uuid())$$,
+  'P0002', 'Day not found',
+  'DAILY-110: a well-formed day id that no row has is not found'
 );
 reset role;
 
@@ -500,6 +550,16 @@ select is(
    where day_id = current_setting('tests.day')::uuid and user_id = (select a_id from t_ids)),
   false,
   'DAILY-060: A''s row is the first pick'
+);
+
+select tests.authenticate_as((select b_id from t_ids));
+select set_config('tests.b_by_id_after', public.get_daily_day_by_id(current_setting('tests.day')::uuid)::text, false);
+reset role;
+select is(
+  current_setting('tests.b_by_id_after')::jsonb ->> 'state' || '/'
+    || (current_setting('tests.b_by_id_after')::jsonb ->> 'partner_choice'),
+  'both/this',
+  'DAILY-106: after B''s pick, B''s by-id answer carries the partner''s choice'
 );
 
 select tests.authenticate_as((select a_id from t_ids));
@@ -568,6 +628,11 @@ select throws_ok(
   format($$select public.submit_daily_pick(%L, 'this', now(), 'UTC', 0)$$, current_setting('tests.day')),
   'P0002', 'Day not found',
   'DAILY-068: and B cannot submit on the old pair''s day'
+);
+select throws_ok(
+  format($$select public.get_daily_day_by_id(%L)$$, current_setting('tests.day')),
+  'P0002', 'Day not found',
+  'DAILY-111: and B cannot read the old pair''s day by id'
 );
 reset role;
 

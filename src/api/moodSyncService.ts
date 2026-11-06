@@ -26,7 +26,15 @@ import {
   resolveSignedInUserForDelivery,
   supabase,
 } from './supabaseClient';
-import { parseMoodBroadcast } from './validation/broadcastSchemas';
+import {
+  DAILY_PICK_EVENT,
+  NEW_MOOD_EVENT,
+  PARTNER_EVENTS,
+  PARTNER_LINKED_EVENT,
+  type PartnerEvent,
+  type PartnerEventName,
+  parsePartnerEvent,
+} from './validation/broadcastSchemas';
 import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
 
 /**
@@ -35,30 +43,31 @@ import type { MoodInsert, SupabaseMood } from './validation/supabaseSchemas';
 export type SupabaseMoodRecord = SupabaseMood;
 
 /**
- * One live consumer of a mood broadcast channel.
+ * What one consumer of the partner channel wants to hear: an optional handler
+ * per event name, which receives that member of the `PartnerEvent` union, and
+ * the channel's status.
+ *
+ * - `partner_linked`: someone just accepted this account's partner request;
+ *   see PARTNER_LINKED_EVENT.
+ * - `daily_pick`: the partner picked on `day_id`; re-read that day.
+ * - `new_mood`: the partner logged a mood.
+ */
+export type PartnerEventHandlers = {
+  [E in PartnerEventName]?: (event: Extract<PartnerEvent, { event: E }>) => void;
+} & {
+  onStatus?: (status: string) => void;
+};
+
+/**
+ * One live consumer of the partner channel.
  *
  * A fresh object per subscribe call, so identity is unique even when two
- * consumers happen to pass the same callback reference — the set that tracks
+ * consumers happen to pass the same handlers object — the set that tracks
  * them is what decides when the channel may be torn down.
  */
 interface MoodSubscriber {
-  onMood: (mood: SupabaseMoodRecord) => void;
-  onStatus?: (status: string) => void;
-  /** Someone just accepted this account's partner request; see PARTNER_LINKED_EVENT. */
-  onPartnerLinked?: () => void;
+  handlers: PartnerEventHandlers;
 }
-
-/**
- * Sent on `mood-updates:<senderId>` by the account that just accepted
- * `senderId`'s partner request, so the sender's open Partner tab re-reads its
- * partner instead of showing "Connect" until a reload.
- *
- * It rides the sender's own mood topic because that is the one channel an
- * unlinked account already listens on, and `couple_broadcast_partner_can_send`
- * lets exactly the new partner publish there the moment the link exists. The
- * payload is empty and trusted for nothing: it only prompts a server re-read.
- */
-export const PARTNER_LINKED_EVENT = 'partner_linked';
 
 /**
  * A broadcast channel plus every consumer currently attached to it.
@@ -74,7 +83,7 @@ interface MoodChannelEntry {
   /**
    * Whether `partnerId` can be trusted for the NEXT `SUBSCRIBED`.
    *
-   * Raised only when `subscribeMoodUpdates` actually resolved a partner moments
+   * Raised only when `subscribePartnerEvents` actually resolved a partner moments
    * before the join: refreshing that would null a fresh value and re-fetch it,
    * dropping every broadcast arriving during the round-trip. It stays false
    * when the join-time lookup answered null -- which `resolvePartnerIdForDelivery`
@@ -301,7 +310,7 @@ class MoodSyncService {
       // `mood-updates:<partnerId>` channel -- and because supabase.channel()
       // hands back the object the first send is still using, the second one's
       // subscribe callback never fired and the partner never got that mood.
-      await sendEphemeralBroadcast(`mood-updates:${partnerId}`, 'new_mood', {
+      await sendEphemeralBroadcast(`mood-updates:${partnerId}`, NEW_MOOD_EVENT, {
         id: mood.id,
         user_id: mood.user_id,
         mood_type: mood.mood_type,
@@ -550,7 +559,7 @@ class MoodSyncService {
    * Split out of `refreshChannelIdentity` so the FIRST `SUBSCRIBED` can run
    * this half alone. The account check is a local session read and is worth
    * making on every join; the partner re-fetch is a `users` round-trip that, on
-   * a first join, would only discard the snapshot `subscribeMoodUpdates`
+   * a first join, would only discard the snapshot `subscribePartnerEvents`
    * resolved moments earlier and drop every mood arriving while it is in
    * flight.
    */
@@ -630,48 +639,77 @@ class MoodSyncService {
    * replaced cannot pin its replacement's `lastStatus`.
    */
   private bindMoodChannel(topic: string, entry: MoodChannelEntry): MoodChannelEntry['channel'] {
-    const channel = supabase
-      .channel(topic, {
-        config: {
-          broadcast: { self: false },
-          // Authorized by the SELECT policy `couple_broadcast_recipient_can_receive`
-          // on `realtime.messages`: receive only on your own topic.
-          private: true,
-        },
-      })
-      .on('broadcast', { event: 'new_mood' }, (payload) => {
-        logger.debug('[MoodSyncService] Received partner mood broadcast:', payload);
+    let channel = supabase.channel(topic, {
+      config: {
+        broadcast: { self: false },
+        // Authorized by the SELECT policy `couple_broadcast_recipient_can_receive`
+        // on `realtime.messages`: receive only on your own topic.
+        private: true,
+      },
+    });
 
-        // The identity check lives HERE rather than in each consumer.
-        // usePartnerMood already filtered on the sender, but PartnerMoodView
-        // raised a toast for any broadcast at all — so a malformed or
-        // non-partner payload has to be dropped where both of them share it.
-        const mood = parseMoodBroadcast(payload?.payload, { partnerId: entry.partnerId });
-        if (!mood) {
-          logger.debug('[MoodSyncService] Dropped an unauthorized or malformed mood broadcast');
-          return;
-        }
-
-        // Snapshot first: a consumer may unsubscribe from inside its own
-        // handler, and that mutates the set being iterated.
-        Array.from(entry.subscribers).forEach((s) => s.onMood(mood));
-      })
-      .on('broadcast', { event: PARTNER_LINKED_EVENT }, () => {
-        logger.debug('[MoodSyncService] Received a partner-linked broadcast');
-        // The snapshot this channel checks moods against was taken while the
-        // account was unlinked, so it is null and every mood from the new
-        // partner would be dropped. Re-take it; a failed lookup keeps the old
-        // value, as on a re-join.
-        void this.refreshChannelIdentity(entry).catch((error) => {
-          logger.debug('[MoodSyncService] Partner snapshot refresh failed:', error);
-        });
-        Array.from(entry.subscribers).forEach((s) => s.onPartnerLinked?.());
-      })
-      .subscribe((status) => {
-        this.handleMoodChannelStatus(topic, entry, status);
+    // One binding per event, made when the channel is created: a binding added
+    // after `subscribe()` is not part of the join and never fires.
+    for (const name of PARTNER_EVENTS) {
+      channel = channel.on('broadcast', { event: name }, (payload) => {
+        this.dispatchPartnerEvent(entry, name, payload?.payload);
       });
+    }
 
-    return channel;
+    return channel.subscribe((status) => {
+      this.handleMoodChannelStatus(topic, entry, status);
+    });
+  }
+
+  /**
+   * Validate one broadcast and fan it out to the subscribers' handler for that
+   * event.
+   *
+   * The identity check lives HERE rather than in each consumer.
+   * usePartnerMood already filtered on the sender, but PartnerMoodView raised a
+   * toast for any broadcast at all — so a malformed or non-partner payload has
+   * to be dropped where every consumer shares it.
+   */
+  private dispatchPartnerEvent(entry: MoodChannelEntry, name: PartnerEventName, raw: unknown): void {
+    logger.debug(`[MoodSyncService] Received a ${name} broadcast`);
+
+    const event = parsePartnerEvent(name, raw, { partnerId: entry.partnerId });
+    if (!event) {
+      logger.debug(`[MoodSyncService] Dropped an unauthorized or malformed ${name} broadcast`);
+      return;
+    }
+
+    if (event.event === PARTNER_LINKED_EVENT) {
+      // The snapshot this channel checks moods against was taken while the
+      // account was unlinked, so it is null and every mood from the new
+      // partner would be dropped. Re-take it; a failed lookup keeps the old
+      // value, as on a re-join.
+      void this.refreshChannelIdentity(entry).catch((error) => {
+        logger.debug('[MoodSyncService] Partner snapshot refresh failed:', error);
+      });
+    }
+
+    // Snapshot first: a consumer may unsubscribe from inside its own handler,
+    // and that mutates the set being iterated.
+    Array.from(entry.subscribers).forEach((s) => {
+      switch (event.event) {
+        case PARTNER_LINKED_EVENT:
+          s.handlers.partner_linked?.(event);
+          break;
+        case DAILY_PICK_EVENT:
+          s.handlers.daily_pick?.(event);
+          break;
+        case NEW_MOOD_EVENT:
+          s.handlers.new_mood?.(event);
+          break;
+        default: {
+          // A member added to `PartnerEvent` without a case here fails the
+          // typecheck instead of being bound, parsed and silently dropped.
+          const unhandled: never = event;
+          return unhandled;
+        }
+      }
+    });
   }
 
   /**
@@ -741,7 +779,7 @@ class MoodSyncService {
     // not notify consumers already attached to the new one. An unsolicited
     // CLOSED still owns the row and is fanned.
     if (this.moodChannels.get(topic) === entry) {
-      Array.from(entry.subscribers).forEach((s) => s.onStatus?.(status));
+      Array.from(entry.subscribers).forEach((s) => s.handlers.onStatus?.(status));
     }
 
     // Unsolicited only while this callback's entry is still the live row and
@@ -796,39 +834,37 @@ class MoodSyncService {
   }
 
   /**
-   * Subscribe to real-time partner mood updates via Broadcast API
+   * Subscribe to the partner channel over the Broadcast API
    *
-   * Listens for broadcast events on the current user's mood-updates channel.
-   * Partner sends broadcasts to this channel when they log new moods.
+   * Listens for broadcast events on the current user's `mood-updates:<uid>`
+   * channel: the partner sends there when they log a mood, pick on a day, or
+   * accept this account's partner request. Every event is validated in
+   * `parsePartnerEvent` and reaches only the handler registered for it.
    *
    * NOTE: This uses Broadcast API instead of postgres_changes because
    * RLS policies on moods table prevent postgres_changes from working
    * (complex subquery for partner lookup cannot be evaluated by Realtime).
    *
-   * @param callback - Function called with new mood record
-   * @param onStatusChange - Optional callback for connection status changes
+   * @param handlers - An optional handler per event name, plus `onStatus` for
+   *   connection status changes
    * @returns Promise that resolves to unsubscribe function to stop listening
    *
    * @example
    * ```typescript
-   * const unsubscribe = await moodSyncService.subscribeMoodUpdates(
-   *   (mood) => {
+   * const unsubscribe = await moodSyncService.subscribePartnerEvents({
+   *   new_mood: ({ mood }) => {
    *     console.log('Partner logged mood:', mood.mood_type);
    *   },
-   *   (status) => {
+   *   onStatus: (status) => {
    *     console.log('Connection status:', status);
-   *   }
-   * );
+   *   },
+   * });
    *
    * // Later, when component unmounts:
    * unsubscribe();
    * ```
    */
-  async subscribeMoodUpdates(
-    callback: (mood: SupabaseMoodRecord) => void,
-    onStatusChange?: (status: string) => void,
-    onPartnerLinked?: () => void
-  ): Promise<() => void> {
+  async subscribePartnerEvents(handlers: PartnerEventHandlers): Promise<() => void> {
     // Get current user ID - we subscribe to OUR OWN channel. Through
     // `getSession`, which answers with the stored session while the server is
     // unreachable: the SDK alone reports none then, and the channel would never
@@ -859,7 +895,7 @@ class MoodSyncService {
     // anon key and the SELECT policy denies it.
     await supabase.realtime.setAuth();
 
-    const subscriber: MoodSubscriber = { onMood: callback, onStatus: onStatusChange, onPartnerLinked };
+    const subscriber: MoodSubscriber = { handlers };
 
     let entry = this.moodChannels.get(topic);
 
@@ -943,8 +979,8 @@ class MoodSyncService {
     // `subscribe()` callback, so replay the last status it reported. Without
     // this its connection indicator sits on its initial value for the lifetime
     // of the channel.
-    if (onStatusChange && entry.lastStatus !== null) {
-      onStatusChange(entry.lastStatus);
+    if (handlers.onStatus && entry.lastStatus !== null) {
+      handlers.onStatus(entry.lastStatus);
     }
 
     // Return unsubscribe function

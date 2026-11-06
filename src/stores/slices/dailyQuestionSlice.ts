@@ -18,6 +18,14 @@
  * its first await and writes nothing after it if either changed.
  * `signedOutState()` clears all three fields.
  *
+ * A partner's pick reaches an open Daily without a reload (AD-11): after a
+ * confirmed pick `submitDailyPick` announces the day on the partner's channel
+ * (`announceDailyPick`, fire-and-forget: the pick stays shown whatever the
+ * broadcast does), and the receiver calls `refreshDailyDay(day_id)`, which
+ * re-reads that one day (`get_daily_day_by_id`) and merges it into the copy. It
+ * shows the answer only when that day is the one on screen, or today's when
+ * nothing is; any other day goes into the copy alone.
+ *
  * A pick is dated by the device (AD-2, AD-12): `submitDailyPick` takes
  * `pickedAt = new Date()` once and refuses, before any request, when its local
  * date is not the shown day's `day`. It then re-reads the day and throws
@@ -40,7 +48,9 @@ import {
   type DailyChoice,
   type DailyDayAnswer,
   type DailyDaySnapshot,
+  announceDailyPick,
   fetchDailyDay,
+  fetchDailyDayById,
   submitDailyPick as submitDailyPickRequest,
 } from '../../api/dailyQuestionApi';
 import type { AppStateCreator } from '../types';
@@ -55,6 +65,13 @@ export interface DailyQuestionSlice {
 
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
   loadDailyDay: () => Promise<void>;
+  /**
+   * Re-read one day by id (a partner's `daily_pick` named it) and merge the
+   * answer into the saved days. It is shown only when it is the day on screen,
+   * or today's with nothing on screen; any other day writes the copy alone.
+   * Never throws; a failure is logged and changes nothing.
+   */
+  refreshDailyDay: (dayId: string) => Promise<void>;
   /**
    * Send the account's pick for the shown day and store the answer. Throws:
    * - a plain `Error` when signed out or with no day shown;
@@ -144,6 +161,33 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       }
     },
 
+    refreshDailyDay: async (dayId) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      try {
+        const snapshot = await fetchDailyDayById(dayId);
+        if (!isCurrent()) return;
+        const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+        if (!isCurrent()) return;
+
+        const shown = get().dailyDay;
+        const isShownDay = shown?.status === 'ok' && shown.snapshot.day_id === snapshot.day_id;
+        const fillsEmptyScreen =
+          shown?.status !== 'ok' && snapshot.day === formatDateISO(new Date());
+        // Any other day (the partner may be on another date, R9) is in the copy
+        // now and stays off the screen.
+        if (isShownDay || fillsEmptyScreen) {
+          set({ dailyDay: mergeAnswer(shown, merged), dailyDayError: null });
+        }
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.error('[DailyQuestion] Failed to re-read a day:', error);
+      }
+    },
+
     submitDailyPick: async (choice) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) throw new Error('You must be signed in to send your pick');
@@ -169,6 +213,11 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         throw error;
       }
       if (!isCurrent()) return;
+      // Tell the partner's open Daily, without waiting for it: the pick is
+      // confirmed and stays shown whatever the broadcast does.
+      void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
+        console.error('[DailyQuestion] Could not announce the pick:', error);
+      });
       // A confirmed own write is a fill source for the copy.
       const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
       if (!isCurrent()) return;

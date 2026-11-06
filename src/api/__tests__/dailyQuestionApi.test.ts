@@ -1,7 +1,8 @@
 /**
- * The two Daily Question RPCs: the arguments they send (AD-2), the zod parse of
+ * The Daily Question RPCs: the arguments they send (AD-2), the zod parse of
  * the AD-16 snapshot, and the failure convention (offline refusal before any
- * request, an error or a bad shape throws).
+ * request, an error or a bad shape throws); and the `daily_pick` announcement
+ * (AD-11): who it goes to, and that it carries a day id and nothing else.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setOnline } from '../../../tests/unit/stores/navigatorFixtures';
@@ -9,6 +10,8 @@ import { DAY_ID, dailySnapshot, waitingSnapshot } from '../../../tests/unit/stor
 
 const rpc = vi.fn();
 const abortSignal = vi.fn();
+const getPartnerId = vi.fn();
+const sendEphemeralBroadcast = vi.fn();
 
 vi.mock('../supabaseClient', () => ({
   supabase: {
@@ -19,10 +22,21 @@ vi.mock('../supabaseClient', () => ({
       },
     }),
   },
+  getPartnerId: (...args: unknown[]) => getPartnerId(...args),
+}));
+
+vi.mock('../ephemeralBroadcast', () => ({
+  sendEphemeralBroadcast: (...args: unknown[]) => sendEphemeralBroadcast(...args),
 }));
 
 import { AccountDataError } from '../../services/accountDataError';
-import { DAY_CHANGED_MESSAGE, fetchDailyDay, submitDailyPick } from '../dailyQuestionApi';
+import {
+  DAY_CHANGED_MESSAGE,
+  announceDailyPick,
+  fetchDailyDay,
+  fetchDailyDayById,
+  submitDailyPick,
+} from '../dailyQuestionApi';
 
 const ZONE = 'America/New_York';
 
@@ -42,6 +56,8 @@ afterEach(() => {
   setOnline(true);
   rpc.mockReset();
   abortSignal.mockReset();
+  getPartnerId.mockReset();
+  sendEphemeralBroadcast.mockReset();
 });
 
 describe('fetchDailyDay', () => {
@@ -104,6 +120,93 @@ describe('fetchDailyDay', () => {
       message: "You are offline. Today's question needs a connection to load.",
     });
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchDailyDayById', () => {
+  it('sends the day id and nothing else', async () => {
+    rpc.mockResolvedValue({ data: waitingSnapshot('that'), error: null });
+
+    await fetchDailyDayById(DAY_ID);
+
+    expect(rpc).toHaveBeenCalledWith('get_daily_day_by_id', { day_id: DAY_ID });
+  });
+
+  it('bounds the request with a timeout signal', async () => {
+    rpc.mockResolvedValue({ data: dailySnapshot(), error: null });
+
+    await fetchDailyDayById(DAY_ID);
+
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('returns the parsed snapshot', async () => {
+    const snapshot = waitingSnapshot('that');
+    rpc.mockResolvedValue({ data: snapshot, error: null });
+
+    await expect(fetchDailyDayById(DAY_ID)).resolves.toEqual(snapshot);
+  });
+
+  it('throws on an RPC error', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'Day not found', code: 'P0002', details: '', hint: '' },
+    });
+
+    await expect(fetchDailyDayById(DAY_ID)).rejects.toBeInstanceOf(AccountDataError);
+  });
+
+  it.each([
+    ['null', null],
+    ['an ok answer wrapper', { status: 'ok', snapshot: dailySnapshot() }],
+    ['a snapshot with an unknown state', { ...dailySnapshot(), state: 'x' }],
+    ['a snapshot with no question', { ...dailySnapshot(), question: null }],
+  ])('throws on %s', async (_label, data) => {
+    rpc.mockResolvedValue({ data, error: null });
+
+    await expect(fetchDailyDayById(DAY_ID)).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('refuses offline before any request', async () => {
+    setOnline(false);
+
+    await expect(fetchDailyDayById(DAY_ID)).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. The question needs a connection to load.',
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('announceDailyPick', () => {
+  const PARTNER = '00000000-0000-4000-8000-0000000000aa';
+
+  it('sends daily_pick with the day id alone to the partner\'s mood topic', async () => {
+    getPartnerId.mockResolvedValue(PARTNER);
+    sendEphemeralBroadcast.mockResolvedValue(undefined);
+
+    await announceDailyPick(DAY_ID);
+
+    expect(sendEphemeralBroadcast).toHaveBeenCalledTimes(1);
+    expect(sendEphemeralBroadcast).toHaveBeenCalledWith(`mood-updates:${PARTNER}`, 'daily_pick', {
+      day_id: DAY_ID,
+    });
+  });
+
+  it('sends nothing when there is no partner', async () => {
+    getPartnerId.mockResolvedValue(null);
+
+    await expect(announceDailyPick(DAY_ID)).resolves.toBeUndefined();
+
+    expect(sendEphemeralBroadcast).not.toHaveBeenCalled();
+  });
+
+  it('throws when the broadcast fails', async () => {
+    const failure = new Error('Unauthorized');
+    getPartnerId.mockResolvedValue(PARTNER);
+    sendEphemeralBroadcast.mockRejectedValue(failure);
+
+    await expect(announceDailyPick(DAY_ID)).rejects.toBe(failure);
   });
 });
 

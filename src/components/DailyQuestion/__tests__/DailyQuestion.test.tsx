@@ -24,9 +24,16 @@ vi.mock('../../../api/supabaseClient', () => ({
   isSeedFallbackName: () => false,
 }));
 
+// The partner-event subscription has its own test; here it is only mounted.
+const useDailyPickListener = vi.fn();
+vi.mock('../../../hooks/useDailyPickListener', () => ({
+  useDailyPickListener: () => useDailyPickListener(),
+}));
+
 vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  announceDailyPick: vi.fn(async () => {}),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
 
@@ -76,6 +83,15 @@ afterEach(() => {
 });
 
 describe('DailyQuestion', () => {
+  it('mounts the listener that shows the partner\'s pick without a reload', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-question');
+
+    expect(useDailyPickListener).toHaveBeenCalled();
+  });
+
   it('no picks: shows the question as plain text, two options, a disabled send and the partner status', async () => {
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
 

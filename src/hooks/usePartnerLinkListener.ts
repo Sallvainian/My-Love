@@ -83,11 +83,10 @@ export function usePartnerLinkListener(): void {
     };
 
     moodSyncService
-      .subscribeMoodUpdates(
+      .subscribePartnerEvents({
         // Moods are for the screens that show them; this subscriber only waits
         // for the link.
-        () => {},
-        (status) => {
+        onStatus: (status) => {
           if (!active || status !== 'SUBSCRIBED') return;
           // Ask first: a loadPartner from here would run on every join of an
           // unlinked account. Only a successful "linked" answer re-reads; an
@@ -97,10 +96,10 @@ export function usePartnerLinkListener(): void {
             if (active && result.status === 'linked') reloadPartner();
           });
         },
-        () => {
+        partner_linked: () => {
           if (active) reloadPartner();
-        }
-      )
+        },
+      })
       .then((release) => {
         if (!active) {
           release();

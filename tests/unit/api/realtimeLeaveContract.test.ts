@@ -370,7 +370,7 @@ describe('moodSyncService unsolicited CLOSED reopen', () => {
   });
 
   async function subscribeMoodAndJoin(): Promise<() => void> {
-    const unsubscribe = await moodSyncService.subscribeMoodUpdates(vi.fn());
+    const unsubscribe = await moodSyncService.subscribePartnerEvents({});
     const join = frames().find(
       (frame) => frame.event === 'phx_join' && frame.topic === MOOD_REALTIME_TOPIC
     );

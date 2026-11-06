@@ -13,7 +13,7 @@ import type { PartnerSearchResult } from '../../../api/partnerService';
 
 vi.mock('../../../api/supabaseClient', () => ({ supabase: {} }));
 vi.mock('../../../api/moodSyncService', () => ({
-  moodSyncService: { subscribeMoodUpdates: vi.fn(async () => () => {}) },
+  moodSyncService: { subscribePartnerEvents: vi.fn(async () => () => {}) },
 }));
 vi.mock('../../PokeKissInterface', () => ({ PokeKissInterface: () => null }));
 vi.mock('../../../stores/useAppStore', () => ({ useAppStore: () => state }));

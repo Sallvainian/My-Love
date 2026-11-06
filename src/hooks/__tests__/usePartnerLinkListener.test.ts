@@ -10,7 +10,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('../../api/moodSyncService', () => ({
-  moodSyncService: { subscribeMoodUpdates: vi.fn() },
+  moodSyncService: { subscribePartnerEvents: vi.fn() },
 }));
 
 vi.mock('../../api/supabaseClient', () => ({
@@ -38,7 +38,7 @@ import { moodSyncService } from '../../api/moodSyncService';
 import { resolvePartnerLookupForDelivery } from '../../api/supabaseClient';
 import { usePartnerLinkListener } from '../usePartnerLinkListener';
 
-const subscribe = vi.mocked(moodSyncService.subscribeMoodUpdates);
+const subscribe = vi.mocked(moodSyncService.subscribePartnerEvents);
 const lookup = vi.mocked(resolvePartnerLookupForDelivery);
 
 /** Mount, then run the signed-in start's first partner load to an unlinked answer. */
@@ -71,10 +71,10 @@ describe('usePartnerLinkListener', () => {
   it('re-reads the partner and the requests when the partner-linked broadcast arrives', async () => {
     renderSettled();
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    const onPartnerLinked = subscribe.mock.calls[0][2];
+    const onPartnerLinked = subscribe.mock.calls[0][0].partner_linked;
     expect(onPartnerLinked).toBeTypeOf('function');
 
-    act(() => onPartnerLinked!());
+    act(() => onPartnerLinked!({ event: 'partner_linked' }));
 
     expect(state.loadPartner).toHaveBeenCalledTimes(1);
     expect(state.loadPendingRequests).toHaveBeenCalledTimes(1);
@@ -84,7 +84,7 @@ describe('usePartnerLinkListener', () => {
     lookup.mockResolvedValue({ status: 'linked', partnerId: 'PARTNER' });
     renderSettled();
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    const onStatusChange = subscribe.mock.calls[0][1];
+    const onStatusChange = subscribe.mock.calls[0][0].onStatus;
     expect(onStatusChange).toBeTypeOf('function');
 
     await act(async () => onStatusChange!('SUBSCRIBED'));
@@ -102,7 +102,7 @@ describe('usePartnerLinkListener', () => {
     renderSettled();
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
 
-    await act(async () => subscribe.mock.calls[0][1]!('SUBSCRIBED'));
+    await act(async () => subscribe.mock.calls[0][0].onStatus!('SUBSCRIBED'));
 
     expect(lookup).toHaveBeenCalledTimes(1);
     expect(state.loadPartner).not.toHaveBeenCalled();
@@ -114,7 +114,7 @@ describe('usePartnerLinkListener', () => {
     renderSettled();
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
 
-    await act(async () => subscribe.mock.calls[0][1]!(status));
+    await act(async () => subscribe.mock.calls[0][0].onStatus!(status));
 
     expect(lookup).not.toHaveBeenCalled();
     expect(state.loadPartner).not.toHaveBeenCalled();

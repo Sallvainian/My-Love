@@ -13,7 +13,7 @@ import type { MoodEntry } from '../../../types';
 
 vi.mock('../../../api/supabaseClient', () => ({ supabase: {} }));
 vi.mock('../../../api/moodSyncService', () => ({
-  moodSyncService: { subscribeMoodUpdates: vi.fn(async () => () => {}) },
+  moodSyncService: { subscribePartnerEvents: vi.fn(async () => () => {}) },
 }));
 vi.mock('../../PokeKissInterface', () => ({
   PokeKissInterface: () => <div data-testid="poke-kiss-interface" />,
@@ -282,9 +282,9 @@ describe('PartnerMoodView on the kit', () => {
     state = makeState({ partnerMoods: SEVERAL });
     render(<PartnerMoodView />);
 
-    const subscribe = vi.mocked(moodSyncService.subscribeMoodUpdates);
+    const subscribe = vi.mocked(moodSyncService.subscribePartnerEvents);
     await waitFor(() => expect(subscribe).toHaveBeenCalled());
-    const onStatus = subscribe.mock.calls[0][1];
+    const onStatus = subscribe.mock.calls[0][0].onStatus;
     expect(onStatus).toBeTypeOf('function');
     const status = screen.getByTestId('realtime-connection-status');
 
@@ -359,11 +359,14 @@ describe('PartnerMoodView on the kit', () => {
     });
     render(<PartnerMoodView />);
 
-    const subscribe = vi.mocked(moodSyncService.subscribeMoodUpdates);
+    const subscribe = vi.mocked(moodSyncService.subscribePartnerEvents);
     await waitFor(() => expect(subscribe).toHaveBeenCalled());
-    const onMood = subscribe.mock.calls[0][0];
+    const onMood = subscribe.mock.calls[0][0].new_mood!;
     act(() =>
-      onMood({ mood_type: 'happy', note: null } as unknown as Parameters<typeof onMood>[0])
+      onMood({
+        event: 'new_mood',
+        mood: { mood_type: 'happy', note: null } as unknown as Parameters<typeof onMood>[0]['mood'],
+      })
     );
 
     const popup = screen.getByTestId('partner-mood-notification');

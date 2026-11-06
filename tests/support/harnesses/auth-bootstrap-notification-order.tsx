@@ -100,7 +100,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   const originalOnAuthStateChange = supabase.auth.onAuthStateChange;
   const originalGetEventsPage = eventsService.getEventsPage;
   const originalFetchAnniversaries = anniversariesService.fetchAnniversaries;
-  const originalSubscribeMoodUpdates = moodSyncService.subscribeMoodUpdates;
+  const originalSubscribePartnerEvents = moodSyncService.subscribePartnerEvents;
   const previousWelcome = localStorage.getItem('lastWelcomeView');
   type LookupResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
   type AuthCallback = (event: AuthChangeEvent, session: Session | null) => void | Promise<void>;
@@ -165,7 +165,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       supabase.auth.onAuthStateChange = originalOnAuthStateChange;
       eventsService.getEventsPage = originalGetEventsPage;
       anniversariesService.fetchAnniversaries = originalFetchAnniversaries;
-      moodSyncService.subscribeMoodUpdates = originalSubscribeMoodUpdates;
+      moodSyncService.subscribePartnerEvents = originalSubscribePartnerEvents;
       restoreCoupleSettingsRefresher?.();
       useAppStore.setState(originalState, true);
       if (previousWelcome === null) localStorage.removeItem('lastWelcomeView');
@@ -214,7 +214,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     // subscribe reads the session -- the very call this harness counts and
     // defers -- and looks the partner up with the fake token, which PostgREST
     // answers with 401.
-    moodSyncService.subscribeMoodUpdates = async () => () => {};
+    moodSyncService.subscribePartnerEvents = async () => () => {};
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
     // directly — and for the partner, profile, mood-history, interactions,

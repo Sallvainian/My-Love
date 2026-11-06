@@ -1,9 +1,11 @@
 /**
- * moodSyncService.subscribeMoodUpdates — channel ownership: reopening after an
+ * moodSyncService.subscribePartnerEvents — channel ownership: reopening after an
  * unsolicited CLOSED
  *
- * Two consumers subscribe in practice — usePartnerMood (Mood tab) and
- * PartnerMoodView (Partner tab) — and both share one channel per topic, so a
+ * Several consumers subscribe in practice — usePartnerMood (Mood tab) and
+ * PartnerMoodView (Partner tab), which are mutually exclusive views, plus the
+ * app-wide usePartnerLinkListener and useDailyPickListener, which can be
+ * attached alongside either of them — and all share one channel per topic. A
  * server-side close must reopen it for whoever is still attached. The Realtime
  * fake is in `fakeMoodRealtime.ts`.
  */
@@ -22,6 +24,7 @@ import {
   getSession,
   getSignedInUserId,
   leaveQueue,
+  moodHandlers,
   moodIdFor,
   opOrder,
   resetRealtimeFake,
@@ -58,7 +61,7 @@ vi.mock('@/api/supabaseClient', () => ({
 
 import { moodSyncService } from '@/api/moodSyncService';
 
-describe('subscribeMoodUpdates channel ownership', () => {
+describe('subscribePartnerEvents channel ownership', () => {
   beforeEach(() => {
     resetRealtimeFake();
   });
@@ -97,7 +100,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     it('re-arms a join when reopen setAuth rejects after the row is swapped', async () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const onMood = vi.fn();
-      const pending = moodSyncService.subscribeMoodUpdates(onMood);
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -128,7 +131,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     it('reopens a live entry on a new channel after an unsolicited CLOSED', async () => {
       const onMood = vi.fn();
       const onStatus = vi.fn();
-      const pending = moodSyncService.subscribeMoodUpdates(onMood, onStatus);
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood, onStatus));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -155,7 +158,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     });
 
     it("does not reopen when last-subscriber teardown reports CLOSED", async () => {
-      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -169,7 +172,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     });
 
     it('cancels a pending reopen when the last subscriber detaches during backoff', async () => {
-      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -182,7 +185,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     });
 
     it('restores the CLOSED retry budget when the replacement reports SUBSCRIBED', async () => {
-      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -202,7 +205,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     it("re-takes the partner snapshot on the replacement's first SUBSCRIBED", async () => {
       const onMood = vi.fn();
-      const pending = moodSyncService.subscribeMoodUpdates(onMood);
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -221,7 +224,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     it("a released channel's late CLOSED does not notify live consumers or open another join", async () => {
       const onStatus = vi.fn();
-      const pending = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatus);
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn(), onStatus));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -243,7 +246,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     it('stops joining once five unsolicited CLOSEs have been spent', async () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const onStatus = vi.fn();
-      const pending = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatus);
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn(), onStatus));
       resolveNextSession();
       const unsubscribe = await pending;
 
@@ -263,7 +266,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
       );
 
       const lateStatus = vi.fn();
-      const latePending = moodSyncService.subscribeMoodUpdates(vi.fn(), lateStatus);
+      const latePending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn(), lateStatus));
       resolveNextSession();
       const lateUnsubscribe = await latePending;
       expect(lateStatus).toHaveBeenCalledWith('CLOSED');

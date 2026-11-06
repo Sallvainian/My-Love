@@ -1,14 +1,16 @@
 /**
- * Daily Question in the store: `loadDailyDay` and `submitDailyPick` on the
- * composed `useAppStore`, with only the Supabase client and the API module
- * mocked. Covers the no-regress rule, the failed-load rule and the session
+ * Daily Question in the store: `loadDailyDay`, `refreshDailyDay` and
+ * `submitDailyPick` on the composed `useAppStore`, with only the Supabase
+ * client and the API module mocked. Covers the no-regress rule, the failed-load rule and the session
  * check after every await.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyDay = vi.fn();
+const fetchDailyDayById = vi.fn();
 const submitDailyPickRequest = vi.fn();
+const announceDailyPick = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -20,6 +22,8 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 vi.mock('../../../src/api/dailyQuestionApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  fetchDailyDayById: (...args: unknown[]) => fetchDailyDayById(...args),
+  announceDailyPick: (...args: unknown[]) => announceDailyPick(...args),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
 
@@ -49,7 +53,10 @@ const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as co
 beforeEach(async () => {
   vi.clearAllMocks();
   fetchDailyDay.mockReset();
+  fetchDailyDayById.mockReset();
   submitDailyPickRequest.mockReset();
+  announceDailyPick.mockReset();
+  announceDailyPick.mockResolvedValue(undefined);
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
@@ -458,6 +465,145 @@ describe('the saved days copy', () => {
   });
 });
 
+describe('refreshDailyDay', () => {
+  const saved = (...snapshots: Array<ReturnType<typeof dailySnapshot>>) =>
+    Object.fromEntries(snapshots.map((snapshot) => [snapshot.day_id, snapshot]));
+  const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+  const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
+
+  it('asks for the named day', async () => {
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(fetchDailyDayById).toHaveBeenCalledWith(DAY_ID);
+    expect(fetchDailyDay).not.toHaveBeenCalled();
+  });
+
+  it('shows that the partner picked first, and keeps it in the copy', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()), dailyDayError: 'old error' });
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(state().dailyDay).toEqual(ok(dailySnapshot({ state: 'partner' })));
+    expect(state().dailyDayError).toBeNull();
+    expect(await copy()).toEqual(saved(dailySnapshot({ state: 'partner' })));
+  });
+
+  it('shows the reveal when the partner picks second', async () => {
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+    fetchDailyDayById.mockResolvedValue(revealSnapshot('this', 'that'));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(state().dailyDay).toEqual(ok(revealSnapshot('this', 'that')));
+    expect(await copy()).toEqual(saved(revealSnapshot('this', 'that')));
+  });
+
+  it('a slower lower re-read stays at the stored reveal, on screen and in the copy', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(revealSnapshot('this', 'that')));
+    useAppStore.setState({ dailyDay: ok(revealSnapshot('this', 'that')) });
+    fetchDailyDayById.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(state().dailyDay).toEqual(ok(revealSnapshot('this', 'that')));
+    expect(await copy()).toEqual(saved(revealSnapshot('this', 'that')));
+  });
+
+  it('another day than the one shown goes into the copy and leaves the screen alone', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()), dailyDayError: 'old error' });
+    const partnerPicked = { ...OTHER_DAY, state: 'partner' as const };
+    fetchDailyDayById.mockResolvedValue(partnerPicked);
+
+    await state().refreshDailyDay('other-day');
+
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(state().dailyDayError).toBe('old error');
+    expect(await copy()).toEqual(saved(dailySnapshot(), partnerPicked));
+  });
+
+  describe('with nothing ok on screen', () => {
+    it("shows the device's today, and clears the load error", async () => {
+      useAppStore.setState({ dailyDay: null, dailyDayError: 'boom' });
+      fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+      await state().refreshDailyDay(DAY_ID);
+
+      expect(state().dailyDay).toEqual(ok(dailySnapshot({ state: 'partner' })));
+      expect(state().dailyDayError).toBeNull();
+      expect(await copy()).toEqual(saved(dailySnapshot({ state: 'partner' })));
+    });
+
+    it("does not show a day that is not the device's today, but keeps it in the copy", async () => {
+      useAppStore.setState({ dailyDay: null, dailyDayError: 'boom' });
+      fetchDailyDayById.mockResolvedValue(OTHER_DAY);
+
+      await state().refreshDailyDay('other-day');
+
+      expect(state().dailyDay).toBeNull();
+      expect(state().dailyDayError).toBe('boom');
+      expect(await copy()).toEqual(saved(OTHER_DAY));
+    });
+  });
+
+  it('never throws: a failed re-read logs and changes nothing', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()), dailyDayError: 'old error' });
+    const failure = new AccountDataError('transport', 'boom');
+    fetchDailyDayById.mockRejectedValue(failure);
+
+    await expect(state().refreshDailyDay(DAY_ID)).resolves.toBeUndefined();
+
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(state().dailyDayError).toBe('old error');
+    expect(await copy()).toEqual(saved(dailySnapshot()));
+    expect(console.error).toHaveBeenCalledWith('[DailyQuestion] Failed to re-read a day:', failure);
+  });
+
+  it('does nothing signed out', async () => {
+    state().clearAuth();
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(fetchDailyDayById).not.toHaveBeenCalled();
+  });
+
+  it('leaves the copy and the screen alone when the session changes while the read is open', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    const request = deferred<ReturnType<typeof dailySnapshot>>();
+    fetchDailyDayById.mockReturnValue(request.promise);
+
+    const refresh = state().refreshDailyDay(DAY_ID);
+    await vi.waitFor(() => expect(fetchDailyDayById).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    request.settle(dailySnapshot({ state: 'partner' }));
+    await refresh;
+
+    expect(await copy()).toBeNull();
+    expect(state().dailyDay).toBeNull();
+  });
+
+  it('writes nothing after a same-account re-login while the read is open', async () => {
+    const request = deferred<ReturnType<typeof dailySnapshot>>();
+    fetchDailyDayById.mockReturnValue(request.promise);
+
+    const refresh = state().refreshDailyDay(DAY_ID);
+    await vi.waitFor(() => expect(fetchDailyDayById).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    request.settle(dailySnapshot({ state: 'partner' }));
+    await refresh;
+
+    expect(await copy()).toBeNull();
+    expect(state().dailyDay).toBeNull();
+  });
+});
+
 describe('sign-out', () => {
   it('clears dailyDay, dailyDayLoading and dailyDayError', () => {
     useAppStore.setState({
@@ -495,6 +641,62 @@ describe('submitDailyPick', () => {
     await state().submitDailyPick('that');
 
     expect(state().dailyDay).toEqual(ok(revealSnapshot('that', 'this')));
+  });
+
+  it('announces the confirmed pick to the partner, by day id', async () => {
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    expect(announceDailyPick).toHaveBeenCalledTimes(1);
+    expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
+  });
+
+  it('keeps the pick shown and logs when the announcement fails', async () => {
+    const failure = new Error('broadcast refused');
+    announceDailyPick.mockRejectedValue(failure);
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await expect(state().submitDailyPick('this')).resolves.toBeUndefined();
+
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    await vi.waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith(
+        '[DailyQuestion] Could not announce the pick:',
+        failure
+      )
+    );
+  });
+
+  it('does not wait for the announcement', async () => {
+    const announcement = deferred<undefined>();
+    announceDailyPick.mockReturnValue(announcement.promise);
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    announcement.settle(undefined);
+  });
+
+  it('announces nothing when the pick is refused', async () => {
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'transport' });
+
+    expect(announceDailyPick).not.toHaveBeenCalled();
+  });
+
+  it('announces nothing when the session changed before the answer', async () => {
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(announceDailyPick).not.toHaveBeenCalled();
   });
 
   it('does not let a lower-state answer undo a stored reveal', async () => {

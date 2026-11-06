@@ -17,6 +17,7 @@ import {
   type DailyChoice,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
+import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError, offlineMessage } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
@@ -202,6 +203,9 @@ export function DailyQuestion() {
   useEffect(() => {
     void loadDailyDay();
   }, [loadDailyDay, userId, authSessionVersion]);
+
+  // The partner's pick shows without a reload (AD-11).
+  useDailyPickListener();
 
   return (
     <div className="min-h-screen bg-page" data-testid="daily-question-view">

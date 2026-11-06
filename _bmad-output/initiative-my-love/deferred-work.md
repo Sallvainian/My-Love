@@ -4058,3 +4058,19 @@ severity: high
 reason: `git ls-tree --name-only origin/main supabase/migrations/` lists `20261105010000_push_added_dates.sql` (and `20261105020000_remind_me_on_by_default.sql`); this epic's story 6.1 added `20261105010000_daily_question_days_and_picks.sql`. The migration history keys on the version alone, so whichever lands second is recorded as applied without running. Renaming an applied migration is outside this story; the epic PR must renumber the daily one past every main version before merging.
 status: done 2026-11-06
 resolution: renumbered to `20261105030000_daily_question_days_and_picks.sql`, after main's `20261105020000` and before this epic's `20261105210000_daily_question_own_clocks.sql`, which builds on it; the two pgTAP header comments that named the version follow, and the shared local stack's `schema_migrations` row was renamed to match. Done on `loop/integration` between stories 6.2 and the next, with the run stopped.
+
+### DW-464: The partner-connect poke test failed once while the realtime-recovery spec ran beside it.
+origin: spec-deferred d403f1340407
+location: tests/e2e/partner/partner-connect.spec.ts ("a poke reaches each linked partner live")
+source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
+severity: medium (unverified)
+reason: During story 6.6 the implementing agent's first combined run of `tests/e2e/daily/`, `partner-connect.spec.ts`, `realtime-recovery-after-renewal.spec.ts` and `login.spec.ts` (chromium, local stack) failed this test once: no `notification-badge` appeared. It passed in two reruns, and in the parent session's two full runs of the same set. The poke path (`interactionService`'s `postgres_changes` subscription) is not touched by that story, and the test was not run on the baseline, so whether it is a load-dependent flake or something else is unverified. To settle it, run `partner-connect.spec.ts` with `--repeat-each=10` next to the recovery spec on the baseline and on this branch. If it does fail, check whether the poke is inserted before the `postgres_changes` confirmation (the AGENTS.md pitfall), the way the recovery spec guards with POKES_ARMED_LOG.
+status: open
+
+### DW-465: The partner-connect poke test failed once while the realtime-recovery spec ran beside it (ledger DW-464).
+origin: spec-deferred 1e1c7fb40342
+location: tests/e2e/partner/partner-connect.spec.ts
+source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
+severity: medium
+reason: The implementing agent's first combined Playwright run failed "a poke reaches each linked partner live" once (no notification-badge); two reruns and the parent's two full runs passed. The poke path (interactionService postgres_changes) is untouched by this change and the baseline was not run, so it is unverified. Settle it with partner-connect.spec.ts --repeat-each=10 beside the recovery spec on the baseline and on this branch. (declared severity: medium (unverified))
+status: open

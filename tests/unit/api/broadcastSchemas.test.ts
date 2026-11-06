@@ -10,7 +10,13 @@
  * Every case below is a row of the story's I/O matrix.
  */
 import { describe, expect, it } from 'vitest';
-import { parseLoveNoteBroadcast, parseMoodBroadcast } from '@/api/validation/broadcastSchemas';
+import {
+  DAILY_PICK_EVENT,
+  PARTNER_EVENTS,
+  parseLoveNoteBroadcast,
+  parseMoodBroadcast,
+  parsePartnerEvent,
+} from '@/api/validation/broadcastSchemas';
 
 const ME = '11111111-1111-4111-8111-111111111111';
 const PARTNER = '22222222-2222-4222-8222-222222222222';
@@ -242,5 +248,65 @@ describe('parseMoodBroadcast', () => {
       mood_type: 'happy',
       mood_types: null,
     });
+  });
+});
+
+describe('parsePartnerEvent', () => {
+  const DAY_ID = '66666666-6666-4666-8666-666666666666';
+  const known = { partnerId: PARTNER };
+  const unknown = { partnerId: null };
+
+  it('names exactly the three events the channel binds', () => {
+    expect([...PARTNER_EVENTS]).toEqual(['partner_linked', 'daily_pick', 'new_mood']);
+    expect(DAILY_PICK_EVENT).toBe('daily_pick');
+  });
+
+  it('returns partner_linked whatever the body and whoever the partner is', () => {
+    expect(parsePartnerEvent('partner_linked', {}, unknown)).toEqual({ event: 'partner_linked' });
+    expect(parsePartnerEvent('partner_linked', 'junk', known)).toEqual({ event: 'partner_linked' });
+    expect(parsePartnerEvent('partner_linked', undefined, known)).toEqual({ event: 'partner_linked' });
+  });
+
+  it("returns a partner's mood through parseMoodBroadcast", () => {
+    const parsed = parsePartnerEvent('new_mood', mood(), known);
+    expect(parsed).toEqual({ event: 'new_mood', mood: parseMoodBroadcast(mood(), known) });
+  });
+
+  it('drops a mood from a non-partner, a malformed one, and any with no partner known', () => {
+    expect(parsePartnerEvent('new_mood', mood({ user_id: OUTSIDER }), known)).toBeNull();
+    expect(parsePartnerEvent('new_mood', mood({ mood_type: 42 }), known)).toBeNull();
+    expect(parsePartnerEvent('new_mood', mood(), unknown)).toBeNull();
+  });
+
+  it('returns a daily pick with its day id', () => {
+    expect(parsePartnerEvent('daily_pick', { day_id: DAY_ID }, known)).toEqual({
+      event: 'daily_pick',
+      day_id: DAY_ID,
+    });
+  });
+
+  it('strips unknown keys: a choice on the wire is never returned', () => {
+    const parsed = parsePartnerEvent('daily_pick', { day_id: DAY_ID, choice: 'this', x: 1 }, known);
+    expect(parsed).toStrictEqual({ event: 'daily_pick', day_id: DAY_ID });
+  });
+
+  it('drops a daily pick with no partner known', () => {
+    expect(parsePartnerEvent('daily_pick', { day_id: DAY_ID }, unknown)).toBeNull();
+  });
+
+  it.each([
+    ['an empty object', {}],
+    ['a non-uuid day_id', { day_id: 'nope' }],
+    ['a numeric day_id', { day_id: 1 }],
+    ['a null day_id', { day_id: null }],
+    ['a string', 'hello'],
+    ['null', null],
+    ['undefined', undefined],
+  ])('drops a daily pick with %s', (_label, raw) => {
+    expect(parsePartnerEvent('daily_pick', raw, known)).toBeNull();
+  });
+
+  it('drops an event it does not know', () => {
+    expect(parsePartnerEvent('daily_nudge', { day_id: DAY_ID }, known)).toBeNull();
   });
 });

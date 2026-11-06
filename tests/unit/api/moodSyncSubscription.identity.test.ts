@@ -1,9 +1,11 @@
 /**
- * moodSyncService.subscribeMoodUpdates — channel ownership: who a delivered
+ * moodSyncService.subscribePartnerEvents — channel ownership: who a delivered
  * mood may come from and who it may go to
  *
- * Two consumers subscribe in practice — usePartnerMood (Mood tab) and
- * PartnerMoodView (Partner tab) — and both share one channel per topic. These
+ * Several consumers subscribe in practice — usePartnerMood (Mood tab) and
+ * PartnerMoodView (Partner tab), which are mutually exclusive views, plus the
+ * app-wide usePartnerLinkListener and useDailyPickListener, which can be
+ * attached alongside either of them — and all share one channel per topic. These
  * tests cover the partner snapshot taken at join and re-taken on a re-join, and
  * the session check that mutes the channel once the device is signed in as a
  * different account. The Realtime fake is in `fakeMoodRealtime.ts`.
@@ -22,6 +24,7 @@ import {
   getPartnerId,
   getSession,
   getSignedInUserId,
+  moodHandlers,
   nextLookupHandled,
   OUTSIDER_ID,
   PARTNER_ID,
@@ -57,7 +60,7 @@ vi.mock('@/api/supabaseClient', () => ({
 
 import { moodSyncService } from '@/api/moodSyncService';
 
-describe('subscribeMoodUpdates channel ownership', () => {
+describe('subscribePartnerEvents channel ownership', () => {
   beforeEach(() => {
     resetRealtimeFake();
   });
@@ -68,7 +71,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
   it('stops dispatching once the device is signed in as a different account', async () => {
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -91,13 +94,13 @@ describe('subscribeMoodUpdates channel ownership', () => {
   });
 
   it('keeps the join-time snapshot on the FIRST SUBSCRIBED', async () => {
-    // `subscribeMoodUpdates` resolved the partner moments before the join and
+    // `subscribePartnerEvents` resolved the partner moments before the join and
     // assigned it. Re-taking it here would null a fresh value and re-fetch it
     // over a `users` round-trip, and `parseMoodBroadcast` drops everything for
     // want of a partner id while that is in flight -- so a mood sent as the
     // view opens would be lost, silently and for good.
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -129,7 +132,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
   it('re-takes the partner snapshot on a RE-join', async () => {
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -162,7 +165,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // `couple_broadcast_partner_can_send` pins the send on `get_my_partner_id()`,
     // so after a real unlink the server refuses their insert outright.
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -193,7 +196,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // the life of the page, because `refreshChannelIdentity` only runs on the
     // next SUBSCRIBED and an already-joined channel never emits another.
     const onMoodA = vi.fn();
-    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodA));
     resolveNextSession();
     const unsubscribeA = await pendingA;
 
@@ -217,7 +220,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // thing that can restore delivery for BOTH consumers.
     getPartnerId.mockResolvedValue(PARTNER_ID);
     const onMoodB = vi.fn();
-    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodB));
     resolveNextSession();
     const unsubscribeB = await pendingB;
 
@@ -240,7 +243,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // re-arms it, because refreshChannelIdentity fires only on SUBSCRIBED
     // and an already-joined channel emits no further one.
     const onMoodA = vi.fn();
-    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodA));
     resolveNextSession();
     const unsubscribeA = await pendingA;
 
@@ -253,7 +256,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // round-trip fails.
     getPartnerId.mockResolvedValue(null);
     const onMoodB = vi.fn();
-    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodB));
     resolveNextSession();
     const unsubscribeB = await pendingB;
 
@@ -275,7 +278,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     getPartnerId.mockResolvedValue(null);
 
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -301,7 +304,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // socket emits none. The scenario: the access token expires as the channel
     // joins and the refresh hits a network blip.
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -323,7 +326,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // The other side of the line above: a CONCLUSIVE answer naming a different
     // account still stops dispatch on the first SUBSCRIBED.
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -354,7 +357,7 @@ describe('a partner link made while the channel is open', () => {
 
   /** Subscribe unlinked, and let the first SUBSCRIBED finish its (null) lookup. */
   async function joinUnlinked(onMood = vi.fn(), onPartnerLinked?: () => void) {
-    const pending = moodSyncService.subscribeMoodUpdates(onMood, undefined, onPartnerLinked);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood, undefined, onPartnerLinked));
     resolveNextSession();
     const unsubscribe = await pending;
     const channel = constructedChannels[0];
