@@ -4077,12 +4077,12 @@ reason: The implementing agent's first combined Playwright run failed "a poke re
 status: open
 
 ### DW-466: 24 existing test-file violations of TEA's write-time hook rules.
-
 origin: installing TEA's write-time enforcement hook (`.claude/hooks/tea-enforce.cjs`, TEA 4.0.0), 2026-11-06
 location: H1 hard waits (`await new Promise((resolve) => setTimeout(resolve, N))`): src/components/MoodTracker/__tests__/MoodTracker.partnerLink.test.tsx:73,161,176; src/services/__tests__/dateReminders.test.ts:1080; src/services/__tests__/pushNotifications.test.ts:284,710; tests/api/push-love-note-trigger.spec.ts:247,446,505,837,908 (3 s each); tests/unit/services/nativeUpdates.test.ts:338; tests/unit/stores/countdownMarks.test.ts:76; tests/unit/stores/dateRemindersAtLaunch.test.ts:668,759,926; tests/unit/stores/pushPreferencesCopy.test.ts:74. H5 over 1,000 lines: src/services/__tests__/dateReminders.test.ts (1205), src/services/__tests__/pushNotifications.test.ts (1239), tests/api/push-love-note-trigger.spec.ts (1060), tests/unit/stores/dateRemindersAtLaunch.test.ts (1324), tests/unit/stores/eventsSlice.test.ts (1254), tests/unit/stores/signOutClearsAccountState.test.ts (1070), tests/e2e-archive/scripture-reflection-original.spec.ts (1155, frozen: never edit)
 severity: low
 reason: The hook's `--pre` blocks only violations a write adds, so these files can still be edited. But `--post` reports the whole file after every edit, and `--stop` sweeps each test file the turn touched and exits 2, so an agent that edits one of them is told to fix the old violations and gets one extra turn before it can stop. That includes a loop session working on something else. Each hard wait should become a wait on the thing it waits for, such as a fake timer, `vi.waitFor` or a polled assertion. Each oversize file should be split by subject. Counts come from running the hook's own `scanFile` over every file its `testGlobs` match.
-status: open
+resolution: 22 findings fixed in #475 (82b77686, merged as 0db0d7b8): every listed H1 hard wait now waits on the condition its test needs, and `dateReminders`, `pushNotifications`, `dateRemindersAtLaunch`, `eventsSlice` and `push-love-note-trigger` are split under 1,000 lines. The `tests/e2e-archive/` spec was deleted in cae2be60. `tests/unit/stores/signOutClearsAccountState.test.ts`'s H5 is excluded in `.tea/enforce-config.json` (8f243e16) until epic 10 splits it; that epic's Done when requires the split and the exclusion's removal. The hook's scan of every tracked test file now reports 0 findings. `settleMs`, a wait the H1 pattern cannot see, is DW-480.
+status: done 2026-11-06
 
 ### DW-480: The date-copy refresh tests still hard-wait 20 ms through `settleMs`, which the H1 regex cannot see.
 origin: DW-466 fix (fix/dw-466-tea-hook-findings), 2026-11-06
