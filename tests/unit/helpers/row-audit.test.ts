@@ -126,7 +126,7 @@ describe('countPoolRows', () => {
   it('counts every audited table for both roles of every slot', async () => {
     fakeDb.counts.set('moods|id-testworker1-partner@test.example.com', 2);
     const counts = await countPoolRows(fakeAdmin() as unknown as TypedSupabaseClient, 2);
-    expect(Object.keys(counts)).toHaveLength(11 * 2 * 2);
+    expect(Object.keys(counts)).toHaveLength(12 * 2 * 2);
     expect(counts['moods|1|partner']).toBe(2);
     expect(counts['moods|1|worker']).toBe(0);
   });

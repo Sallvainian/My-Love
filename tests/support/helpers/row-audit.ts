@@ -34,6 +34,7 @@ export const AUDITED_TABLES = {
   partner_requests: ['from_user_id', 'to_user_id'],
   love_note_removals: ['user_id'],
   couple_settings: ['user_a', 'user_b'],
+  couple_days: ['user_a', 'user_b'],
 } as const;
 
 export type AuditedTable = keyof typeof AUDITED_TABLES;

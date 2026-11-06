@@ -106,6 +106,62 @@ export type Database = {
         }
         Relationships: []
       }
+      couple_days: {
+        Row: {
+          created_at: string
+          cycle: number
+          day: string
+          id: string
+          question_id: string
+          user_a: string
+          user_b: string
+          writer: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          cycle: number
+          day: string
+          id?: string
+          question_id: string
+          user_a: string
+          user_b: string
+          writer: string
+        }
+        Update: {
+          created_at?: string
+          cycle?: number
+          day?: string
+          id?: string
+          question_id?: string
+          user_a?: string
+          user_b?: string
+          writer?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "couple_days_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "daily_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "couple_days_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "couple_days_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       couple_settings: {
         Row: {
           relationship_start: string | null
@@ -185,6 +241,114 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      daily_picks: {
+        Row: {
+          choice: string
+          created_at: string
+          day_id: string
+          effective_zone: string
+          id: string
+          is_second: boolean
+          picked_at: string
+          time_zone: string
+          user_id: string
+          utc_offset_minutes: number
+        }
+        ComputedFields: never
+        Insert: {
+          choice: string
+          created_at?: string
+          day_id: string
+          effective_zone: string
+          id?: string
+          is_second: boolean
+          picked_at: string
+          time_zone: string
+          user_id: string
+          utc_offset_minutes: number
+        }
+        Update: {
+          choice?: string
+          created_at?: string
+          day_id?: string
+          effective_zone?: string
+          id?: string
+          is_second?: boolean
+          picked_at?: string
+          time_zone?: string
+          user_id?: string
+          utc_offset_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_picks_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "couple_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_picks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_questions: {
+        Row: {
+          id: string
+          source_day_id: string | null
+          target_day: string | null
+          that_text: string
+          this_text: string
+          user_a: string | null
+          user_b: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          id?: string
+          source_day_id?: string | null
+          target_day?: string | null
+          that_text: string
+          this_text: string
+          user_a?: string | null
+          user_b?: string | null
+        }
+        Update: {
+          id?: string
+          source_day_id?: string | null
+          target_day?: string | null
+          that_text?: string
+          this_text?: string
+          user_a?: string | null
+          user_b?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_questions_source_day_id_fkey"
+            columns: ["source_day_id"]
+            isOneToOne: true
+            referencedRelation: "couple_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_questions_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_questions_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       events: {
         Row: {
@@ -771,6 +935,25 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      assign_couple_day: {
+        Args: { day: string; user_a: string; user_b: string }
+        Returns: {
+          created_at: string
+          cycle: number
+          day: string
+          id: string
+          question_id: string
+          user_a: string
+          user_b: string
+          writer: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "couple_days"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       claim_love_note_upload: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -778,9 +961,17 @@ export type Database = {
           remaining: number
         }[]
       }
+      daily_day_snapshot: {
+        Args: { at: string; day_id: string; viewer: string }
+        Returns: Json
+      }
       decline_partner_request: {
         Args: { p_request_id: string }
         Returns: undefined
+      }
+      effective_zone: {
+        Args: { time_zone: string; utc_offset_minutes: number }
+        Returns: string
       }
       find_partner_by_email: {
         Args: { p_email: string }
@@ -789,6 +980,14 @@ export type Database = {
           id: string
           is_taken: boolean
         }[]
+      }
+      get_daily_day: {
+        Args: {
+          reported_at: string
+          time_zone: string
+          utc_offset_minutes: number
+        }
+        Returns: Json
       }
       get_my_partner_id: { Args: Record<PropertyKey, never>; Returns: string }
       get_my_pending_partner_requests: {
@@ -810,12 +1009,31 @@ export type Database = {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
+      submit_daily_pick: {
+        Args: {
+          choice: string
+          day_id: string
+          picked_at: string
+          time_zone: string
+          utc_offset_minutes: number
+        }
+        Returns: Json
+      }
       unread_love_note_count: { Args: { p_user_id: string }; Returns: number }
       unregister_all_push_devices: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
       unregister_push_device: { Args: { p_token: string }; Returns: undefined }
+      visible_daily_picks: {
+        Args: { at: string; viewer: string }
+        Returns: {
+          choice: string
+          day_id: string
+          picked_at: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
