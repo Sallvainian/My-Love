@@ -4049,3 +4049,11 @@ source_spec: `tickets/epic-daily-question/tickets/story-both-partners-pick-today
 severity: low
 reason: `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15 after this change; AGENTS.md line 26 still reads "composes 14 slices". The fix edits an agent-context file, so it is deferred rather than patched.
 status: open
+
+### DW-463: origin/main and this epic each hold a migration at version 20261105010000, so once both reach main the hosted deploy skips one of them.
+origin: spec-deferred f2b78a48ca13
+location: supabase/migrations/20261105010000_daily_question_days_and_picks.sql
+source_spec: `tickets/epic-daily-question/tickets/story-each-partner-s-day-runs-on-their-own-clock-plan.md`
+severity: high
+reason: `git ls-tree --name-only origin/main supabase/migrations/` lists `20261105010000_push_added_dates.sql` (and `20261105020000_remind_me_on_by_default.sql`); this epic's story 6.1 added `20261105010000_daily_question_days_and_picks.sql`. The migration history keys on the version alone, so whichever lands second is recorded as applied without running. Renaming an applied migration is outside this story; the epic PR must renumber the daily one past every main version before merging.
+status: open

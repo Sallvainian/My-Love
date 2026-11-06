@@ -10,8 +10,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { isOnline } from '../../api/errorHandlers';
-import type { DailyChoice, DailyDaySnapshot } from '../../api/dailyQuestionApi';
-import { offlineMessage } from '../../services/accountDataError';
+import {
+  DAY_CHANGED_MESSAGE,
+  type DailyChoice,
+  type DailyDaySnapshot,
+} from '../../api/dailyQuestionApi';
+import { AccountDataError, offlineMessage } from '../../services/accountDataError';
 import { useAppStore } from '../../stores/useAppStore';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 
@@ -43,7 +47,19 @@ function PickCard({
   );
 }
 
-function DayCard({ snapshot, partnerName }: { snapshot: DailyDaySnapshot; partnerName: string }) {
+function DayCard({
+  snapshot,
+  partnerName,
+  onSendStart,
+  onDayChanged,
+}: {
+  snapshot: DailyDaySnapshot;
+  partnerName: string;
+  /** A Send began: the parent clears its day-changed notice. */
+  onSendStart: () => void;
+  /** The pick was refused because the date changed; the parent shows the notice. */
+  onDayChanged: () => void;
+}) {
   const submitDailyPick = useAppStore((state) => state.submitDailyPick);
   const [selected, setSelected] = useState<DailyChoice | null>(null);
   const [sending, setSending] = useState(false);
@@ -53,6 +69,7 @@ function DayCard({ snapshot, partnerName }: { snapshot: DailyDaySnapshot; partne
 
   const send = useCallback(async () => {
     if (!selected) return;
+    onSendStart();
     if (!isOnline()) {
       setSendError(offlineMessage('Your pick', 'send', 'needs'));
       return;
@@ -62,12 +79,17 @@ function DayCard({ snapshot, partnerName }: { snapshot: DailyDaySnapshot; partne
     try {
       await submitDailyPick(selected);
     } catch (caught) {
-      console.error('[DailyQuestion] Could not send the pick:', caught);
-      setSendError(caught instanceof Error ? caught.message : 'Could not send your pick.');
+      if (caught instanceof AccountDataError && caught.code === 'day-changed') {
+        // The notice sits above the card: a new day_id remounts the card.
+        onDayChanged();
+      } else {
+        console.error('[DailyQuestion] Could not send the pick:', caught);
+        setSendError(caught instanceof Error ? caught.message : 'Could not send your pick.');
+      }
     } finally {
       setSending(false);
     }
-  }, [selected, submitDailyPick]);
+  }, [selected, submitDailyPick, onSendStart, onDayChanged]);
 
   const mine = snapshot.my_choice ? question[snapshot.my_choice] : null;
   const theirs = snapshot.partner_choice ? question[snapshot.partner_choice] : null;
@@ -164,6 +186,14 @@ export function DailyQuestion() {
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
   const partnerName = useAppStore((state) => state.partner?.displayName)?.trim() || 'Your partner';
 
+  // The day-changed notice belongs to the session that raised it, so an account
+  // change hides it without an effect resetting state.
+  const sessionKey = `${userId ?? ''}:${authSessionVersion}`;
+  const [dayChangedIn, setDayChangedIn] = useState<string | null>(null);
+  const showDayChanged = dayChangedIn === sessionKey;
+  const clearDayChanged = useCallback(() => setDayChangedIn(null), []);
+  const raiseDayChanged = useCallback(() => setDayChangedIn(sessionKey), [sessionKey]);
+
   // Re-read on each mount, and for a new session while the view stays open (an
   // account switch clears `dailyDay` through signedOutState): no local copy yet.
   useEffect(() => {
@@ -173,11 +203,23 @@ export function DailyQuestion() {
   return (
     <div className="min-h-screen bg-page" data-testid="daily-question-view">
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-3 pb-6">
+        {showDayChanged && (
+          <p
+            className="px-1 text-[13px] leading-[1.4] text-muted"
+            role="status"
+            data-testid="daily-day-changed"
+          >
+            {DAY_CHANGED_MESSAGE}
+          </p>
+        )}
+
         {dailyDay?.status === 'ok' && (
           <DayCard
             key={dailyDay.snapshot.day_id}
             snapshot={dailyDay.snapshot}
             partnerName={partnerName}
+            onSendStart={clearDayChanged}
+            onDayChanged={raiseDayChanged}
           />
         )}
 

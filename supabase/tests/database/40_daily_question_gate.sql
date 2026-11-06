@@ -6,7 +6,7 @@
 --     daily_picks; no anon or authenticated privilege on any of them (SELECT
 --     included); service_role holds column SELECT on every daily_picks column
 --     except `choice` and no table privilege.
---   * The internal functions are denied to anon and authenticated; the two
+--   * The six internal functions are denied to anon and authenticated; the two
 --     client RPCs are granted to authenticated only.
 --   * Every client RPC called as the second partner BEFORE their own pick
 --     returns no choice, Same/Different mark or count for that day, and a
@@ -20,6 +20,11 @@
 --     raises P0002.
 --   * effective_zone: an IANA name passes through; anything else becomes a
 --     POSIX spec equal to the interval of the offset.
+--   * Story 6.2 (20261105210000) added record_user_time_zone and
+--     record_daily_pick, listed with the other internal functions. A pick made
+--     now on tomorrow's date is refused by its date check, so the second-day
+--     picks go through record_daily_pick with instants on that date. The window,
+--     date and zone cases live in 41_daily_question_own_clocks.sql.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -142,20 +147,24 @@ select ok(
 select is(
   (select count(*)::int
    from unnest(array['effective_zone(text, integer)', 'assign_couple_day(uuid, uuid, date)',
-                     'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)']) as f(sig),
+                     'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)',
+                     'record_user_time_zone(uuid, text, integer, timestamptz, timestamptz)',
+                     'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)']) as f(sig),
         unnest(array['anon', 'authenticated']) as r(rolename)
    where has_function_privilege(r.rolename, 'public.' || f.sig, 'EXECUTE')),
   0,
-  'DAILY-012: the four internal functions are executable by neither anon nor authenticated'
+  'DAILY-012: the six internal functions are executable by neither anon nor authenticated'
 );
 
 select is(
   (select count(*)::int
    from unnest(array['effective_zone(text, integer)', 'assign_couple_day(uuid, uuid, date)',
-                     'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)']) as f(sig)
+                     'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)',
+                     'record_user_time_zone(uuid, text, integer, timestamptz, timestamptz)',
+                     'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)']) as f(sig)
    where has_function_privilege('service_role', 'public.' || f.sig, 'EXECUTE')),
-  4,
-  'DAILY-013: service_role keeps EXECUTE on the four internal functions'
+  6,
+  'DAILY-013: service_role keeps EXECUTE on the six internal functions'
 );
 
 select ok(
@@ -559,9 +568,14 @@ select is(
 select set_config('tests.day2',
   (public.assign_couple_day((select a_id from t_ids), (select b_id from t_ids), (now() at time zone 'UTC')::date + 1)).id::text, false);
 
-select tests.authenticate_as((select a_id from t_ids));
-select public.submit_daily_pick(current_setting('tests.day2')::uuid, 'this', now(), 'Nowhere/Land', 330);
-reset role;
+-- The day is tomorrow's UTC date, which submit_daily_pick's date check refuses
+-- for a pick made now, so the picks go through record_daily_pick with instants
+-- on that date in each partner's zone (A: +05:30, B: no zone, so UTC).
+select public.record_daily_pick(
+  (select a_id from t_ids), current_setting('tests.day2')::uuid, 'this',
+  ((now() at time zone 'UTC')::date + 1)::timestamp at time zone 'UTC' + interval '12 hours',
+  'Nowhere/Land', 330,
+  ((now() at time zone 'UTC')::date + 1)::timestamp at time zone 'UTC' + interval '12 hours');
 
 -- B has picked day 1, which must not release A's pick on day 2.
 select is(
@@ -576,9 +590,11 @@ select is(
   'DAILY-070: and B''s day 2 snapshot has a null partner_choice'
 );
 
-select tests.authenticate_as((select b_id from t_ids));
-select set_config('tests.b_same', public.submit_daily_pick(current_setting('tests.day2')::uuid, 'this', now(), null, null)::text, false);
-reset role;
+select set_config('tests.b_same', public.record_daily_pick(
+  (select b_id from t_ids), current_setting('tests.day2')::uuid, 'this',
+  ((now() at time zone 'UTC')::date + 1)::timestamp at time zone 'UTC' + interval '13 hours',
+  null, null,
+  ((now() at time zone 'UTC')::date + 1)::timestamp at time zone 'UTC' + interval '13 hours')::text, false);
 
 select is(
   (select time_zone || '/' || utc_offset_minutes || '/' || effective_zone from public.daily_picks

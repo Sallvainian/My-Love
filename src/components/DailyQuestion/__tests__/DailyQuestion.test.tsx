@@ -24,14 +24,21 @@ vi.mock('../../../api/supabaseClient', () => ({
   isSeedFallbackName: () => false,
 }));
 
-vi.mock('../../../api/dailyQuestionApi', () => ({
+vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
 
+import { DAY_CHANGED_MESSAGE } from '../../../api/dailyQuestionApi';
 import { AccountDataError } from '../../../services/accountDataError';
 import { useAppStore } from '../../../stores/useAppStore';
 import { DailyQuestion } from '../DailyQuestion';
+
+/** A local-time instant on the fixture's day (2026-11-05), whatever the machine's zone. */
+const SAME_DAY = new Date(2026, 10, 5, 12);
+/** One minute past local midnight: the device's date is no longer the fixture's day. */
+const NEXT_DAY = new Date(2026, 10, 6, 0, 1);
 
 const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as const, snapshot });
 
@@ -47,12 +54,16 @@ beforeEach(() => {
   submitDailyPickRequest.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
+  // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(SAME_DAY);
   useAppStore.getState().clearAuth();
   useAppStore.getState().setAuthUser('USER-A-ID');
   setPartner('Jessie');
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   setOnline(true);
 });
 
@@ -107,7 +118,7 @@ describe('DailyQuestion', () => {
     expect(screen.getByTestId('daily-option-that')).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByTestId('daily-send-pick'));
 
-    expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'that');
+    expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'that', SAME_DAY);
     expect(await screen.findByTestId('daily-waiting')).toHaveTextContent('Waiting on Jessie');
     expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Mountain day');
     expect(screen.queryByTestId('daily-option-this')).toBeNull();
@@ -302,5 +313,128 @@ describe('DailyQuestion', () => {
     expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
     expect(fetchDailyDay).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('daily-loading')).toBeNull();
+  });
+
+  describe('the day changed notice', () => {
+    const nextDay = dailySnapshot({
+      day_id: 'next-day',
+      day: '2026-11-06',
+      question: { this: 'Tea', that: 'Coffee' },
+    });
+
+    it('device date past the shown day: no request, the new question, and the notice above it', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-option-this'));
+      vi.setSystemTime(NEXT_DAY);
+      await user.click(screen.getByTestId('daily-send-pick'));
+
+      expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
+      const notice = screen.getByTestId('daily-day-changed');
+      expect(notice).toHaveTextContent(DAY_CHANGED_MESSAGE);
+      expect(notice).toHaveAttribute('role', 'status');
+      expect(submitDailyPickRequest).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('daily-send-error')).toBeNull();
+      expect(screen.getByTestId('daily-send-pick')).toBeDisabled();
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('the notice sits outside the card, so it survives the card remounting on the new day', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-option-this'));
+      vi.setSystemTime(NEXT_DAY);
+      await user.click(screen.getByTestId('daily-send-pick'));
+      await screen.findByText('Tea or Coffee?', { exact: false });
+
+      const notice = screen.getByTestId('daily-day-changed');
+      expect(screen.getByTestId('daily-question').parentElement).not.toContainElement(notice);
+    });
+
+    it('a server day-changed answer shows the same notice and re-reads the day', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+      submitDailyPickRequest.mockRejectedValue(new AccountDataError('day-changed', DAY_CHANGED_MESSAGE));
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-option-that'));
+      await user.click(screen.getByTestId('daily-send-pick'));
+
+      expect(await screen.findByTestId('daily-day-changed')).toHaveTextContent(DAY_CHANGED_MESSAGE);
+      expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
+      expect(screen.queryByTestId('daily-send-error')).toBeNull();
+      expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears at the next Send', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-option-this'));
+      vi.setSystemTime(NEXT_DAY);
+      await user.click(screen.getByTestId('daily-send-pick'));
+      await screen.findByTestId('daily-day-changed');
+      await screen.findByText('Tea or Coffee?', { exact: false });
+
+      let settle: (value: unknown) => void = () => {};
+      submitDailyPickRequest.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+      await user.click(screen.getByTestId('daily-option-that'));
+      await user.click(screen.getByTestId('daily-send-pick'));
+
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+      expect(submitDailyPickRequest).toHaveBeenCalledWith('next-day', 'that', NEXT_DAY);
+      await act(async () => settle(waitingSnapshot('that')));
+    });
+
+    it('clears at an offline Send too, beside the offline message', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-option-this'));
+      vi.setSystemTime(NEXT_DAY);
+      await user.click(screen.getByTestId('daily-send-pick'));
+      await screen.findByTestId('daily-day-changed');
+      await screen.findByText('Tea or Coffee?', { exact: false });
+
+      await user.click(screen.getByTestId('daily-option-that'));
+      setOnline(false);
+      await user.click(screen.getByTestId('daily-send-pick'));
+
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+      expect(screen.getByTestId('daily-send-error')).toHaveTextContent(
+        'You are offline. Your pick needs a connection to send.'
+      );
+    });
+
+    it('clears on an account change', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+      fetchDailyDay.mockResolvedValueOnce(
+        ok(dailySnapshot({ day_id: 'c-day', day: '2026-11-06', question: { this: 'Sun', that: 'Rain' } }))
+      );
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-option-this'));
+      vi.setSystemTime(NEXT_DAY);
+      await user.click(screen.getByTestId('daily-send-pick'));
+      await screen.findByTestId('daily-day-changed');
+
+      act(() => useAppStore.getState().setAuthUser('USER-C-ID'));
+
+      expect(await screen.findByText('Sun or Rain?', { exact: false })).toBeInTheDocument();
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+    });
   });
 });

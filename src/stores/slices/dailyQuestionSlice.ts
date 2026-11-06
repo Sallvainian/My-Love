@@ -14,9 +14,19 @@
  * reveal. Every async action captures `{ userId, authSessionVersion }` before
  * its first await and writes nothing after it if either changed.
  * `signedOutState()` clears all three fields.
+ *
+ * A pick is dated by the device (AD-2, AD-12): `submitDailyPick` takes
+ * `pickedAt = new Date()` once and refuses, before any request, when its local
+ * date is not the shown day's `day`. It then re-reads the day and throws
+ * `AccountDataError('day-changed', DAY_CHANGED_MESSAGE)`. The server's `DQ001`
+ * (the same mismatch, seen in the zone sent) takes the same path.
  */
 
+import { AccountDataError } from '../../services/accountDataError';
+import { formatDateISO } from '../../utils/dateUtils';
+
 import {
+  DAY_CHANGED_MESSAGE,
   type DailyChoice,
   type DailyDayAnswer,
   type DailyDaySnapshot,
@@ -37,8 +47,11 @@ export interface DailyQuestionSlice {
   loadDailyDay: () => Promise<void>;
   /**
    * Send the account's pick for the shown day and store the answer. Throws:
-   * with no day shown, `AccountDataError('offline')` without a connection, and
-   * the request's error.
+   * - a plain `Error` when signed out or with no day shown;
+   * - `AccountDataError('day-changed')`, after starting a re-read of the day,
+   *   when the device date is not the shown day or the server answers `DQ001`;
+   * - `AccountDataError('offline')` without a connection;
+   * - the request's own error otherwise.
    */
   submitDailyPick: (choice: DailyChoice) => Promise<void>;
 }
@@ -103,7 +116,21 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     const shown = get().dailyDay;
     if (shown?.status !== 'ok') throw new Error('There is no question to answer yet');
 
-    const snapshot = await submitDailyPickRequest(shown.snapshot.day_id, choice);
+    const pickedAt = new Date();
+    if (formatDateISO(pickedAt) !== shown.snapshot.day) {
+      void get().loadDailyDay();
+      throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE);
+    }
+
+    let snapshot: DailyDaySnapshot;
+    try {
+      snapshot = await submitDailyPickRequest(shown.snapshot.day_id, choice, pickedAt);
+    } catch (error) {
+      if (error instanceof AccountDataError && error.code === 'day-changed' && isCurrent()) {
+        void get().loadDailyDay();
+      }
+      throw error;
+    }
     if (!isCurrent()) return;
     set({
       dailyDay: mergeAnswer(get().dailyDay, { status: 'ok', snapshot }),

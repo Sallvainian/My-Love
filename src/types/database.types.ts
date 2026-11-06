@@ -848,6 +848,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_time_zones: {
+        Row: {
+          effective_zone: string
+          reported_at: string
+          time_zone: string
+          user_id: string
+          utc_offset_minutes: number
+        }
+        ComputedFields: never
+        Insert: {
+          effective_zone: string
+          reported_at: string
+          time_zone: string
+          user_id: string
+          utc_offset_minutes: number
+        }
+        Update: {
+          effective_zone?: string
+          reported_at?: string
+          time_zone?: string
+          user_id?: string
+          utc_offset_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_time_zones_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           birthday: string | null
@@ -1004,6 +1037,28 @@ export type Database = {
       mark_love_notes_read: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      record_daily_pick: {
+        Args: {
+          at: string
+          choice: string
+          day_id: string
+          picked_at: string
+          time_zone: string
+          utc_offset_minutes: number
+          viewer: string
+        }
+        Returns: Json
+      }
+      record_user_time_zone: {
+        Args: {
+          at: string
+          reported_at: string
+          time_zone: string
+          utc_offset_minutes: number
+          viewer: string
+        }
+        Returns: undefined
       }
       register_push_device: {
         Args: { p_environment: string; p_token: string }

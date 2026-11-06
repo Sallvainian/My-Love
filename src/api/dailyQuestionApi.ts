@@ -7,7 +7,9 @@
  * snapshot. Both are online-only and THROW: offline is `AccountDataError('offline')`
  * before any request, a PostgREST or transport failure is an `AccountDataError`
  * from `toAccountDataError`, and an answer that does not parse is a failure too
- * (never `unlinked`).
+ * (never `unlinked`). A pick the server dates to another day than the one shown
+ * (SQLSTATE `DQ001`) is `AccountDataError('day-changed', DAY_CHANGED_MESSAGE)`;
+ * `DQ002` (outside the five-minute window) stays a transport error.
  *
  * @module api/dailyQuestionApi
  */
@@ -19,7 +21,7 @@ import {
   requestTimeout,
   toAccountDataError,
 } from '../services/accountDataError';
-import { isOnline } from './errorHandlers';
+import { isOnline, isPostgrestError, logSupabaseError } from './errorHandlers';
 import { supabase } from './supabaseClient';
 import {
   type DailyChoice,
@@ -33,6 +35,13 @@ export type { DailyChoice, DailyDayAnswer, DailyDaySnapshot };
 
 const FETCH_CONTEXT = 'DailyQuestionApi.fetchDailyDay';
 const SUBMIT_CONTEXT = 'DailyQuestionApi.submitDailyPick';
+
+/** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
+const PICK_DATE_MISMATCH = 'DQ001';
+
+/** Shown when a pick is refused because the date changed since the question was shown. */
+export const DAY_CHANGED_MESSAGE =
+  "The date has changed since this question was shown. Check today's question and pick again.";
 
 /** `requireOnline` with the singular verb: "Your pick needs a connection to send." */
 function refuseOffline(what: string, action: NeedsConnectionAction): void {
@@ -101,6 +110,10 @@ export async function submitDailyPick(
     }
     return parsed.data;
   } catch (error) {
+    if (isPostgrestError(error) && error.code === PICK_DATE_MISMATCH) {
+      logSupabaseError(SUBMIT_CONTEXT, error);
+      throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE, { cause: error });
+    }
     throw toAccountDataError(SUBMIT_CONTEXT, error);
   }
 }

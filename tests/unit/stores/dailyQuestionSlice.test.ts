@@ -17,11 +17,13 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   isSeedFallbackName: () => false,
 }));
 
-vi.mock('../../../src/api/dailyQuestionApi', () => ({
+vi.mock('../../../src/api/dailyQuestionApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
 
+import { DAY_CHANGED_MESSAGE } from '../../../src/api/dailyQuestionApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { deleteAccountCopies } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
@@ -31,6 +33,11 @@ import { deferred } from './loaderIdentityGuardsFixture';
 
 const A = 'USER-A-ID';
 const C = 'USER-C-ID';
+
+/** A local-time instant on the fixture's day (2026-11-05), whatever the machine's zone. */
+const SAME_DAY = new Date(2026, 10, 5, 12);
+/** One minute past local midnight: the device's date is no longer the fixture's day. */
+const NEXT_DAY = new Date(2026, 10, 6, 0, 1);
 
 function state() {
   return useAppStore.getState();
@@ -44,12 +51,16 @@ beforeEach(async () => {
   submitDailyPickRequest.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
+  // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(SAME_DAY);
   state().clearAuth();
   state().setAuthUser(A);
   await deleteAccountCopies(A);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   setOnline(true);
   vi.restoreAllMocks();
 });
@@ -287,7 +298,7 @@ describe('submitDailyPick', () => {
 
     await state().submitDailyPick('this');
 
-    expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'this');
+    expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'this', SAME_DAY);
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 
@@ -368,5 +379,93 @@ describe('submitDailyPick', () => {
     await submit;
 
     expect(state().dailyDay).toBeNull();
+  });
+
+  describe('the device date and the shown day', () => {
+    const nextDay = dailySnapshot({ day_id: 'next-day', day: '2026-11-06' });
+
+    it('refuses a pick on a day the device no longer shows: no request, a re-read, day-changed', async () => {
+      vi.setSystemTime(NEXT_DAY);
+      fetchDailyDay.mockResolvedValue(ok(nextDay));
+
+      await expect(state().submitDailyPick('this')).rejects.toMatchObject({
+        name: 'AccountDataError',
+        code: 'day-changed',
+        message: DAY_CHANGED_MESSAGE,
+      });
+
+      expect(submitDailyPickRequest).not.toHaveBeenCalled();
+      expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(state().dailyDay).toEqual(ok(nextDay)));
+    });
+
+    it('sends the pick when the device date is the shown day, however late in it', async () => {
+      vi.setSystemTime(new Date(2026, 10, 5, 23, 59));
+      submitDailyPickRequest.mockResolvedValue(waitingSnapshot('that'));
+
+      await state().submitDailyPick('that');
+
+      expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'that', new Date(2026, 10, 5, 23, 59));
+      expect(fetchDailyDay).not.toHaveBeenCalled();
+    });
+
+    it('re-reads the day when the server answers day-changed, and rethrows it', async () => {
+      const refusal = new AccountDataError('day-changed', DAY_CHANGED_MESSAGE);
+      submitDailyPickRequest.mockRejectedValue(refusal);
+      fetchDailyDay.mockResolvedValue(ok(nextDay));
+
+      await expect(state().submitDailyPick('this')).rejects.toBe(refusal);
+
+      expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(state().dailyDay).toEqual(ok(nextDay)));
+    });
+
+    it('does not re-read after a day-changed answer that arrives in another session', async () => {
+      const request = deferred<ReturnType<typeof waitingSnapshot>>();
+      submitDailyPickRequest.mockReturnValue(request.promise);
+
+      const submit = state().submitDailyPick('this');
+      useAppStore.setState({ userId: C, dailyDay: ok(dailySnapshot({ day_id: 'c-day' })) });
+      request.fail(new AccountDataError('day-changed', DAY_CHANGED_MESSAGE));
+
+      await expect(submit).rejects.toMatchObject({ code: 'day-changed' });
+      expect(fetchDailyDay).not.toHaveBeenCalled();
+      expect(state().dailyDay).toEqual(ok(dailySnapshot({ day_id: 'c-day' })));
+    });
+
+    it('does not re-read after a day-changed answer that arrives after a same-account re-login', async () => {
+      const request = deferred<ReturnType<typeof waitingSnapshot>>();
+      submitDailyPickRequest.mockReturnValue(request.promise);
+
+      const submit = state().submitDailyPick('this');
+      state().clearAuth();
+      state().setAuthUser(A);
+      await deleteAccountCopies(A);
+      request.fail(new AccountDataError('day-changed', DAY_CHANGED_MESSAGE));
+
+      await expect(submit).rejects.toMatchObject({ code: 'day-changed' });
+      expect(fetchDailyDay).not.toHaveBeenCalled();
+    });
+
+    it('discards the re-read when the session changes while it is open', async () => {
+      vi.setSystemTime(NEXT_DAY);
+      const reread = deferred<ReturnType<typeof ok>>();
+      fetchDailyDay.mockReturnValue(reread.promise);
+
+      await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'day-changed' });
+      state().clearAuth();
+      reread.settle(ok(nextDay));
+      await vi.waitFor(() => expect(state().dailyDayLoading).toBe(false));
+
+      expect(state().dailyDay).toBeNull();
+    });
+
+    it('leaves every other failure on the old path: no re-read', async () => {
+      submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+      await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'transport' });
+
+      expect(fetchDailyDay).not.toHaveBeenCalled();
+    });
   });
 });

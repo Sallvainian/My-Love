@@ -22,7 +22,7 @@ vi.mock('../supabaseClient', () => ({
 }));
 
 import { AccountDataError } from '../../services/accountDataError';
-import { fetchDailyDay, submitDailyPick } from '../dailyQuestionApi';
+import { DAY_CHANGED_MESSAGE, fetchDailyDay, submitDailyPick } from '../dailyQuestionApi';
 
 const ZONE = 'America/New_York';
 
@@ -175,6 +175,36 @@ describe('submitDailyPick', () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'boom', code: 'XX000', details: '', hint: '' } });
 
     await expect(submitDailyPick(DAY_ID, 'this')).rejects.toBeInstanceOf(AccountDataError);
+  });
+
+  it('maps a DQ001 (the pick is not on the shown day) to day-changed with the notice text', async () => {
+    const error = { message: "Pick date is not the day's date", code: 'DQ001', details: '', hint: '' };
+    rpc.mockResolvedValue({ data: null, error });
+
+    await expect(submitDailyPick(DAY_ID, 'this')).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'day-changed',
+      message: DAY_CHANGED_MESSAGE,
+    });
+    expect(console.error).toHaveBeenCalledWith('[Supabase] DailyQuestionApi.submitDailyPick:', {
+      code: 'DQ001',
+      message: error.message,
+      details: '',
+      hint: '',
+    });
+  });
+
+  it('leaves a DQ002 (outside the five-minute window) a transport error', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'Pick time outside the allowed window', code: 'DQ002', details: '', hint: '' },
+    });
+
+    const failure = await submitDailyPick(DAY_ID, 'this').catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(AccountDataError);
+    expect(failure).toMatchObject({ code: 'transport' });
+    expect((failure as AccountDataError).message).not.toBe(DAY_CHANGED_MESSAGE);
   });
 
   it('refuses offline before any request', async () => {
