@@ -67,7 +67,8 @@ tests/.auth/
 *.sw?
 
 # Dot Files
-.claude
+.claude/*
+!.claude/hooks/
 !.claude/commands/
 !.claude/rules/
 .code
