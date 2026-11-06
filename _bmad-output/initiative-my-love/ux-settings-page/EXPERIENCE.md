@@ -31,7 +31,7 @@ Settings (top page, large title)
 │  └─ Dates ›                   → Dates list  [+ → Kind chooser → New event / New anniversary form]
 │       ├─ TOGETHER: Together since ›, Wedding ›          → that date's page
 │       ├─ BIRTHDAYS: You ›, <partner> ›                  → your birthday page / <partner>'s birthday (read-only)
-│       ├─ EVENTS: upcoming events, soonest first          → event page (own: editable; partner's: read-only)
+│       ├─ EVENTS: upcoming events, soonest first          → event page (editable, whoever made it)
 │       ├─ ANNIVERSARIES: one row per anniversary         → anniversary page
 │       └─ PAST: past events, newest first, [Load more]   → event page (editable as above, no Remind me)
 ├─ PREFERENCES
@@ -64,7 +64,7 @@ A group with no visible rows is not shown, just as today's push section renders 
 
 ### Ownership rules
 
-Code facts in the memlog. Events are visible to both partners and editable only by their creator. Anniversaries are private to their creator. Together since and Wedding belong to the couple: either partner can edit them, and only a linked pair can read them. Each person sets their own birthday.
+Code facts in the memlog. Events and anniversaries are shared: both partners see, edit and delete every one, and each stays recorded under the person who added it (owner decision 2026-11-05). Together since and Wedding belong to the couple: either partner can edit them, and only a linked pair can read them. Each person sets their own birthday.
 
 ### Subpages
 
@@ -76,10 +76,9 @@ Remind me appears only in the iOS app (State Patterns → Reminder unavailable).
 | Partner, linked | Large | Read-only rows: Name, Email, Linked since (the date the two were linked; the row is hidden when the link date is unknown). No actions; no unlink exists and none is added. The partner's birthday lives on the Dates list, not here. [v2 frame 4](mockups/key-settings-v2.html). |
 | Partner, not linked | Large | Lead line `You aren't linked with a partner yet.`, then a `Go to Partner` row that opens the Partner view (the dock's Partner destination), where the one connect flow (search, send, accept or decline) stays. [v2 frame 5](mockups/key-settings-v2.html). |
 | Partner, unknown | Large | See State Patterns → Partner unknown. |
-| Dates list | Large | The `+` button at the bar's trailing edge. Groups in this order: Together (Together since, Wedding), Birthdays (yours, then the partner's), Events (both partners' upcoming events, soonest first), Anniversaries (your own only; a partner never sees them), Past (both partners' past events, newest first, with a `Load more` row at the end when there are more, as today's bounded paging does). Past events stay listed here, though Home hides them, because the Dates list is the only place a mistyped year can be fixed. Every row shows the date on the right, as in `Sat 14 Nov` or `3 Feb 2022`, using the app's existing date formatters. An unset Together since or Wedding keeps its place and reads `Not set`. Home keeps the countdowns; the list shows dates, not countdowns. |
-| Own event page | Small (event name) | Name ›, Date ›, Note ›, Icon › (each opens a one-field page). Then the Remind me switch with Footnote `A month and a week before.` Then `Delete event` alone in its own card. [v1 frame 4](mockups/key-settings-v1.html). |
-| Past event page | Small (event name) | Like the own event page above or the partner's event page below, still editable by its creator, but with no Remind me switch: a reminder for a past date can never fire. |
-| Partner's event page | Small (event name) | Read-only rows: Date, Note, Icon. The Remind me switch still works. No Delete and no "added by" footnote: being read-only already says the partner made it. [v2 frame 7](mockups/key-settings-v2.html) shows a `Jessie added this.` footnote, and the spine overrides it. |
+| Dates list | Large | The `+` button at the bar's trailing edge. Groups in this order: Together (Together since, Wedding), Birthdays (yours, then the partner's), Events (both partners' upcoming events, soonest first), Anniversaries (both partners'), Past (both partners' past events, newest first, with a `Load more` row at the end when there are more, as today's bounded paging does). Past events stay listed here, though Home hides them, because the Dates list is the only place a mistyped year can be fixed. Every row shows the date on the right, as in `Sat 14 Nov` or `3 Feb 2022`, using the app's existing date formatters. An unset Together since or Wedding keeps its place and reads `Not set`. Home keeps the countdowns; the list shows dates, not countdowns. |
+| Event page | Small (event name) | The same for an event either partner made: Name ›, Date ›, Note ›, Icon › (each opens a one-field page). Then the Remind me switch with Footnote `A month and a week before.` Then `Delete event` alone in its own card. [v1 frame 4](mockups/key-settings-v1.html). |
+| Past event page | Small (event name) | Like the event page above, still editable by either partner, but with no Remind me switch: a reminder for a past date can never fire. |
 | Anniversary page | Small (anniversary name) | Name ›, Date ›, Note › (anniversaries have no icon), the Remind me switch, and `Delete anniversary` alone in its own card. |
 | Together since page | Small (`Together since`) | Date › (a date and a time, as today; either partner can set it), the Remind me switch. No clear, as today. |
 | Wedding page | Small (`Wedding`) | Date › (either partner can set it), the Remind me switch, then the clear row: a centered Danger action row, `Clear` (today's word), alone in its own card, which sets the wedding date back to `Not set` and returns to the Dates list. Shown only while a date is set. |
@@ -137,7 +136,7 @@ Microcopy. Brand voice lives in `DESIGN.md` → Brand & Style. Strings below are
 | `Log out`, `Log out of all devices` | `Sign out` anywhere in the UI |
 | `Not linked` only for a confirmed unlinked answer | `Not linked` after a failed or offline read |
 | Refusals from `offlineMessage(what, action)` | A hand-typed "you need a connection" sentence |
-| No footnote on a partner's read-only event | `Jessie added this.` |
+| No "added by" footnote on an event page | `Jessie added this.` |
 
 ## Component Patterns
 
@@ -151,7 +150,7 @@ Behavioral. Visual specs live in `DESIGN.md` → Components.
 | Grouped card | Every page | Holds rows. Never holds an open editor, a Save button or a helper sentence. |
 | List row | Every list page | The whole row is one button that pushes its page. On the Dates list, the `Load more` row at the end of Past appends the next page of past events in place instead of pushing a page. The value is the current state, read from the same store the page edits, so it is correct on return without a reload. A row whose page must prefill from a read that has not arrived yet is disabled until it arrives (today's rule for the name editor). |
 | Switch row | Notifications, date pages | Saves when tapped; there is no Save button. Server first: the switch is disabled while its save is in flight and shows the new state (`{colors.fill}` track when on) once the save succeeds. On refusal or failure it stays where it was and the page shows the Error box. Before the account's switches have loaded, it shows the default and is disabled (as today). Disabled while Date reminders is off; see State Patterns → Date reminders off. |
-| Read-only row | Partner (linked), partner's birthday, partner's event | Not a button, not focusable as a control, no chevron. Never shown at reduced opacity: the value keeps `{colors.muted}` like any other value. |
+| Read-only row | Partner (linked), partner's birthday | Not a button, not focusable as a control, no chevron. Never shown at reduced opacity: the value keeps `{colors.muted}` like any other value. |
 | Footnote | Under a card | Explains the card above it in one sentence. Not interactive. |
 | Danger action row | Top page last card; bottom of an own date's page | `{colors.danger}` marks only these actions. Log out acts at once (this device only, works offline as today). Log out of all devices checks the connection first. Offline, it refuses with the refusal string and opens no dialog; online, it opens the Confirmation dialog. `Delete event` and `Delete anniversary` open a Confirmation dialog, as today's `Delete this event?` does. The wedding's `Clear` acts at once, as today's Clear button does. While an action runs, both log-out rows are disabled and the running one shows its in-progress label. |
 | Profile header | Profile | Shows who is signed in. Not interactive. The name updates when the Name field is saved. |
@@ -177,7 +176,7 @@ Behavioral. Visual specs live in `DESIGN.md` → Components.
 | Not linked | Top page, Partner, Dates | Only when the server has confirmed there is no partner (a loaded `{ status: 'unlinked' }` answer). Partner row reads `Not linked`; the Partner page shows the lead line and `Go to Partner`. On the Dates list the partner's birthday row is absent and only your own events appear. The Together group is hidden, because only a linked pair can read or write those dates. |
 | Partner unknown | Top page, Partner | A failed partner read is never treated as unlinked and never shows `Not linked`. If a saved partner copy exists, its name is shown. With nothing saved, the Partner row shows no value, and the Partner page shows the Partner view's load-error wording, `Couldn't load your partner`, with its offline or retry line, never the not-linked page. |
 | Unset date | Dates list, Profile | Together since and Wedding read `Not set` and keep their place; tapping the row on the Dates list opens the one-field Date page directly. An unset birthday reads `Not set` too. A partner's unset birthday shows `Not set` on its read-only page with the same Footnote. Only the wedding date can be cleared back to `Not set` from its page. |
-| Read-only partner item | Partner's birthday, partner's event | Rows without chevrons, a working Remind me switch, and no Delete. The Remind me switch is the reader's own. |
+| Read-only partner item | Partner's birthday | Rows without chevrons, a working Remind me switch, and no Delete. The Remind me switch is the reader's own. |
 | Empty Dates group | Dates list | An Events, Anniversaries or Past group with no rows is hidden; the `+` button is how to add one. |
 | More past events | Dates list | A `Load more` row ends the Past group while older events remain; it appends the next page in place. A failed page keeps the loaded events and shows the Error box. |
 | Date reminders off | Date pages | Remind me is disabled and shown at 60% opacity, with Footnote `Date reminders are off. Turn them on in Notifications.` The per-date setting is kept, so it applies again when Date reminders is turned back on. |
@@ -250,7 +249,7 @@ Failure: Casey is offline at step 3. The refusal "You are offline. Logging out o
 1. On the Dates list Casey taps the `+` button. The Kind chooser asks Event or Anniversary.
 2. Casey taps Anniversary. `New anniversary` opens with Cancel, the title and a disabled Add.
 3. Casey types the name and picks the date. Add becomes active.
-4. **Climax:** Casey taps Add. Back on the Dates list, the new anniversary sits under ANNIVERSARIES with its date on the right. Jessie never sees it, because anniversaries are private.
+4. **Climax:** Casey taps Add. Back on the Dates list, the new anniversary sits under ANNIVERSARIES with its date on the right. Jessie sees it on their own Dates list too, because anniversaries are shared.
 
 Failure: if Casey is offline at step 4, the Form page stays, with the refusal in the Error box and every field kept.
 
