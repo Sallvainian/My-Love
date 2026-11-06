@@ -1,0 +1,306 @@
+/**
+ * The Daily Question view against the real store, with only the API module
+ * mocked: one test per row of the story's matrix.
+ */
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import 'fake-indexeddb/auto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  dailySnapshot,
+  DAY_ID,
+  revealSnapshot,
+  waitingSnapshot,
+} from '../../../../tests/unit/stores/dailyQuestionFixture';
+import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
+
+const fetchDailyDay = vi.fn();
+const submitDailyPickRequest = vi.fn();
+
+vi.mock('../../../api/supabaseClient', () => ({
+  supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
+  getPartnerId: vi.fn(),
+  lookupPartnerId: vi.fn(),
+  isSeedFallbackName: () => false,
+}));
+
+vi.mock('../../../api/dailyQuestionApi', () => ({
+  fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
+}));
+
+import { AccountDataError } from '../../../services/accountDataError';
+import { useAppStore } from '../../../stores/useAppStore';
+import { DailyQuestion } from '../DailyQuestion';
+
+const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as const, snapshot });
+
+function setPartner(displayName: string | null) {
+  useAppStore.setState({
+    partner: displayName === null ? null : { id: 'USER-B-ID', displayName, email: 'b@example.com' },
+  } as unknown as Parameters<typeof useAppStore.setState>[0]);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  fetchDailyDay.mockReset();
+  submitDailyPickRequest.mockReset();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  setOnline(true);
+  useAppStore.getState().clearAuth();
+  useAppStore.getState().setAuthUser('USER-A-ID');
+  setPartner('Jessie');
+});
+
+afterEach(() => {
+  setOnline(true);
+});
+
+describe('DailyQuestion', () => {
+  it('no picks: shows the question as plain text, two options, a disabled send and the partner status', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-question')).toHaveTextContent(
+      'Beach day or Mountain day?'
+    );
+    expect(screen.getByTestId('daily-option-this')).toHaveTextContent('Beach day');
+    expect(screen.getByTestId('daily-option-that')).toHaveTextContent('Mountain day');
+    expect(screen.getByTestId('daily-send-pick')).toBeDisabled();
+    expect(screen.getByTestId('daily-partner-status')).toHaveTextContent(
+      "Jessie hasn't picked yet"
+    );
+    expect(screen.queryByTestId('daily-waiting')).toBeNull();
+    expect(screen.queryByTestId('daily-reveal')).toBeNull();
+  });
+
+  it('falls back to "Your partner" when no name is known', async () => {
+    setPartner(null);
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-partner-status')).toHaveTextContent(
+      "Your partner hasn't picked yet"
+    );
+  });
+
+  it('partner picked: says so and shows no partner choice', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ state: 'partner' })));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-partner-status')).toHaveTextContent('Jessie has picked');
+    expect(screen.queryByTestId('daily-reveal')).toBeNull();
+    expect(screen.queryByTestId('daily-reveal-partner')).toBeNull();
+    expect(screen.getByTestId('daily-option-this')).toBeInTheDocument();
+  });
+
+  it('enables send once an option is chosen, then sends it and shows the waiting screen', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('that'));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-that'));
+    expect(screen.getByTestId('daily-option-that')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'that');
+    expect(await screen.findByTestId('daily-waiting')).toHaveTextContent('Waiting on Jessie');
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Mountain day');
+    expect(screen.queryByTestId('daily-option-this')).toBeNull();
+    expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+  });
+
+  it('waiting: shows the own pick and its time as h:mm AM/PM', async () => {
+    // 15:45Z is 10:45 AM in the suite's New York zone.
+    fetchDailyDay.mockResolvedValue(ok(waitingSnapshot('this', '2026-11-05T15:45:00.000Z')));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-my-pick')).toHaveTextContent('Beach day');
+    expect(screen.getByTestId('daily-my-pick-time')).toHaveTextContent(/^10:45\sAM$/);
+    expect(screen.getByTestId('daily-waiting')).toHaveTextContent('Waiting on Jessie');
+    expect(screen.queryByTestId('daily-option-this')).toBeNull();
+    expect(screen.queryByTestId('daily-partner-status')).toBeNull();
+  });
+
+  it('reveal with different picks: both option texts and "Different picks"', async () => {
+    fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+
+    render(<DailyQuestion />);
+
+    const reveal = await screen.findByTestId('daily-reveal');
+    expect(reveal).toHaveTextContent('Beach day');
+    expect(reveal).toHaveTextContent('Mountain day');
+    expect(screen.getByTestId('daily-reveal-mine')).toHaveTextContent('Beach day');
+    expect(screen.getByTestId('daily-reveal-partner')).toHaveTextContent('Mountain day');
+    expect(screen.getByTestId('daily-reveal-mark')).toHaveTextContent('Different picks');
+  });
+
+  it('reveal with the same pick: "Same picks"', async () => {
+    fetchDailyDay.mockResolvedValue(ok(revealSnapshot('that', 'that')));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-reveal-mark')).toHaveTextContent('Same picks');
+  });
+
+  it('shows the loading line while the first fetch is pending', async () => {
+    let settle: (value: unknown) => void = () => {};
+    fetchDailyDay.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+    render(<DailyQuestion />);
+
+    expect(screen.getByTestId('daily-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-question')).toBeNull();
+    await act(async () => settle(ok(dailySnapshot())));
+    expect(await screen.findByTestId('daily-question')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-loading')).toBeNull();
+  });
+
+  it('a new day_id resets the chosen option and the send error', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'nope'));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-this'));
+    await user.click(screen.getByTestId('daily-send-pick'));
+    expect(await screen.findByTestId('daily-send-error')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-send-pick')).toBeEnabled();
+
+    fetchDailyDay.mockResolvedValue(
+      ok(dailySnapshot({ day_id: 'another-day', day: '2026-11-06' }))
+    );
+    await act(() => useAppStore.getState().loadDailyDay());
+
+    expect(screen.getByTestId('daily-send-pick')).toBeDisabled();
+    expect(screen.getByTestId('daily-option-this')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('daily-send-error')).toBeNull();
+  });
+
+  it('unlinked: no question and no pick control', async () => {
+    fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
+
+    render(<DailyQuestion />);
+
+    await waitFor(() => expect(useAppStore.getState().dailyDay).toEqual({ status: 'unlinked' }));
+    expect(screen.queryByTestId('daily-question')).toBeNull();
+    expect(screen.queryByTestId('daily-option-this')).toBeNull();
+    expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+    expect(screen.queryByTestId('daily-error')).toBeNull();
+  });
+
+  it('load fails with nothing shown: the error and Retry, which loads again', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
+    fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-error')).toHaveTextContent('The server is down');
+    expect(screen.queryByTestId('daily-question')).toBeNull();
+    await user.click(screen.getByTestId('daily-retry'));
+
+    expect(await screen.findByTestId('daily-question')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-error')).toBeNull();
+  });
+
+  it('load fails after a snapshot: the snapshot stays and the error shows', async () => {
+    fetchDailyDay.mockResolvedValueOnce(ok(waitingSnapshot('this')));
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-waiting');
+    await act(() => useAppStore.getState().loadDailyDay());
+
+    expect(await screen.findByTestId('daily-error')).toHaveTextContent('The server is down');
+    expect(screen.getByTestId('daily-waiting')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Beach day');
+  });
+
+  it('offline send: shows the offline message and sends nothing', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-this'));
+    setOnline(false);
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(screen.getByTestId('daily-send-error')).toHaveTextContent(
+      'You are offline. Your pick needs a connection to send.'
+    );
+    expect(submitDailyPickRequest).not.toHaveBeenCalled();
+    expect(screen.getByTestId('daily-option-this')).toBeInTheDocument();
+  });
+
+  it('a failed send shows the error and keeps the options', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    const failure = new AccountDataError('transport', 'Could not reach the server');
+    submitDailyPickRequest.mockRejectedValue(failure);
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-this'));
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(await screen.findByTestId('daily-send-error')).toHaveTextContent('Could not reach the server');
+    expect(console.error).toHaveBeenCalledWith('[DailyQuestion] Could not send the pick:', failure);
+    expect(screen.getByTestId('daily-send-pick')).toBeEnabled();
+  });
+
+  it('while a pick is sending, both options and Send are disabled', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    let settle: (value: unknown) => void = () => {};
+    submitDailyPickRequest.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-this'));
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(screen.getByTestId('daily-send-pick')).toBeDisabled();
+    expect(screen.getByTestId('daily-option-this')).toBeDisabled();
+    expect(screen.getByTestId('daily-option-that')).toBeDisabled();
+    await user.click(screen.getByTestId('daily-send-pick'));
+    expect(submitDailyPickRequest).toHaveBeenCalledTimes(1);
+
+    await act(async () => settle(waitingSnapshot('this')));
+    expect(await screen.findByTestId('daily-waiting')).toBeInTheDocument();
+  });
+
+  it('Retry is disabled while its load is open', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
+    let settle: (value: unknown) => void = () => {};
+    fetchDailyDay.mockReturnValueOnce(new Promise((resolve) => (settle = resolve)));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-retry'));
+
+    expect(screen.getByTestId('daily-retry')).toBeDisabled();
+    await act(async () => settle(ok(dailySnapshot())));
+    expect(await screen.findByTestId('daily-question')).toBeInTheDocument();
+  });
+
+  it('an account switch while the view is open loads the new account\'s day', async () => {
+    fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+    fetchDailyDay.mockResolvedValueOnce(
+      ok(dailySnapshot({ day_id: 'c-day', question: { this: 'Tea', that: 'Coffee' } }))
+    );
+
+    render(<DailyQuestion />);
+    expect(await screen.findByTestId('daily-question')).toHaveTextContent(
+      'Beach day or Mountain day?'
+    );
+    act(() => useAppStore.getState().setAuthUser('USER-C-ID'));
+
+    expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('daily-loading')).toBeNull();
+  });
+});

@@ -42,7 +42,7 @@ const DEPLOYED_BASE = '/';
 const SUBPATH_BASE = '/My-Love/';
 
 /** Every route the app can be on, from `navigationSlice`'s own pathMap. */
-const ROUTES = ['/', '/photos', '/mood', '/partner', '/notes', '/settings'];
+const ROUTES = ['/', '/photos', '/mood', '/partner', '/daily', '/notes', '/settings'];
 
 describe('base path composition and stripping', () => {
   beforeAll(async () => {

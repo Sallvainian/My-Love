@@ -5,6 +5,7 @@ import { SettingsSchema } from '../validation/schemas';
 import { createAppSlice } from './slices/appSlice';
 import { ACCOUNT_OWNER_STORAGE_KEY, createAuthSlice } from './slices/authSlice';
 import { createDatesSlice } from './slices/datesSlice';
+import { createDailyQuestionSlice } from './slices/dailyQuestionSlice';
 import { createEventsSlice } from './slices/eventsSlice';
 import { createInteractionsSlice } from './slices/interactionsSlice';
 import { createMessagesSlice } from './slices/messagesSlice';
@@ -149,6 +150,7 @@ export const useAppStore = create<AppState>()(
       ...createPartnerSlice(set, get, api),
       ...createNotesSlice(set, get, api),
       ...createEventsSlice(set, get, api),
+      ...createDailyQuestionSlice(set, get, api),
     }),
     {
       name: 'my-love-storage',

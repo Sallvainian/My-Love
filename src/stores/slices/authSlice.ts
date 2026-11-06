@@ -248,6 +248,12 @@ export function signedOutState() {
     pushPreferences: null,
     pushPreferencesLoadFailed: false,
 
+    // dailyQuestionSlice — the couple's question and the picks the gate released
+    // to the outgoing account; the loading flag and error go with them.
+    dailyDay: null,
+    dailyDayLoading: false,
+    dailyDayError: null,
+
     // navigationSlice — not account state, but a page pushed in the outgoing
     // session is not one the next sign-in just opened: left set, that page
     // would mount after sign-in as a fresh push, with the slide and focus move.

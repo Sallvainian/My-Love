@@ -4039,4 +4039,13 @@ location: tests/support/factories/daily-question.ts; supabase/migrations/2026110
 source_spec: `tickets/epic-daily-question/tickets/story-the-server-assigns-today-s-question-and-releases-a-pick-s-ch-plan.md`
 severity: medium
 reason: Coach rows have a null pair (daily_questions_coach_or_written), so a question one worker inserts is drawn by every worker's pair. clearPairDays deletes only the worker pair's couple_days rows. couple_days.question_id is NO ACTION, so deleting a test coach row raises 23503 while another worker's day still asks it. The row audit cannot see coach rows, which have no user column. Story 12's ticket says "Tests insert their own questions", so its specs meet this under parallel workers and burn-in: flaky question text or a failing teardown. The intent hands test-pool seeding to story 12, so this story ships no seeding helper.
+resolution: `tests/support/factories/daily-question.ts` now exports `ensureTestCoachQuestions(supabaseAdmin)`, which upserts three fixed-uuid coach rows with `ignoreDuplicates` and never deletes them, so no teardown meets the NO ACTION 23503 and every worker's pair draws from the same idempotent pool; a spec asserts that its pages agree with the question read through the admin client (`readPairQuestionTexts`), never a specific text. Used by `tests/e2e/daily/daily-question-pick-and-reveal.spec.ts` (story 6.12), which passed twice in a row on a local stack.
+status: done 2026-11-05
+
+### DW-462: AGENTS.md says useAppStore.ts composes 14 slices; with dailyQuestionSlice it composes 15.
+origin: spec-deferred a1bf1d8a5ceb
+location: AGENTS.md:26
+source_spec: `tickets/epic-daily-question/tickets/story-both-partners-pick-today-s-question-and-see-the-reveal-plan.md`
+severity: low
+reason: `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15 after this change; AGENTS.md line 26 still reads "composes 14 slices". The fix edits an agent-context file, so it is deferred rather than patched.
 status: open
