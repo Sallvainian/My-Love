@@ -15,8 +15,6 @@ export type DailyChoice = z.infer<typeof DailyChoiceSchema>;
 /** `none` < `me` / `partner` < `both`: how far a day has got. */
 export const DailyStateSchema = z.enum(['none', 'me', 'partner', 'both']);
 
-export type DailyState = z.infer<typeof DailyStateSchema>;
-
 export const DailyDaySnapshotSchema = z.object({
   day_id: z.string().min(1),
   day: z.string().min(1),
