@@ -1,11 +1,12 @@
 /**
- * The re-plan for date reminders and its triggers (stories 4.1, 4.2, 4.3 and
- * 4.6): a real store, real local copies of the five date kinds, the countdown
- * marks and the push switches (the "Date reminders" switch) in fake-indexeddb,
- * and the
- * Capacitor plugin mocked. The sign-out cancel is stubbed here (a switch of
- * account in these cases would otherwise call the plugin); its own cases are in
- * `signOutCancelsDateReminders.test.ts` and `dateReminders.test.ts`.
+ * The re-plan for date reminders (stories 4.1, 4.2, 4.3 and 4.6): the launch
+ * re-plan, which copies it reads, the "Date reminders" switch, single-flight
+ * runs and the launch refresh. A real store, real local copies of the five date
+ * kinds, the countdown marks and the push switches in fake-indexeddb, and the
+ * Capacitor plugin mocked. The triggers that start a re-plan are in
+ * `dateRemindersAtLaunch.triggers.test.ts`. The sign-out cancel is stubbed here
+ * (a switch of account in these cases would otherwise call the plugin); its own
+ * cases are in `signOutCancelsDateReminders.test.ts` and `dateReminders.schedule.test.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
@@ -76,24 +77,13 @@ vi.mock('../../../src/services/localCopy', async (importOriginal) => {
 });
 
 import { Capacitor } from '@capacitor/core';
-import { AUTH_STORAGE_KEY } from '../../../src/api/authStorage';
-import { partnerService } from '../../../src/api/partnerService';
 import {
-  DATE_COPY_REFRESH_INTERVAL_MS,
   replanDateReminders,
   scheduleDateRemindersAtLaunch,
   startDateReminderTriggers,
 } from '../../../src/services/dateRemindersAtLaunch';
-import { MAX_SCHEDULED_REMINDERS } from '../../../src/services/dateReminders';
-import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesService';
-import { anniversariesService } from '../../../src/services/anniversariesService';
-import {
-  refreshLocalCopies,
-  refreshLocalCopy,
-  registerLocalCopy,
-  writeLocalCopy,
-} from '../../../src/services/localCopy';
+import { refreshLocalCopies, registerLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { EVENTS_COPY_KIND } from '../../../src/stores/slices/eventsSlice';
 import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import {
@@ -105,136 +95,29 @@ import { PUSH_PREFERENCES_COPY_KIND } from '../../../src/stores/slices/notificat
 import { PROFILE_COPY_KIND } from '../../../src/stores/slices/profileSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { deferred, setOnline, type StoreState } from './accountDataFixtures';
+import {
+  A,
+  B,
+  NOW,
+  state,
+  owner,
+  clearCopies,
+  savedEvent,
+  DATE_KINDS,
+  seedCopies,
+  seedOneOfEachKind,
+  scheduleReaders,
+  spyOnRefreshers,
+  settleMs,
+  ALL_REMINDER_IDS,
+} from './dateRemindersAtLaunchFixture';
 
-const A = 'USER-A-ID';
-const B = 'USER-B-ID';
-const P = 'PARTNER-ID';
-
-// Vitest runs with TZ=America/New_York; local time throughout.
-const NOW = new Date(2026, 10, 1, 10, 0); // Sun 1 Nov 2026, 10:00
-
-function state() {
-  return useAppStore.getState();
-}
-
-/** The identity of the start the store is on now, as App captures it. */
-function owner() {
-  return { userId: state().userId!, authSessionVersion: state().authSessionVersion };
-}
-
-async function clearCopies(): Promise<void> {
-  const db = await openMyLoveDB();
-  try {
-    await db.clear('local-copies');
-  } finally {
-    db.close();
-  }
-}
-
-function savedEvent(label: string, date: string) {
-  return {
-    id: `event-${label}`,
-    userId: A,
-    label,
-    date,
-    createdAt: '2026-10-01T12:00:00.000Z',
-    description: null,
-    icon: 'calendar',
-  };
-}
-
-const DATE_KINDS = [
-  EVENTS_COPY_KIND,
-  ANNIVERSARIES_COPY_KIND,
-  COUPLE_SETTINGS_COPY_KIND,
-  PROFILE_COPY_KIND,
-  PARTNER_COPY_KIND,
-  REMINDERS_OFF_COPY_KIND,
-  PUSH_PREFERENCES_COPY_KIND,
-] as const;
-
-function partnerInfo(birthday: string | null = '1995-11-09') {
-  return {
-    id: P,
-    email: 'jessie@test.example.com',
-    displayName: 'Jessie',
-    linkedSince: null,
-    birthday,
-  };
-}
-
-/** One date of each kind, 3 to 8 days ahead of `NOW`, as the saved copies; no Remind me is off and the Date reminders switch is on. */
-function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
-  return {
-    [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04')],
-    [ANNIVERSARIES_COPY_KIND]: [{ id: 1, date: '2021-11-05', label: 'Dinner' }],
-    [COUPLE_SETTINGS_COPY_KIND]: {
-      status: 'linked',
-      partnerId: P,
-      relationshipStart: new Date(2018, 10, 6, 20, 0).toISOString(),
-      weddingDate: '2026-11-07',
-    },
-    [PROFILE_COPY_KIND]: { displayName: null, birthday: '1996-11-08' },
-    [PARTNER_COPY_KIND]: { status: 'linked', partner: partnerInfo() },
-    [REMINDERS_OFF_COPY_KIND]: [],
-    [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON },
-  };
-}
-
-/** Writes the copies for A; `overrides` replaces a kind's value, `omit` leaves a kind unsaved. */
-async function seedCopies(
-  overrides: Partial<Record<(typeof DATE_KINDS)[number], unknown>> = {},
-  omit: readonly string[] = []
-): Promise<void> {
-  const copies = { ...defaultCopies(), ...overrides };
-  for (const kind of DATE_KINDS) {
-    if (!omit.includes(kind)) await writeLocalCopy(A, kind, copies[kind]);
-  }
-}
-
-const seedOneOfEachKind = () => seedCopies();
-
-/** The scheduled notifications as `title @ month/day hour:minute`. */
-function scheduledTitles(): string[] {
-  expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
-  return titlesOfSchedule(0);
-}
-
-/** The `call`th schedule (0-based) as `title @ month/day hour:minute`, for runs that schedule more than once. */
-function titlesOfSchedule(call: number): string[] {
-  const [options] = localNotifications.schedule.mock.calls[call];
-  return options.notifications.map((n) => {
-    const on = (n.schedule as { on: { month: number; day: number; hour: number; minute: number } }).on;
-    return `${n.title} @ ${on.month}/${on.day} ${on.hour}:${String(on.minute).padStart(2, '0')}`;
-  });
-}
-
-/** Replaces the seven date kinds' refreshers with spies that resolve at once; `hold` makes them wait on it. */
-function spyOnRefreshers(hold?: Promise<void>) {
-  const spies = new Map(
-    DATE_KINDS.map((kind) => [kind, vi.fn((): Promise<void> => hold ?? Promise.resolve())] as const)
-  );
-  for (const [kind, spy] of spies) registerLocalCopy(kind, spy);
-  return {
-    spies,
-    /** How many of the seven kinds have refreshed at least once. */
-    kindsRefreshed: () => [...spies.values()].filter((spy) => spy.mock.calls.length > 0).length,
-    /** The most calls any one kind's refresher has had. */
-    timesRefreshed: () => Math.max(...[...spies.values()].map((spy) => spy.mock.calls.length)),
-  };
-}
+const { scheduledTitles } = scheduleReaders(localNotifications.schedule);
 
 /** Puts the store's own refreshers back. */
 function restoreRefreshers() {
   for (const kind of DATE_KINDS) registerLocalCopy(kind, realRefreshers.get(kind)!);
 }
-
-/** Delivers an auth event to every live supabase auth listener, as auth-js does. */
-function emitAuth(event: string, userId: string | null) {
-  for (const listener of [...authEvents.listeners]) listener(event, userId ? { user: { id: userId } } : null);
-}
-
-const settleMs = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -263,9 +146,6 @@ afterEach(async () => {
   vi.restoreAllMocks();
   await clearCopies();
 });
-
-/** Every id a date reminder can hold: what each re-plan cancels. */
-const ALL_REMINDER_IDS = Array.from({ length: MAX_SCHEDULED_REMINDERS }, (_, i) => ({ id: i + 1 }));
 
 describe('scheduleDateRemindersAtLaunch', () => {
   it('schedules one date of each kind from the five saved copies, not the store', async () => {
@@ -665,7 +545,8 @@ describe('the Date reminders switch', () => {
       expect(scheduledTitles()).toContain('Today: Wedding day @ 11/7 9:00');
     } finally {
       stop();
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      // Resolves once the run the last write started, and a follow-up, have finished.
+      await replanDateReminders();
     }
   });
 });
@@ -743,515 +624,6 @@ describe('replanDateReminders is single-flight', () => {
     await Promise.all([firstRun, followUp, stale]);
 
     expect(localNotifications.schedule).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('startDateReminderTriggers', () => {
-  let stop: () => void = () => {};
-
-  /** Waits for `count` schedules, since a trigger starts its run without returning it. */
-  async function scheduledTimes(count: number) {
-    await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalledTimes(count));
-  }
-
-  /** Lets a trigger that should do nothing have its chance. */
-  async function settle() {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-
-  function setVisibility(value: 'visible' | 'hidden') {
-    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(value);
-    document.dispatchEvent(new Event('visibilitychange'));
-  }
-
-  // The seven refreshers are spies, so a foreground return or a token renewal
-  // reads nothing from the server and each refresh is counted.
-  let refreshers: ReturnType<typeof spyOnRefreshers>;
-
-  beforeEach(async () => {
-    await seedOneOfEachKind();
-    refreshers = spyOnRefreshers();
-    stop = startDateReminderTriggers();
-  });
-
-  afterEach(async () => {
-    stop();
-    await settle();
-    restoreRefreshers();
-  });
-
-  it('re-plans when the app returns to the foreground, and not when it is hidden', async () => {
-    setVisibility('hidden');
-    await settle();
-    expect(localNotifications.getPending).not.toHaveBeenCalled();
-    expect(refreshers.kindsRefreshed()).toBe(0);
-
-    setVisibility('visible');
-    // The re-plan from the copies, then the re-plan after the refresh.
-    await scheduledTimes(2);
-
-    expect(localNotifications.getPending).toHaveBeenCalledTimes(2);
-    expect(titlesOfSchedule(0)).toContain('Today: Wedding day @ 11/7 9:00');
-    expect(titlesOfSchedule(1)).toContain('Today: Wedding day @ 11/7 9:00');
-  });
-
-  it('re-plans on every return to the foreground, offline, from the copies and not the server', async () => {
-    setOnline(false);
-    const getPartner = vi.spyOn(partnerService, 'getPartner');
-    const fetchAnniversaries = vi.spyOn(anniversariesService, 'fetchAnniversaries');
-    setVisibility('visible');
-    await scheduledTimes(1);
-    setVisibility('visible');
-    await scheduledTimes(2);
-    await settle();
-
-    expect(localNotifications.getPending).toHaveBeenCalledTimes(2);
-    expect(localNotifications.schedule).toHaveBeenCalledTimes(2);
-    expect(refreshers.kindsRefreshed()).toBe(0);
-    expect(getPartner).not.toHaveBeenCalled();
-    expect(fetchAnniversaries).not.toHaveBeenCalled();
-  });
-
-  it('re-plans with an own edit: a real addAnniversary writes its copy and the plan includes it', async () => {
-    vi.spyOn(anniversariesService, 'createAnniversary').mockResolvedValue({
-      serverId: 'ann-new',
-      userId: A,
-      date: '2022-11-04',
-      label: 'Picnic',
-    });
-    await useAppStore.getState().addAnniversary({ date: '2022-11-04', label: 'Picnic' });
-    await scheduledTimes(1);
-
-    expect(scheduledTitles()).toEqual(
-      expect.arrayContaining(['Tomorrow: Picnic @ 11/3 9:00', 'Today: Picnic @ 11/4 9:00'])
-    );
-  });
-
-  it("re-plans with a partner's change: a refresh writes the partner copy", async () => {
-    restoreRefreshers();
-    vi.spyOn(partnerService, 'getPartner').mockResolvedValue({
-      status: 'linked',
-      partner: partnerInfo('1995-11-12'),
-    });
-
-    await refreshLocalCopy(PARTNER_COPY_KIND);
-    await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalled());
-
-    expect(scheduledTitles()).toContain('Today: Jessie turns 31 @ 11/12 9:00');
-    expect(scheduledTitles()).not.toContain('Today: Jessie turns 31 @ 11/9 9:00');
-  });
-
-  it.each(DATE_KINDS)('re-plans when the %s copy is written', async (kind) => {
-    await writeLocalCopy(A, kind, defaultCopies()[kind]);
-    await scheduledTimes(1);
-  });
-
-  it('re-plans with a reminders-off copy write: switching a far date off drops its month and week reminders', async () => {
-    await writeLocalCopy(A, EVENTS_COPY_KIND, [savedEvent('Far', '2026-12-11')]);
-    await scheduledTimes(1);
-    expect(scheduledTitles()).toEqual(
-      expect.arrayContaining(['In a month: Far @ 11/11 9:00', 'In a week: Far @ 12/4 9:00'])
-    );
-
-    await writeLocalCopy(A, REMINDERS_OFF_COPY_KIND, ['event:event-Far']);
-    await scheduledTimes(2);
-
-    const titles = localNotifications.schedule.mock.calls[1][0].notifications.map((n) => n.title);
-    expect(titles).toContain('Tomorrow: Far');
-    expect(titles.filter((title) => title.startsWith('In a') && title.endsWith('Far'))).toEqual([]);
-  });
-
-  it('does not re-plan for a kind that holds no date', async () => {
-    await writeLocalCopy(A, 'love-notes', []);
-    await writeLocalCopy(A, 'interactions', []);
-    await settle();
-
-    expect(localNotifications.getPending).not.toHaveBeenCalled();
-  });
-
-  it('does not re-plan for a copy written for another account', async () => {
-    await writeLocalCopy(B, EVENTS_COPY_KIND, []);
-    await settle();
-
-    expect(localNotifications.getPending).not.toHaveBeenCalled();
-    expect(localNotifications.schedule).not.toHaveBeenCalled();
-  });
-
-  it('does nothing once stopped', async () => {
-    stop();
-
-    setVisibility('visible');
-    await writeLocalCopy(A, EVENTS_COPY_KIND, defaultCopies()[EVENTS_COPY_KIND]);
-    await settle();
-
-    expect(localNotifications.getPending).not.toHaveBeenCalled();
-    expect(localNotifications.schedule).not.toHaveBeenCalled();
-  });
-
-  it('a throwing plugin call is logged and the next trigger still runs', async () => {
-    setOnline(false);
-    const failure = new Error('bridge gone');
-    localNotifications.getPending.mockRejectedValueOnce(failure);
-
-    setVisibility('visible');
-    await vi.waitFor(() =>
-      expect(console.error).toHaveBeenCalledWith(
-        '[DateReminders] Could not schedule the date reminders:',
-        failure
-      )
-    );
-    setVisibility('visible');
-    await scheduledTimes(1);
-  });
-});
-
-describe('startDateReminderTriggers off native', () => {
-  it.each([
-    ['on the web', () => vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(false)],
-    [
-      'in a shell without the plugin',
-      () => vi.spyOn(Capacitor, 'isPluginAvailable').mockReturnValue(false),
-    ],
-  ])('adds no listener and plans nothing %s', async (_name, arrange) => {
-    await seedOneOfEachKind();
-    arrange();
-    const addListener = vi.spyOn(document, 'addEventListener');
-    const { spies, kindsRefreshed } = spyOnRefreshers();
-    readLocalCopySpy.mockClear();
-
-    const stop = startDateReminderTriggers();
-    document.dispatchEvent(new Event('visibilitychange'));
-    emitAuth('TOKEN_REFRESHED', A);
-    await writeLocalCopy(A, EVENTS_COPY_KIND, []);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    stop();
-    restoreRefreshers();
-
-    expect(spies.size).toBe(DATE_KINDS.length);
-    expect(kindsRefreshed()).toBe(0);
-    expect(authEvents.subscribed.count).toBe(0);
-    expect(addListener).not.toHaveBeenCalledWith('visibilitychange', expect.any(Function));
-    expect(readLocalCopySpy).not.toHaveBeenCalled();
-    expect(localNotifications.getPending).not.toHaveBeenCalled();
-  });
-});
-
-describe('the date copies refresh on a foreground return and a token renewal', () => {
-  let stop: () => void = () => {};
-  let held: ReturnType<typeof deferred<void>> | null = null;
-  let refreshers: ReturnType<typeof spyOnRefreshers>;
-
-  const scheduledTimes = (count: number) =>
-    vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalledTimes(count));
-
-  function setVisible() {
-    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
-    document.dispatchEvent(new Event('visibilitychange'));
-  }
-
-  /** Starts the triggers with refreshers that wait on `gate` when given. */
-  async function start(gate?: ReturnType<typeof deferred<void>>) {
-    held = gate ?? null;
-    await seedOneOfEachKind();
-    refreshers = spyOnRefreshers(gate?.promise);
-    stop = startDateReminderTriggers();
-  }
-
-  afterEach(async () => {
-    held?.settle();
-    stop();
-    await settleMs();
-    restoreRefreshers();
-    stop = () => {};
-  });
-
-  it('plans from the copies at once, refreshes all seven kinds, then plans again', async () => {
-    await start(deferred<void>());
-
-    setVisible();
-    await scheduledTimes(1);
-    await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-    // The refresh is still held and the plan did not wait for it.
-    expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
-
-    held!.settle();
-    await scheduledTimes(2);
-    expect(refreshers.timesRefreshed()).toBe(1);
-  });
-
-  it('refreshes only the seven date kinds', async () => {
-    await start();
-    const other = vi.fn(() => Promise.resolve());
-    registerLocalCopy('love-notes', other);
-    try {
-      setVisible();
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await settleMs();
-    } finally {
-      // Put the store's own refresher back; unregistering would delete the kind for later tests.
-      registerLocalCopy('love-notes', realRefreshers.get('love-notes')!);
-    }
-    expect(other).not.toHaveBeenCalled();
-  });
-
-  it('runs no refresher on a second foreground return within 5 minutes, but still plans from the copies', async () => {
-    await start();
-    setVisible();
-    await scheduledTimes(2);
-
-    vi.setSystemTime(new Date(NOW.getTime() + DATE_COPY_REFRESH_INTERVAL_MS - 1));
-    setVisible();
-    await scheduledTimes(3);
-    await settleMs();
-
-    expect(localNotifications.schedule).toHaveBeenCalledTimes(3);
-    expect(refreshers.timesRefreshed()).toBe(1);
-  });
-
-  it('treats a clock moved back before the last refresh as elapsed', async () => {
-    await start();
-    setVisible();
-    await scheduledTimes(2);
-    expect(refreshers.timesRefreshed()).toBe(1);
-
-    vi.setSystemTime(new Date(NOW.getTime() - 60_000));
-    setVisible();
-
-    await vi.waitFor(() => expect(refreshers.timesRefreshed()).toBe(2));
-  });
-
-  it('refreshes again once 5 minutes have passed', async () => {
-    await start();
-    setVisible();
-    await scheduledTimes(2);
-
-    vi.setSystemTime(new Date(NOW.getTime() + DATE_COPY_REFRESH_INTERVAL_MS));
-    setVisible();
-    await vi.waitFor(() => expect(refreshers.timesRefreshed()).toBe(2));
-    await scheduledTimes(4);
-  });
-
-  it.each([
-    ['another account', () => state().setAuthUser(B)],
-    [
-      'the same account signed in again',
-      () => useAppStore.setState({ authSessionVersion: state().authSessionVersion + 1 } as StoreState),
-    ],
-  ])('does not throttle a different identity: %s', async (_name, switchIdentity) => {
-    await start();
-    setVisible();
-    await vi.waitFor(() => expect(refreshers.timesRefreshed()).toBe(1));
-    await settleMs();
-
-    switchIdentity();
-    setVisible();
-
-    await vi.waitFor(() => expect(refreshers.timesRefreshed()).toBe(2));
-  });
-
-  it('offline: plans from the copies, runs no refresher and does not stamp the throttle; the next online return refreshes', async () => {
-    await start();
-    setOnline(false);
-    setVisible();
-    await scheduledTimes(1);
-    setVisible();
-    await scheduledTimes(2);
-    await settleMs();
-    expect(refreshers.kindsRefreshed()).toBe(0);
-
-    setOnline(true);
-    setVisible();
-
-    await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-    await scheduledTimes(4);
-  });
-
-  it('does not refresh when signed out', async () => {
-    await start();
-    state().clearAuth();
-
-    setVisible();
-    await settleMs();
-
-    expect(refreshers.kindsRefreshed()).toBe(0);
-  });
-
-  it('plans again from the refreshed copies: a date the refresh wrote reaches the reminders', async () => {
-    await start();
-    // The partner kind's refresher answers with a new birthday, as a server read would.
-    const partnerRefresher = refreshers.spies.get(PARTNER_COPY_KIND)!;
-    partnerRefresher.mockImplementation(() =>
-      writeLocalCopy(A, PARTNER_COPY_KIND, { status: 'linked', partner: partnerInfo('1995-11-12') })
-    );
-
-    setVisible();
-
-    await vi.waitFor(() => {
-      const last = localNotifications.schedule.mock.calls.length - 1;
-      expect(last).toBeGreaterThanOrEqual(1);
-      expect(titlesOfSchedule(last)).toContain('Today: Jessie turns 31 @ 11/12 9:00');
-    });
-    expect(titlesOfSchedule(0)).toContain('Today: Jessie turns 31 @ 11/9 9:00');
-  });
-
-  it('does nothing after the refresh for an owner the store has left', async () => {
-    await start(deferred<void>());
-    setVisible();
-    await scheduledTimes(1);
-    await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-
-    state().setAuthUser(B);
-    held!.settle();
-    await settleMs();
-
-    expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
-    expect(localNotifications.getPending).toHaveBeenCalledTimes(1);
-  });
-
-  describe('the stored access token at a foreground return', () => {
-    /** Stores a session whose access token expires `inMs` from the (faked) now; `null` leaves out `expires_at`. */
-    function storeSession(inMs: number | null) {
-      localStorage.setItem(
-        AUTH_STORAGE_KEY,
-        JSON.stringify({
-          access_token: 'access',
-          refresh_token: 'refresh',
-          user: { id: A },
-          ...(inMs === null ? {} : { expires_at: Math.floor((Date.now() + inMs) / 1000) }),
-        })
-      );
-    }
-
-    afterEach(() => {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    });
-
-    it.each([
-      ['has expired', -60_000],
-      ['expires within 90 s', 60_000],
-    ])('re-plans from the copies and runs no refresher when the token %s; the TOKEN_REFRESHED that follows refreshes', async (_name, inMs) => {
-      await start();
-      storeSession(inMs);
-
-      setVisible();
-      await scheduledTimes(1);
-      await settleMs();
-      expect(refreshers.kindsRefreshed()).toBe(0);
-
-      // Nothing was stamped, so the renewal's own event is not throttled out.
-      emitAuth('TOKEN_REFRESHED', A);
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await scheduledTimes(2);
-    });
-
-    it.each([
-      ['a fresh stored token', 10 * 60_000],
-      ['a stored token with no expires_at', null],
-    ])('refreshes as before with %s', async (_name, inMs) => {
-      await start();
-      storeSession(inMs);
-
-      setVisible();
-
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await scheduledTimes(2);
-    });
-
-    it('refreshes as before with no stored session', async () => {
-      await start();
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-
-      setVisible();
-
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-    });
-  });
-
-  describe('TOKEN_REFRESHED', () => {
-    it('refreshes the seven kinds on the next task, then plans', async () => {
-      await start();
-
-      emitAuth('TOKEN_REFRESHED', A);
-      // The listener only defers: nothing ran inside it.
-      expect(refreshers.kindsRefreshed()).toBe(0);
-
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await scheduledTimes(1);
-      expect(refreshers.timesRefreshed()).toBe(1);
-    });
-
-    it('is throttled with the foreground refresh', async () => {
-      await start();
-      setVisible();
-      await scheduledTimes(2);
-
-      emitAuth('TOKEN_REFRESHED', A);
-      await settleMs();
-      expect(refreshers.timesRefreshed()).toBe(1);
-
-      vi.setSystemTime(new Date(NOW.getTime() + DATE_COPY_REFRESH_INTERVAL_MS));
-      emitAuth('TOKEN_REFRESHED', A);
-      await vi.waitFor(() => expect(refreshers.timesRefreshed()).toBe(2));
-    });
-
-    it('refreshes once for a burst of renewals', async () => {
-      await start();
-
-      emitAuth('TOKEN_REFRESHED', A);
-      emitAuth('TOKEN_REFRESHED', A);
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await settleMs();
-
-      expect(refreshers.timesRefreshed()).toBe(1);
-    });
-
-    it.each([
-      ['another user', 'TOKEN_REFRESHED', B],
-      ['a sign-in', 'SIGNED_IN', A],
-      ['a sign-out', 'SIGNED_OUT', null],
-      ['a user update', 'USER_UPDATED', A],
-      ['a token renewal with no session', 'TOKEN_REFRESHED', null],
-    ] as const)('does nothing for %s', async (_name, event, userId) => {
-      await start();
-
-      emitAuth(event, userId);
-      await settleMs();
-
-      expect(refreshers.kindsRefreshed()).toBe(0);
-      expect(localNotifications.schedule).not.toHaveBeenCalled();
-    });
-
-    it('does nothing offline', async () => {
-      await start();
-      setOnline(false);
-
-      emitAuth('TOKEN_REFRESHED', A);
-      await settleMs();
-
-      expect(refreshers.kindsRefreshed()).toBe(0);
-    });
-
-    it('does nothing after stop, and drops its auth subscription', async () => {
-      await start();
-      expect(authEvents.listeners.size).toBe(1);
-
-      stop();
-      expect(authEvents.listeners.size).toBe(0);
-      emitAuth('TOKEN_REFRESHED', A);
-      await settleMs();
-
-      expect(refreshers.kindsRefreshed()).toBe(0);
-    });
-
-    it('does nothing when stopped before the deferred refresh runs', async () => {
-      await start();
-
-      emitAuth('TOKEN_REFRESHED', A);
-      stop();
-      await settleMs();
-
-      expect(refreshers.kindsRefreshed()).toBe(0);
-    });
   });
 });
 

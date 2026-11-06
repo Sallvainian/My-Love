@@ -17,6 +17,20 @@ vi.mock('../../../src/api/supabaseClient', () => ({
   isSeedFallbackName: () => false,
 }));
 
+// Call-through spies on the sign-out deletes and cancel, so afterEach can wait for them.
+vi.mock('../../../src/services/localCopy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/localCopy')>();
+  return { ...actual, deleteAccountCopies: vi.fn(actual.deleteAccountCopies) };
+});
+vi.mock('../../../src/services/imageCache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/imageCache')>();
+  return { ...actual, deleteAccountImages: vi.fn(actual.deleteAccountImages) };
+});
+vi.mock('../../../src/services/dateReminders', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/dateReminders')>();
+  return { ...actual, cancelDateReminders: vi.fn(actual.cancelDateReminders) };
+});
+
 vi.mock('../../../src/services/pushPreferencesService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/services/pushPreferencesService')>()),
   pushPreferencesService: {
@@ -28,14 +42,22 @@ vi.mock('../../../src/services/pushPreferencesService', async (importOriginal) =
 import { Capacitor } from '@capacitor/core';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
-import { readLocalCopy, refreshLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
+import { cancelDateReminders } from '../../../src/services/dateReminders';
+import { deleteAccountImages } from '../../../src/services/imageCache';
+import {
+  deleteAccountCopies,
+  readLocalCopy,
+  refreshLocalCopy,
+  writeLocalCopy,
+} from '../../../src/services/localCopy';
+import { moodService } from '../../../src/services/moodService';
 import { ALL_PUSH_PREFERENCES_ON } from '../../../src/services/pushPreferencesService';
 import {
   PUSH_PREFERENCES_COPY_KIND,
   readSavedPushPreferences,
 } from '../../../src/stores/slices/notificationsSlice';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { deferred, setOnline } from './accountDataFixtures';
+import { accountDeletesSettled, deferred, setOnline } from './accountDataFixtures';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -62,6 +84,7 @@ beforeEach(async () => {
   vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true);
   vi.spyOn(Capacitor, 'isPluginAvailable').mockReturnValue(true);
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(moodService, 'deleteSyncedForUser');
   setOnline(true);
   state().clearAuth();
   state().setAuthUser(A);
@@ -71,7 +94,12 @@ beforeEach(async () => {
 
 afterEach(async () => {
   // Lets the sign-out deletes a test started finish before the file can end.
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  await accountDeletesSettled(
+    vi.mocked(deleteAccountCopies),
+    vi.mocked(deleteAccountImages),
+    vi.mocked(moodService.deleteSyncedForUser),
+    vi.mocked(cancelDateReminders)
+  );
   vi.restoreAllMocks();
   await clearCopies();
 });

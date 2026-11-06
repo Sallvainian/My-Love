@@ -7,7 +7,7 @@
  * lookup failed on a stored session the SDK could not use.
  */
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const lookupPartnerId = vi.fn();
 
@@ -66,12 +66,31 @@ describe('MoodTracker partner card after a link', () => {
     authListener = null;
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * Fakes only the timer the component defers its renewal lookup with, so the
+   * test can run it at once; Testing Library's `waitFor` needs real timers, so
+   * they are restored before the caller asserts.
+   */
+  function fakeRenewalTimer() {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  }
+
   /** Fires an auth event as auth-js would, then lets the deferred lookup run. */
   async function emit(event: string, userId: string) {
-    await act(async () => {
-      authListener!(event, { user: { id: userId } });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    fakeRenewalTimer();
+    try {
+      await act(async () => {
+        authListener!(event, { user: { id: userId } });
+        await vi.runOnlyPendingTimersAsync();
+        await lookupPartnerId.mock.results.at(-1)?.value;
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   }
 
   it('looks the partner up again when the store learns of one', async () => {
@@ -153,13 +172,17 @@ describe('MoodTracker partner card after a link', () => {
     await waitFor(() => expect(lookupPartnerId).toHaveBeenCalledTimes(1));
 
     // The renewal's lookup is deferred to the next task; unmount before it runs.
+    fakeRenewalTimer();
     act(() => authListener!('TOKEN_REFRESHED', { user: { id: 'USER-A-ID' } }));
+    expect(vi.getTimerCount()).toBe(1);
     unmount();
 
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await vi.runOnlyPendingTimersAsync();
     });
+    vi.useRealTimers();
     expect(lookupPartnerId).toHaveBeenCalledTimes(1);
   });
 
@@ -170,11 +193,14 @@ describe('MoodTracker partner card after a link', () => {
     const listener = authListener!;
 
     unmount();
+    fakeRenewalTimer();
     act(() => listener('TOKEN_REFRESHED', { user: { id: 'USER-A-ID' } }));
 
+    expect(vi.getTimerCount()).toBe(0);
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await vi.runOnlyPendingTimersAsync();
     });
+    vi.useRealTimers();
     expect(lookupPartnerId).toHaveBeenCalledTimes(1);
   });
 

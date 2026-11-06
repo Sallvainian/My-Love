@@ -335,7 +335,12 @@ describe('checking again while the app is open', () => {
     return { updates, onVisibility, tick: tick as () => void, every };
   }
 
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  /**
+   * How many times `Date.now` (spied as `now`) was read. A check that starts
+   * reads it before its first await, so a refused one is seen at once: only
+   * the foreground handler's own gap test reads it then.
+   */
+  const reads = (now: { mock: { calls: unknown[] } }) => now.mock.calls.length;
 
   it('checks again on a return to the front, at most once a minute', async () => {
     const fetchMock = stubFetch({ ...LATEST, version: 'test-build' });
@@ -345,15 +350,15 @@ describe('checking again while the app is open', () => {
 
     // Back within a minute of the launch check: no second request.
     now.mockReturnValue(1_000_000 + 30_000);
+    const before = reads(now);
     onVisibility();
-    await settle();
+    expect(reads(now)).toBe(before + 1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     // A minute or more later: it asks again.
     now.mockReturnValue(1_000_000 + 61_000);
     onVisibility();
-    await settle();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     now.mockRestore();
   });
 
@@ -364,9 +369,8 @@ describe('checking again while the app is open', () => {
     expect(updates.CHECK_EVERY_MS).toBe(10 * 60 * 1000);
 
     tick();
-    await settle();
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
   it('finds a deploy made after launch and queues it, so the app need not be reopened', async () => {
@@ -389,10 +393,12 @@ describe('checking again while the app is open', () => {
     expect(updates.getUpdateStatus()).toEqual({ state: 'ready' });
 
     now.mockReturnValue(1_000_000 + 5 * 60_000);
+    const before = reads(now);
     onVisibility();
     tick();
-    await settle();
 
+    // Past the minute's gap, so only the queued build stops the check.
+    expect(reads(now)).toBe(before + 1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     now.mockRestore();
   });
