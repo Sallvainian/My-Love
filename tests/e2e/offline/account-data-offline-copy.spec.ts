@@ -91,11 +91,23 @@ test.describe('Account data from the local copy', () => {
     expect(insertError).toBeNull();
 
     // GIVEN: one online session loads the anniversary, which saves the copy.
-    const settingsRead = interceptNetworkCall({ method: 'GET', url: ANNIVERSARIES_READ });
+    // Waits for the read that carries it: Home also re-reads anniversaries when
+    // it opens, so a read from before the row existed, or one the navigation
+    // cancels, can still be in flight here.
+    const settingsRead = page.waitForResponse(
+      async (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes('/rest/v1/anniversaries') &&
+        response.status() === 200 &&
+        (await response.text()).includes(label)
+    );
     await page.goto('/settings/dates');
     const loaded = await settingsRead;
-    expect(loaded.status).toBe(200);
-    expect(loaded.responseJson).toEqual([expect.objectContaining({ label })]);
+    expect(loaded.status()).toBe(200);
+    // The read holds the partner's anniversaries too; this account's own rows
+    // were cleared above, so exactly one of them carries the label.
+    const rows = (await loaded.json()) as Array<{ user_id: string; label: string }>;
+    expect(rows.filter((row) => row.user_id === userId)).toEqual([expect.objectContaining({ label })]);
     await expect(anniversaryRow(page, label)).toBeVisible();
     await recurseUntil(
       () => savedAnniversaryLabels(page),

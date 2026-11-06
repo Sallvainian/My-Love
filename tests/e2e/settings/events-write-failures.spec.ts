@@ -24,10 +24,10 @@
  *   npx playwright test tests/e2e/settings/events-write-failures.spec.ts --project=chromium
  *
  * These tests close an observation gap the test design named at
- * `test-design-epic-5.md:355`: the real service messages —
- * `'Event not found or not yours to edit'` (src/services/eventsService.ts:413),
- * `'Event not found or not yours to delete'` (:466) and
- * `'You are offline. Events need a connection to save.'` (:305-308) — reach
+ * `test-design-epic-5.md:355`: the real service messages — a failed write's
+ * `[EventsService.updateEvent] Database error: TypeError: Failed to fetch` /
+ * `…deleteEvent…` (the PostgREST failure eventsService maps) and
+ * `'You are offline. Events need a connection to save.'` — reach
  * their Error boxes correctly today, but until this file nothing anywhere
  * observed them doing it. The component suites assert a synthetic string against
  * a mocked store; the concatenation from service through slice
@@ -86,12 +86,13 @@ test.afterEach(async ({ supabaseAdmin }) => {
 
 /**
  * No `skipNetworkMonitoring` on this describe, and that is deliberate rather
- * than an oversight. Both stubs answer **200**, because a zero-row body is
- * exactly what RLS produces for a non-creator's write — the service reads
- * `data.length === 0`, not a status (eventsService.ts:412-414, 465-467). The
- * network-error-monitor fixture only fails a test on a 4xx/5xx
- * (`tests/support/merged-fixtures.ts:31-41`), so there is nothing here to opt
- * out of, and leaving it armed keeps a genuine backend error visible.
+ * than an oversight. Both stubs abort the write in flight, so no 4xx/5xx is
+ * ever answered; the network-error-monitor fixture only fails a test on one
+ * (`tests/support/merged-fixtures.ts`), so there is nothing here to opt out
+ * of, and leaving it armed keeps a genuine backend error visible. (These used
+ * to answer zero rows, the shape a partner's write got through RLS; since both
+ * partners may edit every event, zero rows means the event is gone, which the
+ * "deleted elsewhere" describe covers.)
  */
 test.describe('A rejected events write shows its message (DE.5-E2E-002)', () => {
   test(
@@ -115,29 +116,32 @@ test.describe('A rejected events write shows its message (DE.5-E2E-002)', () => 
       const row = rowFor(page, EDIT_LABEL);
       await expect(row).toBeVisible();
 
-      // Declared before the Save is tapped, so the route is in place long
-      // before the PATCH leaves the page (network-first). `body: []` is the
-      // zero-row shape a partner's UPDATE gets back through RLS, which
-      // eventsService turns into EventWriteError at :412-414.
-      const rejectedEdit = interceptNetworkCall({
-        method: 'PATCH',
-        url: '**/rest/v1/events*',
-        fulfillResponse: { status: 200, body: [] },
+      // Declared before the Save is tapped, so the route is in place before the
+      // PATCH leaves the page (network-first). The request fails in flight, a
+      // write that genuinely did not land. (Zero rows no longer means rejected:
+      // since both partners may edit every event it means the event is gone,
+      // which the "deleted elsewhere" describe below covers.)
+      let markAborted: () => void = () => {};
+      const editAborted = new Promise<void>((resolve) => (markAborted = resolve));
+      await page.route('**/rest/v1/events*', async (route) => {
+        if (route.request().method() !== 'PATCH') return route.fallback();
+        await route.abort('failed');
+        markAborted();
       });
 
       await row.click();
       await page.getByTestId('settings-event-name').click();
       await expect(page.getByTestId('settings-event-name-field')).toHaveValue(EDIT_LABEL);
 
-      await log.step('Save an edit the server answers with zero rows');
+      await log.step('Save an edit whose request fails in flight');
       await page.getByTestId('settings-event-name-field').fill(EDIT_ATTEMPT_LABEL);
       await page.getByTestId('settings-field-save').click();
 
-      await rejectedEdit;
+      await editAborted;
 
       // The message the write itself returned, not a generic one.
       await expect(page.getByTestId('settings-field-error')).toContainText(
-        'Event not found or not yours to edit'
+        '[EventsService.updateEvent] Database error: TypeError: Failed to fetch'
       );
       // The field page stays, holding what was typed, with Save usable again.
       await expect(page.getByTestId('settings-event-name-page')).toBeVisible();
@@ -175,24 +179,26 @@ test.describe('A rejected events write shows its message (DE.5-E2E-002)', () => 
       const row = rowFor(page, DELETE_LABEL);
       await expect(row).toBeVisible();
 
-      // Same zero-row shape, on the DELETE this time — eventsService.ts:465-467.
-      const rejectedDelete = interceptNetworkCall({
-        method: 'DELETE',
-        url: '**/rest/v1/events*',
-        fulfillResponse: { status: 200, body: [] },
+      // The same in-flight failure, on the DELETE this time.
+      let markAborted: () => void = () => {};
+      const deleteAborted = new Promise<void>((resolve) => (markAborted = resolve));
+      await page.route('**/rest/v1/events*', async (route) => {
+        if (route.request().method() !== 'DELETE') return route.fallback();
+        await route.abort('failed');
+        markAborted();
       });
 
       await row.click();
       await page.getByTestId('settings-event-delete').click();
       await expect(page.getByTestId('settings-event-delete-confirmation')).toBeVisible();
 
-      await log.step('Confirm a delete the server answers with zero rows');
+      await log.step('Confirm a delete whose request fails in flight');
       await page.getByTestId('settings-event-delete-confirmation-confirm').click();
 
-      await rejectedDelete;
+      await deleteAborted;
 
       await expect(page.getByTestId('settings-date-error')).toContainText(
-        'Event not found or not yours to delete'
+        '[EventsService.deleteEvent] Database error: TypeError: Failed to fetch'
       );
       // The confirmation has closed and the event page stays, with Delete
       // usable again.
@@ -203,6 +209,69 @@ test.describe('A rejected events write shows its message (DE.5-E2E-002)', () => 
       // The row survives the rejection.
       await page.getByRole('button', { name: 'Back' }).click();
       await expect(rowFor(page, DELETE_LABEL)).toBeVisible();
+    }
+  );
+});
+
+test.describe('An event deleted elsewhere while its page is open', () => {
+  test(
+    '[P1] an edit of an event deleted elsewhere drops it and goes back to the Dates list',
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
+      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      await clearPairEvents(supabaseAdmin, userId, partnerId);
+      const id = await seedEvent(supabaseAdmin, {
+        userId: partnerId,
+        label: EDIT_LABEL,
+        eventDate: isoDateDaysFromNow(30, new Date()),
+        icon: 'calendar',
+      });
+
+      await openSettingsFromHome(page, interceptNetworkCall);
+      await openDatesList(page, interceptNetworkCall);
+      await rowFor(page, EDIT_LABEL).click();
+      await page.getByTestId('settings-event-name').click();
+      await expect(page.getByTestId('settings-event-name-field')).toHaveValue(EDIT_LABEL);
+
+      await log.step('The partner deletes it; this phone hears nothing');
+      await supabaseAdmin.from('events').delete().eq('id', id);
+
+      await log.step('Save an edit, which finds no row');
+      await page.getByTestId('settings-event-name-field').fill(EDIT_ATTEMPT_LABEL);
+      await page.getByTestId('settings-field-save').click();
+
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+      await expect(rowFor(page, EDIT_LABEL)).toHaveCount(0);
+      await expect(rowFor(page, EDIT_ATTEMPT_LABEL)).toHaveCount(0);
+    }
+  );
+
+  test(
+    '[P1] a delete of an event deleted elsewhere is done, and it leaves the list',
+    async ({ page, supabaseAdmin, interceptNetworkCall }) => {
+      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      await clearPairEvents(supabaseAdmin, userId, partnerId);
+      const id = await seedEvent(supabaseAdmin, {
+        userId: partnerId,
+        label: DELETE_LABEL,
+        eventDate: isoDateDaysFromNow(30, new Date()),
+        icon: 'calendar',
+      });
+
+      await openSettingsFromHome(page, interceptNetworkCall);
+      await openDatesList(page, interceptNetworkCall);
+      await rowFor(page, DELETE_LABEL).click();
+      await expect(page.getByTestId('settings-event-page')).toBeVisible();
+
+      await log.step('The partner deletes it; this phone hears nothing');
+      await supabaseAdmin.from('events').delete().eq('id', id);
+
+      await page.getByTestId('settings-event-delete').click();
+      await page.getByTestId('settings-event-delete-confirmation-confirm').click();
+
+      await expect(page).toHaveURL(/\/settings\/dates$/);
+      await expect(page.getByTestId('settings-date-error')).toHaveCount(0);
+      await expect(rowFor(page, DELETE_LABEL)).toHaveCount(0);
     }
   );
 });
