@@ -1,11 +1,13 @@
 # Epic 6, Daily Question: every planned story in build order.
+# Stories 1 (server) and 12 (client) together are the tracer bullet; story 1
+# was split in two to keep each loop story inside its token budget.
 # Two lanes share most files. The server lane (migrations, the AD-5 gate pgTAP
 # file, src/types/database.types.ts) and the client lane (dailyQuestionSlice,
-# src/components/DailyQuestion/) both run through stories 1, 2, 3, 5, 6, 7 and
-# 8, so those wait on each other in order. The pool (4) touches only its seed
-# migration and can run beside them once story 1 is in; the dock slot (9) waits
-# on story 6, which ports the realtime-recovery spec off moods before story 9
-# deletes the mood-only specs.
+# src/components/DailyQuestion/) both run through stories 1, 12, 2, 3, 5, 6, 7
+# and 8, so those wait on each other in order. The pool (4) touches only its
+# seed migration and can run beside them once story 1 is in; the dock slot (9)
+# waits on story 12's view and on story 6, which ports the realtime-recovery
+# spec off moods before story 9 deletes the mood-only specs.
 # Every story adds each new client RPC to the AD-5 gate pgTAP file in the same
 # change, updates the existing E2E specs and helpers its change breaks, and
 # clears its worker pair's day rows through story 1's E2E helper before each
@@ -14,11 +16,22 @@
 [[entry]]
 id = 1
 type = "story"
-title = "Both partners pick today's question and see the reveal"
-description = "Tracer through every layer, online only. A migration adds daily_questions with every column the spine gives it (pair null for the coach's rows; pair, target_day and source_day_id for written ones, so stories 3 and 4 add rows, not columns), couple_days and daily_picks, each with RLS on and no policies; it revokes every privilege from anon and authenticated explicitly, since 20260725170000_grant_api_roles_on_public.sql grants ALL on future tables, and gives service_role column SELECT on daily_picks except choice (AD-5, AD-15). Internal functions: effective_zone, assign_couple_day (pool draw with cycles, writer fixed by date; no written questions yet), visible_daily_picks and daily_day_snapshot (every AD-16 field except nudge, which epic 8 adds with daily_nudges). Client RPCs, in FN-GRANT-008 with their final signatures: get_daily_day(time_zone, utc_offset_minutes, reported_at) answering { status: 'ok', snapshot } | { status: 'unlinked' } and throwing on failure, and submit_daily_pick(day_id, choice, picked_at, time_zone, utc_offset_minutes), insert-only, idempotent, is_second stored (AD-6); story 2 adds the date and picked_at checks and the zone store. Adds the AD-5 gate pgTAP file (cycle tests delete coach rows inside their transaction, so story 4's seed never changes them), regenerates the types with npm run db:types, and adds an E2E helper that deletes the worker pair's couple_days rows (cascading to picks) before a test. Client: dailyQuestionApi, dailyQuestionSlice (session check, fields in signedOutState; it keeps the unlinked status, whose screen is story 5's) and the Daily view at /daily registered in ViewType, pathMap, both URL ternaries and the render chain (the dock slot is story 9): Today's question shown as '{This} or {That}?' in plain text, whether the partner has picked, Send my pick (refused offline through isOnline() and offlineMessage until story 7 queues it), the waiting screen with the own pick and its time, and the reveal marked Same picks or Different picks. Tests insert their own questions; story 4 seeds the pool. Seen running when done: two linked accounts at /daily on a local stack see the same question, pick, and see the reveal after a reload."
-verify = "On a local stack, a Playwright spec signs in a linked pair at /daily on two pages: both see the same question, the second sees that the first has picked after a reload, each picks, and after a reload both see the reveal with Same or Different; supabase test db passes the gate file, which shows the second partner gets no choice from either RPC before their own pick and is denied a direct select on daily_picks."
+title = "The server assigns today's question and releases a pick's choice only to a partner who has picked"
+description = "Server half of the tracer; story 12 builds the client on it. A migration adds daily_questions with every column the spine gives it (pair null for the coach's rows; pair, target_day and source_day_id for written ones, so stories 3 and 4 add rows, not columns), couple_days and daily_picks, each with RLS on and no policies; it revokes every privilege from anon and authenticated explicitly, since 20260725170000_grant_api_roles_on_public.sql grants ALL on future tables, and gives service_role column SELECT on daily_picks except choice (AD-5, AD-15). Internal functions: effective_zone, assign_couple_day (pool draw with cycles, writer fixed by date; no written questions yet), visible_daily_picks and daily_day_snapshot (every AD-16 field except nudge, which epic 8 adds with daily_nudges). Client RPCs, in FN-GRANT-008 with their final signatures: get_daily_day(time_zone, utc_offset_minutes, reported_at) answering { status: 'ok', snapshot } | { status: 'unlinked' } and throwing on failure, and submit_daily_pick(day_id, choice, picked_at, time_zone, utc_offset_minutes), insert-only, idempotent, is_second stored (AD-6); story 2 adds the date and picked_at checks and the zone store. Adds the AD-5 gate pgTAP file (cycle tests delete coach rows inside their transaction, so story 4's seed never changes them), regenerates the types with npm run db:types, and adds the E2E helper that deletes a worker pair's couple_days rows (cascading to picks) before a test, which story 12 and every later spec use."
+verify = "supabase test db passes: two linked users get the same question from get_daily_day, each pick belongs to its picker, the gate file shows the second partner gets no choice, Same/Different mark or count from either RPC before their own pick and is denied a direct select on daily_picks, a repeated submit returns the stored pick unchanged, and consecutive days draw distinct questions until a test pool is used up; npm run db:types leaves the committed types unchanged."
 covers = ["R1", "R2", "R5"]
 after = []
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 12
+type = "story"
+title = "Both partners pick today's question and see the reveal"
+description = "Client half of the tracer, on story 1's RPCs: dailyQuestionApi, dailyQuestionSlice (session check, fields in signedOutState; it keeps story 1's unlinked status, whose screen is story 5's) and the Daily view at /daily registered in ViewType, pathMap, both URL ternaries and the render chain (the dock slot is story 9): Today's question shown as '{This} or {That}?' in plain text, whether the partner has picked, Send my pick (refused offline through isOnline() and offlineMessage until story 7 queues it), the waiting screen with the own pick and its time, and the reveal marked Same picks or Different picks. Tests insert their own questions and clear the pair's days with story 1's E2E helper; story 4 seeds the pool. Seen running when done: two linked accounts at /daily on a local stack see the same question, pick, and see the reveal after a reload."
+verify = "On a local stack, a Playwright spec signs in a linked pair at /daily on two pages: both see the same question, the second sees that the first has picked after a reload, each picks, and after a reload both see the reveal with Same or Different; the slice's unit tests show its fields cleared on sign-out."
+covers = ["R1", "R2", "R5"]
+after = [1]
 hitl = false
 risk = "high"
 
@@ -26,10 +39,10 @@ risk = "high"
 id = 2
 type = "story"
 title = "Each partner's day runs on their own clock"
-description = "Finishes AD-2, AD-3 and AD-6's dating on story 1's RPCs. Adds user_time_zones (RLS on, every privilege revoked from anon and authenticated, types regenerated with npm run db:types), written only by get_daily_day when reported_at is newer than the stored one, a reported_at later than now() + 5 min being clamped to now(). submit_daily_pick dates the pick by picked_at in the zone sent with it, refuses a picked_at outside created_at - 5 min to now() + 5 min, and fails with its own error code when the date is not the day's. The client refuses a pick when the device date is not the shown day and re-fetches. Moves formatDateKey out of calendarHelpers.ts first (spine Deferred), since Daily is its next importer. Story 7's queue relies on the late-pick rule this story proves."
+description = "Finishes AD-2, AD-3 and AD-6's dating on story 1's RPCs and story 12's screens. Adds user_time_zones (RLS on, every privilege revoked from anon and authenticated, types regenerated with npm run db:types), written only by get_daily_day when reported_at is newer than the stored one, a reported_at later than now() + 5 min being clamped to now(). submit_daily_pick dates the pick by picked_at in the zone sent with it, refuses a picked_at outside created_at - 5 min to now() + 5 min, and fails with its own error code when the date is not the day's. The client refuses a pick when the device date is not the shown day and re-fetches. Moves formatDateKey out of calendarHelpers.ts first (spine Deferred), since Daily is its next importer. Story 7's queue relies on the late-pick rule this story proves."
 verify = "pgTAP over fixed instants shows a pick made at 11:50 PM and submitted at 12:10 AM counted for the earlier date, and partners an hour apart each picking at 11:30 PM local landing on the same date; a picked_at more than 5 minutes ahead is refused with its error code; the database types match npm run db:types."
 covers = ["R7", "R9"]
-after = [1]
+after = [12]
 hitl = false
 risk = "high"
 
@@ -81,7 +94,7 @@ risk = "high"
 id = 7
 type = "story"
 title = "A pick made offline is sent when the connection returns"
-description = "AD-12, on story 2's rule that a late pick counts for the date it was made: a pick-queue IndexedDB store added in dbSchema.ts (DB_VERSION bumped, opened through openMyLoveDB), rows keyed [user_id, day_id] with a by-user index, holding choice, picked_at, the zone pair and failed. Send my pick now queues offline instead of story 1's refusal. dailyQuestionSlice drains only the signed-in account's rows, oldest first, under withSyncLock, on online and at start, then broadcasts as story 6 does. The own pick shown is the server's, else the queued row; the pick control is disabled while either exists; a queued pick never enters a local copy, and the reveal shows only from a server snapshot. A refused pick is marked failed and its failure shown. The queue survives sign-out."
+description = "AD-12, on story 2's rule that a late pick counts for the date it was made: a pick-queue IndexedDB store added in dbSchema.ts (DB_VERSION bumped, opened through openMyLoveDB), rows keyed [user_id, day_id] with a by-user index, holding choice, picked_at, the zone pair and failed. Send my pick now queues offline instead of story 12's refusal. dailyQuestionSlice drains only the signed-in account's rows, oldest first, under withSyncLock, on online and at start, then broadcasts as story 6 does. The own pick shown is the server's, else the queued row; the pick control is disabled while either exists; a queued pick never enters a local copy, and the reveal shows only from a server snapshot. A refused pick is marked failed and its failure shown. The queue survives sign-out."
 verify = "Playwright on a local stack: a pick made offline shows as the own pick and no reveal, is sent once the page goes online, and the partner then sees it; a unit test with a faked clock shows a pick queued at 11:50 PM and drained at 12:10 AM sent with its 11:50 PM picked_at and day; a refused pick shows its failure."
 covers = ["R7"]
 after = [6, 2]
@@ -103,10 +116,10 @@ risk = "medium"
 id = 9
 type = "story"
 title = "Daily takes Mood's slot in the dock"
-description = "On story 1's Daily view: DESTINATIONS reads Home, Daily, Love Notes, Photos, Partner in both dock forms; /mood opens Daily in both URL ternaries; viewForPush routes a mood push tap to Daily. The mood screens leave the dock and their code stays until epic 10. Deletes the E2E tests whose subject is the mood screen or sending a mood, which no route reaches any more (mood-tracker.spec.ts, mood-kit.spec.ts, partner-mood-realtime.spec.ts, the mood calendar test in mood-offline-copy.spec.ts); a test that only passed through /mood (network-status, dock, dock-walk, routing, settings, account-data, partner specs) is pointed at Daily or another view instead. Partner-page mood tests stay until epic 7 rebuilds that page."
+description = "On story 12's Daily view: DESTINATIONS reads Home, Daily, Love Notes, Photos, Partner in both dock forms; /mood opens Daily in both URL ternaries; viewForPush routes a mood push tap to Daily. The mood screens leave the dock and their code stays until epic 10. Deletes the E2E tests whose subject is the mood screen or sending a mood, which no route reaches any more (mood-tracker.spec.ts, mood-kit.spec.ts, partner-mood-realtime.spec.ts, the mood calendar test in mood-offline-copy.spec.ts); a test that only passed through /mood (network-status, dock, dock-walk, routing, settings, account-data, partner specs) is pointed at Daily or another view instead. Partner-page mood tests stay until epic 7 rebuilds that page."
 verify = "In both dock forms the dock reads Home, Daily, Love Notes, Photos, Partner; loading /mood shows Daily; a unit test shows a mood push payload maps to daily; no E2E spec opens /mood expecting the mood screen, and the full E2E suite passes."
 covers = ["R6"]
-after = [1, 6]
+after = [12, 6]
 hitl = false
 risk = "medium"
 
@@ -114,10 +127,10 @@ risk = "medium"
 id = 10
 type = "story"
 title = "Refactor sweep"
-description = "Cleanup only, scoped at its start from the review findings and plan notes stories 1 to 9 deferred; scope pushed out of another story becomes a new story."
+description = "Cleanup only, scoped at its start from the review findings and plan notes stories 1 to 9 and 12 deferred; scope pushed out of another story becomes a new story."
 verify = "The deferred items picked at its start are fixed or recorded in deferred-work.md, and the unit, E2E and supabase test db suites pass."
 covers = []
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+after = [1, 12, 2, 3, 4, 5, 6, 7, 8, 9]
 hitl = false
 risk = "low"
 
@@ -125,8 +138,8 @@ risk = "low"
 id = 11
 type = "story"
 title = "After every deploy, a test checks Daily on the real website"
-description = "Adds a password for the production bot's partner login to fnox.toml and scripts/provision-claude-bot.mjs, and a Playwright spec that signs in the production Claude bot pair: both see the same question, the second partner's get_daily_day and get_daily_day_by_id answers before their pick carry no trace of the first pick's choice, then both pick and see the reveal. The spec never uses the Supabase secret key. Before each run it signs in as each bot and calls a new security definer client RPC (gate file, FN-GRANT-008, types) that deletes only the calling user's couple's couple_days rows (their picks cascade) and refuses unless the caller's email is test_email or partner_email in claude_bot_config, so it can rerun any number of times a day. deploy.yml runs the spec after its health-check job, against the live site, so a failed check fails the deploy. The story does not run gh secret set: it lists the GitHub secrets the job needs, which the owner sets after the epic merges. It never signs in, reads or deletes the owner's or partner's account."
-verify = "pgTAP shows the reset RPC refusing a non-bot caller and a bot caller unable to delete another couple's rows; the spec passes twice in a row against a local stack using that RPC; deploy.yml lists the job after health-check, and the story's plan lists the GitHub secrets it needs. The live run happens once the owner has set them after the epic's merge to main."
+description = "A Playwright spec that signs in the production Claude bot pair: both see the same question, the second partner's get_daily_day and get_daily_day_by_id answers before their pick carry no trace of the first pick's choice, then both pick and see the reveal. The bot's login uses CLAUDE_BOT_PASSWORD and the partner bot's uses PUSH_FIXTURE_PASSWORD, which scripts/provision-push-fixtures.mjs already sets on that account; no new password is added. The spec never uses the Supabase secret key. Before each run it signs in as each bot and calls the new client RPC reset_bot_daily_days() (security definer, spine AD-15; gate file, FN-GRANT-008, types), which deletes only the calling user's couple's couple_days rows (their picks cascade) and refuses unless the caller's email is test_email or partner_email in claude_bot_config, so the check can rerun any number of times a day. On a local stack, where claude_bot_config holds the two bot emails but no account has them, the spec's setup signs both up through the anon key (local email sign-up needs no confirmation) when they are missing, and links them the way the app does, by a partner request and accept_partner_request; the spec runs alone, outside the per-worker pool. deploy.yml runs the spec after its health-check job, against the live site, so a failed check fails the deploy. The story does not run gh secret set: it lists the GitHub secrets the job needs, which the owner sets after the epic merges. It never signs in, reads or deletes the owner's or partner's account."
+verify = "pgTAP shows reset_bot_daily_days refusing a non-bot caller and a bot caller unable to delete another couple's rows; on a fresh local stack the spec creates and links the two bot accounts and passes twice in a row; deploy.yml lists the job after health-check, and the story's plan lists the GitHub secrets it needs. The live run happens once the owner has set them after the epic's merge to main."
 covers = ["R1", "R2"]
 after = [10]
 hitl = false
