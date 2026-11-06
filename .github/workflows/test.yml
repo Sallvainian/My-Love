@@ -185,6 +185,11 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
 
+      # Unused files, exports and dependencies. knip.json names what Knip cannot
+      # trace, such as the TEA hook Claude Code runs from settings.json.
+      - name: Knip
+        run: npx knip
+
       # `npm run lint` is passed `src tests scripts` and every tsconfig includes
       # only `src`/`tests`, so nothing above ever parses supabase/functions/**.
       # Without this step the bounded-body handler could be reverted to
