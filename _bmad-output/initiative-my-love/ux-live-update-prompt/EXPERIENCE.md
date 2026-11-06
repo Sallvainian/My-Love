@@ -47,12 +47,12 @@ The ticket's one-line dialog string ("Update now? You may lose what you're doing
 | Component | Behavioural rules |
 |---|---|
 | Update toast, downloading | Shows when the check starts a download (`downloading`), and only then: a build an earlier launch already downloaded skips it. The percent updates as the plugin reports it, and the bar slides until the first report arrives. It can't be closed or tapped. It leaves when the download ends, whether it worked or failed. On Love Notes it sits above the composer, not over it (see Responsive & Platform). |
-| Update toast, ready | Shows when the status becomes `ready`, on this launch or on a later launch that finds the build already downloaded. It replaces the download toast in place. It hides by itself after 6 seconds. A tap anywhere on it within that time hides it and opens the confirm dialog. It shows again on each launch while the update is still ready. |
+| Update toast, ready | Shows when the status becomes `ready`, on this launch or on a later launch that finds the build already downloaded. It replaces the download toast in place. It stays until the person acts on it (owner, 2026-11-06: one that hid after 6 seconds was easily missed): a tap on its line hides it and opens the confirm dialog, and its × (a 44px target) hides it. It shows again on each launch while the update is still ready. |
 | Bell button | Native shell only, at the header's top-left in every pose. A tap opens the drop-down, and a tap while it is open closes it. It sits wherever the header is, so it isn't on Settings. |
 | Bell dot | Shows while an update is ready. Opening the drop-down does not clear it; only applying the update (Yes, or the background swap) does. After No it stays. |
 | Notifications drop-down | Opens under the bell. A tap anywhere outside it closes it, and that tap does nothing else: it doesn't press the control underneath. Changing view, or the app going to the background, also closes it. Entries come newest first. Today there is at most one. |
 | Notification entry ("Update now") | Present for as long as the dot shows. A tap closes the drop-down and opens the confirm dialog. It has no swipe and no dismiss: it leaves only when the update is applied. |
-| Update confirm dialog | Modal, like the app's other confirms. **No**, or a tap on the scrim, closes it: the app stays on its build and its screen, and the entry and dot stay. **Yes** disables both buttons and restarts on the new build (`applyUpdate`). If the restart fails, the dialog closes and the update stays waiting, with the entry and dot, for the background swap. |
+| Update confirm dialog | Modal, like the app's other confirms. **Yes** is a solid red pill and **No** a neutral one (card2 with a line-strong outline), so the two never read alike (owner, 2026-11-06). **No**, or a tap on the scrim, closes it: the app stays on its build and its screen, and the entry and dot stay. **Yes** disables both buttons and restarts on the new build (`applyUpdate`). If the restart fails, the dialog closes and the update stays waiting, with the entry and dot, for the background swap. |
 
 ## State Patterns
 
@@ -60,9 +60,9 @@ The ticket's one-line dialog string ("Update now? You may lose what you're doing
 |---|---|---|---|
 | No update (published build is the running one) | None | None | `No notifications` |
 | Downloading | Download toast with progress | None | `No notifications` |
-| Download fails, or `latest.json` unreadable or incomplete | Download toast leaves (if it showed); no ready toast | None | `No notifications`. The next launch checks again |
-| Ready, this launch | Ready toast for 6 s | Shown | `Update now` entry |
-| Ready, downloaded on an earlier launch | Ready toast for 6 s (no download toast) | Shown | `Update now` entry |
+| Download fails, or `latest.json` unreadable or incomplete | Download toast leaves (if it showed); no ready toast | None | `No notifications`. The next check (a return to the front, the 10-minute check or the next launch) tries again |
+| Ready, this launch | Ready toast until tapped or closed | Shown | `Update now` entry |
+| Ready, downloaded on an earlier launch | Ready toast until tapped or closed (no download toast) | Shown | `Update now` entry |
 | Ready, after No | None until the next launch | Shown | `Update now` entry |
 | Applied (Yes, or background and reopen) | None | None | `No notifications` |
 | Offline at launch | The check fails quietly, as in the fail row | None | `No notifications` |
@@ -97,7 +97,7 @@ Failure: the restart fails. The dialog closes, the dot and the entry stay, and t
 ### Flow 2: No leaves it waiting, and the background swap still applies it (Jessie, regular iPhone, bottom dock, writing a love note)
 
 1. Jessie opens the app halfway through a love note. The update downloaded on the previous launch, so no download toast shows.
-2. **The ready update shows:** "Update ready — tap to restart" sits just above the typing box for 6 seconds, clear of it. Jessie keeps typing and it leaves. The dot stays on the bell.
+2. **The ready update shows:** "Update ready — tap to restart" sits just above the typing box, clear of it, until Jessie taps it or its ×. Jessie closes it and keeps typing. The dot stays on the bell.
 3. **The notifications drop-down:** later, Jessie taps the bell. The drop-down opens under it with one entry: "Update now", "A new version of My Love is ready."
 4. **Tapping asks first:** Jessie taps the entry. The drop-down closes and the dialog opens.
 5. **No leaves it waiting:** Jessie taps **No**. The dialog closes, the half-written note is still there, and the dot stays.
