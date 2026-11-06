@@ -174,7 +174,8 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Rule:**
   - Day snapshots are one `localCopy` kind, a map keyed by `day_id`; today is one entry of it, never a second copy. Every write to the map goes through one merge function under a lock, and an entry's `state` never moves back (`none` → `me` or `partner` → `both`), so a slow read cannot undo a reveal. The streak snapshot is a second kind.
   - `get_daily_day(time_zone, utc_offset_minutes, reported_at)` answers `{ status: 'ok', snapshot } | { status: 'unlinked' }` and throws on failure. Only a successful answer writes a copy. `unlinked` shows the invitation to link (R18).
-  - Celebration state is its own kind, `daily-celebrated { held, milestones }`, written only by the animation. It is the one device-state kind; the `localCopy.ts` header exempts it from the server-fill rule in the same change. A first read with none stored seeds it from the current snapshot without playing. The +1 animation (R8) and the milestone screen (R9) play only when the snapshot exceeds it, never because a realtime event arrived.
+  - Celebration state is its own kind, `daily-celebrated { held, milestones }`, written only by the animation. A first read with none stored seeds it from the current snapshot without playing. The +1 animation (R8) and the milestone screen (R9) play only when the snapshot exceeds it, never because a realtime event arrived.
+  - A second device-state kind, `daily-write-declined`, holds the `day_id`s whose write prompt (AD-4) this account declined on this device, written only by "No thanks". The prompt shows while `write.mine` is true, `write.done` is false and the `day_id` is not in it, so another device may ask once more. These are the only two device-state kinds; the `localCopy.ts` header exempts both from the server-fill rule in the same change, and sign-out deletes them with the account's other kinds.
 
 ### AD-14: A reply references its day
 
@@ -196,7 +197,7 @@ Arrows point the only way a dependency may run. Views never call the API directl
 
 - **Binds:** R2, R10, R11; epics 6, 7, 8, 9
 - **Prevents:** today, history, the reply attachment and the live re-read each inventing a row shape and reading around the gate
-- **Rule:** the internal `daily_day_snapshot(day_id, viewer, at)` returns `{ day_id, day, question { this, that }, state: 'none' | 'me' | 'partner' | 'both', my_choice, partner_choice | null, same | null, nudge { slot: 'after_pick' | 'evening' | null, spent }, write { mine, done } }`, reading choices only through AD-5. `nudge` is the viewer's current slot (AD-17) and whether it is spent. `write.mine` is whether the viewer is the day's writer (AD-4), `write.done` whether a question from this day exists. `get_daily_day` (the caller's date), `get_daily_day_by_id`, `submit_daily_pick` and `get_daily_history` (an array, newest first) all return it.
+- **Rule:** the internal `daily_day_snapshot(day_id, viewer, at)` returns `{ day_id, day, question { this, that }, state: 'none' | 'me' | 'partner' | 'both', my_choice, my_picked_at, partner_choice | null, same | null, nudge { slot: 'after_pick' | 'evening' | null, spent }, write { mine, done } }`, reading choices only through AD-5. `my_picked_at` is the viewer's own pick instant, null until that pick exists; the snapshot carries no question number. `nudge` is the viewer's current slot (AD-17) and whether it is spent. `write.mine` is whether the viewer is the day's writer (AD-4), `write.done` whether a question from this day exists. `get_daily_day` (the caller's date), `get_daily_day_by_id`, `submit_daily_pick` and `get_daily_history` (an array, newest first) all return it.
 
 ### AD-17: A nudge spends one of two daily slots
 
@@ -296,6 +297,5 @@ Deployment does not change. `deploy.yml` applies the migrations (tables, functio
 - **Push copy and badge rules** (epic 8): owned by `send-push/payload.ts`, using the mock-up's notifications screen and AD-7's naming.
 - **Renaming `mood-updates:` and `moodSyncService`** (after epic 10): needs a policy change and both partners' clients updated together.
 - **Pool authoring and the size check** (epic 6): content work, with "about 500" checked by a count.
-- **The two after-pick prompts** (epic 6): which comes first, write tomorrow's question or nudge, and whether an unanswered write prompt shows again on a later open of the same day. UX only; AD-4 and AD-16 hold either way.
 - **Moving `formatDateKey` out of `calendarHelpers.ts`** (epic 6, before epic 10 deletes the mood calendar).
 - **Cron observability beyond `cron.job_run_details`** (epic 8): no dashboard is planned.

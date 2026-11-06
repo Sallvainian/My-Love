@@ -32,6 +32,7 @@ The couple watches one shared streak grow and sees how often they pick the same.
 
 - Out: deleting mood and interaction code and data (epic 10); pushes (epic 8).
 - Out: the flaming heart anywhere but milestones; the counter, the +1 animation and the dock keep the plain flame.
+- Must not change: partner search and linking, which Daily's invitation to link opens on the Partner page (epic 6 R8); the rebuilt page keeps them.
 
 ## References
 
