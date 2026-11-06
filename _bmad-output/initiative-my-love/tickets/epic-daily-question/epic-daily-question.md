@@ -14,7 +14,7 @@ risk: high
 
 ## Description
 
-Daily replaces Mood as the dock's second destination. Each day the couple gets one this-or-that question; each partner picks one option blind, the server withholding the other's choice until their own pick exists, and then both see the reveal. After the reveal each is asked to write tomorrow's question (This / That) or let the pool pick one: about 500 questions written by the coach, none repeated until all are used, joined by the ones partners write. A pick made offline keeps the time it was made and sends on reconnect; each partner's day runs on their own clock; an account with no linked partner sees an invitation to link. The mood screens leave the dock here and stay in the code until epic 10 deletes them; epic 7 adds the streak to these screens, epic 8 puts Nudge on the waiting screen and times its pushes on this day, epic 9 adds the reveal's Reply button, and epic 10 deletes the mood code once Daily holds the dock slot.
+Daily replaces Mood as the dock's second destination. Each day the couple gets one this-or-that question; each partner picks one option blind, the server withholding the other's choice until their own pick exists, and then both see the reveal. Each day one partner, in turns by date, is asked right after their own pick to write tomorrow's question (This / That) or let the pool pick one: about 500 questions written by the coach, none repeated until all are used, joined by the ones partners write; a turn not used is not carried over. A pick made offline keeps the time it was made and sends on reconnect; each partner's day runs on their own clock; an account with no linked partner sees an invitation to link. The mood screens leave the dock here and stay in the code until epic 10 deletes them; epic 7 adds the streak to these screens, epic 8 puts Nudge on the waiting screen and times its pushes on this day, epic 9 adds the reveal's Reply button, and epic 10 deletes the mood code once Daily holds the dock slot.
 
 ## Outcome
 
@@ -24,7 +24,7 @@ Both partners answer one question a day and see each other's pick only after the
 
 - On the live site both partners see the same question, pick, and see the reveal, and a request made as the second partner before their pick gets no trace of the first pick's choice.
 - An automated test shows a pick made offline at 11:50 PM and sent at 12:10 AM counted for the earlier date, and partners an hour apart each picking at 11:30 PM local landing on the same date.
-- The pool holds about 500 questions; a written question is asked of both the next day, and a declined prompt yields a pool question.
+- The pool holds about 500 questions; a written question is asked of both the next day, a declined or unused turn yields a pool question, and an automated test shows consecutive dates prompting alternate partners.
 - The dock reads Home, Daily, Love Notes, Photos, Partner, and an unlinked account's Daily shows the invitation to link.
 - Shipped to production through `deploy.yml`.
 
@@ -42,3 +42,5 @@ Both partners answer one question a day and see each other's pick only after the
 ## Notes
 
 - The architecture spine (companion) settles how a day is dated across the partners' clocks and how questions and picks are stored; refine against it.
+- Decision: 2026-11-06 re-sliced in place after the owner made writing tomorrow's question one partner's turn a day, offered right after their own pick rather than after the reveal (parent R3; spine AD-4): Description and Done when follow.
+- Decision: 2026-11-06 the owner set the after-pick order: the write prompt first, then the nudge prompt (epic 8). The write prompt shows again on each later open of that day until it is answered or the day ends, and "No thanks" counts as answered (spine memlog question, no architecture impact).
