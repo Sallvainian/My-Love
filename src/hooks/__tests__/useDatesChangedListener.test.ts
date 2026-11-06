@@ -83,3 +83,81 @@ describe('useDatesChangedListener', () => {
     expect(state.loadEvents).not.toHaveBeenCalled();
   });
 });
+
+describe('useDatesChangedListener: what the broadcast cannot reach', () => {
+  let visibility: DocumentVisibilityState = 'visible';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    subscribe.mockResolvedValue(vi.fn());
+    Object.assign(state, {
+      userId: 'USER-A',
+      authSessionVersion: 0,
+      syncStatus: { isOnline: true },
+      partner: { id: 'PARTNER-B' },
+    });
+    visibility = 'visible';
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+  });
+
+  const comeBack = () => {
+    visibility = 'hidden';
+    document.dispatchEvent(new Event('visibilitychange'));
+    visibility = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+
+  it('re-reads both lists when the app comes back to the front, at most every 30 seconds', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(10_000_000);
+    const hook = renderHook(() => useDatesChangedListener());
+    await act(async () => {});
+
+    act(() => comeBack());
+    expect(state.loadEvents).toHaveBeenCalledTimes(1);
+    expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(10_000_000 + 10_000);
+    act(() => comeBack());
+    expect(state.loadEvents).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(10_000_000 + 31_000);
+    act(() => comeBack());
+    expect(state.loadEvents).toHaveBeenCalledTimes(2);
+    expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(2);
+
+    hook.unmount();
+    now.mockRestore();
+  });
+
+  it('re-reads on a return to the front when not linked too, and not when signed out', async () => {
+    Object.assign(state, { partner: null });
+    const linkedOff = renderHook(() => useDatesChangedListener());
+    await act(async () => {});
+    act(() => comeBack());
+    expect(state.loadEvents).toHaveBeenCalledTimes(1);
+    linkedOff.unmount();
+
+    vi.clearAllMocks();
+    Object.assign(state, { userId: null });
+    const signedOut = renderHook(() => useDatesChangedListener());
+    await act(async () => {});
+    act(() => comeBack());
+    expect(state.loadEvents).not.toHaveBeenCalled();
+    signedOut.unmount();
+  });
+
+  it('re-reads on a Realtime re-join, not on the first join', async () => {
+    const hook = renderHook(() => useDatesChangedListener());
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+    const onStatus = subscribe.mock.calls[0][1]!;
+
+    act(() => onStatus('SUBSCRIBED'));
+    expect(state.loadEvents).not.toHaveBeenCalled();
+
+    act(() => onStatus('CHANNEL_ERROR'));
+    act(() => onStatus('SUBSCRIBED'));
+    expect(state.loadEvents).toHaveBeenCalledTimes(1);
+    expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(1);
+    hook.unmount();
+  });
+});
