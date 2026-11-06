@@ -42,7 +42,7 @@ after = [{ epic = 2, needs = "story 2.8: the header gear and the column dock's s
 id = 6
 slug = "epic-daily-question"
 title = "Daily Question"
-description = "Daily replaces Mood in the dock; each day both partners pick one this-or-that question blind, the server withholding each pick until the other's own exists, then see the reveal and write tomorrow's question or leave it to the pool; offline picks send on reconnect, each partner's day runs on their own clock, and an unlinked account sees an invitation to link."
+description = "Daily replaces Mood in the dock; each day both partners pick one this-or-that question blind, the server withholding each pick until the other's own exists, then see the reveal; one partner a day, in turns by date, is asked right after their own pick to write tomorrow's question or leave it to the pool; offline picks send on reconnect, each partner's day runs on their own clock, and an unlinked account sees an invitation to link."
 covers = ["R1", "R2", "R3", "R4", "R12", "R17", "R18", "R20"]
 
 [[epic]]
