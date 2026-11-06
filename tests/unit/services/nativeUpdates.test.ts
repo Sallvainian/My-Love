@@ -317,3 +317,83 @@ describe('update confirm store', () => {
     expect(loadUpdater).not.toHaveBeenCalled();
   });
 });
+
+describe('checking again while the app is open', () => {
+  /** Starts the updates and hands back this module's foreground handler and interval callback. */
+  async function startAndCapture() {
+    const addListener = vi.spyOn(document, 'addEventListener');
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const updates = await import('../../../src/services/nativeUpdates');
+    await updates.startNativeUpdates();
+    const onVisibility = addListener.mock.calls.find(([type]) => type === 'visibilitychange')?.[1] as
+      | (() => void)
+      | undefined;
+    const [tick, every] = setIntervalSpy.mock.calls.at(-1) ?? [];
+    addListener.mockRestore();
+    setIntervalSpy.mockRestore();
+    if (!onVisibility || typeof tick !== 'function') throw new Error('no re-check was armed');
+    return { updates, onVisibility, tick: tick as () => void, every };
+  }
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('checks again on a return to the front, at most once a minute', async () => {
+    const fetchMock = stubFetch({ ...LATEST, version: 'test-build' });
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const { onVisibility } = await startAndCapture();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Back within a minute of the launch check: no second request.
+    now.mockReturnValue(1_000_000 + 30_000);
+    onVisibility();
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // A minute or more later: it asks again.
+    now.mockReturnValue(1_000_000 + 61_000);
+    onVisibility();
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
+  it('checks every 10 minutes while the app is in front', async () => {
+    const fetchMock = stubFetch({ ...LATEST, version: 'test-build' });
+    const { tick, every, updates } = await startAndCapture();
+    expect(every).toBe(updates.CHECK_EVERY_MS);
+    expect(updates.CHECK_EVERY_MS).toBe(10 * 60 * 1000);
+
+    tick();
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('finds a deploy made after launch and queues it, so the app need not be reopened', async () => {
+    const fetchMock = stubFetch({ ...LATEST, version: 'test-build' });
+    const { tick, updates } = await startAndCapture();
+    expect(updates.getUpdateStatus()).toEqual({ state: 'idle' });
+
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(LATEST), { headers: { 'Content-Type': 'application/json' } })
+    );
+    tick();
+    await vi.waitFor(() => expect(updates.getUpdateStatus()).toEqual({ state: 'ready' }));
+    expect(updater.next).toHaveBeenCalledWith({ id: 'dl-1' });
+  });
+
+  it('asks nothing more once a build is queued', async () => {
+    const fetchMock = stubFetch(LATEST);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const { onVisibility, tick, updates } = await startAndCapture();
+    expect(updates.getUpdateStatus()).toEqual({ state: 'ready' });
+
+    now.mockReturnValue(1_000_000 + 5 * 60_000);
+    onVisibility();
+    tick();
+    await settle();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    now.mockRestore();
+  });
+});

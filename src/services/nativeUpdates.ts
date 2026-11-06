@@ -2,11 +2,13 @@
  * Live updates for the native iOS shell (Capacitor), with no Capgo account.
  *
  * Every deploy publishes the built site as a zip next to `updates/latest.json`
- * (scripts/package-live-update.sh). On launch the shell compares that file's
- * version with the build it is running (`__BUILD_ID__`), downloads a newer
- * bundle, and queues it with `next()`, which swaps it in when the app is next
- * backgrounded or relaunched, never mid-use. A bundle that fails to start rolls
- * back to the last good one by itself.
+ * (scripts/package-live-update.sh). The shell compares that file's version
+ * with the build it is running (`__BUILD_ID__`) on launch, each time the app
+ * comes back to the front, and every `CHECK_EVERY_MS` while it stays open, so
+ * a deploy is found without reopening the app. A newer bundle is downloaded
+ * and queued with `next()`, which swaps it in when the app is next backgrounded
+ * or relaunched, never mid-use. A bundle that fails to start rolls back to the
+ * last good one by itself.
  *
  * The check also publishes its progress (`getUpdateStatus`), which the shell's
  * update UI reads: UpdateToast shows the download's percent, then a ready
@@ -124,19 +126,62 @@ function isLatestBundle(value: unknown): value is LatestBundle {
   );
 }
 
+/** How often an app left open checks for a deploy. */
+export const CHECK_EVERY_MS = 10 * 60 * 1000;
+/** A return to the front checks again only this long after the last check began. */
+export const FOREGROUND_CHECK_GAP_MS = 60 * 1000;
+
+let checking: Promise<void> | null = null;
+let lastCheckAt = 0;
+
 /**
- * Confirms this bundle started, then fetches and queues a newer one if there
- * is one. Never throws: a failed check leaves the app on the build it has.
+ * Confirms this bundle started, checks for a newer one, and keeps checking:
+ * when the app comes back to the front (at most once a minute) and every
+ * `CHECK_EVERY_MS` while it is in front. Never throws: a failed check leaves
+ * the app on the build it has.
  */
 export async function startNativeUpdates(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
   try {
     const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
-
     // First, before any request: without it the plugin treats this bundle as
     // broken after its timeout and rolls back.
     await CapacitorUpdater.notifyAppReady();
+  } catch (error) {
+    console.warn('[NativeUpdates] Update check failed:', error);
+    return;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastCheckAt < FOREGROUND_CHECK_GAP_MS) return;
+    void checkForNativeUpdate();
+  });
+  setInterval(() => {
+    if (document.visibilityState === 'visible') void checkForNativeUpdate();
+  }, CHECK_EVERY_MS);
+
+  await checkForNativeUpdate();
+}
+
+/**
+ * Fetches `latest.json` and downloads and queues a newer build. One check at a
+ * time; a build already downloading or queued is not asked about again this
+ * launch. Never throws.
+ */
+export function checkForNativeUpdate(): Promise<void> {
+  if (status.state !== 'idle') return Promise.resolve();
+  checking ??= runCheck().finally(() => {
+    checking = null;
+  });
+  return checking;
+}
+
+async function runCheck(): Promise<void> {
+  lastCheckAt = Date.now();
+  try {
+    const { CapacitorUpdater } = await import('@capgo/capacitor-updater');
 
     const updateUrl = import.meta.env.VITE_LIVE_UPDATE_URL || DEFAULT_UPDATE_URL;
     const response = await fetch(updateUrl, { cache: 'no-store' });
