@@ -67,6 +67,7 @@ Each partner has a reason to open the app every day, an open loop from the other
 - project-context — AGENTS.md, section My Love
 - brainstorm — _bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md, sections Decided, Mock-up assumptions, Consequences for existing code
 - design — https://claude.ai/artifact/8wnGn8SjpqJwSckSUVBaEh, the owner-approved mock-up canvas (12 screens)
+- architecture — _bmad-output/initiative-my-love/architecture-daily-question/architecture-daily-question.md, sections Invariants & Rules, Capability → Architecture Map
 
 ## Notes
 
@@ -89,4 +90,4 @@ Each partner has a reason to open the app every day, an open loop from the other
 - Decision: 2026-11-05 Reply in Love Notes is its own epic, not part of epic 6, which already holds about ten stories; removal goes last, so the dock never loses its second destination.
 - Decision: 2026-11-05 during the architecture pass the owner made the 8 PM push depend on who has picked (R14) and capped nudges at two per partner per day, one offered right after their own pick and one from 8 PM, the waiting screen's button spending the same two (R13). "No trace" means the partner's choice: that the partner picked is shown, as the mock-up's "made their pick" push does (R2, C1).
 - Decision: 2026-11-05 the architecture spine, `architecture-daily-question/`, is a companion of this initiative and of epics 6 to 10, which build on its decisions.
-- Unknown: R3 asks each partner "Write tomorrow's question?" each day, while epic 6 asks it after the reveal; whether a partner whose partner never picks is still asked is settled in epic 6's refinement (the spine works either way).
+- Open question: R3 asks each partner "Write tomorrow's question?" each day, while epic 6 asks it after the reveal; whether a partner whose partner never picks is still asked waits on epic 6's refinement (the spine works either way).
