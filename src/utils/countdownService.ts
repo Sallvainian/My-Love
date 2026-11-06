@@ -6,38 +6,6 @@
  */
 
 import { parseEventDate } from '../services/eventsService';
-import type { Anniversary } from '../types';
-
-/**
- * Get next 'n' upcoming anniversaries
- *
- * @param anniversaries - Array of anniversaries
- * @param count - Number of anniversaries to return
- * @returns Array of nearest upcoming anniversaries (max 'count')
- */
-export function getUpcomingAnniversaries(
-  anniversaries: Anniversary[],
-  count: number = 3
-): Anniversary[] {
-  if (!anniversaries || anniversaries.length === 0) {
-    return [];
-  }
-
-  const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-  // Get anniversaries with their next occurrence dates
-  const upcomingAnniversaries = anniversaries
-    .map((anniversary) => {
-      const nextDate = getNextAnniversaryDate(anniversary.date);
-      return { anniversary, nextDate };
-    })
-    .filter(({ nextDate }) => nextDate >= startOfToday)
-    .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())
-    .slice(0, count);
-
-  return upcomingAnniversaries.map(({ anniversary }) => anniversary);
-}
 
 /**
  * Calculate next occurrence of an anniversary date

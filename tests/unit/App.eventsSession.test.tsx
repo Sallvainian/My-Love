@@ -115,6 +115,8 @@ type MotionDivProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 vi.mock('motion/react', () => ({
+  // Home's anniversary cards wrap their celebration in AnimatePresence.
+  AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
   m: {
     div: ({
       children,
@@ -807,6 +809,29 @@ describe('Home event-load session ownership', () => {
       '[App] Could not read the profile display name:',
       'Service unavailable'
     );
+  });
+});
+
+describe('Home lists anniversaries in Upcoming with the events', () => {
+  it('shows an anniversary in Upcoming instead of the empty placeholder, and not below the daily message', async () => {
+    const { requests } = controlHomeLoads();
+    useAppStore.setState({
+      settings: {
+        relationship: {
+          anniversaries: [{ id: 1, date: '2024-10-05', label: '2 year Anniversary', serverId: 'srv-1', userId: 'partner' }],
+        },
+      },
+    } as Partial<ReturnType<typeof useAppStore.getState>>);
+    await renderHome();
+    await act(async () => requests[0].resolve(success));
+
+    const card = screen.getByTestId('anniversary-countdown-1');
+    expect(card).toHaveTextContent('2 year Anniversary');
+    expect(screen.queryByTestId('events-empty-placeholder')).not.toBeInTheDocument();
+    // It sits in the Upcoming grid, before the daily message, not after it.
+    expect(screen.getByRole('heading', { name: 'Upcoming' }).compareDocumentPosition(card) &
+      Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId('countdown-timer')).not.toBeInTheDocument();
   });
 });
 

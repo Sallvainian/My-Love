@@ -20,6 +20,7 @@ import { EventCountdown } from '../EventCountdown';
 import {
   getCalendarDaysDiff,
   getEventsSlotView,
+  getUpcomingDateCards,
   getUpcomingEventCards,
 } from '../eventCountdownHelpers';
 
@@ -342,5 +343,53 @@ describe('getUpcomingEventCards', () => {
 
     expect(visible).toEqual([]);
     expect(upcomingCount).toBe(0);
+  });
+});
+
+describe('getUpcomingDateCards', () => {
+  const event = (id: string, dayOffset: number) => ({
+    id,
+    date: localMidnightOffsetFromToday(dayOffset),
+  });
+  /** An anniversary whose next occurrence is `dayOffset` days from the pinned today. */
+  const anniversary = (id: string, dayOffset: number) => ({
+    item: { id },
+    date: localMidnightOffsetFromToday(dayOffset),
+  });
+
+  it('lists events and anniversaries together, soonest first, an event first on the same day', () => {
+    const { upcomingCount, visible } = getUpcomingDateCards(
+      [event('trip', 3), event('dinner', 10), event('gone', -1)],
+      [anniversary('first-date', 5), anniversary('wedding', 3)],
+      new Date(),
+      6
+    );
+
+    expect(visible.map((card) => `${card.kind}:${card.item.id}`)).toEqual([
+      'event:trip',
+      'anniversary:wedding',
+      'anniversary:first-date',
+      'event:dinner',
+    ]);
+    expect(upcomingCount).toBe(4);
+  });
+
+  it('caps the merged list and counts every upcoming card', () => {
+    const { upcomingCount, visible } = getUpcomingDateCards(
+      [event('a', 1), event('b', 4)],
+      [anniversary('c', 2), anniversary('d', 3)],
+      new Date(),
+      3
+    );
+
+    expect(visible.map((card) => card.item.id)).toEqual(['a', 'c', 'd']);
+    expect(upcomingCount).toBe(4);
+  });
+
+  it('shows an anniversary alone when there are no events', () => {
+    const { upcomingCount, visible } = getUpcomingDateCards([], [anniversary('only', 333)], new Date(), 6);
+
+    expect(visible).toEqual([expect.objectContaining({ kind: 'anniversary', item: { id: 'only' } })]);
+    expect(upcomingCount).toBe(1);
   });
 });

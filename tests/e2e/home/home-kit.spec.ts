@@ -237,7 +237,8 @@ test.describe('Home on the style kit', () => {
         '[data-testid="message-text"]',
         `${storedEvent} [data-testid="countdown-label"]`,
         `${storedEvent} [data-testid="countdown-description"]`,
-        '[data-testid="countdown-timer"]',
+        '[data-testid^="anniversary-countdown-"] [data-testid="countdown-label"]',
+        '[data-testid^="anniversary-countdown-"] [data-testid="countdown-description"]',
       ].join(', ');
       const chromeText = await page.getByRole('main').evaluate((main, selectors) => {
         const clone = main.cloneNode(true) as HTMLElement;

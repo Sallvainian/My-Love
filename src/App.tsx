@@ -7,9 +7,12 @@ import {
   BirthdayWeddingCards,
   EventCountdown,
   getEventsSlotView,
-  getUpcomingEventCards,
+  getUpcomingDateCards,
   TimeTogether,
 } from './components/RelationshipTimers';
+import { AnniversaryCountdown } from './components/CountdownTimer/CountdownTimer';
+import { getNextAnniversaryDate } from './utils/countdownService';
+import { parseEventDate } from './services/eventsService';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from './stores/useAppStore';
@@ -102,8 +105,8 @@ const LAST_WELCOME_VIEW_KEY = 'lastWelcomeView';
  * plan at once. The overflow still gets no affordance — Settings lists every
  * event, past ones included — but at 6 the overflow is not reachable in
  * practice. Sibling precedent for the pattern (not the number) is
- * `<CountdownTimer anniversaries={...} maxDisplay={3} />` in `DailyMessage`,
- * a `.slice(0, count)` in `utils/countdownService.ts`.
+ * a `.slice(0, count)` in `utils/countdownService.ts`. Since 2026-11-05 the
+ * list holds anniversaries too, sorted with the events, under the same cap.
  */
 const HOME_MAX_EVENT_CARDS = 6;
 
@@ -130,6 +133,7 @@ function App() {
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
   const loadEvents = useAppStore((s) => s.loadEvents);
   const loadAnniversariesFromServer = useAppStore((s) => s.loadAnniversariesFromServer);
+  const anniversaries = useAppStore((s) => s.settings?.relationship.anniversaries);
   // The bundled rows are seeded by initializeApp; the message-data refresher maps
   // server keys onto them, so account-data sync waits until they exist.
   const messagesSeeded = useAppStore((s) => s.messages.length > 0);
@@ -822,21 +826,27 @@ function App() {
 
   // Story 3 (dynamic events): only events that have not yet passed at the
   // viewer's own local midnight (CAP-3), capped at HOME_MAX_EVENT_CARDS
-  // (DW-22). Both live in `getUpcomingEventCards`, which reuses
+  // (DW-22). Both live in `getUpcomingDateCards`, which reuses
   // `getCalendarDaysDiff` — the same comparison EventCountdown already trusts —
   // rather than re-deriving it. `events` is already sorted soonest-first by
   // eventsSlice; no re-sort. One clock reading for the whole list: called
   // without `now`, every event samples its own `new Date()`, so a pass
   // straddling a midnight tick can judge two same-day events against different
   // days.
+  //
+  // Anniversaries share the list (2026-11-05): each at its next occurrence,
+  // sorted with the events. An unreadable date is skipped, as the Dates list does.
   const now = new Date();
-  const { upcomingCount, visible: visibleEvents } = getUpcomingEventCards(
+  const { upcomingCount, visible: visibleCards } = getUpcomingDateCards(
     events,
+    (anniversaries ?? [])
+      .filter((anniversary) => parseEventDate(anniversary.date) !== null)
+      .map((anniversary) => ({ item: anniversary, date: getNextAnniversaryDate(anniversary.date, now) })),
     now,
     HOME_MAX_EVENT_CARDS
   );
   const eventsSlotView = getEventsSlotView(
-    events.length,
+    events.length + (anniversaries?.length ?? 0),
     upcomingCount,
     firstEventsLoadSettled,
     eventsLoadFailed
@@ -940,23 +950,30 @@ function App() {
                   </p>
                 </div>
               ) : (
-                // Already filtered and capped by getUpcomingEventCards, which
+                // Already filtered and capped by getUpcomingDateCards, which
                 // hands the slot decision above the UNCAPPED count — so hiding
                 // the tail can never turn a real list into the empty
                 // placeholder. A card that retires returns null, which occupies
                 // no grid cell, so the survivors reflow with no gap.
                 <div className="grid grid-cols-2 gap-3">
-                  {visibleEvents.map((event) => (
-                    <EventCountdown
-                      key={event.id}
-                      label={event.label}
-                      icon={event.icon}
-                      date={event.date}
-                      description={event.description ?? undefined}
-                      onRetire={handleEventRetired}
-                      onOpen={() => openSettingsPage(`dates/event/${event.id}`, { fromHome: true })}
-                    />
-                  ))}
+                  {visibleCards.map((card) =>
+                    card.kind === 'event' ? (
+                      <EventCountdown
+                        key={`event-${card.item.id}`}
+                        label={card.item.label}
+                        icon={card.item.icon}
+                        date={card.item.date}
+                        description={card.item.description ?? undefined}
+                        onRetire={handleEventRetired}
+                        onOpen={() => openSettingsPage(`dates/event/${card.item.id}`, { fromHome: true })}
+                      />
+                    ) : (
+                      <AnniversaryCountdown
+                        key={`anniversary-${card.item.serverId ?? card.item.id}`}
+                        anniversary={card.item}
+                      />
+                    )
+                  )}
                 </div>
               )}
 

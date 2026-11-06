@@ -10,7 +10,7 @@
 import type { ReactNode } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CountdownTimer } from '../../CountdownTimer/CountdownTimer';
+import { AnniversaryCountdown } from '../../CountdownTimer/CountdownTimer';
 import { BirthdayCountdown } from '../BirthdayCountdown';
 import { BirthdayWeddingCards } from '../BirthdayWeddingCards';
 import { EventCountdown } from '../EventCountdown';
@@ -116,10 +116,7 @@ describe('Countdown cards on the day itself', () => {
 
   it('highlights a celebrating anniversary with Sparkles and "Today!"', () => {
     render(
-      <CountdownTimer
-        anniversaries={[{ id: 1, date: '2024-03-16', label: 'First date' }]}
-        maxDisplay={3}
-      />
+      <AnniversaryCountdown anniversary={{ id: 1, date: '2024-03-16', label: 'First date' }} />
     );
 
     const card = screen.getByTestId('anniversary-countdown-1');
@@ -230,10 +227,7 @@ describe('Countdown cards on an ordinary day', () => {
   it('shows a plain calendar tile, a day count and a live clock for an upcoming anniversary', () => {
     // Noon on 16 March to midnight on 20 March: 3 days 12h 0m.
     render(
-      <CountdownTimer
-        anniversaries={[{ id: 2, date: '2024-03-20', label: 'First kiss' }]}
-        maxDisplay={3}
-      />
+      <AnniversaryCountdown anniversary={{ id: 2, date: '2024-03-20', label: 'First kiss' }} />
     );
 
     const card = screen.getByTestId('anniversary-countdown-2');
@@ -251,10 +245,7 @@ describe('Anniversary clock in the last minute', () => {
   it('keeps counting seconds until midnight, then reads "Today!"', () => {
     vi.setSystemTime(new Date(2026, 2, 19, 23, 59, 30));
     render(
-      <CountdownTimer
-        anniversaries={[{ id: 3, date: '2024-03-20', label: 'First kiss' }]}
-        maxDisplay={3}
-      />
+      <AnniversaryCountdown anniversary={{ id: 3, date: '2024-03-20', label: 'First kiss' }} />
     );
 
     const card = screen.getByTestId('anniversary-countdown-3');

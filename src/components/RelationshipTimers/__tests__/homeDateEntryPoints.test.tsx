@@ -6,7 +6,7 @@
 import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CountdownTimer } from '../../CountdownTimer/CountdownTimer';
+import { AnniversaryCountdown } from '../../CountdownTimer/CountdownTimer';
 import { BirthdayWeddingCards } from '../BirthdayWeddingCards';
 import { EventCountdown } from '../EventCountdown';
 import { TimeTogether } from '../TimeTogether';
@@ -159,13 +159,10 @@ describe("Home's date cards open the date pages", () => {
 
   it('opens an anniversary by its server id, or by its local id until it has one', () => {
     render(
-      <CountdownTimer
-        anniversaries={[
-          { id: 1, date: '2024-03-16', label: 'First date', serverId: 'srv-1' },
-          { id: 2, date: '2024-04-16', label: 'Second date' },
-        ]}
-        maxDisplay={3}
-      />
+      <>
+        <AnniversaryCountdown anniversary={{ id: 1, date: '2024-03-16', label: 'First date', serverId: 'srv-1' }} />
+        <AnniversaryCountdown anniversary={{ id: 2, date: '2024-04-16', label: 'Second date' }} />
+      </>
     );
 
     fireEvent.click(screen.getByTestId('anniversary-countdown-1-open'));
