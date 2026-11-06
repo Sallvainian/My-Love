@@ -84,6 +84,14 @@ R9 (parent R20): Each partner's day runs on their own phone's clock. Met when pa
 
 ## Notes
 
+- Decision: 2026-11-05 tracer bullet is story 1, both partners pick today's question and see the reveal, online only, through migration, gate, RPCs, slice and view. Story 2 (each partner's own clock) comes second as the least certain part: date and zone errors fail silently.
+- Decision: 2026-11-05 sequencing: stories touching the migrations, the gate pgTAP file, the generated types or dailyQuestionSlice wait on each other in one lane (1, 2, 3, 5, 6, 7, 8); the pool (4) runs beside them after 1; the dock slot (9) waits on 6; the refactor sweep (10) is kept; the live check (11) closes.
+- Decision: 2026-11-05 the snapshot's `nudge` field (spine AD-16) is added by epic 8 with `daily_nudges`; epic 6's snapshot carries every other field.
+- Decision: 2026-11-05 story 9 deletes the E2E tests whose subject is the mood screen or sending a mood; story 6 first ports the realtime-recovery spec to a live `daily_pick`. Partner-page mood tests stay until epic 7.
+- Decision: 2026-11-05 the owner runs this epic through bmad-loop with no person in any story: no `plan_checkpoint` or `done_checkpoint`, no `hitl` entry; each story is done when its checks pass. The pool is skimmed in the epic PR, and the live check runs in `deploy.yml` after every deploy.
+
+- Decision: 2026-11-05 the live-site check resets the production bot pair's day rows with the service key before each run, limited to the two bot ids, so it can rerun any number of times a day. Declined: choosing a time zone whose date is unused (two or three runs a day at most) and creating throwaway accounts per run.
+
 - Decision: 2026-11-06 re-sliced in place after the owner made writing tomorrow's question one partner's turn a day, offered right after their own pick rather than after the reveal (parent R3; spine AD-4): Description and Done when follow.
 - Decision: 2026-11-06 the owner set the after-pick order: the write prompt first, then the nudge prompt (epic 8). The write prompt shows again on each later open of that day until it is answered or the day ends, and "No thanks" counts as answered (spine memlog question, no architecture impact).
 - Decision: 2026-11-05 refined with the owner taking the PO's picks:
