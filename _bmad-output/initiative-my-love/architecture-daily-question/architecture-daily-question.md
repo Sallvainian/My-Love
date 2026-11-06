@@ -71,8 +71,8 @@ Arrows point the only way a dependency may run. Views never call the API directl
 ### AD-4: One function assigns the day's question
 
 - **Binds:** R1, R3, R4; epics 6, 8
-- **Prevents:** the client and the 8 AM push each drawing a question, a question repeating within a cycle, two written questions both claiming one date
-- **Rule:** only the internal `assign_couple_day(user_a, user_b, day)` creates a `couple_days` row. It takes `pg_advisory_xact_lock` on the pair, then inserts into `couple_days` (`unique (user_a, user_b, day)`, `cycle int not null`) on conflict do nothing, then selects. It takes the couple's earliest pending written question whose `target_day <= day`, so a question whose own date got no row is still asked next. Otherwise it draws at random from the coach's questions plus the couple's own, excluding every `question_id` in the current cycle; when none is left, it starts cycle `max + 1`. A written question goes in only through `submit_written_question(day_id, this_text, that_text)`, which takes the same pair lock and records `source_day_id`. Its target is the first date after the revealed day (`day_id`'s `day`) that has no `couple_days` row, so an ahead partner having already opened the next date does not push it to the pool. The first question written from a source day is the pending one, held to one per source day by a partial unique index. A second one from the same source day joins the couple's pool (target null), whatever state the first is in. "No thanks" writes nothing.
+- **Prevents:** the client and the 8 AM push each drawing a question, a question repeating within a cycle, two written questions both claiming one date, both partners asked to write on one day
+- **Rule:** only the internal `assign_couple_day(user_a, user_b, day)` creates a `couple_days` row. It takes `pg_advisory_xact_lock` on the pair, then inserts into `couple_days` (`unique (user_a, user_b, day)`, `cycle int not null`, `writer uuid not null`) on conflict do nothing, then selects. It takes the couple's earliest pending written question whose `target_day <= day`, so a question whose own date got no row is still asked next. Otherwise it draws at random from the coach's questions plus the couple's own, excluding every `question_id` in the current cycle; when none is left, it starts cycle `max + 1`. Each row stores its writer, `couple_days.writer`, fixed from the date alone: `user_a` when `day - date '2000-01-01'` is even, else `user_b`. It is never derived from a count of rows, so a date with no row still keeps the turns alternating. A written question goes in only through `submit_written_question(day_id, this_text, that_text)`, which takes the same pair lock and records `source_day_id`. It refuses unless the caller is `day_id`'s writer, the caller's own pick of `day_id` exists and `day_id`'s `day` is still the caller's current date (AD-2), so the prompt follows the writer's pick, never the reveal, and a turn ends with its date. Its target is the first date after `day_id`'s `day` that has no `couple_days` row, so an ahead partner having already opened the next date does not push it to the pool. `unique (source_day_id)` holds it to one per source day, and a retry returns the existing row unchanged. "No thanks" writes nothing, and an unused turn is not carried over.
 
 ### AD-5: One gate releases a pick's choice
 
@@ -196,7 +196,7 @@ Arrows point the only way a dependency may run. Views never call the API directl
 
 - **Binds:** R2, R10, R11; epics 6, 7, 8, 9
 - **Prevents:** today, history, the reply attachment and the live re-read each inventing a row shape and reading around the gate
-- **Rule:** the internal `daily_day_snapshot(day_id, viewer, at)` returns `{ day_id, day, question { this, that }, state: 'none' | 'me' | 'partner' | 'both', my_choice, partner_choice | null, same | null, nudge { slot: 'after_pick' | 'evening' | null, spent } }`, reading choices only through AD-5. `nudge` is the viewer's current slot (AD-17) and whether it is spent. `get_daily_day` (the caller's date), `get_daily_day_by_id`, `submit_daily_pick` and `get_daily_history` (an array, newest first) all return it.
+- **Rule:** the internal `daily_day_snapshot(day_id, viewer, at)` returns `{ day_id, day, question { this, that }, state: 'none' | 'me' | 'partner' | 'both', my_choice, partner_choice | null, same | null, nudge { slot: 'after_pick' | 'evening' | null, spent }, write { mine, done } }`, reading choices only through AD-5. `nudge` is the viewer's current slot (AD-17) and whether it is spent. `write.mine` is whether the viewer is the day's writer (AD-4), `write.done` whether a question from this day exists. `get_daily_day` (the caller's date), `get_daily_day_by_id`, `submit_daily_pick` and `get_daily_history` (an array, newest first) all return it.
 
 ### AD-17: A nudge spends one of two daily slots
 
@@ -277,7 +277,7 @@ Deployment does not change. `deploy.yml` applies the migrations (tables, functio
 | --- | --- | --- |
 | R1 same question, own pick | `couple_days`, `submit_daily_pick` | AD-1, AD-4, AD-6 |
 | R2 / C1 hidden pick | the gate, the policy, the pgTAP file | AD-5, AD-15, AD-16 |
-| R3, R4 written questions, pool | `submit_written_question`, `assign_couple_day` | AD-4 |
+| R3, R4 written questions in turns, pool | `submit_written_question`, `assign_couple_day` | AD-4 |
 | R5–R7, R9, R11 streak, run, colours, milestones, Same/Different | `couple_streak`, snapshot | AD-7, AD-8, AD-16 |
 | R8 +1 animation | `daily-celebrated` copy | AD-13 |
 | R10 reply attached | `love_notes.couple_day_id` | AD-14, AD-16 |
@@ -296,6 +296,6 @@ Deployment does not change. `deploy.yml` applies the migrations (tables, functio
 - **Push copy and badge rules** (epic 8): owned by `send-push/payload.ts`, using the mock-up's notifications screen and AD-7's naming.
 - **Renaming `mood-updates:` and `moodSyncService`** (after epic 10): needs a policy change and both partners' clients updated together.
 - **Pool authoring and the size check** (epic 6): content work, with "about 500" checked by a count.
-- **When the write-tomorrow prompt shows** (epic 6): R3 says each day, while epic 6 says after the reveal. AD-4 works either way.
+- **The two after-pick prompts** (epic 6): which comes first, write tomorrow's question or nudge, and whether an unanswered write prompt shows again on a later open of the same day. UX only; AD-4 and AD-16 hold either way.
 - **Moving `formatDateKey` out of `calendarHelpers.ts`** (epic 6, before epic 10 deletes the mood calendar).
 - **Cron observability beyond `cron.job_run_details`** (epic 8): no dashboard is planned.
