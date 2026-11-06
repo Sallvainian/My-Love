@@ -4,11 +4,14 @@
  * Today's this-or-that question for the signed-in couple (architecture AD-13,
  * AD-16). `dailyDay` holds the last server answer of `get_daily_day` or
  * `submit_daily_pick`: `{ status: 'ok', snapshot }`, `{ status: 'unlinked' }`,
- * or `null` before any answer. It is NOT persisted and has no local copy yet
- * (a later story adds one), so the view re-reads on each mount.
+ * or `null` before any answer. The field is NOT persisted; the account's saved
+ * days are the `daily-days` local copy (`services/dailyDaysCopy.ts`), which
+ * `loadDailyDay` shows first for the device's date and every successful answer
+ * (a read or a confirmed pick) is merged into. The view re-reads on each mount.
  *
- * Only a successful answer writes `dailyDay`: a failed load keeps what is shown
- * and sets `dailyDayError`, and never turns into `unlinked`. A snapshot of the
+ * Only a successful answer writes `dailyDay` and the copy: a failed load keeps
+ * what is shown and sets `dailyDayError`, and never turns into `unlinked`. A
+ * load with no connection and today's saved day shown sets no error. A snapshot of the
  * same `day_id` whose state ranks lower than the stored one (`none` <
  * `me`/`partner` < `both`) does not replace it, so a slow read cannot undo a
  * reveal. Every async action captures `{ userId, authSessionVersion }` before
@@ -23,6 +26,13 @@
  */
 
 import { AccountDataError } from '../../services/accountDataError';
+import {
+  DAILY_DAYS_COPY_KIND,
+  dailyStateRank,
+  mergeDailyDay,
+  readSavedDailyDay,
+} from '../../services/dailyDaysCopy';
+import { registerLocalCopy } from '../../services/localCopy';
 import { formatDateISO } from '../../utils/dateUtils';
 
 import {
@@ -56,85 +66,116 @@ export interface DailyQuestionSlice {
   submitDailyPick: (choice: DailyChoice) => Promise<void>;
 }
 
-/** How far a day has got: `none` < `me` / `partner` < `both`. */
-const STATE_RANK: Record<DailyDaySnapshot['state'], number> = {
-  none: 0,
-  me: 1,
-  partner: 1,
-  both: 2,
-};
-
 /** The answer to keep: `next`, unless it is the same day at an earlier state than `stored`. */
 function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): DailyDayAnswer {
   if (
     stored?.status === 'ok' &&
     next.status === 'ok' &&
     stored.snapshot.day_id === next.snapshot.day_id &&
-    STATE_RANK[next.snapshot.state] < STATE_RANK[stored.snapshot.state]
+    dailyStateRank(next.snapshot.state) < dailyStateRank(stored.snapshot.state)
   ) {
     return stored;
   }
   return next;
 }
 
-export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (set, get, _api) => ({
-  dailyDay: null,
-  dailyDayLoading: false,
-  dailyDayError: null,
+export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (set, get, _api) => {
+  // A signed-in start and the window `online` event refresh the saved days.
+  registerLocalCopy(DAILY_DAYS_COPY_KIND, () => get().loadDailyDay());
 
-  loadDailyDay: async () => {
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) return;
-    const isCurrent = () =>
-      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+  return {
+    dailyDay: null,
+    dailyDayLoading: false,
+    dailyDayError: null,
 
-    set({ dailyDayLoading: true });
-    try {
-      const answer = await fetchDailyDay();
+    loadDailyDay: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      set({ dailyDayLoading: true });
+
+      // 1. The saved day for the device's date, at once: shown when nothing is,
+      // or when the shown day is another one; the higher state wins for the
+      // same day_id.
+      const today = formatDateISO(new Date());
+      const saved = await readSavedDailyDay(requestedBy, today);
+      if (!isCurrent()) return;
+      if (saved) {
+        const shown = get().dailyDay;
+        const savedAnswer: DailyDayAnswer = { status: 'ok', snapshot: saved };
+        if (shown === null || (shown.status === 'ok' && shown.snapshot.day !== saved.day)) {
+          set({ dailyDay: savedAnswer });
+        } else if (shown.status === 'ok' && shown.snapshot.day_id === saved.day_id) {
+          set({ dailyDay: mergeAnswer(shown, savedAnswer) });
+        }
+      }
+
+      try {
+        // 2. The server's answer, merged into the copy and then shown.
+        const answer = await fetchDailyDay();
+        if (!isCurrent()) return;
+        const merged = await mergeDailyDay(requestedBy, answer, isCurrent);
+        if (!isCurrent()) return;
+        set({
+          dailyDay: mergeAnswer(get().dailyDay, merged),
+          dailyDayLoading: false,
+          dailyDayError: null,
+        });
+      } catch (error) {
+        if (!isCurrent()) return;
+        const shown = get().dailyDay;
+        if (
+          error instanceof AccountDataError &&
+          error.code === 'offline' &&
+          shown?.status === 'ok' &&
+          shown.snapshot.day === today
+        ) {
+          // No connection and today's saved day is up: nothing to report.
+          set({ dailyDayLoading: false, dailyDayError: null });
+          return;
+        }
+        console.error("[DailyQuestion] Failed to load today's question:", error);
+        set({
+          dailyDayLoading: false,
+          dailyDayError: error instanceof Error ? error.message : "Could not load today's question.",
+        });
+      }
+    },
+
+    submitDailyPick: async (choice) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to send your pick');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      const shown = get().dailyDay;
+      if (shown?.status !== 'ok') throw new Error('There is no question to answer yet');
+
+      const pickedAt = new Date();
+      if (formatDateISO(pickedAt) !== shown.snapshot.day) {
+        void get().loadDailyDay();
+        throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE);
+      }
+
+      let snapshot: DailyDaySnapshot;
+      try {
+        snapshot = await submitDailyPickRequest(shown.snapshot.day_id, choice, pickedAt);
+      } catch (error) {
+        if (error instanceof AccountDataError && error.code === 'day-changed' && isCurrent()) {
+          void get().loadDailyDay();
+        }
+        throw error;
+      }
+      if (!isCurrent()) return;
+      // A confirmed own write is a fill source for the copy.
+      const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
       if (!isCurrent()) return;
       set({
-        dailyDay: mergeAnswer(get().dailyDay, answer),
-        dailyDayLoading: false,
+        dailyDay: mergeAnswer(get().dailyDay, merged),
         dailyDayError: null,
       });
-    } catch (error) {
-      if (!isCurrent()) return;
-      console.error('[DailyQuestion] Failed to load today\'s question:', error);
-      set({
-        dailyDayLoading: false,
-        dailyDayError: error instanceof Error ? error.message : 'Could not load today\'s question.',
-      });
-    }
-  },
-
-  submitDailyPick: async (choice) => {
-    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) throw new Error('You must be signed in to send your pick');
-    const isCurrent = () =>
-      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
-
-    const shown = get().dailyDay;
-    if (shown?.status !== 'ok') throw new Error('There is no question to answer yet');
-
-    const pickedAt = new Date();
-    if (formatDateISO(pickedAt) !== shown.snapshot.day) {
-      void get().loadDailyDay();
-      throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE);
-    }
-
-    let snapshot: DailyDaySnapshot;
-    try {
-      snapshot = await submitDailyPickRequest(shown.snapshot.day_id, choice, pickedAt);
-    } catch (error) {
-      if (error instanceof AccountDataError && error.code === 'day-changed' && isCurrent()) {
-        void get().loadDailyDay();
-      }
-      throw error;
-    }
-    if (!isCurrent()) return;
-    set({
-      dailyDay: mergeAnswer(get().dailyDay, { status: 'ok', snapshot }),
-      dailyDayError: null,
-    });
-  },
-});
+    },
+  };
+};

@@ -4,8 +4,10 @@
  * Reads `dailyDay` from `dailyQuestionSlice`; every projection (state, the
  * partner's choice, Same/Different) comes from the server snapshot, and the
  * view shows the partner's choice only when the snapshot carries it. `unlinked`
- * renders no question and no pick control. A normal page inside `<main>`, so it
- * gets the dock clearance and side padding from there.
+ * renders no question and no pick control, only the invitation to link (Go to
+ * Partner); a failed load never does. The slice shows the account's saved day
+ * first, so a day seen earlier stays on screen offline. A normal page inside
+ * `<main>`, so it gets the dock clearance and side padding from there.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -184,6 +186,7 @@ export function DailyQuestion() {
   const loadDailyDay = useAppStore((state) => state.loadDailyDay);
   const userId = useAppStore((state) => state.userId);
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
+  const navigatePartner = useAppStore((state) => state.navigatePartner);
   const partnerName = useAppStore((state) => state.partner?.displayName)?.trim() || 'Your partner';
 
   // The day-changed notice belongs to the session that raised it, so an account
@@ -195,7 +198,7 @@ export function DailyQuestion() {
   const raiseDayChanged = useCallback(() => setDayChangedIn(sessionKey), [sessionKey]);
 
   // Re-read on each mount, and for a new session while the view stays open (an
-  // account switch clears `dailyDay` through signedOutState): no local copy yet.
+  // account switch clears `dailyDay` through signedOutState).
   useEffect(() => {
     void loadDailyDay();
   }, [loadDailyDay, userId, authSessionVersion]);
@@ -221,6 +224,27 @@ export function DailyQuestion() {
             onSendStart={clearDayChanged}
             onDayChanged={raiseDayChanged}
           />
+        )}
+
+        {dailyDay?.status === 'unlinked' && (
+          <div className={`${CARD} gap-3 p-5`} data-testid="daily-invite">
+            <h1 className="font-serif text-[28px] leading-[1.15] font-semibold wrap-break-word text-ink">
+              Link with your partner
+            </h1>
+            <p className="text-[15px] leading-[1.4] text-muted">
+              Daily asks you both one question a day. Link your accounts to start.
+            </p>
+            <div className="flex">
+              <button
+                type="button"
+                className={PRIMARY_BUTTON}
+                onClick={navigatePartner}
+                data-testid="daily-invite-link"
+              >
+                Go to Partner
+              </button>
+            </div>
+          </div>
         )}
 
         {dailyDay === null && !loadError && (

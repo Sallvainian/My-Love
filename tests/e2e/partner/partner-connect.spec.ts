@@ -46,9 +46,8 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
-import { createOutsiderClient, deleteOutsider } from '../../support/helpers/rls-security';
+import { createThrowaway, signIn, type Throwaway } from '../../support/helpers/throwaway-account';
 import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
-import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
 const REQUEST_SEND = '**/rest/v1/partner_requests*';
@@ -61,37 +60,6 @@ const INTERACTIONS_SUBSCRIBED_LOG = /\[InteractionService\] Realtime subscriptio
 
 const MISSING = "No account uses that email — check it's the one they sign in with.";
 const TAKEN = 'That account is already connected with a partner.';
-
-type Throwaway = Awaited<ReturnType<typeof createOutsiderClient>> & {
-  email: string;
-  name: string;
-};
-
-/**
- * A throwaway account with a chosen display name, so sign-in lands in the app
- * rather than on the name-setup screen. The name is written by the account
- * itself, through the same column grant the app's own name form uses.
- */
-async function createThrowaway(
-  supabaseAdmin: TypedSupabaseClient,
-  cleanup: { defer: (label: string, fn: () => Promise<unknown>) => void },
-  role: string
-): Promise<Throwaway> {
-  const tag = Math.random().toString(36).slice(2, 8);
-  const account = await createOutsiderClient(supabaseAdmin, `connect-${role}-${tag}`);
-  cleanup.defer(`delete throwaway account ${role}`, () => deleteOutsider(account));
-
-  const { data, error: userError } = await account.client.auth.getUser();
-  if (userError || !data.user?.email) throw new Error(`No email for ${role}: ${userError?.message}`);
-  const name = `Connect ${role.toUpperCase()} ${tag}`;
-  const { error } = await account.client
-    .from('users')
-    .update({ display_name: name, updated_at: new Date().toISOString() })
-    .eq('id', account.userId);
-  if (error) throw new Error(`Failed to name ${role}: ${error.message}`);
-
-  return { ...account, email: data.user.email, name };
-}
 
 /** A pending request from `from` to `to`, sent as `from` itself; returns its id. */
 async function seedRequest(from: Throwaway, to: Throwaway): Promise<string> {
@@ -166,16 +134,6 @@ async function openSecondBrowser(
   const second = await newBareContext(browser, testInfo, anchor);
   cleanup.defer('close the second context', () => closeContext(second));
   return second.newPage();
-}
-
-/** Sign in through the real login form and wait for the app. */
-async function signIn(page: Page, account: Throwaway): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByTestId('login-screen')).toBeVisible();
-  await page.getByLabel('Email', { exact: true }).fill(account.email);
-  await page.getByTestId('password-input').fill(TEST_USER_PASSWORD);
-  await page.getByTestId('submit-button').click();
-  await expect(page.getByTestId('app-container')).toBeVisible();
 }
 
 /**

@@ -25,7 +25,8 @@ vi.mock('../../../src/api/dailyQuestionApi', async (importOriginal) => ({
 
 import { DAY_CHANGED_MESSAGE } from '../../../src/api/dailyQuestionApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
-import { deleteAccountCopies } from '../../../src/services/localCopy';
+import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
+import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { dailySnapshot, revealSnapshot, waitingSnapshot, DAY_ID } from './dailyQuestionFixture';
 import { setOnline } from './navigatorFixtures';
@@ -272,6 +273,191 @@ describe('loadDailyDay', () => {
   });
 });
 
+describe('the saved days copy', () => {
+  const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({ [snapshot.day_id]: snapshot });
+  const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+
+  it('shows the saved day for the device date before the fetch settles', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(waitingSnapshot('this')));
+    const request = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValue(request.promise);
+
+    const load = state().loadDailyDay();
+    await vi.waitFor(() => expect(state().dailyDay).toEqual(ok(waitingSnapshot('this'))));
+    expect(state().dailyDayLoading).toBe(true);
+    request.settle(ok(waitingSnapshot('this')));
+    await load;
+
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it("does not show a saved day that is not the device's date", async () => {
+    await writeLocalCopy(
+      A,
+      DAILY_DAYS_COPY_KIND,
+      saved(dailySnapshot({ day_id: 'yesterday', day: '2026-11-04' }))
+    );
+    const request = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValue(request.promise);
+
+    const load = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+
+    expect(state().dailyDay).toBeNull();
+    request.settle(ok(dailySnapshot()));
+    await load;
+  });
+
+  it('a saved day does not replace an unlinked answer that is shown', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+    useAppStore.setState({ dailyDay: { status: 'unlinked' } });
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toEqual({ status: 'unlinked' });
+  });
+
+  it('a saved day of the shown day_id keeps the higher state', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it('writes the server answer into the copy, and an unlinked answer as an empty map', async () => {
+    fetchDailyDay.mockResolvedValueOnce(ok(waitingSnapshot('this')));
+    await state().loadDailyDay();
+    expect(await copy()).toEqual(saved(waitingSnapshot('this')));
+
+    fetchDailyDay.mockResolvedValueOnce({ status: 'unlinked' });
+    await state().loadDailyDay();
+    expect(await copy()).toEqual({});
+  });
+
+  it('a slower lower read changes neither the copy nor the screen', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(revealSnapshot('this', 'that')));
+    fetchDailyDay.mockResolvedValue(ok(waitingSnapshot('this')));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toEqual(ok(revealSnapshot('this', 'that')));
+    expect(await copy()).toEqual(saved(revealSnapshot('this', 'that')));
+  });
+
+  describe('offline', () => {
+    it('with today saved: shows it, sets no error and logs nothing when the API refuses offline', async () => {
+      await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(waitingSnapshot('that')));
+      setOnline(false);
+      // The real API refuses offline before any request; mirror it here.
+      fetchDailyDay.mockRejectedValue(
+        new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+      );
+
+      await state().loadDailyDay();
+
+      expect(state().dailyDay).toEqual(ok(waitingSnapshot('that')));
+      expect(state().dailyDayError).toBeNull();
+      expect(state().dailyDayLoading).toBe(false);
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('with none saved: sets the offline message and shows nothing', async () => {
+      setOnline(false);
+      fetchDailyDay.mockRejectedValue(
+        new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+      );
+
+      await state().loadDailyDay();
+
+      expect(state().dailyDay).toBeNull();
+      expect(state().dailyDayError).toBe(
+        "You are offline. Today's question needs a connection to load."
+      );
+    });
+
+    it('with only yesterday saved: sets the offline message and shows nothing', async () => {
+      await writeLocalCopy(
+        A,
+        DAILY_DAYS_COPY_KIND,
+        saved(dailySnapshot({ day_id: 'yesterday', day: '2026-11-04' }))
+      );
+      setOnline(false);
+      fetchDailyDay.mockRejectedValue(
+        new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+      );
+
+      await state().loadDailyDay();
+
+      expect(state().dailyDay).toBeNull();
+      expect(state().dailyDayError).toMatch(/needs a connection to load/);
+    });
+  });
+
+  describe('an online failure', () => {
+    it('with today saved: keeps it, never the invitation, and shows the request error', async () => {
+      await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+      fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+      await state().loadDailyDay();
+
+      expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+      expect(state().dailyDayError).toBe('boom');
+      expect(await copy()).toEqual(saved(dailySnapshot()));
+    });
+
+    it('with none saved: shows nothing, never unlinked, and does not write the copy', async () => {
+      fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+      await state().loadDailyDay();
+
+      expect(state().dailyDay).toBeNull();
+      expect(state().dailyDayError).toBe('boom');
+      expect(await copy()).toBeNull();
+    });
+  });
+
+  it('a pick confirmed by the server is merged into the copy', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(dailySnapshot()));
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    expect(await copy()).toEqual(saved(waitingSnapshot('this')));
+  });
+
+  it('writes no copy when the session changes while the read is open', async () => {
+    const request = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValue(request.promise);
+
+    const load = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    request.settle(ok(dailySnapshot()));
+    await load;
+
+    expect(await copy()).toBeNull();
+    expect(state().dailyDay).toBeNull();
+  });
+
+  it('writes no copy when the session changes while a pick is open', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(await copy()).toBeNull();
+  });
+});
+
 describe('sign-out', () => {
   it('clears dailyDay, dailyDayLoading and dailyDayError', () => {
     useAppStore.setState({
@@ -395,7 +581,8 @@ describe('submitDailyPick', () => {
       });
 
       expect(submitDailyPickRequest).not.toHaveBeenCalled();
-      expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+      // The re-read reads the saved copy first, so its request follows a tick later.
+      await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
       await vi.waitFor(() => expect(state().dailyDay).toEqual(ok(nextDay)));
     });
 
@@ -416,7 +603,7 @@ describe('submitDailyPick', () => {
 
       await expect(state().submitDailyPick('this')).rejects.toBe(refusal);
 
-      expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
       await vi.waitFor(() => expect(state().dailyDay).toEqual(ok(nextDay)));
     });
 

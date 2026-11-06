@@ -122,6 +122,17 @@ test.describe('Login Flow', () => {
       await page.route(`**/rest/v1/${table}?**`, serve([]));
     }
 
+    // Same reason, for the Daily days refresher: its get_daily_day RPC is a POST,
+    // which `serve` leaves alone. An unlinked answer needs no further reads.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/rpc/get_daily_day', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'unlinked' }),
+      })
+    );
+
     // GIVEN: User is on login screen
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();

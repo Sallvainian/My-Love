@@ -32,6 +32,8 @@ vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
 
 import { DAY_CHANGED_MESSAGE } from '../../../api/dailyQuestionApi';
 import { AccountDataError } from '../../../services/accountDataError';
+import { DAILY_DAYS_COPY_KIND } from '../../../services/dailyDaysCopy';
+import { deleteAccountCopies, writeLocalCopy } from '../../../services/localCopy';
 import { useAppStore } from '../../../stores/useAppStore';
 import { DailyQuestion } from '../DailyQuestion';
 
@@ -48,7 +50,9 @@ function setPartner(displayName: string | null) {
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
 }
 
-beforeEach(() => {
+const realNavigatePartner = useAppStore.getState().navigatePartner;
+
+beforeEach(async () => {
   vi.clearAllMocks();
   fetchDailyDay.mockReset();
   submitDailyPickRequest.mockReset();
@@ -60,11 +64,15 @@ beforeEach(() => {
   useAppStore.getState().clearAuth();
   useAppStore.getState().setAuthUser('USER-A-ID');
   setPartner('Jessie');
+  // A day saved by an earlier test must not be shown first in this one.
+  await deleteAccountCopies('USER-A-ID');
+  await deleteAccountCopies('USER-C-ID');
 });
 
 afterEach(() => {
   vi.useRealTimers();
   setOnline(true);
+  useAppStore.setState({ navigatePartner: realNavigatePartner });
 });
 
 describe('DailyQuestion', () => {
@@ -193,16 +201,95 @@ describe('DailyQuestion', () => {
     expect(screen.queryByTestId('daily-send-error')).toBeNull();
   });
 
-  it('unlinked: no question and no pick control', async () => {
+  it('unlinked: the invitation, and no question and no pick control', async () => {
     fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
 
     render(<DailyQuestion />);
 
-    await waitFor(() => expect(useAppStore.getState().dailyDay).toEqual({ status: 'unlinked' }));
+    const invite = await screen.findByTestId('daily-invite');
+    expect(screen.getByRole('heading', { level: 1, name: 'Link with your partner' })).toBeInTheDocument();
+    expect(invite).toHaveTextContent(
+      'Daily asks you both one question a day. Link your accounts to start.'
+    );
+    expect(screen.getByTestId('daily-invite-link')).toHaveTextContent('Go to Partner');
     expect(screen.queryByTestId('daily-question')).toBeNull();
     expect(screen.queryByTestId('daily-option-this')).toBeNull();
     expect(screen.queryByTestId('daily-send-pick')).toBeNull();
     expect(screen.queryByTestId('daily-error')).toBeNull();
+    expect(screen.queryByTestId('daily-loading')).toBeNull();
+  });
+
+  it('Go to Partner calls navigatePartner', async () => {
+    const user = userEvent.setup();
+    const navigatePartner = vi.fn();
+    useAppStore.setState({ navigatePartner });
+    fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-invite-link'));
+
+    expect(navigatePartner).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no invitation for a linked day', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    await screen.findByTestId('daily-question');
+    expect(screen.queryByTestId('daily-invite')).toBeNull();
+  });
+
+  it('shows no invitation when the load fails with nothing saved', async () => {
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'The server is down'));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-invite')).toBeNull();
+  });
+
+  it('a failed load after a saved day keeps the question and shows no invitation', async () => {
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: dailySnapshot() });
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'The server is down'));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-error')).toHaveTextContent('The server is down');
+    expect(screen.getByTestId('daily-question')).toHaveTextContent('Beach day or Mountain day?');
+    expect(screen.queryByTestId('daily-invite')).toBeNull();
+  });
+
+  it('offline with today saved: the saved question, no error, no invitation, no loading line', async () => {
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: dailySnapshot() });
+    setOnline(false);
+    fetchDailyDay.mockRejectedValue(
+      new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+    );
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-question')).toHaveTextContent('Beach day or Mountain day?');
+    await waitFor(() => expect(useAppStore.getState().dailyDayLoading).toBe(false));
+    expect(screen.queryByTestId('daily-error')).toBeNull();
+    expect(screen.queryByTestId('daily-invite')).toBeNull();
+    expect(screen.queryByTestId('daily-loading')).toBeNull();
+  });
+
+  it('offline with nothing saved: the offline sentence and Retry, no question, no invitation', async () => {
+    setOnline(false);
+    fetchDailyDay.mockRejectedValue(
+      new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+    );
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-error')).toHaveTextContent(
+      "You are offline. Today's question needs a connection to load."
+    );
+    expect(screen.getByTestId('daily-retry')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-question')).toBeNull();
+    expect(screen.queryByTestId('daily-invite')).toBeNull();
   });
 
   it('load fails with nothing shown: the error and Retry, which loads again', async () => {
@@ -332,7 +419,10 @@ describe('DailyQuestion', () => {
       vi.setSystemTime(NEXT_DAY);
       await user.click(screen.getByTestId('daily-send-pick'));
 
-      expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
+      // The old card is still up until the re-read (which reads the saved copy first) lands.
+      await waitFor(() =>
+        expect(screen.getByTestId('daily-question')).toHaveTextContent('Tea or Coffee?')
+      );
       const notice = screen.getByTestId('daily-day-changed');
       expect(notice).toHaveTextContent(DAY_CHANGED_MESSAGE);
       expect(notice).toHaveAttribute('role', 'status');
@@ -368,7 +458,9 @@ describe('DailyQuestion', () => {
       await user.click(screen.getByTestId('daily-send-pick'));
 
       expect(await screen.findByTestId('daily-day-changed')).toHaveTextContent(DAY_CHANGED_MESSAGE);
-      expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
+      await waitFor(() =>
+        expect(screen.getByTestId('daily-question')).toHaveTextContent('Tea or Coffee?')
+      );
       expect(screen.queryByTestId('daily-send-error')).toBeNull();
       expect(fetchDailyDay).toHaveBeenCalledTimes(2);
     });

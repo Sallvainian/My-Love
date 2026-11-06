@@ -16,8 +16,9 @@ import type { TypedSupabaseClient } from './index';
  *
  * Call it before each test, and defer it again at teardown: a day left by an
  * earlier test fixes the question, the writer and the picks the next one starts
- * from, and the row audit (`couple_days` is in `AUDITED_TABLES`) fails a run
- * that leaves days behind. Checked, because a silently-failed clear leaves
+ * from. The row audit counts the pair's `daily_picks`, not `couple_days`
+ * (every signed-in start assigns today's day, through the Daily copy's
+ * refresher), so a run that leaves picks behind fails. Checked, because a silently-failed clear leaves
  * stray rows that break the NEXT test's premise.
  */
 export async function clearPairDays(
