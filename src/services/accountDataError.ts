@@ -18,6 +18,7 @@ export type AccountDataErrorCode =
   | 'not-synced'
   | 'not-found'
   | 'invalid-response'
+  | 'day-changed'
   | 'transport';
 
 export class AccountDataError extends Error {

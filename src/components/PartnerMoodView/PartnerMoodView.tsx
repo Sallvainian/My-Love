@@ -162,7 +162,7 @@ export function PartnerMoodView() {
     // Track notification timeout IDs for cleanup (Task 11: prevent memory leaks)
     const timeoutIds: NodeJS.Timeout[] = [];
     let unsubscribe: (() => void) | null = null;
-    // subscribeMoodUpdates is async, so the effect can be torn down before it
+    // subscribePartnerEvents is async, so the effect can be torn down before it
     // resolves -- a fast tab switch, or the two renders StrictMode does in dev.
     // The cleanup below would then find `unsubscribe` still null and the
     // subscriber would stay attached for the life of the page, holding the
@@ -172,8 +172,8 @@ export function PartnerMoodView() {
     // Setup async subscription
     const setupSubscription = async () => {
       // Subscribe to partner mood INSERT events with status tracking
-      const unsubscribeFn = await moodSyncService.subscribeMoodUpdates(
-        (newMood) => {
+      const unsubscribeFn = await moodSyncService.subscribePartnerEvents({
+        new_mood: ({ mood: newMood }) => {
           logger.debug('[PartnerMoodView] Received partner mood update:', newMood);
 
           // Show notification toast
@@ -195,7 +195,7 @@ export function PartnerMoodView() {
             console.error('[PartnerMoodView] Failed to refresh after realtime update:', err);
           });
         },
-        (status) => {
+        onStatus: (status) => {
           // Story 6.4: Task 7 - Map Supabase Realtime status to ConnectionStatus
           logger.info('[PartnerMoodView] Realtime status changed:', status);
 
@@ -206,8 +206,8 @@ export function PartnerMoodView() {
           } else if (status === 'TIMED_OUT') {
             setConnectionStatus('reconnecting');
           }
-        }
-      );
+        },
+      });
 
       if (!isMounted) {
         unsubscribeFn();

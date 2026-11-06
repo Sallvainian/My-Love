@@ -20,13 +20,14 @@
  *    settled, so the badge can only come from the live row;
  *  - love notes (`useRealtimeMessages`): the feed gives up while the token is
  *    stale and is re-armed by the renewal;
- *  - the partner mood card on the Mood screen. A boot that cannot read the
- *    server never mounts that card (`MoodTracker`'s partner lookup answers an
- *    error and keeps no partner), so the "Real-time connection lost" error
- *    `usePartnerMood` keeps and now clears is not reachable from a cold stale
- *    boot and is covered by its unit tests. `MoodTracker` looks its partner up
- *    again on `TOKEN_REFRESHED`, so after the renewal the card appears on the
- *    open screen, with no navigation, and receives the partner's mood live.
+ *  - a partner's daily pick on the Daily screen (`useDailyPickListener` over
+ *    the partner-event registry in `moodSyncService`). The screen mounts its
+ *    subscriber at boot, so the registry opens its channel on a token it cannot
+ *    use: the join is refused and the SDK rejoins the errored channel with the
+ *    renewed token, whose `SUBSCRIBED` also re-reads the day. After that the
+ *    partner picks through the real UI, and "has picked" has to appear with no
+ *    reload and no new `get_daily_day` read, only the `get_daily_day_by_id`
+ *    re-read the `daily_pick` broadcast asks for.
  *
  * The poke screen only mounts its tiles once it knows the partner, which a
  * cold stale boot never does, so that context saves the partner local copy on
@@ -41,14 +42,15 @@
  * default to the global scope and revoke the worker's shared one.
  *
  * The sender is the worker's partner, from the ordinary partner storage state,
- * through the real UI for the mood and the note; the poke is an admin insert,
- * as in `interactions-offline-copy.spec.ts`.
+ * through the real UI for the daily pick and the note; the poke is an admin
+ * insert, as in `interactions-offline-copy.spec.ts`.
  *
- * Nothing here links, unlinks or resets an account, and teardown deletes only
- * the rows carrying this test's own text or id.
+ * Nothing here links, unlinks or resets an account. Teardown deletes only the
+ * rows carrying this test's own text or id, and clears the pair's days, which a
+ * day left behind would fix for the next run.
  */
 import { randomUUID } from 'node:crypto';
-import type { Browser, BrowserContext, Page, Request, Response } from '@playwright/test';
+import type { Browser, BrowserContext, Page, Response } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { log } from '@seontechnologies/playwright-utils';
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
@@ -58,10 +60,17 @@ import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
 import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
+import { clearPairDays, ensureTestCoachQuestions } from '../../support/factories/daily-question';
+import { resolveWorkerPairIds } from '../../support/factories/events';
 import { resolveOwnPair } from '../../support/helpers/events';
-import { ownMoodHistoryRead } from '../../support/helpers/reads';
+import { DAILY_DAY_BY_ID_READ, DAILY_DAY_READ, DAILY_PICK_SEND } from '../../support/helpers/reads';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { recurseUntil } from '../../support/helpers/recurse';
+import {
+  MOOD_SUBSCRIBED_LOG,
+  type ReadTracker,
+  trackReads,
+} from '../../support/helpers/request-tracker';
 import { deleteRowById } from '../../support/helpers/teardown';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
@@ -78,12 +87,6 @@ const STORED_SESSION_WARNING = 'INITIAL_SESSION carried no session; using the st
 
 /** `interactionService`: the server confirmed the poke channel's row delivery. */
 const POKES_ARMED_LOG = /\[InteractionService\] postgres_changes subscription confirmed/;
-
-/**
- * `moodSyncService` reporting a join (`logger.debug`, which the dev server the
- * E2E project runs against does print). `usePartnerMood` logs nothing of its own.
- */
-const MOOD_SUBSCRIBED_LOG = /\[MoodSyncService\] Broadcast subscription status:.*SUBSCRIBED/;
 
 /** `useRealtimeMessages` reporting a join, as the sibling realtime specs read it. */
 const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
@@ -117,35 +120,6 @@ async function signInFresh(email: string): Promise<StoredSession> {
   }
   return data.session as unknown as StoredSession;
 }
-
-/**
- * Counts the GET reads of one REST table a page starts and settles, failed ones
- * too, so a spec can tell that none is in flight and that none started later.
- * Attach it to the page before it loads: a read it never saw start would look
- * settled.
- */
-function trackReads(page: Page, pathSuffix: string) {
-  let started = 0;
-  let settled = 0;
-  const isRead = (request: Request) =>
-    request.method() === 'GET' && new URL(request.url()).pathname.endsWith(pathSuffix);
-  const settle = (request: Request) => {
-    if (isRead(request)) settled += 1;
-  };
-  // playwright-utils deviation: counts every read the receiver starts, to know when none is in flight; interceptNetworkCall's observe mode latches onto the first matching request only.
-  page.on('request', (request) => {
-    if (isRead(request)) started += 1;
-  });
-  // playwright-utils deviation: settles every read, failed ones too; interceptNetworkCall's observe mode throws on a request that gets no response rather than reporting it.
-  page.on('requestfinished', settle);
-  page.on('requestfailed', settle);
-  return {
-    started: () => started,
-    inFlight: () => started - settled,
-  };
-}
-
-type ReadTracker = ReturnType<typeof trackReads>;
 
 type ReceivingPage = {
   context: BrowserContext;
@@ -220,7 +194,8 @@ async function bootExpired(
   baseURL: string,
   email: string,
   path: string,
-  trackedTable?: string
+  trackedPath?: string,
+  trackedMethod?: 'GET' | 'POST'
 ): Promise<ReceivingPage> {
   const context = await newReceivingContext(browser, baseURL, email, pastExpiry());
   // Registered at once, so a boot that fails later still closes its context.
@@ -229,7 +204,7 @@ async function bootExpired(
   await context.route(REFRESH_ROUTE, (route) => route.abort());
   const page = await context.newPage();
   await dismissWelcomeSplash(page);
-  const reads = trackedTable ? trackReads(page, trackedTable) : null;
+  const reads = trackedPath ? trackReads(page, trackedPath, trackedMethod) : null;
   const receiving = receivingPage(context, page, reads);
   await page.goto(path);
   return receiving;
@@ -285,7 +260,7 @@ test.describe('Realtime recovery after the token renews', () => {
   test.describe.configure({ timeout: 300_000 });
 
   test(
-    '[P1] DW-378-E2E-001 a poke, a mood and a note arrive live after an expired session renews',
+    '[P1] DW-378-E2E-001 a poke, a daily pick and a note arrive live after an expired session renews',
     async ({
       browser,
       baseURL,
@@ -302,23 +277,16 @@ test.describe('Realtime recovery after the token renews', () => {
       const pair = getWorkerPairEmails();
       if (!pair) throw new Error('no worker identity (TEST_PARALLEL_INDEX unset)');
       const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
+      const pairIds = await resolveWorkerPairIds(supabaseAdmin);
 
-      const moodNote = `DW-378 renewal mood ${randomUUID()}`;
       const noteText = `DW-378 renewal note ${randomUUID()}`;
 
-      let moodRowCommitted = false;
-      cleanup.defer('delete the mood row this test created', async () => {
-        const { data, error } = await supabaseAdmin
-          .from('moods')
-          .delete()
-          .eq('note', moodNote)
-          .in('user_id', [userId, partnerId])
-          .select('id');
-        if (error) throw error;
-        if (moodRowCommitted) {
-          expect.soft(data ?? [], 'Teardown must delete exactly the one mood row').toHaveLength(1);
-        }
-      });
+      // A day left behind would fix the question and the picks the next run
+      // starts from; the pick this test sends is gone with its day.
+      await ensureTestCoachQuestions(supabaseAdmin);
+      await clearPairDays(supabaseAdmin, pairIds);
+      cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pairIds));
+
       let noteRowCommitted = false;
       cleanup.defer('delete the note row this test created', async () => {
         const { data, error } = await supabaseAdmin
@@ -334,8 +302,16 @@ test.describe('Realtime recovery after the token renews', () => {
       });
 
       await log.step('Boot three receiving contexts on an expired session, refresh cut off');
-      const [mood, partner, notes] = await Promise.all([
-        bootExpired(browser, cleanup, origin, pair.user1Email, '/mood'),
+      const [daily, partner, notes] = await Promise.all([
+        bootExpired(
+          browser,
+          cleanup,
+          origin,
+          pair.user1Email,
+          '/daily',
+          '/rest/v1/rpc/get_daily_day',
+          'POST'
+        ),
         bootExpiredWithSavedPartner(
           browser,
           cleanup,
@@ -350,9 +326,10 @@ test.describe('Realtime recovery after the token renews', () => {
       // no read of its list delivered it instead.
       const interactionReads = partner.reads!;
       const noteReads = notes.reads!;
+      const dailyReads: ReadTracker = daily.reads!;
 
       await Promise.all([
-        mood.storedSessionWarning,
+        daily.storedSessionWarning,
         partner.storedSessionWarning,
         notes.storedSessionWarning,
       ]);
@@ -366,7 +343,7 @@ test.describe('Realtime recovery after the token renews', () => {
 
       await log.step('Let the refresh through and wait for each context to renew');
       const renewals = Promise.all([
-        mood.armRenewal(),
+        daily.armRenewal(),
         partner.armRenewal(),
         notes.armRenewal(),
       ]);
@@ -377,9 +354,9 @@ test.describe('Realtime recovery after the token renews', () => {
         predicate: (message) => POKES_ARMED_LOG.test(message.text()),
         timeout: RENEWAL_TIMEOUT_MS,
       });
-      // Armed before the unroute below: the card joins its channel as soon as
-      // the renewal lets the lookup answer.
-      const moodJoined = mood.page.waitForEvent('console', {
+      // Armed before the unroute below: the Daily screen subscribed at boot on
+      // a token it cannot use, and its channel joins once the renewal lands.
+      const dailyJoined = daily.page.waitForEvent('console', {
         predicate: (message) => MOOD_SUBSCRIBED_LOG.test(message.text()),
         timeout: RENEWAL_TIMEOUT_MS,
       });
@@ -387,29 +364,31 @@ test.describe('Realtime recovery after the token renews', () => {
         predicate: (message) => NOTES_SUBSCRIBED_LOG.test(message.text()),
         timeout: RENEWAL_TIMEOUT_MS,
       });
-      // The card is the partner's mood, or its empty state while the partner has
-      // logged none, which is what shows here until the partner's mood arrives.
-      const partnerCard = mood.page
-        .getByTestId('partner-mood-display')
-        .or(mood.page.getByTestId('no-mood-logged-state'));
-      // Before the renewal the screen shows no partner card (loading, loaded or
-      // empty) and no error card.
-      await expect(partnerCard).toHaveCount(0);
-      await expect(mood.page.getByTestId('loading-state')).toHaveCount(0);
-      await expect(mood.page.getByTestId('partner-mood-error')).toHaveCount(0);
-      for (const receiving of [mood, partner, notes]) {
+      // Before the renewal the screen has no question: every read failed.
+      await expect(daily.page.getByTestId('daily-question')).toHaveCount(0);
+      for (const receiving of [daily, partner, notes]) {
         await receiving.context.unroute(REFRESH_ROUTE);
       }
       await renewals;
 
-      await log.step('The notes feed rejoins; the Mood screen shows its card in place');
+      await log.step('The notes feed rejoins; the Daily screen joins and shows its question in place');
       await notesJoined;
-      // `MoodTracker` looks its partner up again when this user's token
-      // renews, so the card mounts on the screen that is already open and
-      // joins its channel on the renewed token. Nothing navigates.
-      await expect(partnerCard).toBeVisible();
-      await moodJoined;
-      await expect(mood.page.getByTestId('partner-mood-error')).toHaveCount(0);
+      // The registry's channel was refused on the stale token and is rejoined
+      // by the SDK on the renewed one. Its `SUBSCRIBED` re-reads the day, so
+      // the question appears on the screen that is already open. Nothing
+      // navigates.
+      await dailyJoined;
+      await expect(daily.page.getByTestId('daily-question')).toBeVisible();
+      await expect(daily.page.getByTestId('daily-partner-status')).toContainText(
+        "hasn't picked yet"
+      );
+      await recurseUntil(
+        async () => dailyReads.inFlight(),
+        (inFlight) => {
+          expect(inFlight, 'no get_daily_day read is in flight on the receiver').toBe(0);
+        },
+        { timeout: 15_000 }
+      );
 
       // The poke screen re-resolves its partner snapshot after the renewal,
       // and re-reads its history once the channel is armed; the poke is sent
@@ -430,7 +409,7 @@ test.describe('Realtime recovery after the token renews', () => {
         { timeout: 15_000 }
       );
 
-      await log.step('The partner logs a mood and sends a note through the real UI');
+      await log.step('The partner picks on Daily and sends a note through the real UI');
       const partnerContext = await browser.newContext({
         storageState: getStorageStatePath({
           ...authOptions,
@@ -442,28 +421,40 @@ test.describe('Realtime recovery after the token renews', () => {
       const sender = await partnerContext.newPage();
       await dismissWelcomeSplash(sender);
 
-      const senderBackfill = interceptNetworkCall({
-        page: sender,
-        method: 'GET',
-        url: ownMoodHistoryRead(partnerId),
-        timeout: 30_000,
-      });
-      await sender.goto('/mood');
-      expect((await senderBackfill).status).toBe(200);
-      await expect(sender.getByTestId('mood-tracker')).toBeVisible();
-      await sender.getByRole('button', { name: /happy/i }).click();
-      await sender.getByTestId('mood-add-note-toggle').click();
-      await sender.getByTestId('mood-note-input').fill(moodNote);
-      // The send is fire-and-forget; leaving the screen before it lands would
-      // abort it, so it is awaited. Each topic is the receiver's own.
-      const moodBroadcast = interceptNetworkCall({
+      const senderDay = interceptNetworkCall({
         page: sender,
         method: 'POST',
-        url: `**${broadcastPath(`mood-updates:${userId}`, 'new_mood')}?*`,
+        url: DAILY_DAY_READ,
         timeout: 30_000,
       });
-      await sender.getByTestId('mood-submit-button').click();
-      expect((await moodBroadcast).status).toBe(202);
+      await sender.goto('/daily');
+      expect((await senderDay).status).toBe(200);
+      await expect(sender.getByTestId('daily-question')).toBeVisible();
+      await sender.getByTestId('daily-option-this').click();
+      // The announcement is fire-and-forget; leaving the screen before it lands
+      // would abort it, so it is awaited. The topic is the receiver's own.
+      const dailyBroadcast = interceptNetworkCall({
+        page: sender,
+        method: 'POST',
+        url: `**${broadcastPath(`mood-updates:${userId}`, 'daily_pick')}?*`,
+        timeout: 30_000,
+      });
+      const sendPick = interceptNetworkCall({
+        page: sender,
+        method: 'POST',
+        url: DAILY_PICK_SEND,
+        timeout: 30_000,
+      });
+      const dailyReadsBeforeSend = dailyReads.started();
+      const dayReRead = interceptNetworkCall({
+        page: daily.page,
+        method: 'POST',
+        url: DAILY_DAY_BY_ID_READ,
+        timeout: 30_000,
+      });
+      await sender.getByTestId('daily-send-pick').click();
+      expect((await sendPick).status).toBe(200);
+      expect((await dailyBroadcast).status).toBe(202);
 
       await sender.goto('/notes');
       const messageInput = sender.getByLabel(/love note message input/i);
@@ -502,8 +493,12 @@ test.describe('Realtime recovery after the token renews', () => {
       );
 
       await log.step('All three arrive live, with no reload');
-      await expect(mood.page.getByTestId('partner-mood-note')).toContainText(moodNote);
-      moodRowCommitted = true;
+      expect((await dayReRead).status).toBe(200);
+      await expect(daily.page.getByTestId('daily-partner-status')).toContainText('has picked');
+      await expect(daily.page.getByTestId('daily-reveal')).toHaveCount(0);
+      expect(dailyReads.started(), 'no get_daily_day read may deliver the pick instead').toBe(
+        dailyReadsBeforeSend
+      );
       await expect(
         notes.page.getByTestId('love-note-message').getByText(noteText)
       ).toBeVisible();

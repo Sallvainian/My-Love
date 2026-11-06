@@ -62,6 +62,9 @@ const PartnerMoodView = lazy(() =>
     default: m.PartnerMoodView,
   }))
 );
+const DailyQuestion = lazy(() =>
+  import('./components/DailyQuestion').then((m) => ({ default: m.DailyQuestion }))
+);
 const AdminPanel = lazy(() =>
   import('./components/AdminPanel/AdminPanel').then((m) => ({ default: m.AdminPanel }))
 );
@@ -215,11 +218,13 @@ function App() {
           ? 'mood'
           : routePath === '/partner'
             ? 'partner'
-            : routePath === '/notes'
-              ? 'notes'
-              : isSettingsRoute(routePath)
-                ? 'settings'
-                : 'home';
+            : routePath === '/daily'
+              ? 'daily'
+              : routePath === '/notes'
+                ? 'notes'
+                : isSettingsRoute(routePath)
+                  ? 'settings'
+                  : 'home';
     setView(initialView, true); // Skip history update on initial load
     // A reload on /settings/photos reopens the subpage; any other route clears it.
     showSettingsPage(settingsPathFromRoute(routePath));
@@ -234,11 +239,13 @@ function App() {
             ? 'mood'
             : routePath === '/partner'
               ? 'partner'
-              : routePath === '/notes'
-                ? 'notes'
-                : isSettingsRoute(routePath)
-                  ? 'settings'
-                  : 'home';
+              : routePath === '/daily'
+                ? 'daily'
+                : routePath === '/notes'
+                  ? 'notes'
+                  : isSettingsRoute(routePath)
+                    ? 'settings'
+                    : 'home';
       setView(view, true); // Skip history update to prevent loop
       showSettingsPage(settingsPathFromRoute(routePath));
       logger.debug(`[App] Popstate: navigated to ${view}`);
@@ -998,6 +1005,8 @@ function App() {
                 {currentView === 'mood' && <MoodTracker />}
 
                 {currentView === 'partner' && <PartnerMoodView />}
+
+                {currentView === 'daily' && <DailyQuestion />}
 
                 {currentView === 'notes' && <LoveNotes />}
 

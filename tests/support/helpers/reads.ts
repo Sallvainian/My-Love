@@ -126,3 +126,12 @@ export function partnerLatestMoodRead(partnerId: string): string {
  * drops `timeout`). Mirrors `use.actionTimeout` in `playwright.config.ts`.
  */
 export const SECOND_CONTEXT_READ_TIMEOUT = 15_000;
+
+/** Today's day (`dailyQuestionApi.fetchDailyDay`): the `get_daily_day` RPC. Observe it with `method: 'POST'`. */
+export const DAILY_DAY_READ = '**/rest/v1/rpc/get_daily_day';
+
+/** A pick's send (`dailyQuestionApi.submitDailyPick`): the `submit_daily_pick` RPC. Observe it with `method: 'POST'`. */
+export const DAILY_PICK_SEND = '**/rest/v1/rpc/submit_daily_pick';
+
+/** A named day's re-read after a partner's `daily_pick` (`dailyQuestionApi.fetchDailyDayById`): the `get_daily_day_by_id` RPC. Observe it with `method: 'POST'`. */
+export const DAILY_DAY_BY_ID_READ = '**/rest/v1/rpc/get_daily_day_by_id';

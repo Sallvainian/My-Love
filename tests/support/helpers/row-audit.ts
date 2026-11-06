@@ -34,6 +34,11 @@ export const AUDITED_TABLES = {
   partner_requests: ['from_user_id', 'to_user_id'],
   love_note_removals: ['user_id'],
   couple_settings: ['user_a', 'user_b'],
+  // Picks, not `couple_days`: the Daily copy's refresher (story 6.5) runs
+  // `get_daily_day` on every signed-in start, which assigns today's day for the
+  // pair, so any spec that signs in a pool account adds a day. Only a spec that
+  // picks adds a pick, and `clearPairDays` removes the picks with their days.
+  daily_picks: ['user_id'],
 } as const;
 
 export type AuditedTable = keyof typeof AUDITED_TABLES;
@@ -112,7 +117,9 @@ export async function countPoolRows(
         const owned = columns.map((column) => `${column}.eq.${userId}`).join(',');
         const { count, error } = await admin
           .from(table)
-          .select('*', { count: 'exact', head: true })
+          // The ownership column, not `*`: service_role may not read
+          // `daily_picks.choice` (architecture AD-5).
+          .select(columns[0], { count: 'exact', head: true })
           .or(owned);
         if (error || count === null) {
           throw new Error(

@@ -51,6 +51,7 @@ import { moodService } from '../../../src/services/moodService';
 import { moodSyncFingerprint } from '../../../src/services/moodSyncPayload';
 import { moodSyncService } from '../../../src/api/moodSyncService';
 import type { MoodEntry } from '../../../src/types';
+import { dailySnapshot } from './dailyQuestionFixture';
 import { makeMoodEntry } from './moodSliceFixture';
 import { serializedStore } from './loaderIdentityGuardsFixture';
 import { STORAGE_KEY } from '../helpers/persistedBlob';
@@ -105,6 +106,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   pushPreferencesLoadFailed: false,
   settingsPushedPath: null,
   remindersOff: null,
+  dailyDay: null,
+  dailyDayLoading: false,
+  dailyDayError: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -118,6 +122,8 @@ const SECRETS = {
   photoCaption: 'PHOTO-CAPTION-TEXT',
   anniversaryLabel: 'OUR-FIRST-KISS-LABEL',
   customMessage: 'MY-OWN-CUSTOM-MESSAGE-TEXT',
+  dailyQuestionThis: 'THE-DAILY-QUESTION-THIS-TEXT',
+  dailyQuestionThat: 'THE-DAILY-QUESTION-THAT-TEXT',
   userId: 'USER-A-ID',
 };
 
@@ -230,6 +236,18 @@ function seedSignedInSession(): void {
 
     interactions: [{ id: 'int-1', from_user_id: 'USER-B-ID', type: 'poke' }],
     unviewedCount: 3,
+
+    // The couple's question and the picks the gate released to this account.
+    dailyDay: {
+      status: 'ok',
+      snapshot: dailySnapshot({
+        question: { this: SECRETS.dailyQuestionThis, that: SECRETS.dailyQuestionThat },
+        state: 'both',
+        my_choice: 'this',
+        partner_choice: 'that',
+        same: false,
+      }),
+    },
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device

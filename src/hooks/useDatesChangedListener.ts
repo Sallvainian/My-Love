@@ -67,21 +67,18 @@ export function useDatesChangedListener(): void {
     };
 
     moodSyncService
-      .subscribeMoodUpdates(
-        // Moods are for the screens that show them.
-        () => {},
-        (status) => {
+      .subscribePartnerEvents({
+        onStatus: (status) => {
           if (!active || status !== 'SUBSCRIBED') return;
           // The first join follows the start's own loads; a re-join may have
           // missed a broadcast while the channel was down.
           if (joinedOnce) reread();
           joinedOnce = true;
         },
-        undefined,
-        () => {
+        dates_changed: () => {
           if (active) reread();
-        }
-      )
+        },
+      })
       .then((release) => {
         if (!active) {
           release();

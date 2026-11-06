@@ -1,10 +1,11 @@
 /**
- * moodSyncService.subscribeMoodUpdates — channel ownership
+ * moodSyncService.subscribePartnerEvents — channel ownership
  *
- * Two consumers subscribe in practice — usePartnerMood (Mood tab) and
- * PartnerMoodView (Partner tab) — and the two views are mutually exclusive, so
- * moving between them unmounts one and mounts the other while both subscribe
- * calls are still in flight.
+ * Several consumers subscribe in practice — usePartnerMood (Mood tab) and
+ * PartnerMoodView (Partner tab), plus the app-wide usePartnerLinkListener and
+ * useDailyPickListener, which can be attached alongside either view. The two
+ * views are mutually exclusive, so moving between them unmounts one and mounts
+ * the other while both subscribe calls are still in flight.
  *
  * The shared-channel Realtime fake these tests run against, and why it hands
  * the same object back per topic, is in `fakeMoodRealtime.ts`. The partner and
@@ -29,6 +30,7 @@ import {
   getSession,
   getSignedInUserId,
   MOOD_CREATED_AT,
+  moodHandlers,
   moodIdFor,
   openChannels,
   opOrder,
@@ -68,7 +70,7 @@ vi.mock('@/api/supabaseClient', () => ({
 
 import { moodSyncService } from '@/api/moodSyncService';
 
-describe('subscribeMoodUpdates channel ownership', () => {
+describe('subscribePartnerEvents channel ownership', () => {
   beforeEach(() => {
     resetRealtimeFake();
   });
@@ -80,8 +82,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
   it('two overlapping subscribers share one channel', async () => {
     // Mood tab subscribes, then Partner tab subscribes before the first
     // resolves — one tap apart on adjacent bottom-nav buttons.
-    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn());
-    const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
 
     resolveNextSession();
     resolveNextSession();
@@ -100,8 +102,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const onMoodA = vi.fn();
     const onMoodB = vi.fn();
 
-    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
-    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodA));
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodB));
     resolveNextSession();
     resolveNextSession();
     const [unsubscribeA, unsubscribeB] = await Promise.all([pendingA, pendingB]);
@@ -126,8 +128,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
   });
 
   it('the last subscriber to leave removes the channel', async () => {
-    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn());
-    const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     resolveNextSession();
     resolveNextSession();
     const [unsubscribeA, unsubscribeB] = await Promise.all([pendingA, pendingB]);
@@ -153,8 +155,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
     const onMoodA = vi.fn();
     const onMoodB = vi.fn();
 
-    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
-    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodA));
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodB));
     resolveNextSession();
     resolveNextSession();
     const [unsubscribeA, unsubscribeB] = await Promise.all([pendingA, pendingB]);
@@ -172,7 +174,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
   it('a subscriber that joins an already-open channel is told the current status', async () => {
     const onStatusA = vi.fn();
-    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatusA);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn(), onStatusA));
     resolveNextSession();
     const unsubscribeA = await pendingA;
 
@@ -183,7 +185,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // would otherwise sit on its initial value forever, showing "disconnected"
     // over a live channel.
     const onStatusB = vi.fn();
-    const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatusB);
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn(), onStatusB));
     resolveNextSession();
     const unsubscribeB = await pendingB;
 
@@ -202,8 +204,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // again from the effect cleanup. Calling it twice must not consume the
     // other consumer's registration.
     const onMoodB = vi.fn();
-    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn());
-    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodB));
     resolveNextSession();
     resolveNextSession();
     const [unsubscribeA, unsubscribeB] = await Promise.all([pendingA, pendingB]);
@@ -223,8 +225,8 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // Set-of-callbacks would collapse these into one entry, and the first
     // unsubscribe would then take the channel down under the second.
     const shared = vi.fn();
-    const pendingA = moodSyncService.subscribeMoodUpdates(shared);
-    const pendingB = moodSyncService.subscribeMoodUpdates(shared);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(shared));
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(shared));
     resolveNextSession();
     resolveNextSession();
     const [unsubscribeA, unsubscribeB] = await Promise.all([pendingA, pendingB]);
@@ -241,7 +243,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // cleanup and then the incoming effect's setup back to back, so the second
     // subscribe lands inside the first one's leave round-trip.
     const onMoodA = vi.fn();
-    const pendingA = moodSyncService.subscribeMoodUpdates(onMoodA);
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodA));
     resolveNextSession();
     const unsubscribeA = await pendingA;
 
@@ -251,7 +253,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     expect(openChannels.get(TOPIC)!.state).toBe('leaving');
 
     const onMoodB = vi.fn();
-    const pendingB = moodSyncService.subscribeMoodUpdates(onMoodB);
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(onMoodB));
     resolveNextSession();
     // B has installed its token, the last step before it looks for the topic.
     await vi.waitFor(() => expect(setAuth).toHaveBeenCalledTimes(2));
@@ -278,14 +280,14 @@ describe('subscribeMoodUpdates channel ownership', () => {
   });
 
   it('two subscribers arriving during one leave share a single reopened channel', async () => {
-    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     resolveNextSession();
     const unsubscribeA = await pendingA;
     unsubscribeA();
 
     // Both arrive while the leave is unacked.
-    const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn());
-    const pendingC = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
+    const pendingC = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     resolveNextSession();
     resolveNextSession();
     // Both have installed their tokens (A's was the first), so both are
@@ -310,7 +312,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     // replaced under the same topic therefore landed on its REPLACEMENT, and
     // the replay below handed that stale CLOSED to the next consumer to
     // attach — a live channel reporting itself disconnected, permanently.
-    const pendingA = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pendingA = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     resolveNextSession();
     const unsubscribeA = await pendingA;
 
@@ -321,7 +323,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     ackNextLeave();
 
     // A replacement opens under the same topic.
-    const pendingB = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pendingB = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     resolveNextSession();
     const unsubscribeB = await pendingB;
 
@@ -335,7 +337,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
     // A third consumer attaches to the LIVE channel and gets the replay.
     const onStatusC = vi.fn();
-    const pendingC = moodSyncService.subscribeMoodUpdates(vi.fn(), onStatusC);
+    const pendingC = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn(), onStatusC));
     resolveNextSession();
     const unsubscribeC = await pendingC;
 
@@ -347,7 +349,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
   });
 
   it('opens the topic as a private channel, with the JWT installed before the join', async () => {
-    const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -366,7 +368,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
   it('drops a broadcast from someone who is not the partner', async () => {
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -382,7 +384,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
   it('drops malformed broadcasts without reaching a subscriber', async () => {
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -406,7 +408,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
 
   it('delivers a valid multi-mood broadcast whole', async () => {
     const onMood = vi.fn();
-    const pending = moodSyncService.subscribeMoodUpdates(onMood);
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(onMood));
     resolveNextSession();
     const unsubscribe = await pending;
 
@@ -437,7 +439,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     try {
-      const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+      const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
       const resolve = sessionQueue.shift();
       resolve?.({
         data: { session: null },
@@ -456,7 +458,7 @@ describe('subscribeMoodUpdates channel ownership', () => {
   });
 
   it('returns a no-op unsubscribe when there is no session', async () => {
-    const pending = moodSyncService.subscribeMoodUpdates(vi.fn());
+    const pending = moodSyncService.subscribePartnerEvents(moodHandlers(vi.fn()));
     const resolve = sessionQueue.shift();
     resolve?.({ data: { session: null } });
 

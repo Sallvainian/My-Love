@@ -14,7 +14,7 @@
  * topic at the protocol level, with hand-built `createClient` identities, and
  * the unit tests measure the service. Neither runs what actually ships:
  * `MoodTracker` -> `moodSlice.addMoodEntry` -> `syncPendingMoods` ->
- * `broadcastMoodToPartner` -> the partner's `subscribeMoodUpdates` ->
+ * `broadcastMoodToPartner` -> the partner's `subscribePartnerEvents` ->
  * `PartnerMoodView`. This spec is the only place where all of it runs in a
  * browser against the real policies.
  *

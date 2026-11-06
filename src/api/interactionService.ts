@@ -337,7 +337,7 @@ export class InteractionService {
     // object and the first teardown closes it under the second. Only
     // PokeKissInterface mounts this, and only once, so today the overlap is
     // confined to StrictMode's double-invoked effects in dev. See
-    // moodSyncService.subscribeMoodUpdates for the per-topic tracking this
+    // moodSyncService.subscribePartnerEvents for the per-topic tracking this
     // needs if a second consumer is ever added.
     const channel = supabase
       .channel(`incoming-interactions:${userId}`)

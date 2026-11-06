@@ -39,7 +39,7 @@ describe('usePartnerMood', () => {
     const mockMood = moodRecord();
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(mockMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockResolvedValue(() => {});
 
     const { result } = renderHook(() => usePartnerMood(mockPartnerId));
 
@@ -54,7 +54,7 @@ describe('usePartnerMood', () => {
 
   it('returns null when partner has no moods', async () => {
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockResolvedValue(() => {});
 
     const { result } = renderHook(() => usePartnerMood(mockPartnerId));
 
@@ -67,12 +67,12 @@ describe('usePartnerMood', () => {
 
   it("listens for the partner's live mood updates once mounted", async () => {
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockResolvedValue(() => {});
 
     renderHook(() => usePartnerMood(mockPartnerId));
 
     await waitFor(() => {
-      expect(moodSyncService.subscribeMoodUpdates).toHaveBeenCalled();
+      expect(moodSyncService.subscribePartnerEvents).toHaveBeenCalled();
     });
   });
 
@@ -84,9 +84,9 @@ describe('usePartnerMood', () => {
     let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(initialMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (callback: (mood: SupabaseMoodRecord) => void) => {
-        broadcastCallback = callback;
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockImplementation(
+      async ({ new_mood }) => {
+        broadcastCallback = (mood: SupabaseMoodRecord) => new_mood?.({ event: 'new_mood', mood });
         return () => {};
       }
     );
@@ -119,9 +119,9 @@ describe('usePartnerMood', () => {
     let broadcastCallback: ((mood: SupabaseMoodRecord) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(initialMood);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (callback: (mood: SupabaseMoodRecord) => void) => {
-        broadcastCallback = callback;
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockImplementation(
+      async ({ new_mood }) => {
+        broadcastCallback = (mood: SupabaseMoodRecord) => new_mood?.({ event: 'new_mood', mood });
         return () => {};
       }
     );
@@ -151,12 +151,12 @@ describe('usePartnerMood', () => {
     const unsubscribeMock = vi.fn();
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(unsubscribeMock);
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockResolvedValue(unsubscribeMock);
 
     const { unmount } = renderHook(() => usePartnerMood(mockPartnerId));
 
     await waitFor(() => {
-      expect(moodSyncService.subscribeMoodUpdates).toHaveBeenCalled();
+      expect(moodSyncService.subscribePartnerEvents).toHaveBeenCalled();
     });
 
     unmount();
@@ -168,7 +168,7 @@ describe('usePartnerMood', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(new Error('Network failure'));
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockResolvedValue(() => {});
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockResolvedValue(() => {});
 
     const { result } = renderHook(() => usePartnerMood(mockPartnerId));
 
@@ -188,7 +188,7 @@ describe('usePartnerMood', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockRejectedValue(
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockRejectedValue(
       new Error('Subscription failed')
     );
 
@@ -207,10 +207,10 @@ describe('usePartnerMood', () => {
     let statusCallback: ((status: string) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (_: (mood: SupabaseMoodRecord) => void, onStatusChange?: (status: string) => void) => {
-        if (onStatusChange) {
-          statusCallback = onStatusChange;
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockImplementation(
+      async ({ onStatus }) => {
+        if (onStatus) {
+          statusCallback = onStatus;
         }
         return () => {};
       }
@@ -241,10 +241,10 @@ describe('usePartnerMood', () => {
     let statusCallback: ((status: string) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockResolvedValue(null);
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (_: (mood: SupabaseMoodRecord) => void, onStatusChange?: (status: string) => void) => {
-        if (onStatusChange) {
-          statusCallback = onStatusChange;
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockImplementation(
+      async ({ onStatus }) => {
+        if (onStatus) {
+          statusCallback = onStatus;
         }
         return () => {};
       }
@@ -270,10 +270,10 @@ describe('usePartnerMood', () => {
     let statusCallback: ((status: string) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(new Error('Network failure'));
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (_: (mood: SupabaseMoodRecord) => void, onStatusChange?: (status: string) => void) => {
-        if (onStatusChange) {
-          statusCallback = onStatusChange;
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockImplementation(
+      async ({ onStatus }) => {
+        if (onStatus) {
+          statusCallback = onStatus;
         }
         return () => {};
       }
@@ -298,10 +298,10 @@ describe('usePartnerMood', () => {
     let statusCallback: ((status: string) => void) | null = null;
 
     vi.mocked(moodSyncService.getLatestPartnerMood).mockRejectedValue(new Error('Network failure'));
-    vi.mocked(moodSyncService.subscribeMoodUpdates).mockImplementation(
-      async (_: (mood: SupabaseMoodRecord) => void, onStatusChange?: (status: string) => void) => {
-        if (onStatusChange) {
-          statusCallback = onStatusChange;
+    vi.mocked(moodSyncService.subscribePartnerEvents).mockImplementation(
+      async ({ onStatus }) => {
+        if (onStatus) {
+          statusCallback = onStatus;
         }
         return () => {};
       }

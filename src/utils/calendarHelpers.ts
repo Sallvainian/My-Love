@@ -100,23 +100,6 @@ export function generateCalendarDays(year: number, month: number): CalendarDay[]
 }
 
 /**
- * Format date as YYYY-MM-DD (ISO date string)
- * Used for IndexedDB by-date index queries
- *
- * @param date - Date to format
- * @returns ISO date string (YYYY-MM-DD)
- *
- * @example
- * formatDateKey(new Date(2025, 10, 15)) // '2025-11-15'
- */
-export function formatDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
  * Get start and end dates for a calendar month (for getMoodsInRange queries)
  * @param year - Full year
  * @param month - Month (0-11)
