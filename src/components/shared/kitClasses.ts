@@ -61,6 +61,14 @@ const PILL =
 export const PRIMARY_BUTTON = `${PILL} bg-fill text-white focus-visible:ring-accent`;
 export const SECONDARY_BUTTON = `${PILL} bg-tint text-accent focus-visible:ring-accent`;
 export const DESTRUCTIVE_BUTTON = `${PILL} bg-dtint text-danger focus-visible:ring-danger`;
+/**
+ * A solid red pill and a neutral one, for a Yes/No confirm whose two tinted
+ * pills read too alike (owner, 2026-11-06). White (card) on danger is 5.6:1 in
+ * light and the dark card on the dark danger is higher; the neutral pill's
+ * line-strong outline is its 3:1 boundary on the dialog's card.
+ */
+export const DANGER_SOLID_BUTTON = `${PILL} bg-danger text-card focus-visible:ring-danger`;
+export const NEUTRAL_BUTTON = `${PILL} border border-line-strong bg-card2 text-ink focus-visible:ring-accent`;
 
 export const FIELD_LABEL = 'mb-2 block text-[13px] font-semibold text-ink';
 export const FAILURE_BOX = 'rounded-[14px] bg-dtint px-4 py-3 text-sm text-danger';
