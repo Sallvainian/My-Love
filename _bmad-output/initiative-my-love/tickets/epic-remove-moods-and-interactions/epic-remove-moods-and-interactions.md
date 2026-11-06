@@ -26,6 +26,7 @@ The app carries no code or data for features the couple no longer uses. Signal: 
 - The hosted database has no mood or interaction rows or tables after the deploy, hosted-only objects included.
 - A device upgraded from the old build keeps no mood or interaction copy, unsent moods included.
 - Partner linking still updates the other partner live.
+- `tests/unit/stores/signOutClearsAccountState.test.ts` is no longer in `excludeGlobs` in `.tea/enforce-config.json`, and the TEA hook reports no H5 for any file it was split into.
 - Shipped to production through `deploy.yml`.
 
 ## Boundaries
