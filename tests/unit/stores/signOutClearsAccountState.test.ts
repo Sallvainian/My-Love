@@ -536,6 +536,7 @@ describe('clearAuth on sign-out', () => {
         photos: true,
         pokesAndKisses: true,
         partnerRequests: true,
+        dates: true,
         dateReminders: true,
       },
       pushPreferencesLoadFailed: true,

@@ -49,6 +49,7 @@ const ROW = {
   photos: true,
   pokes_and_kisses: true,
   partner_requests: true,
+  dates: true,
   date_reminders: true,
 };
 
@@ -73,20 +74,22 @@ describe('fetchPushPreferences', () => {
       photos: true,
       pokesAndKisses: true,
       partnerRequests: true,
+      dates: true,
       dateReminders: true,
     });
     expect(calls[0].table).toBe('push_preferences');
     expect(argsOf('eq')).toEqual([['user_id', 'USER-A']]);
   });
 
-  it('does not select the dates column, which story 5.18 dropped', async () => {
-    results.push({ data: ROW, error: null });
+  it('selects the dates column, the switch for an added event or anniversary', async () => {
+    results.push({ data: { ...ROW, dates: false }, error: null });
 
-    await pushPreferencesService.fetchPushPreferences('USER-A');
+    const read = await pushPreferencesService.fetchPushPreferences('USER-A');
 
     const [[columns]] = argsOf('select') as [[string]];
-    expect(columns.split(', ')).not.toContain('dates');
+    expect(columns.split(', ')).toContain('dates');
     expect(columns).toContain('date_reminders');
+    expect(read.dates).toBe(false);
   });
 
   it('reads a missing row as every switch on', async () => {

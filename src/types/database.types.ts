@@ -539,6 +539,7 @@ export type Database = {
         Row: {
           created_at: string
           date_reminders: boolean
+          dates: boolean
           love_notes: boolean
           moods: boolean
           partner_requests: boolean
@@ -550,6 +551,7 @@ export type Database = {
         Insert: {
           created_at?: string
           date_reminders?: boolean
+          dates?: boolean
           love_notes?: boolean
           moods?: boolean
           partner_requests?: boolean
@@ -560,6 +562,7 @@ export type Database = {
         Update: {
           created_at?: string
           date_reminders?: boolean
+          dates?: boolean
           love_notes?: boolean
           moods?: boolean
           partner_requests?: boolean
@@ -571,9 +574,11 @@ export type Database = {
       }
       push_requests: {
         Row: {
+          anniversary_id: string | null
           created_at: string
           delivery: string
           environment: string
+          event_id: string | null
           id: string
           interaction_id: string | null
           mood_id: string | null
@@ -586,9 +591,11 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          anniversary_id?: string | null
           created_at?: string
           delivery: string
           environment: string
+          event_id?: string | null
           id?: string
           interaction_id?: string | null
           mood_id?: string | null
@@ -600,9 +607,11 @@ export type Database = {
           token: string
         }
         Update: {
+          anniversary_id?: string | null
           created_at?: string
           delivery?: string
           environment?: string
+          event_id?: string | null
           id?: string
           interaction_id?: string | null
           mood_id?: string | null
@@ -614,6 +623,20 @@ export type Database = {
           token?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "push_requests_anniversary_id_fkey"
+            columns: ["anniversary_id"]
+            isOneToOne: false
+            referencedRelation: "anniversaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "push_requests_interaction_id_fkey"
             columns: ["interaction_id"]

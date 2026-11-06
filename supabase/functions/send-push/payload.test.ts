@@ -1,6 +1,8 @@
 import { assertEquals, assertFalse } from 'jsr:@std/assert@1';
 
 import {
+  buildAnniversaryPayload,
+  buildEventPayload,
   buildInteractionPayload,
   buildLoveNotePayload,
   buildMoodPayload,
@@ -164,8 +166,23 @@ Deno.test('a love note stacks on love-notes and every other kind on partner-acti
     buildInteractionPayload('kiss', 'Casey')!,
     buildPartnerRequestPayload('Casey'),
     buildPartnerAcceptPayload('Casey'),
+    buildEventPayload('Paris trip', 'Casey'),
+    buildAnniversaryPayload('First date', 'Casey'),
   ];
   for (const payload of others) assertEquals(payload.aps['thread-id'], 'partner-activity');
+});
+
+Deno.test('an added event or anniversary names it, titled with the partner or Your partner', () => {
+  assertEquals(buildEventPayload('Paris trip', 'Casey'), {
+    aps: { alert: { title: 'Casey', body: 'Added an event: Paris trip' }, 'thread-id': thread },
+  });
+  assertEquals(buildAnniversaryPayload('First date', 'Casey'), {
+    aps: { alert: { title: 'Casey', body: 'Added an anniversary: First date' }, 'thread-id': thread },
+  });
+  for (const payload of [buildEventPayload('Paris trip', null), buildAnniversaryPayload('First date', ' ')]) {
+    assertEquals(payload.aps.alert.title, FALLBACK_SENDER_NAME);
+    assertEquals(Object.keys(payload.aps).sort(), ['alert', 'thread-id']);
+  }
 });
 
 Deno.test('withBadge puts the count in aps.badge, zero included, and does not change its input', () => {

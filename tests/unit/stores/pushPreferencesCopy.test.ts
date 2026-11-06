@@ -298,13 +298,17 @@ describe('readSavedPushPreferences', () => {
     expect(await readSavedPushPreferences(A)).toBeNull();
   });
 
-  it('parses a copy saved before story 5.4 and drops its dates switch', async () => {
+  it('keeps a saved dates switch', async () => {
     await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, { ...ALL_PUSH_PREFERENCES_ON, dates: false, moods: false });
 
-    const parsed = await readSavedPushPreferences(A);
+    expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, dates: false, moods: false });
+  });
 
-    expect(parsed).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
-    expect(parsed).not.toHaveProperty('dates');
+  it('reads a copy saved without a dates switch as dates on', async () => {
+    const { dates: _dates, ...withoutDates } = { ...ALL_PUSH_PREFERENCES_ON, moods: false };
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, withoutDates);
+
+    expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
   });
 
   it('does not read another account\'s copy', async () => {

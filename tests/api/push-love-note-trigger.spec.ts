@@ -5,10 +5,13 @@
  * a new one, because the "sender is down" test rewrites the one
  * `push_sender_settings` row and a parallel file's triggers would miss the sender.
  * Story 3.5 added a third: an event, the wedding date, the date the couple got
- * together and a birthday each pushed the partner. Story 5.4 removed that push,
- * and the third describe now asserts the same writes leave the partner no
- * `push_requests` row while a mood still records one; that the triggers are gone
- * is pinned by `supabase/tests/database/35_push_devices.sql`.
+ * together and a birthday each pushed the partner. Story 5.4 removed that push;
+ * since 2026-11-05 an added event or anniversary pushes again
+ * (`{kind: 'event' | 'anniversary', id}` through `notify_push`), so the third
+ * describe asserts an added event and anniversary record on the partner's
+ * devices, while their edits, the wedding date, the start date and a birthday
+ * record nothing; the trigger set is pinned by
+ * `supabase/tests/database/35_push_devices.sql`.
  * Story 3.6 adds a fourth: a partner request records on the asked person's
  * devices and its acceptance on the asker's (`{kind: 'partner_request' |
  * 'partner_accept', id}` through `notify_push`); a decline records nothing.
@@ -57,7 +60,9 @@ type SourceColumn =
   | 'photo_id'
   | 'interaction_id'
   | 'partner_request_id'
-  | 'partner_accept_id';
+  | 'partner_accept_id'
+  | 'event_id'
+  | 'anniversary_id';
 
 /** Rows the sender records for a note (or another source row), ordered by token. */
 async function requestsFor(
@@ -561,15 +566,15 @@ test.describe('Mood, photo, poke and kiss push', () => {
     // Story 5.4 removed the date kind: a post from an older trigger is refused like any unknown kind.
     const oldDate = await postToSender(supabaseAdmin, { kind: 'date', id: randomUUID() });
     expect(oldDate.status).toBe(400);
-    for (const kind of ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept']) {
+    for (const kind of ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept', 'event', 'anniversary']) {
       const missing = await postToSender(supabaseAdmin, { kind, id: randomUUID() });
       expect(missing.status, kind).toBe(404);
     }
   });
 });
 
-test.describe('Date changes do not push', () => {
-  test('[P0] an event, the wedding date, the start date and a birthday record no request for the partner, and a mood still does', async ({
+test.describe('Added dates push, date changes do not', () => {
+  test('[P0] an added event and anniversary record for the partner; their edits, the wedding date, the start date and a birthday record none', async ({
     supabaseAdmin,
     supabaseAsUser,
     cleanup,
@@ -579,6 +584,7 @@ test.describe('Date changes do not push', () => {
     const [phone, tablet] = [newToken(), newToken()];
     const createdAt = uniqueMoodTime();
     let eventId: string | null = null;
+    let anniversaryId: string | null = null;
     const [userA, userB] = userId < partnerId ? [userId, partnerId] : [partnerId, userId];
     const [{ data: original, error: originalError }, { data: sender, error: senderError }] = await Promise.all([
       supabaseAdmin
@@ -595,6 +601,7 @@ test.describe('Date changes do not push', () => {
       await supabaseAdmin.from('push_devices').delete().in('token', [phone, tablet]);
       await supabaseAdmin.from('moods').delete().eq('user_id', userId).eq('created_at', createdAt);
       if (eventId) await supabaseAdmin.from('events').delete().eq('id', eventId);
+      if (anniversaryId) await supabaseAdmin.from('anniversaries').delete().eq('id', anniversaryId);
       if (original) {
         await supabaseAdmin.from('couple_settings').update(original).eq('user_a', userA).eq('user_b', userB);
       } else {
@@ -626,6 +633,19 @@ test.describe('Date changes do not push', () => {
     eventId = event!.id;
     expect((await supabaseAsUser.from('events').update({ event_date: '2027-05-02' }).eq('id', eventId)).error).toBeNull();
 
+    const { data: anniversary, error: anniversaryError } = await supabaseAsUser
+      .from('anniversaries')
+      .insert({ user_id: userId, label: 'First date', event_date: '2020-02-14' })
+      .select('id')
+      .single();
+    expect(anniversaryError).toBeNull();
+    anniversaryId = anniversary!.id;
+    expect(
+      // The date, not the name: the sender reads the row when pg_net's call
+      // lands, so a renamed row could already carry the new name.
+      (await supabaseAsUser.from('anniversaries').update({ event_date: '2020-02-15' }).eq('id', anniversaryId)).error
+    ).toBeNull();
+
     const own = await clientFor(supabaseAdmin, userId);
     const writeDates = (dates: { wedding_date?: string; relationship_start?: string }) =>
       own.from('couple_settings').upsert({ user_a: userA, user_b: userB, ...dates }, { onConflict: 'user_a,user_b' });
@@ -637,9 +657,29 @@ test.describe('Date changes do not push', () => {
     expect((await own.from('users').update({ birthday: '1990-05-01' }).eq('id', userId)).error).toBeNull();
     expect((await own.from('users').update({ birthday: '1990-05-02' }).eq('id', userId)).error).toBeNull();
 
+    // The added event and anniversary each record a request per partner device,
+    // titled with the sender and naming the date as it was added.
+    for (const [column, id, body] of [
+      ['event_id', eventId, 'Added an event: Paris trip'],
+      ['anniversary_id', anniversaryId, 'Added an anniversary: First date'],
+    ] as const) {
+      await expect
+        .poll(async () => (await requestsFor(supabaseAdmin, id!, column)).length, {
+          message: `the sender records a request for each of the partner's devices (${column})`,
+          timeout: 20_000,
+        })
+        .toBe(2);
+      for (const row of await requestsFor(supabaseAdmin, id!, column)) {
+        const payload = row.payload as { kind: string; aps: { alert: { body: string } } };
+        expect(payload.aps.alert.body).toBe(body);
+        expect(payload.kind).toBe(column === 'event_id' ? 'event' : 'anniversary');
+      }
+    }
+
     // The control: a mood after those writes still records a request per device.
-    // This shows the date writes left the partner no push_requests row; that the
-    // triggers are gone is pinned by 35_push_devices.sql (PUSH-DB-060, 064-067).
+    // Once it has, every row on the partner's devices is the event's, the
+    // anniversary's or the mood's: no edit and no couple date or birthday added
+    // one (the triggers are pinned by 35_push_devices.sql, PUSH-DB-060, 064-068).
     const { data: mood, error: moodError } = await supabaseAsUser
       .from('moods')
       .upsert(
@@ -658,11 +698,12 @@ test.describe('Date changes do not push', () => {
 
     const { data: all, error } = await supabaseAdmin
       .from('push_requests')
-      .select('token, mood_id')
+      .select('token, mood_id, event_id, anniversary_id')
       .in('token', [phone, tablet]);
     expect(error).toBeNull();
-    expect(all).toHaveLength(2);
-    for (const row of all ?? []) expect(row.mood_id).toBe(mood!.id);
+    expect(all).toHaveLength(6);
+    const sources = (all ?? []).map((row) => row.mood_id ?? row.event_id ?? row.anniversary_id).sort();
+    expect(sources).toEqual([mood!.id, mood!.id, eventId!, eventId!, anniversaryId!, anniversaryId!].sort());
   });
 });
 

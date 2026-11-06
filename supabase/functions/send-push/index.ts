@@ -1,12 +1,12 @@
 /**
  * Edge Function: send-push
  *
- * Sends the push a new love note, mood, photo, poke, kiss, partner request or
- * accepted partner request becomes, to every device registered to the
+ * Sends the push a new love note, mood, photo, poke, kiss, partner request,
+ * accepted partner request, event or anniversary becomes, to every device registered to the
  * recipient, unless the recipient switched that kind off in
  * `push_preferences`. Every push carries the recipient's unread love-note
  * count as the icon badge. Called by the triggers on `love_notes`, `moods`,
- * `photos`, `interactions` and `partner_requests`; see `handler.ts` for the
+ * `photos`, `interactions`, `partner_requests`, `events` and `anniversaries`; see `handler.ts` for the
  * contract. This file is only the serve binding and the real database and APNs
  * wiring.
  *
@@ -32,6 +32,8 @@ const SOURCE_COLUMN: Record<PushKind, string> = {
   interaction: 'interaction_id',
   partner_request: 'partner_request_id',
   partner_accept: 'partner_accept_id',
+  event: 'event_id',
+  anniversary: 'anniversary_id',
 };
 
 const secretKey = apiKeyFromEnv('secret', (name) => Deno.env.get(name)).key;
@@ -83,6 +85,20 @@ const db: PushDb = {
       .from('partner_requests')
       .select('id, from_user_id, to_user_id, status')
       .eq('id', requestId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async getEvent(eventId) {
+    const { data, error } = await admin.from('events').select('id, user_id, label').eq('id', eventId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async getAnniversary(anniversaryId) {
+    const { data, error } = await admin
+      .from('anniversaries')
+      .select('id, user_id, label')
+      .eq('id', anniversaryId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     return data;

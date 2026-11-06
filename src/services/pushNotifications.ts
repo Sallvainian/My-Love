@@ -158,6 +158,9 @@ const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
   partner_request: 'partner',
   partner_accept: 'partner',
   photo: 'photos',
+  // An added event or anniversary opens Home, which re-reads both.
+  event: 'home',
+  anniversary: 'home',
 };
 
 /** `aps.thread-id` of a love note; a push sent before `kind` existed is told apart by it alone. */
