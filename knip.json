@@ -9,6 +9,7 @@
   ],
   "ignore": [
     "src/types/database.types.ts",
+    ".claude/hooks/tea-enforce.cjs",
     "supabase/functions/**"
   ],
   "ignoreBinaries": [
