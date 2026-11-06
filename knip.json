@@ -9,7 +9,6 @@
   ],
   "ignore": [
     "src/types/database.types.ts",
-    "tests/e2e-archive/**",
     "supabase/functions/**"
   ],
   "ignoreBinaries": [
