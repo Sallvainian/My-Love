@@ -185,7 +185,7 @@ describe('Settings > Dates > an event\'s page', () => {
       partnerKnown: true,
       partnerLoadError: false,
       ownProfile: { displayName: 'Casey', birthday: null },
-      countdownMarks: [],
+      remindersOff: [],
       pushPreferences: { ...ALL_PUSH_PREFERENCES_ON },
       events: [makeEvent()],
     });
@@ -208,7 +208,7 @@ describe('Settings > Dates > an event\'s page', () => {
       partner: null,
       partnerKnown: false,
       coupleSettings: null,
-      countdownMarks: null,
+      remindersOff: null,
       pushPreferences: null,
       events: [],
       settings: null,
@@ -410,19 +410,20 @@ describe('Settings > Dates > an event\'s page', () => {
       capacitor.isNativePlatform.mockReturnValue(true);
     });
 
-    it('is the event\'s own mark, and a tap writes it', async () => {
+    it('is the event\'s own switch, on by default, and a tap writes it', async () => {
       const user = userEvent.setup();
       renderAt('dates/event/event-1');
       await heading('Weekend trip');
 
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      // On by default (2026-11-05): a tap switches it off.
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
       expect(screen.getByTestId('settings-remind-me-footnote')).toHaveTextContent(
         'A month and a week before.'
       );
 
       await user.click(remindMe()!);
 
-      expect(setCountdownMark).toHaveBeenCalledWith('event:event-1', true);
+      expect(setCountdownMark).toHaveBeenCalledWith('event:event-1', false);
     });
 
     it('is not drawn without the local-notifications plugin', async () => {

@@ -45,8 +45,8 @@ vi.mock('../../../api/supabaseClient', () => ({
 }));
 vi.mock('../../../services/countdownMarksService', () => ({
   countdownMarksService: {
-    fetchCountdownMarks: vi.fn(() => Promise.resolve([])),
-    setCountdownMark: vi.fn(() => Promise.resolve()),
+    fetchRemindersOff: vi.fn(() => Promise.resolve([])),
+    setRemindMe: vi.fn(() => Promise.resolve()),
   },
 }));
 vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({

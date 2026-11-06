@@ -9,8 +9,9 @@
 //        start years ago whose calendar date is 5 days ahead, a wedding date
 //        in 6 and a birthday in 7; Jessie gets a birthday in 8.
 // many   More due reminders than iOS keeps: 50 Casey events 2..51 days ahead
-//        and 10 Casey anniversaries 2..11 days ahead, which plan 70 reminders
-//        (50 + 10 x 2), and no other date.
+//        and 10 Casey anniversaries 2..11 days ahead, and no other date: at
+//        least 70 reminders (50 + 10 x 2), more with Remind me's week- and
+//        month-before ones, which are on by default since 2026-11-05.
 // clear  Deletes both people's events, anniversaries and countdown marks and
 //        the pair's couple_settings row, nulls both birthdays, and turns both
 //        people's date reminders back on (push_preferences.date_reminders),
@@ -131,7 +132,7 @@ async function seedMany(admin: SupabaseClient, ids: Ids) {
     event_date: localDate(i + 2, ANNIVERSARY_YEAR),
   }));
   check('seeding anniversaries', (await admin.from('anniversaries').insert(anniversaries)).error);
-  console.log('many: 50 Casey events 2..51 days ahead and 10 Casey anniversaries 2..11 days ahead (70 reminders)');
+  console.log('many: 50 Casey events 2..51 days ahead and 10 Casey anniversaries 2..11 days ahead (70+ reminders)');
 }
 
 async function main() {

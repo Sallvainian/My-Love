@@ -98,7 +98,7 @@ import { EVENTS_COPY_KIND } from '../../../src/stores/slices/eventsSlice';
 import { PARTNER_COPY_KIND } from '../../../src/stores/slices/partnerSlice';
 import {
   ANNIVERSARIES_COPY_KIND,
-  COUNTDOWN_MARKS_COPY_KIND,
+  REMINDERS_OFF_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
 } from '../../../src/stores/slices/datesSlice';
 import { PUSH_PREFERENCES_COPY_KIND } from '../../../src/stores/slices/notificationsSlice';
@@ -149,7 +149,7 @@ const DATE_KINDS = [
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
   PARTNER_COPY_KIND,
-  COUNTDOWN_MARKS_COPY_KIND,
+  REMINDERS_OFF_COPY_KIND,
   PUSH_PREFERENCES_COPY_KIND,
 ] as const;
 
@@ -163,7 +163,7 @@ function partnerInfo(birthday: string | null = '1995-11-09') {
   };
 }
 
-/** One date of each kind, 3 to 8 days ahead of `NOW`, as the saved copies; nothing is marked and the Date reminders switch is on. */
+/** One date of each kind, 3 to 8 days ahead of `NOW`, as the saved copies; no Remind me is off and the Date reminders switch is on. */
 function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
   return {
     [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04')],
@@ -176,7 +176,7 @@ function defaultCopies(): Record<(typeof DATE_KINDS)[number], unknown> {
     },
     [PROFILE_COPY_KIND]: { displayName: null, birthday: '1996-11-08' },
     [PARTNER_COPY_KIND]: { status: 'linked', partner: partnerInfo() },
-    [COUNTDOWN_MARKS_COPY_KIND]: [],
+    [REMINDERS_OFF_COPY_KIND]: [],
     [PUSH_PREFERENCES_COPY_KIND]: { ...ALL_PUSH_PREFERENCES_ON },
   };
 }
@@ -280,6 +280,8 @@ describe('scheduleDateRemindersAtLaunch', () => {
     expect(localNotifications.cancel).toHaveBeenCalledWith({ notifications: ALL_REMINDER_IDS });
     expect(localNotifications.requestPermissions).not.toHaveBeenCalled();
     expect(scheduledTitles()).toEqual([
+      // Remind me is on by default, and the partner's birthday is exactly a week out.
+      'In a week: Jessie turns 31 @ 11/2 9:00',
       'Tomorrow: Trip @ 11/3 9:00',
       'Tomorrow: Dinner @ 11/4 9:00',
       'Today: Dinner @ 11/5 9:00',
@@ -295,15 +297,19 @@ describe('scheduleDateRemindersAtLaunch', () => {
     const ids = localNotifications.schedule.mock.calls[0][0].notifications.map((n) => n.id);
     expect(ids).toEqual(ids.map((_, i) => i + 1));
     expect(localNotifications.schedule.mock.calls[0][0].notifications[0].schedule).toEqual({
-      on: { year: 2026, month: 11, day: 3, hour: 9, minute: 0 },
+      on: { year: 2026, month: 11, day: 2, hour: 9, minute: 0 },
     });
   });
 
-  it('adds In a month and In a week for the dates in the marks copy, and only for those', async () => {
+  it('adds In a month and In a week for every date except those switched off', async () => {
     await seedCopies({
-      [EVENTS_COPY_KIND]: [savedEvent('Trip', '2026-11-04'), savedEvent('Far', '2026-12-11')],
+      [EVENTS_COPY_KIND]: [
+        savedEvent('Trip', '2026-11-04'),
+        savedEvent('Far', '2026-12-11'),
+        savedEvent('Quiet', '2026-12-15'),
+      ],
       [ANNIVERSARIES_COPY_KIND]: [{ id: 1, date: '2021-12-20', label: 'Dinner', serverId: 'ann-1' }],
-      [COUNTDOWN_MARKS_COPY_KIND]: ['event:event-Far', 'anniversary:ann-1', 'event:deleted-event'],
+      [REMINDERS_OFF_COPY_KIND]: ['event:event-Quiet', 'event:deleted-event'],
     });
 
     await scheduleDateRemindersAtLaunch(owner());
@@ -314,17 +320,30 @@ describe('scheduleDateRemindersAtLaunch', () => {
     expect(titles).toContain('Tomorrow: Far @ 12/10 9:00');
     expect(titles).toContain('In a month: Dinner @ 11/20 9:00');
     expect(titles).toContain('In a week: Dinner @ 12/13 9:00');
-    // Unmarked dates stay as they were.
-    expect(titles.filter((title) => title.startsWith('In a'))).toHaveLength(4);
+    // The date switched off keeps only its day-before reminder.
+    expect(titles).toContain('Tomorrow: Quiet @ 12/14 9:00');
+    expect(titles.filter((title) => title.includes('Quiet') && title.startsWith('In a'))).toEqual([]);
+    // Trip is too close for a month or a week before; the partner's birthday,
+    // a week out, adds its week-before one.
+    expect(titles.filter((title) => title.startsWith('In a'))).toEqual([
+      'In a week: Jessie turns 31 @ 11/2 9:00',
+      'In a month: Far @ 11/11 9:00',
+      'In a month: Dinner @ 11/20 9:00',
+      'In a week: Far @ 12/4 9:00',
+      'In a week: Dinner @ 12/13 9:00',
+    ]);
     expect(titles).toContain('Tomorrow: Trip @ 11/3 9:00');
   });
 
-  it('plans an empty marks copy as a loaded "no marks"', async () => {
-    await seedCopies({ [COUNTDOWN_MARKS_COPY_KIND]: [] });
+  it('plans an empty reminders-off copy as every date on', async () => {
+    await seedCopies({
+      [EVENTS_COPY_KIND]: [savedEvent('Far', '2026-12-11')],
+      [REMINDERS_OFF_COPY_KIND]: [],
+    });
 
     await scheduleDateRemindersAtLaunch(owner());
 
-    expect(scheduledTitles().some((title) => title.startsWith('In a'))).toBe(false);
+    expect(scheduledTitles()).toContain('In a month: Far @ 11/11 9:00');
   });
 
   it('names an own birthday after a chosen display name', async () => {
@@ -474,8 +493,8 @@ describe('replanDateReminders reads only loaded copies', () => {
     [PROFILE_COPY_KIND, 'not a profile'],
     [PARTNER_COPY_KIND, { status: 'linked' }],
     [EVENTS_COPY_KIND, { not: 'a list' }],
-    [COUNTDOWN_MARKS_COPY_KIND, 'not a list'],
-    [COUNTDOWN_MARKS_COPY_KIND, ['wedding', 7]],
+    [REMINDERS_OFF_COPY_KIND, 'not a list'],
+    [REMINDERS_OFF_COPY_KIND, ['wedding', 7]],
     [PUSH_PREFERENCES_COPY_KIND, 'not a row'],
     [PUSH_PREFERENCES_COPY_KIND, { ...ALL_PUSH_PREFERENCES_ON, dateReminders: 'yes' }],
     [PUSH_PREFERENCES_COPY_KIND, { loveNotes: true, moods: true }],
@@ -827,18 +846,19 @@ describe('startDateReminderTriggers', () => {
     await scheduledTimes(1);
   });
 
-  it('re-plans with a marks copy write: marking a far date adds its month and week reminders', async () => {
+  it('re-plans with a reminders-off copy write: switching a far date off drops its month and week reminders', async () => {
     await writeLocalCopy(A, EVENTS_COPY_KIND, [savedEvent('Far', '2026-12-11')]);
     await scheduledTimes(1);
-    expect(scheduledTitles().some((title) => title.startsWith('In a'))).toBe(false);
+    expect(scheduledTitles()).toEqual(
+      expect.arrayContaining(['In a month: Far @ 11/11 9:00', 'In a week: Far @ 12/4 9:00'])
+    );
 
-    await writeLocalCopy(A, COUNTDOWN_MARKS_COPY_KIND, ['event:event-Far']);
+    await writeLocalCopy(A, REMINDERS_OFF_COPY_KIND, ['event:event-Far']);
     await scheduledTimes(2);
 
     const titles = localNotifications.schedule.mock.calls[1][0].notifications.map((n) => n.title);
-    expect(titles).toEqual(
-      expect.arrayContaining(['In a month: Far', 'In a week: Far', 'Tomorrow: Far'])
-    );
+    expect(titles).toContain('Tomorrow: Far');
+    expect(titles.filter((title) => title.startsWith('In a') && title.endsWith('Far'))).toEqual([]);
   });
 
   it('does not re-plan for a kind that holds no date', async () => {

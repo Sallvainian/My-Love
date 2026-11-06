@@ -11,7 +11,7 @@ import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/s
 import { hasNativeReminders } from '../../../src/services/dateReminders';
 import { registerLocalCopy } from '../../../src/services/localCopy';
 import {
-  COUNTDOWN_MARKS_COPY_KIND,
+  REMINDERS_OFF_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
 } from '../../../src/stores/slices/datesSlice';
 import { PUSH_PREFERENCES_COPY_KIND } from '../../../src/stores/slices/notificationsSlice';
@@ -228,7 +228,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     const unregisterLoveNotesNoop = registerLocalCopy(LOVE_NOTES_COPY_KIND, async () => {});
     const unregisterPhotosNoop = registerLocalCopy(PHOTOS_COPY_KIND, async () => {});
     const unregisterPartnerNoop = registerLocalCopy(PARTNER_COPY_KIND, async () => {});
-    const unregisterCountdownMarksNoop = registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, async () => {});
+    const unregisterRemindersOffNoop = registerLocalCopy(REMINDERS_OFF_COPY_KIND, async () => {});
     const unregisterPushPreferencesNoop = registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
@@ -238,12 +238,12 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       unregisterLoveNotesNoop();
       unregisterPhotosNoop();
       unregisterPartnerNoop();
-      unregisterCountdownMarksNoop();
+      unregisterRemindersOffNoop();
       unregisterPushPreferencesNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
       registerLocalCopy(PARTNER_COPY_KIND, () => useAppStore.getState().loadPartner());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
-      registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, () => useAppStore.getState().loadCountdownMarks());
+      registerLocalCopy(REMINDERS_OFF_COPY_KIND, () => useAppStore.getState().loadCountdownMarks());
       registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, () =>
         hasNativeReminders() ? useAppStore.getState().loadPushPreferences() : Promise.resolve()
       );

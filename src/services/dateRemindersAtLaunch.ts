@@ -1,10 +1,10 @@
 import {
   ANNIVERSARIES_COPY_KIND,
-  COUNTDOWN_MARKS_COPY_KIND,
   COUPLE_SETTINGS_COPY_KIND,
   readSavedAnniversaries,
-  readSavedCountdownMarks,
   readSavedCoupleSettings,
+  readSavedRemindersOff,
+  REMINDERS_OFF_COPY_KIND,
 } from '../stores/slices/datesSlice';
 import {
   PUSH_PREFERENCES_COPY_KIND,
@@ -18,6 +18,7 @@ import {
   hasNativeReminders,
   planDateReminders,
   reminderDatesFrom,
+  remindedKeys,
   scheduleDateReminders,
   type ReminderDates,
 } from './dateReminders';
@@ -37,15 +38,15 @@ export interface LaunchOwner {
  *
  * `replanDateReminders()` plans from the saved local copies of all five date
  * kinds (`events`, `anniversaries`, `couple-settings`, `profile`, `partner`),
- * the marks copy (`countdown-marks`, the dates marked for the month and
- * week reminders) and the push switches copy (`push-preferences`, whose
+ * the Remind me copy (`reminders-off`, the dates whose month and week
+ * reminders are switched off; every other date gets them) and the push switches copy (`push-preferences`, whose
  * `dateReminders` is the Settings switch: off plans nothing, so the pending
  * reminders are cancelled), and replaces the shell's pending reminders. It
  * never reads the store's copy of a date, because the store cannot tell "not loaded" apart
  * for these kinds: the anniversaries start as `[]` and the partner is `null`
  * both when unlinked and before it has loaded. A copy exists only after a
  * server answer or a confirmed write, so a copy is a loaded value (an empty
- * marks list is a loaded "no marks"). If any of the seven reads `null` (absent,
+ * reminders-off list is a loaded "none off"). If any of the seven reads `null` (absent,
  * failed or malformed) the whole re-plan is skipped and the pending list
  * stays: planning the other kinds would cancel that kind's reminders, which is
  * the wipe this rule forbids. The one exception is a push switches copy with
@@ -60,7 +61,7 @@ export interface LaunchOwner {
  * Triggers: the signed-in start (`scheduleDateRemindersAtLaunch`), the push
  * permission answer (App), `startDateReminderTriggers()`'s foreground return
  * (`visibilitychange` to visible), a token renewal (`TOKEN_REFRESHED`) and
- * every successful write of a date kind's copy, the marks and push switches
+ * every successful write of a date kind's copy, the Remind me and push switches
  * copies included, for the signed-in user. The write hook fires after the copy
  * lands, so the re-plan reads the new value; a store subscription would fire
  * before it.
@@ -108,7 +109,7 @@ const DATE_COPY_KINDS: ReadonlySet<string> = new Set([
   COUPLE_SETTINGS_COPY_KIND,
   PROFILE_COPY_KIND,
   PARTNER_COPY_KIND,
-  COUNTDOWN_MARKS_COPY_KIND,
+  REMINDERS_OFF_COPY_KIND,
   PUSH_PREFERENCES_COPY_KIND,
 ]);
 
@@ -124,13 +125,13 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
 
   try {
     const { userId } = owner;
-    const [events, anniversaries, coupleSettings, ownProfile, partner, marks, prefs] = await Promise.all([
+    const [events, anniversaries, coupleSettings, ownProfile, partner, off, prefs] = await Promise.all([
       readSavedEvents(userId),
       readSavedAnniversaries(userId),
       readSavedCoupleSettings(userId),
       readSavedOwnProfile(userId),
       readSavedPartner(userId),
-      readSavedCountdownMarks(userId),
+      readSavedRemindersOff(userId),
       readSavedPushPreferences(userId),
     ]);
     if (!isCurrent(owner)) return;
@@ -141,17 +142,18 @@ async function planOnce(owner: LaunchOwner): Promise<void> {
       return;
     }
     // A copy that is missing is not yet loaded: keep whatever is pending.
-    if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner || !marks || !prefs) return;
+    if (!events || !anniversaries || !coupleSettings || !ownProfile || !partner || !off || !prefs) return;
 
+    const sources = reminderDatesFrom({
+      events,
+      anniversaries,
+      coupleSettings,
+      ownProfile,
+      partner: partner.status === 'linked' ? partner.partner : null,
+    });
     const dates: ReminderDates = {
-      ...reminderDatesFrom({
-        events,
-        anniversaries,
-        coupleSettings,
-        ownProfile,
-        partner: partner.status === 'linked' ? partner.partner : null,
-      }),
-      marks: new Set(marks),
+      ...sources,
+      marks: remindedKeys(sources, off),
       remindersOn: prefs.dateReminders,
     };
 

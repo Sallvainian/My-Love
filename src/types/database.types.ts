@@ -91,17 +91,20 @@ export type Database = {
         Row: {
           created_at: string
           date_key: string
+          reminds: boolean
           user_id: string
         }
         ComputedFields: never
         Insert: {
           created_at?: string
           date_key: string
+          reminds?: boolean
           user_id: string
         }
         Update: {
           created_at?: string
           date_key?: string
+          reminds?: boolean
           user_id?: string
         }
         Relationships: []

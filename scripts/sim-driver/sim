@@ -70,7 +70,7 @@ Accounts (local stack only):
                          Set the dates the date reminders are planned from, for
                          Casey and Jessie only. kinds: one date of each kind,
                          3 to 8 days ahead. many: 50 events and 10 anniversaries
-                         (70 reminders). clear: remove every date (both people's
+                         (70+ reminders). clear: remove every date (both people's
                          events and anniversaries, the pair's couple settings and
                          both birthdays), delete both people's countdown marks
                          and turn both people's date reminders back on. kinds
