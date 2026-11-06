@@ -88,7 +88,6 @@ tests/
 │       ├── events.ts               # Single-row event helpers
 │       ├── rls-security.ts
 │       └── supabase.ts             # Supabase admin client, token acquisition
-├── e2e-archive/                    # Archived/superseded specs (frozen)
 ├── setup.ts                        # Vitest setup (browser API mocks)
 └── README.md
 ```
