@@ -227,11 +227,11 @@ Failure: Casey is offline at step 5. Save is refused before any request with the
 1. Jessie taps the gear in the app header. Settings opens with a back arrow above the large title.
 2. Under PARTNER, Jessie taps `Dates`. The Dates list opens.
 3. Under BIRTHDAYS, Jessie taps `Casey`, whose row reads `4 Apr`.
-4. `Casey's birthday` opens: a Date row reading `4 Apr` with no chevron, the Footnote `Casey sets this in their Profile.`, and the Remind me switch, off.
-5. Jessie taps Remind me. The switch is disabled for the moment its save takes, then shows on.
+4. `Casey's birthday` opens: a Date row reading `4 Apr` with no chevron, the Footnote `Casey sets this in their Profile.`, and the Remind me switch, already on: Remind me is on by default for every date (owner decision 2026-11-05).
+5. Jessie leaves it on; a tap would switch it off, disabled for the moment its save takes.
 6. **Climax:** under the switch the Footnote reads `A month and a week before.` A month before Casey's birthday, at 9:00, Jessie's phone will remind Jessie, and again a week before. Jessie did not need Casey to do anything, and could not change Casey's birthday by accident.
 
-Failure: Jessie is offline at step 5. The switch stays off and the Error box shows the `offlineMessage` refusal. If Jessie's Date reminders switch is off, Remind me is disabled, shown at 60% opacity, with the Footnote `Date reminders are off. Turn them on in Notifications.`, and Jessie turns it on in Notifications first. On the website the date page has no Remind me switch at all, because reminders exist only in the iOS app.
+Failure: Jessie is offline and taps Remind me. The switch stays on and the Error box shows the `offlineMessage` refusal. If Jessie's Date reminders switch is off, Remind me is disabled, shown at 60% opacity, with the Footnote `Date reminders are off. Turn them on in Notifications.`, and Jessie turns it on in Notifications first. On the website the date page has no Remind me switch at all, because reminders exist only in the iOS app.
 
 ### Flow 3: Casey logs out of all devices after losing a phone (Casey, iPhone Duo unfolded, column dock)
 
