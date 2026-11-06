@@ -28,6 +28,7 @@ import {
 } from './supabaseClient';
 import {
   DAILY_PICK_EVENT,
+  DATES_CHANGED_EVENT,
   NEW_MOOD_EVENT,
   PARTNER_EVENTS,
   PARTNER_LINKED_EVENT,
@@ -51,6 +52,8 @@ export type SupabaseMoodRecord = SupabaseMood;
  *   see PARTNER_LINKED_EVENT.
  * - `daily_pick`: the partner picked on `day_id`; re-read that day.
  * - `new_mood`: the partner logged a mood.
+ * - `dates_changed`: the partner added, edited or deleted an event or an
+ *   anniversary; see DATES_CHANGED_EVENT.
  */
 export type PartnerEventHandlers = {
   [E in PartnerEventName]?: (event: Extract<PartnerEvent, { event: E }>) => void;
@@ -702,6 +705,9 @@ class MoodSyncService {
         case NEW_MOOD_EVENT:
           s.handlers.new_mood?.(event);
           break;
+        case DATES_CHANGED_EVENT:
+          s.handlers.dates_changed?.(event);
+          break;
         default: {
           // A member added to `PartnerEvent` without a case here fails the
           // typecheck instead of being bound, parsed and silently dropped.
@@ -1028,6 +1034,23 @@ class MoodSyncService {
    */
   async announcePartnerLinked(partnerId: string): Promise<void> {
     await sendEphemeralBroadcast(`mood-updates:${partnerId}`, PARTNER_LINKED_EVENT, {});
+  }
+
+  /**
+   * Tell the partner's open app that an event or anniversary was added, edited
+   * or deleted (DATES_CHANGED_EVENT), so it re-reads them. Best effort: never
+   * throws. A failed broadcast only means the partner sees the change on their
+   * next load of the dates.
+   *
+   * @param partnerId - The store's linked partner; none sends nothing
+   */
+  async announceDatesChanged(partnerId: string | null | undefined): Promise<void> {
+    if (!partnerId) return;
+    try {
+      await sendEphemeralBroadcast(`mood-updates:${partnerId}`, DATES_CHANGED_EVENT, {});
+    } catch (error) {
+      logger.debug('[MoodSyncService] Dates-changed broadcast failed:', error);
+    }
   }
 
   /**

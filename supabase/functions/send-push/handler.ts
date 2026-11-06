@@ -11,7 +11,10 @@
  * - `partner_requests` (`notify_push`, 20261031040000_push_partner_requests.sql)
  *   posts `{ "kind": "partner_request", "id": "<request id>" }` for an INSERT
  *   of a pending request and `{ "kind": "partner_accept", "id": ... }` for a
- *   `pending` to `accepted` UPDATE.
+ *   `pending` to `accepted` UPDATE;
+ * - `events` and `anniversaries` AFTER INSERT (`notify_push`,
+ *   20261105010000_push_added_dates.sql) post `{ "kind": "event" | "anniversary",
+ *   "id": "<uuid>" }`. Only an added date pushes; an edit has no trigger.
  *
  * Split out of `index.ts` so `deno test` can drive it with a fake database
  * and a fake APNs client.
@@ -29,8 +32,8 @@
  * The sender reads the row itself with the service role and derives the
  * sender's name and the recipient from it, so a forged call can name no target
  * beyond an existing row. The recipient of a note is its `to_user_id`, of an
- * interaction its `to_user_id`, and of a mood or photo the sender's
- * `users.partner_id`. A partner request goes to its `to_user_id` (the asker is
+ * interaction its `to_user_id`, and of a mood, photo, event or anniversary the
+ * sender's (the row owner's) `users.partner_id`. A partner request goes to its `to_user_id` (the asker is
  * the sender) and its acceptance to its `from_user_id` (the accepter,
  * `to_user_id`, is the sender); neither looks up a partner, since the asker is
  * not linked yet. An owner with no partner, or a recipient equal to the sender,
@@ -66,7 +69,7 @@
  *
  * Every payload also carries a top-level `kind` (`withKind`), the `PushKind`
  * handled: `love_note`, `mood`, `photo`, `interaction` (poke and kiss alike),
- * `partner_request` or `partner_accept`. It is the web code's tap
+ * `partner_request`, `partner_accept`, `event` or `anniversary`. It is the web code's tap
  * routing key (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is
  * not touched.
  *
@@ -109,6 +112,8 @@ import {
   buildPartnerAcceptPayload,
   buildPartnerRequestPayload,
   buildPhotoPayload,
+  buildAnniversaryPayload,
+  buildEventPayload,
   type ApnsPayload,
   type PushMood,
   withBadge,
@@ -122,7 +127,9 @@ export type PushKind =
   | 'photo'
   | 'interaction'
   | 'partner_request'
-  | 'partner_accept';
+  | 'partner_accept'
+  | 'event'
+  | 'anniversary';
 
 /** The columns of `push_preferences`: one switch per kind of push the person can turn off. */
 export type PushPreference =
@@ -130,7 +137,8 @@ export type PushPreference =
   | 'moods'
   | 'photos'
   | 'pokes_and_kisses'
-  | 'partner_requests';
+  | 'partner_requests'
+  | 'dates';
 
 /** The switch each kind answers to; both partner kinds share one. */
 export const PREFERENCE_FOR_KIND: Record<PushKind, PushPreference> = {
@@ -140,10 +148,20 @@ export const PREFERENCE_FOR_KIND: Record<PushKind, PushPreference> = {
   interaction: 'pokes_and_kisses',
   partner_request: 'partner_requests',
   partner_accept: 'partner_requests',
+  event: 'dates',
+  anniversary: 'dates',
 };
 
 /** The kinds the triggers post as `{kind, id}`; a love note posts `{note_id}`. */
-const POSTED_KINDS = ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept'] as const;
+const POSTED_KINDS = [
+  'mood',
+  'photo',
+  'interaction',
+  'partner_request',
+  'partner_accept',
+  'event',
+  'anniversary',
+] as const;
 
 export interface NoteRow {
   id: string;
@@ -161,6 +179,13 @@ export interface MoodRow extends PushMood {
 export interface PhotoRow {
   id: string;
   user_id: string;
+}
+
+/** An `events` or `anniversaries` row: its owner and its name. */
+export interface DateRow {
+  id: string;
+  user_id: string;
+  label: string;
 }
 
 export interface InteractionRow {
@@ -187,7 +212,7 @@ export interface DeviceRow {
 
 export interface PushRequestRow {
   kind: PushKind;
-  /** The id of the note, mood, photo, interaction or partner request. */
+  /** The id of the note, mood, photo, interaction, partner request, event or anniversary. */
   source_id: string;
   token: string;
   environment: string;
@@ -203,6 +228,8 @@ export interface PushDb {
   getPhoto(photoId: string): Promise<PhotoRow | null>;
   getInteraction(interactionId: string): Promise<InteractionRow | null>;
   getPartnerRequest(requestId: string): Promise<PartnerRequestRow | null>;
+  getEvent(eventId: string): Promise<DateRow | null>;
+  getAnniversary(anniversaryId: string): Promise<DateRow | null>;
   /** The account's linked partner, or null when it has none. */
   getPartnerId(userId: string): Promise<string | null>;
   /** The receiver's switch: true when on or when the account has no `push_preferences` row. */
@@ -256,7 +283,7 @@ function parseBody(body: { note_id?: unknown; kind?: unknown; id?: unknown }): P
     if (typeof body.kind !== 'string' || !(POSTED_KINDS as readonly string[]).includes(body.kind)) {
       return {
         ok: false,
-        message: 'kind must be mood, photo, interaction, partner_request or partner_accept',
+        message: 'kind must be mood, photo, interaction, partner_request, partner_accept, event or anniversary',
       };
     }
     if (typeof body.id !== 'string' || !UUID.test(body.id)) {
@@ -334,6 +361,28 @@ async function resolveSource(db: PushDb, kind: PushKind, id: string): Promise<Pu
         senderId: request.from_user_id,
         recipientId: request.to_user_id,
         buildPayload: (name) => buildPartnerRequestPayload(name),
+      };
+    }
+    case 'event': {
+      const event = await db.getEvent(id);
+      if (!event) return null;
+      return {
+        kind,
+        id,
+        senderId: event.user_id,
+        recipientId: await db.getPartnerId(event.user_id),
+        buildPayload: (name) => buildEventPayload(event.label, name),
+      };
+    }
+    case 'anniversary': {
+      const anniversary = await db.getAnniversary(id);
+      if (!anniversary) return null;
+      return {
+        kind,
+        id,
+        senderId: anniversary.user_id,
+        recipientId: await db.getPartnerId(anniversary.user_id),
+        buildPayload: (name) => buildAnniversaryPayload(anniversary.label, name),
       };
     }
     case 'partner_accept': {

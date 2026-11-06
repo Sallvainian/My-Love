@@ -5,9 +5,10 @@
  *
  * Native iOS shell with the local-notifications plugin only: without it
  * (`hasNativeReminders()`) the group is not drawn and nothing is read. The mark
- * is the account's `countdown_marks` row for `markKey` (`datesSlice`): the
- * switch is on while `countdownMarks` holds the key, and is disabled, off,
- * until the marks have loaded. A tap writes the server first (`setCountdownMark`),
+ * is on by default (2026-11-05): the switch is off only while
+ * `remindersOff` (`datesSlice`, the account's `countdown_marks` rows with
+ * `reminds` false) holds `markKey`, and is disabled, showing on, until the
+ * switches have loaded. A tap writes the server first (`setCountdownMark`),
  * which re-plans the reminders; the switch is disabled while its save is in
  * flight. The marks and the account's push preferences load when the group
  * mounts and when the connection returns.
@@ -42,7 +43,7 @@ interface RemindMeGroupProps {
 }
 
 function RemindMeCard({ markKey, onError }: RemindMeGroupProps) {
-  const marks = useAppStore((state) => state.countdownMarks);
+  const remindersOff = useAppStore((state) => state.remindersOff);
   const loadCountdownMarks = useAppStore((state) => state.loadCountdownMarks);
   const setCountdownMark = useAppStore((state) => state.setCountdownMark);
   const pushPreferences = useAppStore((state) => state.pushPreferences);
@@ -62,7 +63,7 @@ function RemindMeCard({ markKey, onError }: RemindMeGroupProps) {
   }, [loadCountdownMarks, loadPushPreferences]);
 
   // The default is on, as on the Notifications page, until the row has loaded.
-  const remindersOff = pushPreferences?.dateReminders === false;
+  const dateRemindersOff = pushPreferences?.dateReminders === false;
 
   const toggle = async (next: boolean) => {
     onError(null);
@@ -85,7 +86,7 @@ function RemindMeCard({ markKey, onError }: RemindMeGroupProps) {
     <SettingsGroup
       footnote={
         <p className={FOOTNOTE} data-testid="settings-remind-me-footnote">
-          {remindersOff ? FOOTNOTE_OFF : FOOTNOTE_ON}
+          {dateRemindersOff ? FOOTNOTE_OFF : FOOTNOTE_ON}
         </p>
       }
     >
@@ -94,9 +95,9 @@ function RemindMeCard({ markKey, onError }: RemindMeGroupProps) {
         id="settings-remind-me"
         icon={Bell}
         label="Remind me"
-        checked={marks?.includes(markKey) ?? false}
+        checked={!(remindersOff?.includes(markKey) ?? false)}
         onChange={(next) => void toggle(next)}
-        disabled={marks === null || saving || remindersOff}
+        disabled={remindersOff === null || saving || dateRemindersOff}
       />
     </SettingsGroup>
   );

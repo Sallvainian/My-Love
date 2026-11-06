@@ -237,7 +237,7 @@ export function signedOutState() {
     // relationship; the incoming account's refresher reads its own copy.
     coupleSettings: null,
     // The outgoing account's marked dates ("not loaded" for the next account).
-    countdownMarks: null,
+    remindersOff: null,
 
     // profileSlice — the outgoing account's own name and birthday, and whether
     // its last read found no server answer.

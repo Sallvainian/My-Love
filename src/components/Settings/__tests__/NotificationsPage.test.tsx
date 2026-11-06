@@ -45,8 +45,8 @@ vi.mock('../../../api/supabaseClient', () => ({
 }));
 vi.mock('../../../services/countdownMarksService', () => ({
   countdownMarksService: {
-    fetchCountdownMarks: vi.fn(() => Promise.resolve([])),
-    setCountdownMark: vi.fn(() => Promise.resolve()),
+    fetchRemindersOff: vi.fn(() => Promise.resolve([])),
+    setRemindMe: vi.fn(() => Promise.resolve()),
   },
 }));
 vi.mock('../../../services/pushPreferencesService', async (importOriginal) => ({
@@ -72,6 +72,7 @@ const ROWS = [
   ['settings-push-moods', 'Moods', 'moods'],
   ['settings-push-photos', 'Photos', 'photos'],
   ['settings-push-pokes-and-kisses', 'Pokes and kisses', 'pokesAndKisses'],
+  ['settings-push-dates', 'Dates', 'dates'],
   ['settings-push-partner-requests', 'Partner requests', 'partnerRequests'],
 ] as const;
 
@@ -121,7 +122,7 @@ afterEach(() => {
 });
 
 describe('NotificationsPage: the groups', () => {
-  it('has a Notify me about group of five switches, then a Reminders group with Date reminders', async () => {
+  it('has a Notify me about group of six switches, then a Reminders group with Date reminders', async () => {
     await renderLoaded();
 
     const page = screen.getByTestId('settings-notifications');
@@ -135,7 +136,7 @@ describe('NotificationsPage: the groups', () => {
       REMINDERS_SWITCH,
     ]);
     const notifyGroup = screen.getByRole('region', { name: 'Notify me about' });
-    expect(within(notifyGroup).getAllByRole('switch')).toHaveLength(5);
+    expect(within(notifyGroup).getAllByRole('switch')).toHaveLength(6);
     const remindersGroup = screen.getByRole('region', { name: 'Reminders' });
     expect(within(remindersGroup).getAllByRole('switch')).toEqual([screen.getByTestId(REMINDERS_SWITCH)]);
   });
@@ -175,7 +176,7 @@ describe('NotificationsPage: the groups', () => {
     expect(screen.queryByRole('heading', { name: 'Reminders' })).not.toBeInTheDocument();
     expect(screen.queryByTestId(REMINDERS_SWITCH)).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-reminders-footnote')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('switch')).toHaveLength(5);
+    expect(screen.getAllByRole('switch')).toHaveLength(6);
   });
 });
 
@@ -643,14 +644,15 @@ describe('notificationsSummary', () => {
     photos: false,
     pokesAndKisses: false,
     partnerRequests: false,
+    dates: false,
     dateReminders: false,
   };
 
   it.each([
-    ['all six on, permission granted', ALL_PUSH_PREFERENCES_ON, 'granted', true, 'On'],
+    ['all seven on, permission granted', ALL_PUSH_PREFERENCES_ON, 'granted', true, 'On'],
     ['one push switch off', { ...ALL_PUSH_PREFERENCES_ON, moods: false }, 'granted', true, 'Some'],
     ['only Date reminders off', REMINDERS_OFF, 'granted', true, 'Some'],
-    ['all six off', allOff, 'granted', true, 'Off'],
+    ['all seven off', allOff, 'granted', true, 'Off'],
     ['permission denied with every switch on', ALL_PUSH_PREFERENCES_ON, 'denied', true, 'Off'],
     ['permission denied before the switches load', null, 'denied', true, 'Off'],
     ['permission prompt, all on', ALL_PUSH_PREFERENCES_ON, 'prompt', true, 'On'],
@@ -658,9 +660,9 @@ describe('notificationsSummary', () => {
     ['the switches not loaded', null, 'granted', true, undefined],
     ['the permission not read yet', ALL_PUSH_PREFERENCES_ON, null, true, undefined],
     ['neither known', null, null, true, undefined],
-    ['no reminders plugin, Date reminders off, five on', REMINDERS_OFF, 'granted', false, 'On'],
+    ['no reminders plugin, Date reminders off, six on', REMINDERS_OFF, 'granted', false, 'On'],
     ['no reminders plugin, one push switch off', { ...allOff, loveNotes: true }, 'granted', false, 'Some'],
-    ['no reminders plugin, five off, Date reminders on', { ...allOff, dateReminders: true }, 'granted', false, 'Off'],
+    ['no reminders plugin, six off, Date reminders on', { ...allOff, dateReminders: true }, 'granted', false, 'Off'],
   ] as const)('%s', (_name, preferences, permission, withReminders, expected) => {
     expect(notificationsSummary(preferences, permission, withReminders)).toBe(expected);
   });

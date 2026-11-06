@@ -101,7 +101,7 @@ export const MARK_KEYS = {
 /** Every date the planner reads. */
 export interface ReminderDates {
   events: { id: string; label: string; date: Date }[];
-  /** The person's own anniversaries; `date` is `YYYY-MM-DD`, `serverId` is `anniversaries.id`. */
+  /** The couple's anniversaries; `date` is `YYYY-MM-DD`, `serverId` is `anniversaries.id`. */
   anniversaries: { label: string; date: string; serverId?: string }[];
   /** ISO instant, or `null` when not set. */
   relationshipStart: string | null;
@@ -109,7 +109,7 @@ export interface ReminderDates {
   weddingDate: string | null;
   ownBirthday: ReminderBirthday | null;
   partnerBirthday: ReminderBirthday | null;
-  /** The keys of the dates marked for the month and week reminders. */
+  /** The keys of the dates that get the month and week reminders (`remindedKeys`). */
   marks: ReadonlySet<string>;
   /** The Settings switch (story 4.3): `false` plans no reminder at all. */
   remindersOn: boolean;
@@ -332,6 +332,24 @@ function reminderDateItems(dates: Omit<ReminderDates, 'marks' | 'remindersOn'>):
   }
 
   return items;
+}
+
+/**
+ * The `marks` for `planDateReminders`: every date's key except those whose
+ * Remind me is off. Remind me is on by default (2026-11-05), so a date gets the
+ * month and week reminders unless the person switched it off. An anniversary
+ * with no `serverId` yet has no key and gets none until it has one.
+ */
+export function remindedKeys(
+  dates: Omit<ReminderDates, 'marks' | 'remindersOn'>,
+  remindersOff: Iterable<string>
+): Set<string> {
+  const off = new Set(remindersOff);
+  const keys = new Set<string>();
+  for (const { key } of reminderDateItems(dates)) {
+    if (key !== null && !off.has(key)) keys.add(key);
+  }
+  return keys;
 }
 
 /**

@@ -130,6 +130,19 @@ describe('subscribePartnerEvents', () => {
     unsubscribe();
   });
 
+  it('delivers dates_changed to its handler alone', async () => {
+    const new_mood = vi.fn();
+    const dates_changed = vi.fn();
+    const { channel, unsubscribe } = await join({ new_mood, dates_changed });
+
+    emitEvent(channel, 'dates_changed');
+
+    expect(dates_changed).toHaveBeenCalledTimes(1);
+    expect(dates_changed).toHaveBeenCalledWith({ event: 'dates_changed' });
+    expect(new_mood).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
   it('delivers daily_pick to its handler with the day id', async () => {
     const new_mood = vi.fn();
     const daily_pick = vi.fn();

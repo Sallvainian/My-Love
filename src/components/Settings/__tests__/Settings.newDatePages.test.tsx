@@ -202,7 +202,7 @@ describe('Settings > Dates > adding a date', () => {
       partnerKnown: true,
       partnerLoadError: false,
       ownProfile: { displayName: 'Casey', birthday: null },
-      countdownMarks: [],
+      remindersOff: [],
       pushPreferences: { ...ALL_PUSH_PREFERENCES_ON },
       settings: { relationship: { anniversaries: [] } },
     });
@@ -224,7 +224,7 @@ describe('Settings > Dates > adding a date', () => {
       partner: null,
       partnerKnown: false,
       coupleSettings: null,
-      countdownMarks: null,
+      remindersOff: null,
       pushPreferences: null,
       events: [],
       settings: null,

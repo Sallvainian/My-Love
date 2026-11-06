@@ -132,3 +132,38 @@ export function getUpcomingEventCards<T extends { date: Date }>(
   const upcoming = events.filter((event) => getCalendarDaysDiff(event.date, now) >= 0);
   return { upcomingCount: upcoming.length, visible: upcoming.slice(0, maxCards) };
 }
+
+/** One card in Home's Upcoming list: an event, or an anniversary at its next occurrence. */
+export type UpcomingDateCard<E, A> =
+  | { kind: 'event'; date: Date; item: E }
+  | { kind: 'anniversary'; date: Date; item: A };
+
+/**
+ * Home's Upcoming list: events and anniversaries in one list, soonest first
+ * (owner decision 2026-11-05: on Home the two are the same thing). The same
+ * two answers as `getUpcomingEventCards`, for the same reasons: `visible` is
+ * capped, `upcomingCount` is not.
+ *
+ * Events keep their own filter (not passed at the viewer's local midnight);
+ * an anniversary is always upcoming, so the caller passes each at its next
+ * occurrence (`getNextAnniversaryDate`), which keeps this file free of the
+ * services. On the same day an event comes before an anniversary.
+ */
+export function getUpcomingDateCards<E extends { date: Date }, A>(
+  events: E[],
+  anniversaries: { item: A; date: Date }[],
+  now: Date,
+  maxCards: number
+): { upcomingCount: number; visible: UpcomingDateCard<E, A>[] } {
+  const cards: UpcomingDateCard<E, A>[] = [
+    ...getUpcomingEventCards(events, now, events.length).visible.map((event) => ({
+      kind: 'event' as const,
+      date: event.date,
+      item: event,
+    })),
+    ...anniversaries.map(({ item, date }) => ({ kind: 'anniversary' as const, date, item })),
+  ];
+  // Stable: same-day cards keep events first, and each kind its own order.
+  cards.sort((a, b) => getCalendarDaysDiff(a.date, now) - getCalendarDaysDiff(b.date, now));
+  return { upcomingCount: cards.length, visible: cards.slice(0, maxCards) };
+}

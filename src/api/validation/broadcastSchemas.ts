@@ -27,8 +27,24 @@ export const DAILY_PICK_EVENT = 'daily_pick';
 /** Sent on `mood-updates:<partnerId>` by `moodSyncService.broadcastMoodToPartner`. */
 export const NEW_MOOD_EVENT = 'new_mood';
 
+/**
+ * Sent on `mood-updates:<partnerId>` by a device that just added, edited or
+ * deleted an event or an anniversary (`moodSyncService.announceDatesChanged`),
+ * so the partner's open app re-reads both instead of showing a date that is
+ * gone until it next loads them. Like PARTNER_LINKED_EVENT, the payload is
+ * empty and trusted for nothing: it only prompts a server re-read, and
+ * `couple_broadcast_partner_can_send` lets only the partner publish on the
+ * topic.
+ */
+export const DATES_CHANGED_EVENT = 'dates_changed';
+
 /** Every event the `mood-updates:<uuid>` channel binds, once each, when it is created. */
-export const PARTNER_EVENTS = [PARTNER_LINKED_EVENT, DAILY_PICK_EVENT, NEW_MOOD_EVENT] as const;
+export const PARTNER_EVENTS = [
+  PARTNER_LINKED_EVENT,
+  DAILY_PICK_EVENT,
+  NEW_MOOD_EVENT,
+  DATES_CHANGED_EVENT,
+] as const;
 
 export type PartnerEventName = (typeof PARTNER_EVENTS)[number];
 
@@ -36,14 +52,16 @@ export type PartnerEventName = (typeof PARTNER_EVENTS)[number];
 export type PartnerEvent =
   | { event: typeof PARTNER_LINKED_EVENT }
   | { event: typeof DAILY_PICK_EVENT; day_id: string }
-  | { event: typeof NEW_MOOD_EVENT; mood: SupabaseMood };
+  | { event: typeof NEW_MOOD_EVENT; mood: SupabaseMood }
+  | { event: typeof DATES_CHANGED_EVENT };
 
 /**
  * Wire validation for the two couple broadcast topics
  *
  * `love-notes:<uuid>` and `mood-updates:<uuid>` carry client-to-client
  * Realtime broadcasts. `mood-updates:<uuid>` carries one registry of partner
- * events (`PartnerEvent`: `partner_linked`, `daily_pick`, `new_mood`), and
+ * events (`PartnerEvent`: `partner_linked`, `daily_pick`, `new_mood`,
+ * `dates_changed`), and
  * `parsePartnerEvent` is the one door each of them passes through.
  *
  * RLS on `realtime.messages` decides who may join and who may send, but it
@@ -239,8 +257,8 @@ export const DailyPickBroadcastSchema = z.object({ day_id: UUIDSchema });
 /**
  * Parse and authorize one partner broadcast, whichever event it is.
  *
- * - `partner_linked` is always returned: its body is trusted for nothing, it
- *   only prompts a server re-read.
+ * - `partner_linked` and `dates_changed` are always returned: their bodies are
+ *   trusted for nothing, they only prompt a server re-read.
  * - `new_mood` goes through `parseMoodBroadcast`.
  * - `daily_pick` needs a known partner (a channel whose account changed is
  *   muted that way) and a body of `{ day_id: uuid }`. It too only asks for a
@@ -260,6 +278,8 @@ export function parsePartnerEvent(
   switch (event) {
     case PARTNER_LINKED_EVENT:
       return { event: PARTNER_LINKED_EVENT };
+    case DATES_CHANGED_EVENT:
+      return { event: DATES_CHANGED_EVENT };
     case NEW_MOOD_EVENT: {
       const mood = parseMoodBroadcast(raw, identity);
       return mood ? { event: NEW_MOOD_EVENT, mood } : null;

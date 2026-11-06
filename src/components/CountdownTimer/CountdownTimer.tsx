@@ -1,19 +1,18 @@
 /**
- * CountdownTimer Component
+ * AnniversaryCountdown -- one anniversary's card in Home's Upcoming list,
+ * beside the events and sorted with them by date (owner decision 2026-11-05:
+ * an anniversary and an event are the same thing on Home).
  *
- * Displays countdown to next upcoming anniversary with celebration animations.
- * Features:
- * - A live h/m/s clock, ticking every second like the other Home countdowns
- * - Celebration animations using Motion when countdown reaches zero
- * - Support for multiple anniversaries (displays next 3)
- * - Responsive mobile-first design
- * - Each anniversary renders the shared CountdownCard (CAP-3), a button that
- *   opens the anniversary's page from Home (`dates/anniversary/<key>`)
+ * Counts down to the anniversary's next occurrence with a live h/m/s clock,
+ * ticking every second like the other Home countdowns. On the day it reads
+ * `Today!` with the highlight and plays the celebration once per mount. The
+ * card is the shared CountdownCard (CAP-3), a button that opens the
+ * anniversary's page from Home (`dates/anniversary/<key>`).
  */
 
 import { AnimatePresence, m as motion } from 'motion/react';
 import { Calendar, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ANIMATION_TIMING, ANIMATION_VALUES } from '../../constants/animations';
 import type { Anniversary } from '../../types';
 import { useAppStore } from '../../stores/useAppStore';
@@ -24,153 +23,52 @@ import {
   getCountdownToDay,
   type CountdownParts,
 } from '../RelationshipTimers/eventCountdownHelpers';
-import {
-  getNextAnniversaryDate,
-  getUpcomingAnniversaries,
-} from '../../utils/countdownService';
+import { getNextAnniversaryDate } from '../../utils/countdownService';
 import { generateDeterministicNumbers } from '../../utils/deterministicRandom';
 
-interface CountdownTimerProps {
-  anniversaries: Anniversary[];
-  className?: string;
-  maxDisplay?: number;
-}
-
-interface AnniversaryWithCountdown {
+interface AnniversaryCountdownProps {
   anniversary: Anniversary;
-  /** Time left until the anniversary's day starts; `null` on the day itself. */
-  remaining: CountdownParts | null;
-  nextDate: Date;
-  shouldCelebrate: boolean;
 }
 
-export function CountdownTimer({
-  anniversaries,
-  className = '',
-  maxDisplay = 3,
-}: CountdownTimerProps) {
-  const [tick, setTick] = useState(0);
-  const [celebratingId, setCelebratingId] = useState<number | null>(null);
-  const activeCelebrationRef = useRef<number | null>(null);
+export function AnniversaryCountdown({ anniversary }: AnniversaryCountdownProps) {
+  const [now, setNow] = useState(() => new Date());
+  const [isCelebrating, setIsCelebrating] = useState(false);
+  const celebratedRef = useRef(false);
   const celebrationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Get upcoming anniversaries with their countdowns
-  const upcomingAnniversaries = useMemo(
-    () => getUpcomingAnniversaries(anniversaries, maxDisplay),
-    [anniversaries, maxDisplay]
-  );
-
-  const buildCountdowns = useCallback(
-    (_tick: number): AnniversaryWithCountdown[] => {
-      return upcomingAnniversaries.map((anniversary) => {
-        const nextDate = getNextAnniversaryDate(anniversary.date);
-        const remaining = getCountdownToDay(nextDate);
-        // The day has come exactly when the clock has nothing left to count,
-        // so the card flips and the animation starts at midnight, not in the
-        // last minute before it.
-        const shouldCelebrate = remaining === null;
-
-        return {
-          anniversary,
-          remaining,
-          nextDate,
-          shouldCelebrate,
-        };
-      });
-    },
-    [upcomingAnniversaries]
-  );
-
-  const countdowns = useMemo(() => buildCountdowns(tick), [buildCountdowns, tick]);
-
-  const updateCelebration = useCallback(() => {
-    const celebrating = buildCountdowns(Date.now()).find((countdown) => countdown.shouldCelebrate);
-
-    if (celebrating) {
-      if (activeCelebrationRef.current !== celebrating.anniversary.id) {
-        activeCelebrationRef.current = celebrating.anniversary.id;
-        setCelebratingId(celebrating.anniversary.id);
-
-        if (celebrationTimeoutRef.current) {
-          clearTimeout(celebrationTimeoutRef.current);
-        }
-
-        celebrationTimeoutRef.current = setTimeout(() => {
-          setCelebratingId(null);
-        }, 3000);
-      }
-      return;
-    }
-
-    activeCelebrationRef.current = null;
-  }, [buildCountdowns]);
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
 
   // Tick every second so the clock counts down live, as on the other cards
   useEffect(() => {
-    const kickoff = setTimeout(() => {
-      updateCelebration();
-    }, 0);
-
-    const interval = setInterval(() => {
-      updateCelebration();
-      setTick((current) => current + 1);
-    }, 1000);
-
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => {
-      clearTimeout(kickoff);
-      clearInterval(interval); // Cleanup on unmount
-      if (celebrationTimeoutRef.current) {
-        clearTimeout(celebrationTimeoutRef.current);
-      }
+      clearInterval(interval);
+      if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
     };
-  }, [updateCelebration]);
+  }, []);
 
-  // No anniversaries to display
-  if (countdowns.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className={`space-y-4 ${className}`} data-testid="countdown-timer">
-      <AnimatePresence mode="wait">
-        {countdowns.map((countdown, index) => (
-          <motion.div
-            key={countdown.anniversary.id}
-            data-testid={`countdown-card-${index}`}
-            className="relative"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{
-              duration: 0.5,
-              delay: index * 0.1,
-            }}
-          >
-            <AnniversaryCard
-              countdown={countdown}
-              isCelebrating={celebratingId === countdown.anniversary.id}
-            />
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
+  const remaining: CountdownParts | null = getCountdownToDay(
+    getNextAnniversaryDate(anniversary.date, now),
+    now
   );
-}
+  // The day has come exactly when the clock has nothing left to count, so the
+  // card flips and the animation starts at midnight, not in the last minute before it.
+  const celebrating = remaining === null;
 
-interface AnniversaryCardProps {
-  countdown: AnniversaryWithCountdown;
-  isCelebrating: boolean;
-}
+  useEffect(() => {
+    if (!celebrating || celebratedRef.current) return;
+    celebratedRef.current = true;
+    const kickoff = setTimeout(() => {
+      setIsCelebrating(true);
+      celebrationTimeoutRef.current = setTimeout(() => setIsCelebrating(false), 3000);
+    }, 0);
+    return () => clearTimeout(kickoff);
+  }, [celebrating]);
 
-function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
-  const { anniversary, remaining } = countdown;
-  const celebrating = !remaining;
-  const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   // The key DatesPage and the anniversary page use: the server id, or the local id until it has one.
   const key = anniversary.serverId ?? String(anniversary.id);
 
   return (
-    <>
+    <div className="relative">
       <CountdownCard
         icon={celebrating ? Sparkles : Calendar}
         highlight={celebrating}
@@ -184,7 +82,7 @@ function AnniversaryCard({ countdown, isCelebrating }: AnniversaryCardProps) {
 
       {/* Celebration Animation, over the card and clipped to its corners */}
       <AnimatePresence>{isCelebrating && <CelebrationAnimation />}</AnimatePresence>
-    </>
+    </div>
   );
 }
 

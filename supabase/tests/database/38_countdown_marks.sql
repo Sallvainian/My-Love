@@ -13,7 +13,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(26);
+select plan(29);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -93,6 +93,15 @@ select fk_ok('public', 'countdown_marks', 'user_id', 'auth', 'users', 'id',
 
 select col_is_pk('public', 'countdown_marks', array['user_id', 'date_key'],
   'MARKS-008: the primary key is (user_id, date_key)');
+
+-- Remind me is on by default (20261105020000): a row records the choice in
+-- `reminds`, and a row written without it, as every row before that
+-- migration was, means on.
+select col_type_is('public', 'countdown_marks', 'reminds', 'boolean',
+  'MARKS-027: reminds is a boolean');
+select col_not_null('public', 'countdown_marks', 'reminds', 'MARKS-028: reminds is not null');
+select col_default_is('public', 'countdown_marks', 'reminds', 'true',
+  'MARKS-029: reminds defaults to true, so a row from before Remind me defaulted on stays on');
 
 -- ============================================
 -- The owner

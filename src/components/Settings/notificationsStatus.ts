@@ -10,12 +10,13 @@ import { useEffect, useState } from 'react';
 import { getPushPermission, type PushPermission } from '../../services/pushNotifications';
 import type { PushPreferenceKey, PushPreferences } from '../../services/pushPreferencesService';
 
-/** The five push switches under "Notify me about", in the order the page shows them. */
+/** The six push switches under "Notify me about", in the order the page shows them. */
 export const PUSH_SWITCH_KEYS: readonly PushPreferenceKey[] = [
   'loveNotes',
   'moods',
   'photos',
   'pokesAndKisses',
+  'dates',
   'partnerRequests',
 ];
 

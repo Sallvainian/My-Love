@@ -256,8 +256,8 @@ describe('parsePartnerEvent', () => {
   const known = { partnerId: PARTNER };
   const unknown = { partnerId: null };
 
-  it('names exactly the three events the channel binds', () => {
-    expect([...PARTNER_EVENTS]).toEqual(['partner_linked', 'daily_pick', 'new_mood']);
+  it('names exactly the four events the channel binds', () => {
+    expect([...PARTNER_EVENTS]).toEqual(['partner_linked', 'daily_pick', 'new_mood', 'dates_changed']);
     expect(DAILY_PICK_EVENT).toBe('daily_pick');
   });
 
@@ -265,6 +265,11 @@ describe('parsePartnerEvent', () => {
     expect(parsePartnerEvent('partner_linked', {}, unknown)).toEqual({ event: 'partner_linked' });
     expect(parsePartnerEvent('partner_linked', 'junk', known)).toEqual({ event: 'partner_linked' });
     expect(parsePartnerEvent('partner_linked', undefined, known)).toEqual({ event: 'partner_linked' });
+  });
+
+  it('returns dates_changed whatever the body and whoever the partner is', () => {
+    expect(parsePartnerEvent('dates_changed', {}, unknown)).toEqual({ event: 'dates_changed' });
+    expect(parsePartnerEvent('dates_changed', 'junk', known)).toEqual({ event: 'dates_changed' });
   });
 
   it("returns a partner's mood through parseMoodBroadcast", () => {

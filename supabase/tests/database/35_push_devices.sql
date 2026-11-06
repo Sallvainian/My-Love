@@ -526,11 +526,13 @@ select is(
 );
 
 -- ============================================
--- Date changes removed (20261103000000, story 5.4)
+-- Date changes (20261103000000, story 5.4) and added dates (20261105010000)
 -- ============================================
--- No date change pushes any more: the five triggers, notify_date_change(),
--- date_changes and push_requests.date_change_id are gone, and story 5.18
--- (20261104000000) dropped push_preferences.dates.
+-- No date CHANGE pushes: the five story 3.5 triggers, notify_date_change(),
+-- date_changes and push_requests.date_change_id are gone. An ADDED event or
+-- anniversary pushes again (2026-11-05) through notify_push(), with
+-- push_requests.event_id / anniversary_id as its sources and
+-- push_preferences.dates as the receiver's switch.
 create temporary table t_pair as
 select least(a_id, b_id) as lo, greatest(a_id, b_id) as hi from t_ids;
 grant select on t_pair to authenticated, anon;
@@ -544,47 +546,48 @@ select hasnt_table('public', 'date_changes', 'PUSH-DB-058: date_changes is gone'
 select hasnt_function('public', 'notify_date_change', 'PUSH-DB-059: notify_date_change() is gone');
 
 select is(
-  (select count(*)::int from pg_trigger
-    where tgname in ('events_push_after_insert', 'events_push_after_update',
-                     'couple_settings_push_after_insert', 'couple_settings_push_after_update',
-                     'users_push_after_birthday')),
-  0,
-  'PUSH-DB-060: none of the five date triggers exists'
+  (select string_agg(format('%s %s %s', t.tgname, p.proname, t.tgenabled), ', ' order by t.tgname)
+     from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+    where t.tgrelid in ('public.events'::regclass, 'public.anniversaries'::regclass, 'public.couple_settings'::regclass)
+      and not t.tgisinternal and t.tgname like '%push%'),
+  'anniversaries_push_after_insert notify_push O, events_push_after_insert notify_push O',
+  'PUSH-DB-060: events and anniversaries carry one insert push trigger each, and couple_settings none'
 );
 
 select hasnt_column('public', 'push_requests', 'date_change_id', 'PUSH-DB-061: push_requests has no date_change_id');
 
 select ok(
-  (select pg_get_constraintdef(oid) from pg_constraint
-    where conrelid = 'public.push_requests'::regclass and conname = 'push_requests_source_check')
-    !~ 'date_change_id'
-  and (select count(*)::int
-         from regexp_matches(
-           (select pg_get_constraintdef(oid) from pg_constraint
-             where conrelid = 'public.push_requests'::regclass and conname = 'push_requests_source_check'),
-           '(note_id|mood_id|photo_id|interaction_id|partner_request_id|partner_accept_id)', 'g')) = 6,
-  'PUSH-DB-062: the source check names the six remaining sources'
+  (select count(*)::int
+     from regexp_matches(
+       (select pg_get_constraintdef(oid) from pg_constraint
+         where conrelid = 'public.push_requests'::regclass and conname = 'push_requests_source_check'),
+       '(note_id|mood_id|photo_id|interaction_id|partner_request_id|partner_accept_id|event_id|anniversary_id)', 'g')) = 8
+  and (select count(*)::int from pg_constraint
+        where conrelid = 'public.push_requests'::regclass
+          and conname in ('push_requests_event_token_key', 'push_requests_anniversary_token_key')) = 2,
+  'PUSH-DB-062: the source check names eight sources and each date source has its (id, token) unique key'
 );
 
-select hasnt_column('public', 'push_preferences', 'dates', 'PUSH-DB-063: push_preferences.dates is gone');
+select has_column('public', 'push_preferences', 'dates', 'PUSH-DB-063: push_preferences.dates is back');
 
--- Sender settings present, the queue emptied: a date write must still queue nothing.
+-- Sender settings present, the queue emptied.
 delete from public.push_sender_settings;
 insert into public.push_sender_settings (sender_url, sender_secret)
 values ('http://sender.test/send-push', 'trigger-test-secret-1234');
 delete from net.http_request_queue;
 
--- ---- events ----
+-- ---- events: an insert posts, an edit does not ----
 insert into public.events (id, user_id, label, event_date)
 select '99999999-0000-4000-8000-000000000021', a_id, 'Paris trip', '2027-05-01' from t_ids;
 update public.events set label = 'Rome trip', event_date = '2027-05-02'
  where id = '99999999-0000-4000-8000-000000000021';
 
-select is(
-  (select count(*)::int from net.http_request_queue),
-  0,
-  'PUSH-DB-064: adding and changing an event queues no call'
+select results_eq(
+  $$select convert_from(body, 'UTF8')::jsonb from net.http_request_queue$$,
+  $$values ('{"kind": "event", "id": "99999999-0000-4000-8000-000000000021"}'::jsonb)$$,
+  'PUSH-DB-064: adding an event queues one {kind: event} call, and changing it queues none'
 );
+delete from net.http_request_queue;
 
 -- ---- couple_settings ----
 -- The writer is auth.uid(); the row does not record it.
@@ -626,17 +629,17 @@ select is(
   'PUSH-DB-067: setting and changing a birthday queues no call'
 );
 
--- ---- control ----
--- The same settings and the same queue: a mood still queues exactly one call.
-insert into public.moods (id, user_id, mood_type, mood_types, created_at)
-select '99999999-0000-4000-8000-000000000025', a_id, 'happy', array['happy'], '2026-11-03 12:00:00+00' from t_ids;
+-- ---- anniversaries: an insert posts, an edit does not ----
+insert into public.anniversaries (id, user_id, label, event_date)
+select '99999999-0000-4000-8000-000000000025', a_id, 'First date', '2020-02-14' from t_ids;
+update public.anniversaries set label = 'First kiss'
+ where id = '99999999-0000-4000-8000-000000000025';
 
 select results_eq(
   $$select convert_from(body, 'UTF8')::jsonb from net.http_request_queue$$,
-  $$values ('{"kind": "mood", "id": "99999999-0000-4000-8000-000000000025"}'::jsonb)$$,
-  'PUSH-DB-068: a mood then queues exactly one {kind: mood} call'
+  $$values ('{"kind": "anniversary", "id": "99999999-0000-4000-8000-000000000025"}'::jsonb)$$,
+  'PUSH-DB-068: adding an anniversary queues one {kind: anniversary} call, and changing it queues none'
 );
-
 
 -- ============================================
 -- Partner requests (20261031040000, story 3.6)

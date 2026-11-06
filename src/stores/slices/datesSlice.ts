@@ -32,20 +32,23 @@
  * wins. The wedding date (`YYYY-MM-DD` or `null`) rides on the same row and
  * copy; a copy saved before it existed reads it as not set.
  *
- * Countdown marks (story 4.2): `countdownMarks` is the list of date keys the
- * account marked for the "In a month" and "In a week" reminders
- * (`public.countdown_marks`; key forms in `dateReminders.ts`). `null` means not
- * loaded, `[]` means loaded with no marks. It is NOT persisted: its saved copy
- * is the local copy of kind `countdown-marks`, filled only from a successful
- * read or a confirmed write, which is what lets the date reminders' re-plan
- * (`dateRemindersAtLaunch.ts`) tell "not loaded" from "no marks".
- * `loadCountdownMarks` is the kind's refresher and does nothing unless the shell
- * carries the local-notifications plugin, so the web never reads the table.
- * `setCountdownMark` writes the server first, then state and copy; a failed read
- * keeps both. `signedOutState()` resets the state.
+ * Remind me (story 4.2; on by default since 2026-11-05): `remindersOff` is the
+ * list of date keys whose "In a month" and "In a week" reminders the account
+ * switched off (`public.countdown_marks` rows with `reminds` false; key forms in
+ * `dateReminders.ts`); every other date has them. `null` means not loaded, `[]`
+ * means loaded with none off. It is NOT persisted: its saved copy is the local
+ * copy of kind `reminders-off`, filled only from a successful read or a
+ * confirmed write, which is what lets the date reminders' re-plan
+ * (`dateRemindersAtLaunch.ts`) tell "not loaded" from "none off". (The
+ * `countdown-marks` copy before it listed the dates switched on; it is no
+ * longer read.) `loadCountdownMarks` is the kind's refresher and does nothing
+ * unless the shell carries the local-notifications plugin, so the web never
+ * reads the table. `setCountdownMark(key, on)` writes the server first, then
+ * state and copy; a failed read keeps both. `signedOutState()` resets the state.
  */
 
 import { ZodError } from 'zod/v4';
+import { moodSyncService } from '../../api/moodSyncService';
 import { lookupPartnerId } from '../../api/supabaseClient';
 import { AccountDataError, requireOnline } from '../../services/accountDataError';
 import { serializeAccountDataWrite } from '../../services/accountDataQueue';
@@ -78,7 +81,8 @@ export interface DatesSlice {
    * `public.countdown_marks` via its local copy. `null` until the saved copy or
    * the server has answered; `[]` is a loaded "no marks".
    */
-  countdownMarks: string[] | null;
+  /** The date keys whose Remind me is off; `null` until loaded. */
+  remindersOff: string[] | null;
 
   // Anniversary actions — server first, then the settings mirror. Writes throw.
   /** `clientKey`: minted once per submit and reused on its retry (useSubmitKey). */
@@ -124,7 +128,8 @@ export interface DatesSlice {
    * and copy. Throws: `AccountDataError('offline')` without a connection, an
    * error while the marks are not loaded, and the save's error.
    */
-  setCountdownMark: (key: string, marked: boolean) => Promise<void>;
+  /** Switches one date's Remind me on or off. */
+  setCountdownMark: (key: string, on: boolean) => Promise<void>;
 }
 
 /**
@@ -220,18 +225,18 @@ export async function readSavedCoupleSettings(userId: string): Promise<CoupleSet
   return parseSavedCoupleSettings(await readLocalCopy<unknown>(userId, COUPLE_SETTINGS_COPY_KIND));
 }
 
-/** Local-copy kind for the account's countdown marks (`string[]` of date keys). */
-export const COUNTDOWN_MARKS_COPY_KIND = 'countdown-marks';
+/** Local-copy kind for the date keys whose Remind me is off (`string[]`). */
+export const REMINDERS_OFF_COPY_KIND = 'reminders-off';
 
-/** A saved marks copy: a list of strings, otherwise `null`. */
-function parseSavedCountdownMarks(value: unknown): string[] | null {
+/** A saved reminders-off copy: a list of strings, otherwise `null`. */
+function parseSavedRemindersOff(value: unknown): string[] | null {
   if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) return null;
   return value as string[];
 }
 
-/** The saved countdown-marks copy for `userId`, or `null` (absent, failed or malformed). */
-export async function readSavedCountdownMarks(userId: string): Promise<string[] | null> {
-  return parseSavedCountdownMarks(await readLocalCopy<unknown>(userId, COUNTDOWN_MARKS_COPY_KIND));
+/** The saved reminders-off copy for `userId`, or `null` (absent, failed or malformed). */
+export async function readSavedRemindersOff(userId: string): Promise<string[] | null> {
+  return parseSavedRemindersOff(await readLocalCopy<unknown>(userId, REMINDERS_OFF_COPY_KIND));
 }
 
 const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true, userId: true });
@@ -288,14 +293,14 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
     await get().loadAnniversariesFromServer();
   });
   registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => get().loadCoupleSettings());
-  registerLocalCopy(COUNTDOWN_MARKS_COPY_KIND, () => get().loadCountdownMarks());
+  registerLocalCopy(REMINDERS_OFF_COPY_KIND, () => get().loadCountdownMarks());
 
-  /** After a confirmed server answer for `userId`: save the marks as the copy. A failed save is logged. */
-  const saveCountdownMarksCopy = async (userId: string, value: string[]) => {
+  /** After a confirmed server answer for `userId`: save the keys switched off as the copy. A failed save is logged. */
+  const saveRemindersOffCopy = async (userId: string, value: string[]) => {
     try {
-      await writeLocalCopy(userId, COUNTDOWN_MARKS_COPY_KIND, value);
+      await writeLocalCopy(userId, REMINDERS_OFF_COPY_KIND, value);
     } catch (error) {
-      console.error('[Settings] Failed to save the countdown marks copy:', error);
+      console.error('[Settings] Failed to save the reminders-off copy:', error);
     }
   };
 
@@ -333,9 +338,32 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
     }
   };
 
+  /**
+   * Drops one anniversary from the mirror and the copy: after a confirmed
+   * delete, or when an edit found no row because the partner deleted it. Only
+   * for the session that asked.
+   */
+  const dropGoneAnniversary = async (
+    requestedBy: string,
+    requestedInSession: number,
+    serverId: string
+  ): Promise<void> => {
+    if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+    set((state) => {
+      if (!state.settings) return {};
+      return {
+        settings: withAnniversaries(
+          state.settings,
+          state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
+        ),
+      };
+    });
+    await saveAnniversariesCopy(requestedBy, requestedInSession);
+  };
+
   return {
     coupleSettings: null,
-    countdownMarks: null,
+    remindersOff: null,
 
     // Anniversary actions. Each runs in the account-data queue, so the mirror
     // refresh cannot read the server before a write and replace the list after it.
@@ -362,6 +390,7 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
           };
         });
         await saveAnniversariesCopy(requestedBy, requestedInSession);
+        await moodSyncService.announceDatesChanged(get().partner?.id);
       });
     },
 
@@ -378,7 +407,17 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
         if (!existing) throw new AccountDataError('not-found', 'Anniversary not found');
         if (!existing.serverId) throw notSynced();
 
-        const updated = await anniversariesService.updateAnniversary(existing.serverId, input);
+        let updated: ServerAnniversary;
+        try {
+          updated = await anniversariesService.updateAnniversary(existing.serverId, input);
+        } catch (error) {
+          // The row is gone (the partner deleted it): drop it here too, so the
+          // list and the open page stop showing it, then report the failure.
+          if (error instanceof AccountDataError && error.code === 'not-found') {
+            await dropGoneAnniversary(requestedBy, requestedInSession, existing.serverId);
+          }
+          throw error;
+        }
 
         if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
         set((state) => {
@@ -393,6 +432,7 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
           };
         });
         await saveAnniversariesCopy(requestedBy, requestedInSession);
+        await moodSyncService.announceDatesChanged(get().partner?.id);
       });
     },
 
@@ -411,17 +451,8 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
 
         await anniversariesService.deleteAnniversary(serverId);
 
-        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-        set((state) => {
-          if (!state.settings) return {};
-          return {
-            settings: withAnniversaries(
-              state.settings,
-              state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
-            ),
-          };
-        });
-        await saveAnniversariesCopy(requestedBy, requestedInSession);
+        await dropGoneAnniversary(requestedBy, requestedInSession, serverId);
+        await moodSyncService.announceDatesChanged(get().partner?.id);
       });
     },
 
@@ -630,10 +661,10 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
 
       // 1. The saved copy, at once — online or offline. Only while the state is
       // not loaded: a server answer or a confirmed write is newer.
-      if (get().countdownMarks === null) {
-        const saved = await readSavedCountdownMarks(requestedBy);
+      if (get().remindersOff === null) {
+        const saved = await readSavedRemindersOff(requestedBy);
         if (!isCurrent()) return;
-        if (saved && get().countdownMarks === null) set({ countdownMarks: saved });
+        if (saved && get().remindersOff === null) set({ remindersOff: saved });
       }
 
       // 2. Offline there is nothing to ask; the copy (or nothing) stays shown.
@@ -644,18 +675,18 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
       // after it.
       try {
         await serializeAccountDataWrite(async () => {
-          const next = await countdownMarksService.fetchCountdownMarks(requestedBy);
+          const next = await countdownMarksService.fetchRemindersOff(requestedBy);
           if (!isCurrent()) return;
-          set({ countdownMarks: next });
-          await saveCountdownMarksCopy(requestedBy, next);
+          set({ remindersOff: next });
+          await saveRemindersOffCopy(requestedBy, next);
         });
       } catch (error) {
-        // State and copy stay as they were, so the reminders keep their marks.
-        console.error('[Settings] Failed to load the countdown marks from the server:', error);
+        // State and copy stay as they were, so the reminders keep their switches.
+        console.error('[Settings] Failed to load the Remind me switches from the server:', error);
       }
     },
 
-    setCountdownMark: async (key, marked) => {
+    setCountdownMark: async (key, on) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) throw new Error('You must be signed in to change your reminders');
       const isCurrent = () =>
@@ -663,21 +694,21 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
 
       // Refused before any request, so an offline edit changes nothing.
       requireOnline('Reminders');
-      // A copy written from a list that was never loaded would claim "no other marks".
-      if (get().countdownMarks === null) throw new Error('Your reminders have not loaded yet');
+      // A copy written from a list that was never loaded would claim "nothing else off".
+      if (get().remindersOff === null) throw new Error('Your reminders have not loaded yet');
 
       await serializeAccountDataWrite(async () => {
         if (!isCurrent()) return;
-        await countdownMarksService.setCountdownMark(requestedBy, key, marked);
+        await countdownMarksService.setRemindMe(requestedBy, key, on);
         if (!isCurrent()) return;
-        const current = get().countdownMarks ?? [];
-        const next = marked
-          ? current.includes(key)
+        const current = get().remindersOff ?? [];
+        const next = on
+          ? current.filter((existing) => existing !== key)
+          : current.includes(key)
             ? current
-            : [...current, key]
-          : current.filter((existing) => existing !== key);
-        set({ countdownMarks: next });
-        await saveCountdownMarksCopy(requestedBy, next);
+            : [...current, key];
+        set({ remindersOff: next });
+        await saveRemindersOffCopy(requestedBy, next);
       });
     },
   };

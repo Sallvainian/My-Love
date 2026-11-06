@@ -106,10 +106,10 @@ function setDates(state: {
   partner?: PartnerInfo | null;
   partnerKnown?: boolean;
   partnerLoadError?: boolean;
-  countdownMarks?: string[] | null;
+  remindersOff?: string[] | null;
   dateReminders?: boolean;
 }) {
-  const { ownBirthday = null, countdownMarks = [], dateReminders = true, ...rest } = state;
+  const { ownBirthday = null, remindersOff = [], dateReminders = true, ...rest } = state;
   backend.fetchOwnProfile.mockImplementation(() =>
     ownBirthday === 'unloaded'
       ? Promise.reject(new Error('profile unavailable'))
@@ -123,7 +123,7 @@ function setDates(state: {
       partnerLoadError: false,
       ownProfile:
         ownBirthday === 'unloaded' ? null : { displayName: 'Casey', birthday: ownBirthday },
-      countdownMarks,
+      remindersOff,
       pushPreferences: { ...ALL_PUSH_PREFERENCES_ON, dateReminders },
       ...rest,
     });
@@ -195,7 +195,7 @@ describe('Settings > Dates > date pages', () => {
       partnerKnown: false,
       partnerLoadError: false,
       coupleSettings: null,
-      countdownMarks: null,
+      remindersOff: null,
       pushPreferences: null,
       events: [],
       settings: null,
@@ -871,29 +871,29 @@ describe('Settings > Dates > date pages', () => {
       ['dates/wedding', 'Wedding', 'wedding'],
       ['dates/birthday', 'Your birthday', 'own-birthday'],
       ['dates/partner-birthday', "Harper's birthday", 'partner-birthday'],
-    ])('on %s reflects and writes its own mark', async (path, title, key) => {
+    ])('on %s is on by default, and a tap turns its own key off', async (path, title, key) => {
       const user = userEvent.setup();
       renderAt(path);
       await heading(title);
 
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
       expect(remindMe()).toHaveAccessibleName('Remind me');
       expect(remindMe()).toBeEnabled();
       expect(footnote()).toHaveTextContent('A month and a week before.');
 
       await user.click(remindMe());
-      expect(setCountdownMark).toHaveBeenCalledWith(key, true);
+      expect(setCountdownMark).toHaveBeenCalledWith(key, false);
     });
 
-    it('is on while the marks hold its key, and a tap turns it off', async () => {
+    it('is off while its key is switched off, and a tap turns it back on', async () => {
       const user = userEvent.setup();
-      setDates({ countdownMarks: ['wedding', 'own-birthday'] });
+      setDates({ remindersOff: ['wedding', 'own-birthday'] });
       renderAt('dates/wedding');
       await heading('Wedding');
 
-      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
+      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
       await user.click(remindMe());
-      expect(setCountdownMark).toHaveBeenCalledWith('wedding', false);
+      expect(setCountdownMark).toHaveBeenCalledWith('wedding', true);
     });
 
     it('is disabled while its save is in flight', async () => {
@@ -910,17 +910,17 @@ describe('Settings > Dates > date pages', () => {
       await waitFor(() => expect(remindMe()).toBeEnabled());
     });
 
-    it('is disabled and off until the marks have loaded', async () => {
-      setDates({ countdownMarks: null });
+    it('is disabled, showing the default on, until the switches have loaded', async () => {
+      setDates({ remindersOff: null });
       renderAt('dates/wedding');
       await heading('Wedding');
 
       expect(remindMe()).toBeDisabled();
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
     });
 
     it('is disabled with the Notifications Footnote while Date reminders is off', async () => {
-      setDates({ countdownMarks: ['wedding'], dateReminders: false });
+      setDates({ remindersOff: [], dateReminders: false });
       renderAt('dates/wedding');
       await heading('Wedding');
 
@@ -944,7 +944,7 @@ describe('Settings > Dates > date pages', () => {
         offlineMessage('Reminders')
       );
       expect(setCountdownMark).not.toHaveBeenCalled();
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
     });
 
     it('shows a failed save in the page Error box, and the next tap clears it', async () => {
@@ -957,7 +957,7 @@ describe('Settings > Dates > date pages', () => {
       expect(await screen.findByTestId('settings-date-error')).toHaveTextContent(
         'Could not reach the server.'
       );
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
 
       await user.click(remindMe());
       await waitFor(() =>

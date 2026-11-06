@@ -86,7 +86,7 @@ Remind me appears only in the iOS app (State Patterns → Reminder unavailable).
 | Partner's birthday page | Small (`<Partner>'s birthday`, for example, `Jessie's birthday`) | A read-only Date row, Footnote `Jessie sets this in their Profile.` (partner's name substituted), then the Remind me switch. [v2 frame 6](mockups/key-settings-v2.html). |
 | One-field edit page | Small (the field's name) | Back arrow, Save in the bar, one field. [v1 frame 7](mockups/key-settings-v1.html). |
 | New event / New anniversary | Small (`New event` / `New anniversary`) | The Form page: Cancel and Add in the bar, every field at once. Event: Name, Date, Note, Icon. Anniversary: Name, Date, Note. [v2 frame 8](mockups/key-settings-v2.html). |
-| Notifications | Large | The Notice when iOS permission is off. Group `Notify me about`: Love notes, Moods, Photos, Pokes and kisses, Partner requests (five switches). There is no Dates push: no push is sent when a date is added or changed, and the only date notifications are the upcoming-date reminders. Group `Reminders`: Date reminders, with Footnote `At 9:00 the day before, and on the day for birthdays and anniversaries.` [v2 frame 9](mockups/key-settings-v2.html). |
+| Notifications | Large | The Notice when iOS permission is off. Group `Notify me about`: Love notes, Moods, Photos, Pokes and kisses, Dates, Partner requests (six switches). Dates is the push sent when the partner adds an event or an anniversary (owner decision 2026-11-05); a change to any date sends no push. The other date notifications are the upcoming-date reminders. Group `Reminders`: Date reminders, with Footnote `At 9:00 the day before, and on the day for birthdays and anniversaries.` [v2 frame 9](mockups/key-settings-v2.html). |
 | Photos | Large | The device's photo-download choice: two rows, `Wi-Fi only` and `Any connection`, with a check on the current one, saved on tap. A device preference, so it needs no connection and survives sign-out, as today. No mock exists. |
 
 **Entry points beyond Settings.** Tapping a date card on Home opens that date's page; Home stays highlighted in the dock, and back returns to Home. Home's Upcoming Add button (`aria-label` "Add event") opens the New event form directly, skipping the Kind chooser. Today it opens Settings.
@@ -106,7 +106,7 @@ Microcopy. Brand voice lives in `DESIGN.md` → Brand & Style. Strings below are
 | Partner, linked | `Name` · `Email` · `Linked since` |
 | Partner, not linked | `You aren't linked with a partner yet.` · `Go to Partner` |
 | Partner's birthday | Title `Jessie's birthday` · Footnote `Jessie sets this in their Profile.` |
-| Notifications | `Notify me about` · `Love notes` · `Moods` · `Photos` · `Pokes and kisses` · `Partner requests` · `Reminders` · `Date reminders` · `At 9:00 the day before, and on the day for birthdays and anniversaries.` |
+| Notifications | `Notify me about` · `Love notes` · `Moods` · `Photos` · `Pokes and kisses` · `Dates` · `Partner requests` · `Reminders` · `Date reminders` · `At 9:00 the day before, and on the day for birthdays and anniversaries.` |
 | Permission notice (today's) | `Notifications are off for My Love. Turn them on in iOS Settings.` |
 | Push load errors (today's) | `Couldn't load your push settings.` · `offlineMessage('Push settings', 'load')` |
 | Dates list | `Together` · `Together since` · `Wedding` · `Birthdays` · `You` · `Events` · `Anniversaries` · `Past` · `Load more` |
@@ -227,11 +227,11 @@ Failure: Casey is offline at step 5. Save is refused before any request with the
 1. Jessie taps the gear in the app header. Settings opens with a back arrow above the large title.
 2. Under PARTNER, Jessie taps `Dates`. The Dates list opens.
 3. Under BIRTHDAYS, Jessie taps `Casey`, whose row reads `4 Apr`.
-4. `Casey's birthday` opens: a Date row reading `4 Apr` with no chevron, the Footnote `Casey sets this in their Profile.`, and the Remind me switch, off.
-5. Jessie taps Remind me. The switch is disabled for the moment its save takes, then shows on.
+4. `Casey's birthday` opens: a Date row reading `4 Apr` with no chevron, the Footnote `Casey sets this in their Profile.`, and the Remind me switch, already on: Remind me is on by default for every date (owner decision 2026-11-05).
+5. Jessie leaves it on; a tap would switch it off, disabled for the moment its save takes.
 6. **Climax:** under the switch the Footnote reads `A month and a week before.` A month before Casey's birthday, at 9:00, Jessie's phone will remind Jessie, and again a week before. Jessie did not need Casey to do anything, and could not change Casey's birthday by accident.
 
-Failure: Jessie is offline at step 5. The switch stays off and the Error box shows the `offlineMessage` refusal. If Jessie's Date reminders switch is off, Remind me is disabled, shown at 60% opacity, with the Footnote `Date reminders are off. Turn them on in Notifications.`, and Jessie turns it on in Notifications first. On the website the date page has no Remind me switch at all, because reminders exist only in the iOS app.
+Failure: Jessie is offline and taps Remind me. The switch stays on and the Error box shows the `offlineMessage` refusal. If Jessie's Date reminders switch is off, Remind me is disabled, shown at 60% opacity, with the Footnote `Date reminders are off. Turn them on in Notifications.`, and Jessie turns it on in Notifications first. On the website the date page has no Remind me switch at all, because reminders exist only in the iOS app.
 
 ### Flow 3: Casey logs out of all devices after losing a phone (Casey, iPhone Duo unfolded, column dock)
 

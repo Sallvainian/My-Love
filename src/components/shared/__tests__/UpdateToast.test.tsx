@@ -87,7 +87,7 @@ vi.mock('motion/react', () => {
   };
 });
 
-import { READY_TOAST_MS, UpdateToast } from '../UpdateToast';
+import { UpdateToast } from '../UpdateToast';
 
 /** setTimeout is faked here, so user-event's own pauses must advance it. */
 function setupUser() {
@@ -175,31 +175,38 @@ describe('UpdateToast', () => {
     expect(screen.getByRole('button', { name: 'Update ready — tap to restart' })).toBeVisible();
   });
 
-  it('makes the ready toast one 44px tap target with no close button', () => {
+  it('makes the ready toast a 44px tap target with a 44px close button', () => {
     store.set({ state: 'ready' });
     render(<UpdateToast />);
 
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(1);
+    expect(buttons).toHaveLength(2);
     expect(buttons[0]).toHaveAccessibleName('Update ready — tap to restart');
-    expect(buttons[0]).toHaveClass('min-h-11', 'w-full');
-    expect(screen.queryByRole('button', { name: /dismiss|close|hide/i })).not.toBeInTheDocument();
+    expect(buttons[0]).toHaveClass('min-h-11');
+    expect(buttons[1]).toHaveAccessibleName('Close');
+    expect(buttons[1]).toHaveClass('h-11', 'w-11');
   });
 
-  it('hides the ready toast after 6 seconds and keeps it hidden for the launch', () => {
-    expect(READY_TOAST_MS).toBe(6000);
+  it('keeps the ready toast up until it is tapped or closed', () => {
     store.set({ state: 'ready' });
     render(<UpdateToast />);
 
-    act(() => vi.advanceTimersByTime(READY_TOAST_MS - 1));
+    // No timer hides it: an hour on, it is still there.
+    act(() => vi.advanceTimersByTime(60 * 60 * 1000));
     expect(screen.getByTestId('update-toast')).toBeVisible();
+  });
 
-    act(() => vi.advanceTimersByTime(1));
+  it('hides for the launch when closed, without opening the confirm dialog', async () => {
+    const user = setupUser();
+    store.set({ state: 'ready' });
+    render(<UpdateToast />);
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
     expect(screen.queryByTestId('update-toast')).not.toBeInTheDocument();
-
+    expect(store.openUpdateConfirm).not.toHaveBeenCalled();
     // The status stays ready, and nothing brings the toast back.
     act(() => store.set({ state: 'ready' }));
-    act(() => vi.advanceTimersByTime(READY_TOAST_MS));
     expect(screen.queryByTestId('update-toast')).not.toBeInTheDocument();
   });
 

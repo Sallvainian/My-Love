@@ -3,13 +3,16 @@
  *
  * The native shell's live update, shown at the bottom of the screen: while a
  * newer build downloads, a toast with its progress; once it is queued, "Update
- * ready — tap to restart", which takes the download toast's place. Neither can
- * be closed. The ready toast is one tap target: a tap hides it and opens the
- * update confirm dialog (`openUpdateConfirm`, UpdateConfirmDialog). It hides by
- * itself after 6 seconds, and once hidden, by either, or by the dialog opening
- * from the bell's entry, it stays hidden for the rest of this launch: this
- * component mounts once (main.tsx), and a restart or the background swap reloads
- * the web view. The header bell's dot and entry stay the way back to it.
+ * ready — tap to restart", which takes the download toast's place. The download
+ * toast cannot be closed. The ready toast stays until the person acts on it
+ * (owner decision 2026-11-06: a toast that hid itself after 6 seconds was
+ * easily missed, often while the app was still loading): a tap on its text
+ * hides it and opens the update confirm dialog (`openUpdateConfirm`,
+ * UpdateConfirmDialog), and its × hides it. Once hidden, by either or by the
+ * dialog opening from the bell's entry, it stays hidden for the rest of this
+ * launch: this component mounts once (main.tsx), and a restart or the
+ * background swap reloads the web view. The header bell's dot and entry stay
+ * the way back to it.
  *
  * It reads `nativeUpdates`' status, which stays idle on the web, so it renders
  * nothing there. Its bottom edge sits 12px above `--dock-top` (index.css), the
@@ -18,7 +21,7 @@
  * keep it clear of the side column. z-100 keeps it above the dock and header.
  */
 import { AnimatePresence, m as motion, useReducedMotion } from 'motion/react';
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw, X } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   getUpdateConfirmOpen,
@@ -28,14 +31,11 @@ import {
   subscribeUpdateStatus,
 } from '../../services/nativeUpdates';
 
-/** How long the ready toast stays before it hides by itself. */
-export const READY_TOAST_MS = 6000;
-
 export function UpdateToast() {
   const status = useSyncExternalStore(subscribeUpdateStatus, getUpdateStatus);
   const reduceMotion = useReducedMotion();
-  // Set once the ready toast has hidden, by its timer, a tap or the dialog
-  // opening from the bell; it never shows again this launch.
+  // Set once the ready toast has hidden, by a tap, its × or the dialog opening
+  // from the bell; it never shows again this launch.
   const [readyHidden, setReadyHidden] = useState(false);
 
   const showReady = status.state === 'ready' && !readyHidden;
@@ -50,12 +50,6 @@ export function UpdateToast() {
       }),
     []
   );
-
-  useEffect(() => {
-    if (!showReady) return;
-    const timer = setTimeout(() => setReadyHidden(true), READY_TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [showReady]);
 
   const handleReadyTap = () => {
     setReadyHidden(true);
@@ -122,18 +116,29 @@ export function UpdateToast() {
               </div>
             </div>
           ) : (
-            // The whole toast is the tap target: one 44px-high line.
-            <button
-              type="button"
-              onClick={handleReadyTap}
-              className="flex min-h-11 w-full items-center gap-3 px-4 text-left transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
-              data-testid="update-toast-ready"
-            >
-              <RefreshCw className="h-5 w-5 shrink-0 text-good" aria-hidden="true" />
-              <span className="flex-1 text-sm font-medium text-ink">
-                Update ready — tap to restart
-              </span>
-            </button>
+            // The line is the tap target, 44px high; the × beside it closes the toast.
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={handleReadyTap}
+                className="flex min-h-11 flex-1 items-center gap-3 pl-4 text-left transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+                data-testid="update-toast-ready"
+              >
+                <RefreshCw className="h-5 w-5 shrink-0 text-good" aria-hidden="true" />
+                <span className="flex-1 text-sm font-medium text-ink">
+                  Update ready — tap to restart
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReadyHidden(true)}
+                aria-label="Close"
+                className="flex h-11 w-11 shrink-0 items-center justify-center text-muted focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+                data-testid="update-toast-close"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           )}
         </motion.div>
       )}

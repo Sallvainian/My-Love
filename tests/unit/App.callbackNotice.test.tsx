@@ -106,6 +106,8 @@ type MotionDivProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 vi.mock('motion/react', () => ({
+  // Home's anniversary cards wrap their celebration in AnimatePresence.
+  AnimatePresence: ({ children }: { children?: ReactNode }) => <>{children}</>,
   m: {
     div: ({
       children,

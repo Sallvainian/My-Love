@@ -185,7 +185,7 @@ describe('Settings > Dates > an event\'s page', () => {
       partnerKnown: true,
       partnerLoadError: false,
       ownProfile: { displayName: 'Casey', birthday: null },
-      countdownMarks: [],
+      remindersOff: [],
       pushPreferences: { ...ALL_PUSH_PREFERENCES_ON },
       events: [makeEvent()],
     });
@@ -208,7 +208,7 @@ describe('Settings > Dates > an event\'s page', () => {
       partner: null,
       partnerKnown: false,
       coupleSettings: null,
-      countdownMarks: null,
+      remindersOff: null,
       pushPreferences: null,
       events: [],
       settings: null,
@@ -335,6 +335,51 @@ describe('Settings > Dates > an event\'s page', () => {
     });
   });
 
+  describe('an event deleted elsewhere while its page is open', () => {
+    it('reads it by id, then goes back to the Dates list once', async () => {
+      const user = userEvent.setup();
+      await openFromDates(user);
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      loadEvent.mockClear();
+
+      // The partner deleted it and a re-read dropped it from the store.
+      setEvents([]);
+
+      await waitFor(() => expect(loadEvent).toHaveBeenCalledWith('event-1'));
+      expect(await heading('Dates')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates');
+    });
+
+    it('stays when the by-id read finds it (it only fell outside the loaded window)', async () => {
+      const user = userEvent.setup();
+      await openFromDates(user);
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      const held = useAppStore.getState().events;
+      loadEvent.mockImplementation(async () => {
+        act(() => useAppStore.setState({ events: held }));
+        return { status: 'success' };
+      });
+
+      setEvents([]);
+
+      await waitFor(() => expect(loadEvent).toHaveBeenCalled());
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates/event/event-1');
+    });
+
+    it('leaves an open field page when the event goes', async () => {
+      const user = userEvent.setup();
+      await openFromDates(user);
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      await user.click(screen.getByTestId('settings-event-name'));
+      expect(await screen.findByTestId('settings-event-name-field')).toBeInTheDocument();
+
+      setEvents([]);
+
+      expect(await heading('Dates')).toBeInTheDocument();
+    });
+  });
+
   describe("a partner's event", () => {
     beforeEach(() => {
       setEvents([makeEvent({ userId: 'partner-1', description: 'Her pick\nsecond line' })]);
@@ -410,19 +455,20 @@ describe('Settings > Dates > an event\'s page', () => {
       capacitor.isNativePlatform.mockReturnValue(true);
     });
 
-    it('is the event\'s own mark, and a tap writes it', async () => {
+    it('is the event\'s own switch, on by default, and a tap writes it', async () => {
       const user = userEvent.setup();
       renderAt('dates/event/event-1');
       await heading('Weekend trip');
 
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      // On by default (2026-11-05): a tap switches it off.
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
       expect(screen.getByTestId('settings-remind-me-footnote')).toHaveTextContent(
         'A month and a week before.'
       );
 
       await user.click(remindMe()!);
 
-      expect(setCountdownMark).toHaveBeenCalledWith('event:event-1', true);
+      expect(setCountdownMark).toHaveBeenCalledWith('event:event-1', false);
     });
 
     it('is not drawn without the local-notifications plugin', async () => {

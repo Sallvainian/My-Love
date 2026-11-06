@@ -4,6 +4,7 @@ import type { ApnsClient } from './apns.ts';
 import {
   handleSendPush,
   secretsMatch,
+  type DateRow,
   type DeviceRow,
   type InteractionRow,
   type MoodRow,
@@ -24,6 +25,8 @@ const INTERACTION_ID = '44444444-4444-4444-8444-444444444444';
 /** The id story 3.5's trigger posted under the `date` kind, which is gone. */
 const OLD_DATE_CHANGE_ID = '55555555-5555-4555-8555-555555555555';
 const PARTNER_REQUEST_ID = '66666666-6666-4666-8666-666666666666';
+const EVENT_ID = '77777777-7777-4777-8777-777777777777';
+const ANNIVERSARY_ID = '88888888-8888-4888-8888-888888888888';
 const SECRET = 'a-shared-secret-for-tests';
 
 const textNote: NoteRow = {
@@ -56,6 +59,8 @@ const acceptedRequest: PartnerRequestRow = {
   status: 'accepted',
 };
 const poke: InteractionRow = { id: INTERACTION_ID, from_user_id: 'sender', to_user_id: 'recipient', type: 'poke' };
+const event: DateRow = { id: EVENT_ID, user_id: 'sender', label: 'Paris trip' };
+const anniversary: DateRow = { id: ANNIVERSARY_ID, user_id: 'sender', label: 'First date' };
 
 function fakeDb(options: {
   note?: NoteRow | null;
@@ -63,6 +68,8 @@ function fakeDb(options: {
   photo?: PhotoRow | null;
   interaction?: InteractionRow | null;
   partnerRequest?: PartnerRequestRow | null;
+  event?: DateRow | null;
+  anniversary?: DateRow | null;
   /** The display name of every account; defaults to Casey for `sender` and Jessie for the rest. */
   displayName?: string | null;
   /** The user ids whose devices were listed. */
@@ -96,6 +103,8 @@ function fakeDb(options: {
     getInteraction: () => Promise.resolve(options.interaction === undefined ? null : options.interaction),
     getPartnerRequest: () =>
       Promise.resolve(options.partnerRequest === undefined ? null : options.partnerRequest),
+    getEvent: () => Promise.resolve(options.event === undefined ? null : options.event),
+    getAnniversary: () => Promise.resolve(options.anniversary === undefined ? null : options.anniversary),
     getPartnerId: (userId) => {
       options.partnerLookups?.push(userId);
       return Promise.resolve(options.partnerId === undefined ? 'recipient' : options.partnerId);
@@ -681,7 +690,7 @@ Deno.test('an unknown kind or a non-uuid id is a 400', async () => {
 });
 
 Deno.test('a valid kind with a missing row is a 404', async () => {
-  for (const kind of ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept']) {
+  for (const kind of ['mood', 'photo', 'interaction', 'partner_request', 'partner_accept', 'event', 'anniversary']) {
     const response = await handleSendPush(request({ kind, id: MOOD_ID }), { db: fakeDb({}), apns: null });
     assertEquals(response.status, 404, kind);
     await response.body?.cancel();
@@ -697,7 +706,47 @@ Deno.test('the love-note body still works beside the new kinds', async () => {
   assertEquals(claimed.map((c) => [c.kind, c.source_id]), [['love_note', NOTE_ID]]);
 });
 
-// ---- Story 5.4: date changes no longer push ----
+// ---- Story 5.4: date changes no longer push; 2026-11-05: an added date does ----
+
+Deno.test('an added event and an added anniversary record their text on the owner\'s partner\'s devices', async () => {
+  const cases: [Record<string, unknown>, Parameters<typeof fakeDb>[0], string][] = [
+    [{ kind: 'event', id: EVENT_ID }, { event }, 'Added an event: Paris trip'],
+    [{ kind: 'anniversary', id: ANNIVERSARY_ID }, { anniversary }, 'Added an anniversary: First date'],
+  ];
+  for (const [body, options, text] of cases) {
+    const claimed: PushRequestRow[] = [];
+    const partnerLookups: string[] = [];
+    const response = await handleSendPush(request(body), {
+      db: fakeDb({ ...options, devices: TWO_DEVICES, claimed, partnerLookups }),
+      apns: null,
+    });
+    assertEquals(await response.json(), { sent: 0, recorded: 2, skipped: 0, failed: 0, gone: 0 });
+    assertEquals(partnerLookups, ['sender']);
+    assertEquals(claimed.map((c) => [c.kind, c.source_id, c.token]), [
+      [body.kind, body.id, 'tok-a'],
+      [body.kind, body.id, 'tok-b'],
+    ]);
+    assertEquals(claimed[0].payload, {
+      kind: body.kind as string,
+      aps: { alert: { title: 'Casey', body: text }, 'thread-id': PARTNER_THREAD, badge: 0 },
+    });
+  }
+});
+
+Deno.test('an added date by an unlinked owner claims nothing', async () => {
+  for (const [body, options] of [
+    [{ kind: 'event', id: EVENT_ID }, { event }],
+    [{ kind: 'anniversary', id: ANNIVERSARY_ID }, { anniversary }],
+  ] as const) {
+    const claimed: PushRequestRow[] = [];
+    const response = await handleSendPush(request(body), {
+      db: fakeDb({ ...options, partnerId: null, devices: TWO_DEVICES, claimed }),
+      apns: null,
+    });
+    assertEquals(await response.json(), { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 });
+    assertEquals(claimed.length, 0);
+  }
+});
 
 Deno.test('a date post from an older trigger is a 400 and claims nothing', async () => {
   const claimed: PushRequestRow[] = [];
@@ -708,7 +757,7 @@ Deno.test('a date post from an older trigger is a 400 and claims nothing', async
   });
   assertEquals(response.status, 400);
   assertEquals(await response.json(), {
-    error: 'kind must be mood, photo, interaction, partner_request or partner_accept',
+    error: 'kind must be mood, photo, interaction, partner_request, partner_accept, event or anniversary',
   });
   assertEquals(claimed.length, 0);
   assertEquals(listed, []);
@@ -917,6 +966,8 @@ const KIND_CASES: { kind: PushKind; body: Record<string, string>; rows: Paramete
     body: { kind: 'partner_accept', id: PARTNER_REQUEST_ID },
     rows: { partnerRequest: acceptedRequest },
   },
+  { kind: 'event', body: { kind: 'event', id: EVENT_ID }, rows: { event } },
+  { kind: 'anniversary', body: { kind: 'anniversary', id: ANNIVERSARY_ID }, rows: { anniversary } },
 ];
 
 const ALL_PREFERENCES: PushPreference[] = [
@@ -925,9 +976,10 @@ const ALL_PREFERENCES: PushPreference[] = [
   'photos',
   'pokes_and_kisses',
   'partner_requests',
+  'dates',
 ];
 
-Deno.test('every kind answers to one switch, and both partner kinds share one', () => {
+Deno.test('every kind answers to one switch; both partner kinds share one, as do both date kinds', () => {
   assertEquals(
     KIND_CASES.map((c) => [c.kind, PREFERENCE_FOR_KIND[c.kind]]),
     [
@@ -937,6 +989,8 @@ Deno.test('every kind answers to one switch, and both partner kinds share one', 
       ['interaction', 'pokes_and_kisses'],
       ['partner_request', 'partner_requests'],
       ['partner_accept', 'partner_requests'],
+      ['event', 'dates'],
+      ['anniversary', 'dates'],
     ]
   );
   assertEquals(

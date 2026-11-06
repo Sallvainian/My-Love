@@ -205,7 +205,7 @@ describe("Settings > Dates > an anniversary's page", () => {
       partnerKnown: true,
       partnerLoadError: false,
       ownProfile: { displayName: 'Casey', birthday: null },
-      countdownMarks: [],
+      remindersOff: [],
       pushPreferences: { ...ALL_PUSH_PREFERENCES_ON },
       settings: { relationship: { anniversaries: [makeAnniversary()] } },
     });
@@ -228,7 +228,7 @@ describe("Settings > Dates > an anniversary's page", () => {
       partner: null,
       partnerKnown: false,
       coupleSettings: null,
-      countdownMarks: null,
+      remindersOff: null,
       pushPreferences: null,
       events: [],
       settings: null,
@@ -335,19 +335,20 @@ describe("Settings > Dates > an anniversary's page", () => {
       capacitor.isNativePlatform.mockReturnValue(true);
     });
 
-    it("is the anniversary's own mark, and a tap writes it", async () => {
+    it("is the anniversary's own switch, on by default, and a tap writes it", async () => {
       const user = userEvent.setup();
       renderAt('dates/anniversary/srv-1');
       await heading('First date');
 
-      expect(remindMe()).toHaveAttribute('aria-checked', 'false');
+      // On by default (2026-11-05): a tap switches it off.
+      expect(remindMe()).toHaveAttribute('aria-checked', 'true');
       expect(screen.getByTestId('settings-remind-me-footnote')).toHaveTextContent(
         'A month and a week before.'
       );
 
       await user.click(remindMe()!);
 
-      expect(setCountdownMark).toHaveBeenCalledWith('anniversary:srv-1', true);
+      expect(setCountdownMark).toHaveBeenCalledWith('anniversary:srv-1', false);
     });
 
     it('shows on an anniversary whose date is long past, because it recurs', async () => {
@@ -638,6 +639,19 @@ describe("Settings > Dates > an anniversary's page", () => {
           'Note, The other cafe'
         );
       });
+    });
+  });
+
+  describe('an anniversary deleted elsewhere while its page is open', () => {
+    it('goes back to the Dates list once it leaves the store', async () => {
+      renderAt('dates/anniversary/srv-1');
+      expect(await heading('First date')).toBeInTheDocument();
+
+      // The partner deleted it and a re-read dropped it from the store.
+      setAnniversaries([]);
+
+      expect(await heading('Dates')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates');
     });
   });
 

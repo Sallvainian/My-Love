@@ -31,6 +31,7 @@
 
 import {
   Bell,
+  CalendarHeart,
   Hand,
   Image as ImageIcon,
   MessageCircleHeart,
@@ -64,6 +65,7 @@ const ROWS: readonly PushRow[] = [
   { key: 'moods', testId: 'moods', icon: Smile, label: 'Moods' },
   { key: 'photos', testId: 'photos', icon: ImageIcon, label: 'Photos' },
   { key: 'pokesAndKisses', testId: 'pokes-and-kisses', icon: Hand, label: 'Pokes and kisses' },
+  { key: 'dates', testId: 'dates', icon: CalendarHeart, label: 'Dates' },
   {
     key: 'partnerRequests',
     testId: 'partner-requests',

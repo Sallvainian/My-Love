@@ -19,7 +19,7 @@ import {
   subscribeUpdateConfirm,
 } from '../../services/nativeUpdates';
 import { KitDialog } from '../Settings/ConfirmDialog';
-import { DESTRUCTIVE_BUTTON, DIALOG_TITLE, SECONDARY_BUTTON } from './kitClasses';
+import { DANGER_SOLID_BUTTON, DIALOG_TITLE, NEUTRAL_BUTTON } from './kitClasses';
 
 export function UpdateConfirmDialog() {
   const open = useSyncExternalStore(subscribeUpdateConfirm, getUpdateConfirmOpen);
@@ -83,7 +83,7 @@ function UpdateConfirmPanel() {
               onClick={cancel}
               disabled={busy}
               data-testid="update-confirm-no"
-              className={SECONDARY_BUTTON}
+              className={NEUTRAL_BUTTON}
             >
               No
             </button>
@@ -92,7 +92,7 @@ function UpdateConfirmPanel() {
               onClick={() => void handleYes()}
               disabled={busy}
               data-testid="update-confirm-yes"
-              className={DESTRUCTIVE_BUTTON}
+              className={DANGER_SOLID_BUTTON}
             >
               Yes
             </button>

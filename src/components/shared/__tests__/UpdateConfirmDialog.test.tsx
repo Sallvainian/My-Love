@@ -68,6 +68,14 @@ describe('UpdateConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'No' })).toHaveFocus();
   });
 
+  it('paints Yes solid red and No neutral, so the two do not read alike', () => {
+    renderOpen();
+
+    expect(screen.getByTestId('update-confirm-yes')).toHaveClass('bg-danger', 'text-card');
+    expect(screen.getByTestId('update-confirm-no')).toHaveClass('bg-card2', 'text-ink', 'border-line-strong');
+    expect(screen.getByTestId('update-confirm-no')).not.toHaveClass('bg-tint', 'text-accent');
+  });
+
   it('paints above every other overlay, the toast (z-100) and the drop-down (z-110)', () => {
     renderOpen();
 

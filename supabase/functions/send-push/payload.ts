@@ -10,8 +10,9 @@
  * thread, `partner-activity`, so they stack apart from love notes; the title
  * is again the sender's display name; no image, no `sound`.
  *
- * Story 3.5 added a push for each date change; story 5.4 removed it, so a date
- * is never a push.
+ * Story 3.5 added a push for each date change; story 5.4 removed it. On
+ * 2026-11-05 an added event or anniversary pushes again (`Added an event: Paris`,
+ * `Added an anniversary: First date`), on `partner-activity`; an edit never does.
  *
  * Story 3.6 adds a partner request and its acceptance, again on
  * `partner-activity`. The title is the other person's display name. A request
@@ -44,6 +45,8 @@ export const POKE_BODY = 'Poked you';
 export const KISS_BODY = 'Sent you a kiss';
 export const PARTNER_REQUEST_BODY = 'Sent you a partner request';
 export const PARTNER_ACCEPT_BODY = 'Accepted your partner request';
+export const EVENT_ADDED_PREFIX = 'Added an event';
+export const ANNIVERSARY_ADDED_PREFIX = 'Added an anniversary';
 /** Used when the asker has no display name: they are not a partner yet. */
 export const FALLBACK_REQUESTER_NAME = 'Someone';
 
@@ -176,4 +179,14 @@ export function buildPartnerRequestPayload(askerName: string | null): ApnsPayloa
 /** `Accepted your partner request`, titled with the accepter's name or `Your partner`. */
 export function buildPartnerAcceptPayload(accepterName: string | null): ApnsPayload {
   return partnerActivityPayload(PARTNER_ACCEPT_BODY, accepterName);
+}
+
+/** `Added an event: Paris trip`, titled with the partner's name. */
+export function buildEventPayload(label: string, senderName: string | null): ApnsPayload {
+  return partnerActivityPayload(`${EVENT_ADDED_PREFIX}: ${label}`, senderName);
+}
+
+/** `Added an anniversary: First date`, titled with the partner's name. */
+export function buildAnniversaryPayload(label: string, senderName: string | null): ApnsPayload {
+  return partnerActivityPayload(`${ANNIVERSARY_ADDED_PREFIX}: ${label}`, senderName);
 }

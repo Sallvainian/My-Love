@@ -200,6 +200,24 @@ export function EventPage({ eventId }: EventPageProps) {
     })();
   }, [userId, authSessionVersion, online, loadEvents, loadEvent, eventId]);
 
+  // A held event that leaves the store (the partner deleted it and a re-read
+  // dropped it, or an edit found no row) is read by id once: a load can also
+  // drop an event only because it lies beyond the paged window. Gone there
+  // too, the page goes back to the Dates list.
+  const missing = event === undefined;
+  const wasHeld = useRef(false);
+  useEffect(() => {
+    if (!missing) {
+      wasHeld.current = true;
+      return;
+    }
+    if (!wasHeld.current) return;
+    wasHeld.current = false;
+    void loadEvent(eventId).then((byId) => {
+      if (mounted.current && byId.status === 'success') setAnswered(true);
+    });
+  }, [missing, loadEvent, eventId]);
+
   const leave = useFallBackToDates(answered && event === undefined);
 
   const { deleting, requestDelete, confirmation } = useDateDelete({
@@ -295,6 +313,12 @@ interface EventFieldPageProps extends EventPageProps {
 export function EventFieldPage({ eventId, field }: EventFieldPageProps) {
   const event = useAppStore((s) => s.events.find((candidate) => candidate.id === eventId));
   const editEvent = useAppStore((s) => s.editEvent);
+  // An event that leaves the store while its field is open (deleted by the
+  // partner, or an edit found no row) goes back to its page, which then goes
+  // back to the Dates list once the server confirms it is gone.
+  const [wasHeld, setWasHeld] = useState(event !== undefined);
+  if (event && !wasHeld) setWasHeld(true);
+  useFallBackToDates(wasHeld && event === undefined);
 
   // An unknown event has no field to edit.
   if (!event) return null;

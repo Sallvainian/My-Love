@@ -1,17 +1,20 @@
 /**
- * Countdown Marks Service — the dates the signed-in account marked for the
- * "In a month" and "In a week" reminders (`public.countdown_marks`, one row per
- * marked date key).
+ * Countdown Marks Service — the dates whose "Remind me" (the "In a month" and
+ * "In a week" reminders) the signed-in account switched off
+ * (`public.countdown_marks`, one row per date key the person set).
  *
- * Supabase is the source of truth. The marks reach the screens through the
- * `countdown-marks` local copy (`datesSlice.countdownMarks`), so the date
- * reminders' re-plan reads them offline. A date with no row is not marked.
- * Reads and writes are online-only and THROW — see `accountDataError.ts` for
- * the error convention (offline is `AccountDataError('offline')`).
+ * Remind me is on by default (2026-11-05): a date with no row, or with a row
+ * whose `reminds` is true (written before the default changed), is on; a row
+ * with `reminds` false is off. Supabase is the source of truth. The keys
+ * switched off reach the screens through the `reminders-off` local copy
+ * (`datesSlice.remindersOff`), so the date reminders' re-plan reads them
+ * offline. Reads and writes are online-only and THROW — see
+ * `accountDataError.ts` for the error convention (offline is
+ * `AccountDataError('offline')`).
  *
- * A mark is an insert that ignores a duplicate, so a retry after a timeout is
- * a no-op; an unmark is a delete, which succeeds when the row is already gone.
- * The key forms are listed beside the table's check in
+ * Switching on deletes the row; switching off deletes it and inserts one with
+ * `reminds` false, ignoring a duplicate, so either is a no-op on retry and no
+ * UPDATE is needed. The key forms are listed beside the table's check in
  * `20261101010000_countdown_marks.sql`; the planner's constants are
  * `MARK_KEYS` in `dateReminders.ts`.
  *
@@ -25,47 +28,47 @@ import { requestTimeout, requireOnline, toAccountDataError } from './accountData
 const WHAT = 'Reminders';
 
 export const countdownMarksService = {
-  /** The date keys the account has marked; no rows is an answer, and reads as `[]`. */
-  async fetchCountdownMarks(userId: string): Promise<string[]> {
+  /** The date keys whose Remind me the account switched off; none is an answer, and reads as `[]`. */
+  async fetchRemindersOff(userId: string): Promise<string[]> {
     requireOnline(WHAT, 'load');
     try {
       const { data, error } = await supabase
         .from('countdown_marks')
         .select('date_key')
         .eq('user_id', userId)
+        .eq('reminds', false)
         .abortSignal(requestTimeout());
       if (error) throw error;
       return (data ?? []).map((row) => row.date_key);
     } catch (error) {
-      throw toAccountDataError('CountdownMarksService.fetchCountdownMarks', error);
+      throw toAccountDataError('CountdownMarksService.fetchRemindersOff', error);
     }
   },
 
-  /** Marks (`marked` true) or unmarks (false) one date key. Idempotent either way. */
-  async setCountdownMark(userId: string, key: string, marked: boolean): Promise<void> {
+  /** Switches one date's Remind me on (`on` true) or off. Idempotent either way. */
+  async setRemindMe(userId: string, key: string, on: boolean): Promise<void> {
     requireOnline(WHAT);
     try {
-      if (marked) {
+      const { error: deleteError } = await supabase
+        .from('countdown_marks')
+        .delete()
+        .eq('user_id', userId)
+        .eq('date_key', key)
+        .abortSignal(requestTimeout());
+      if (deleteError) throw deleteError;
+      if (!on) {
         const { error } = await supabase
           .from('countdown_marks')
           .upsert(
-            { user_id: userId, date_key: key },
+            { user_id: userId, date_key: key, reminds: false },
             { onConflict: 'user_id,date_key', ignoreDuplicates: true }
           )
           .abortSignal(requestTimeout());
         if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('countdown_marks')
-          .delete()
-          .eq('user_id', userId)
-          .eq('date_key', key)
-          .abortSignal(requestTimeout());
-        if (error) throw error;
       }
-      logger.debug('[CountdownMarksService] Saved a countdown mark');
+      logger.debug('[CountdownMarksService] Saved a Remind me switch');
     } catch (error) {
-      throw toAccountDataError('CountdownMarksService.setCountdownMark', error);
+      throw toAccountDataError('CountdownMarksService.setRemindMe', error);
     }
   },
 };

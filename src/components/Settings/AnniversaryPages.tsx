@@ -107,7 +107,15 @@ export function AnniversaryPage({ anniversaryKey }: AnniversaryPageProps) {
     });
   }, [userId, authSessionVersion, online, loadAnniversariesFromServer, anniversaryKey]);
 
-  const leave = useFallBackToDates(answered && anniversary === undefined);
+  // A held anniversary that leaves the store is gone: the list is read whole
+  // (no paging) and only a server answer or a confirmed write changes it, so
+  // the page goes back to the Dates list (the partner deleted it).
+  const [wasHeld, setWasHeld] = useState(anniversary !== undefined);
+  if (anniversary && !wasHeld) setWasHeld(true);
+
+  const leave = useFallBackToDates(
+    (answered || wasHeld) && anniversary === undefined
+  );
 
   const { deleting, requestDelete, confirmation } = useDateDelete({
     noun: 'anniversary',
@@ -184,6 +192,12 @@ interface AnniversaryFieldPageProps extends AnniversaryPageProps {
 export function AnniversaryFieldPage({ anniversaryKey, field }: AnniversaryFieldPageProps) {
   const anniversary = useAnniversary(anniversaryKey);
   const updateAnniversary = useAppStore((s) => s.updateAnniversary);
+  // An anniversary that leaves the store while its field is open (deleted by
+  // the partner, or an edit found no row) goes back to its page, which goes
+  // back to the Dates list.
+  const [wasHeld, setWasHeld] = useState(anniversary !== undefined);
+  if (anniversary && !wasHeld) setWasHeld(true);
+  useFallBackToDates(wasHeld && anniversary === undefined);
 
   // An unknown anniversary has no field to edit.
   if (!anniversary) return null;

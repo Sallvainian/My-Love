@@ -3,8 +3,8 @@
  * push, and the date reminders' switch (`public.push_preferences`, one row per
  * account).
  *
- * No date change sends a push since story 5.4, and story 5.18 dropped the
- * `push_preferences.dates` column it used to switch.
+ * `dates` is the switch for the push sent when the partner adds an event or an
+ * anniversary (2026-11-05); a change to a date never pushes (story 5.4).
  *
  * Supabase is the source of truth. This service caches nothing: Settings loads
  * the switches when its push section opens (`notificationsSlice.pushPreferences`),
@@ -33,6 +33,8 @@ export interface PushPreferences {
   photos: boolean;
   pokesAndKisses: boolean;
   partnerRequests: boolean;
+  /** The push sent when the partner adds an event or an anniversary. */
+  dates: boolean;
   /** The iOS shell's date reminders (local notifications, story 4.3); no push is behind it. */
   dateReminders: boolean;
 }
@@ -46,6 +48,7 @@ export const ALL_PUSH_PREFERENCES_ON: PushPreferences = {
   photos: true,
   pokesAndKisses: true,
   partnerRequests: true,
+  dates: true,
   dateReminders: true,
 };
 
@@ -56,6 +59,7 @@ interface PreferencesRow {
   photos: boolean;
   pokes_and_kisses: boolean;
   partner_requests: boolean;
+  dates: boolean;
   date_reminders: boolean;
 }
 
@@ -67,6 +71,7 @@ const COLUMN: Record<PushPreferenceKey, PreferenceColumn> = {
   photos: 'photos',
   pokesAndKisses: 'pokes_and_kisses',
   partnerRequests: 'partner_requests',
+  dates: 'dates',
   dateReminders: 'date_reminders',
 };
 
@@ -81,6 +86,7 @@ function toPushPreferences(row: PreferencesRow): PushPreferences {
     photos: row.photos,
     pokesAndKisses: row.pokes_and_kisses,
     partnerRequests: row.partner_requests,
+    dates: row.dates,
     dateReminders: row.date_reminders,
   };
 }

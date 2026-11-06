@@ -104,9 +104,11 @@ test.describe('Settings > Dates > adding a date', () => {
       { user_id: userId, label, event_date: '2022-04-04', description: 'The cafe' },
     ]);
 
-    // THEN: Home's countdown shows it, with no reload
+    // THEN: Home's Upcoming list shows it beside the events, with no reload
     await navigateTo(page, 'home');
-    await expect(page.getByTestId('countdown-timer').getByText(label)).toBeVisible();
+    await expect(
+      page.locator('[data-testid^="anniversary-countdown-"]').filter({ hasText: label })
+    ).toBeVisible();
 
     // THEN: the partner's Dates list shows it too (anniversaries are shared, as events are)
     const pair = getWorkerPairEmails();

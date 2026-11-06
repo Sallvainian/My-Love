@@ -64,13 +64,18 @@ const PUSH_PREFERENCE_KEYS: readonly (keyof PushPreferences)[] = [
   'photos',
   'pokesAndKisses',
   'partnerRequests',
+  'dates',
   'dateReminders',
 ];
 
-/** A saved push-preferences copy: an object whose six switches are all booleans, otherwise `null`. */
+/**
+ * A saved push-preferences copy: an object whose seven switches are all
+ * booleans, otherwise `null`. A copy saved before the `dates` switch came back
+ * (2026-11-05) has none and reads it as on, the server's default.
+ */
 function parseSavedPushPreferences(value: unknown): PushPreferences | null {
   if (typeof value !== 'object' || value === null) return null;
-  const record = value as Record<string, unknown>;
+  const record: Record<string, unknown> = { dates: true, ...(value as Record<string, unknown>) };
   if (!PUSH_PREFERENCE_KEYS.every((key) => typeof record[key] === 'boolean')) return null;
   return Object.fromEntries(
     PUSH_PREFERENCE_KEYS.map((key) => [key, record[key]])

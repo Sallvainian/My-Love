@@ -105,7 +105,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   pushPreferences: null,
   pushPreferencesLoadFailed: false,
   settingsPushedPath: null,
-  countdownMarks: null,
+  remindersOff: null,
   dailyDay: null,
   dailyDayLoading: false,
   dailyDayError: null,
@@ -554,10 +554,11 @@ describe('clearAuth on sign-out', () => {
         photos: true,
         pokesAndKisses: true,
         partnerRequests: true,
+        dates: true,
         dateReminders: true,
       },
       pushPreferencesLoadFailed: true,
-      countdownMarks: ['wedding', 'own-birthday'],
+      remindersOff: ['wedding', 'own-birthday'],
     });
 
     useAppStore.getState().clearAuth();
@@ -576,7 +577,7 @@ describe('clearAuth on sign-out', () => {
     expect(state.pushPreferences).toBeNull();
     expect(state.pushPreferencesLoadFailed).toBe(false);
     // And the dates the previous account marked for a month-and-a-week reminder.
-    expect(state.countdownMarks).toBeNull();
+    expect(state.remindersOff).toBeNull();
   });
 
   it('keeps no copy of the anniversaries anywhere in localStorage', () => {
