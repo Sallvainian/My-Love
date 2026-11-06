@@ -51,6 +51,7 @@ import type {
   EventsPagination,
   EventWriteErrorCode,
 } from '../../../src/services/eventsService';
+import { moodSyncService } from '../../../src/api/moodSyncService';
 import { createEventsSlice, type EventsSlice } from '../../../src/stores/slices/eventsSlice';
 import { INSUFFICIENT_PRIVILEGE } from '../../support/sqlstate';
 
@@ -1129,17 +1130,16 @@ describe('eventsSlice', () => {
       expect(updateEvent).not.toHaveBeenCalled();
     });
 
-    it('reports a zero-row write as a failure and leaves the list untouched', async () => {
-      // RLS filters a non-creator's UPDATE silently — the service turns that
-      // into a throw, and the list must not pretend the edit landed.
+    it('reports a zero-row write as a failure and drops the event, which the partner deleted', async () => {
+      // Both partners may edit any event, so zero rows means the row is gone:
+      // the list must stop showing it rather than pretend the edit landed.
       const store = createTestStore();
-      const existing = [event('partners-event', '2026-09-12')];
-      store.setState({ events: existing });
+      store.setState({ events: [event('deleted-by-partner', '2026-09-12'), event('kept', '2026-10-31')] });
       updateEvent.mockRejectedValue(
         codedWriteError('not-found', 'Event not found or not yours to edit')
       );
 
-      const result = await store.getState().editEvent('partners-event', { label: 'mine now' });
+      const result = await store.getState().editEvent('deleted-by-partner', { label: 'renamed' });
 
       expect(result).toEqual({
         success: false,
@@ -1147,6 +1147,18 @@ describe('eventsSlice', () => {
         error: 'Event not found or not yours to edit',
       });
       expect(store.getState().eventsError).toBeNull();
+      expect(store.getState().events.map((e) => e.id)).toEqual(['kept']);
+    });
+
+    it('keeps the event on any other failure', async () => {
+      const store = createTestStore();
+      const existing = [event('a', '2026-09-12')];
+      store.setState({ events: existing });
+      updateEvent.mockRejectedValue(codedWriteError('transport', 'Network down'));
+
+      const result = await store.getState().editEvent('a', { label: 'renamed' });
+
+      expect(result).toMatchObject({ success: false, code: 'transport' });
       expect(store.getState().events).toEqual(existing);
     });
   });
@@ -1182,23 +1194,44 @@ describe('eventsSlice', () => {
       expect(deleteEvent).not.toHaveBeenCalled();
     });
 
-    it('reports a zero-row delete as a failure and keeps the event on screen', async () => {
+    it('treats a zero-row delete as done: the partner deleted it first, so it leaves the list', async () => {
       const store = createTestStore();
-      const existing = [event('partners-event', '2026-09-12')];
-      store.setState({ events: existing });
+      store.setState({ events: [event('deleted-by-partner', '2026-09-12'), event('kept', '2026-10-31')] });
       deleteEvent.mockRejectedValue(
         codedWriteError('not-found', 'Event not found or not yours to delete')
       );
 
-      const result = await store.getState().removeEvent('partners-event');
+      const result = await store.getState().removeEvent('deleted-by-partner');
 
-      expect(result).toEqual({
-        success: false,
-        code: 'not-found',
-        error: 'Event not found or not yours to delete',
-      });
+      expect(result).toEqual({ success: true });
       expect(store.getState().eventsError).toBeNull();
-      expect(store.getState().events).toEqual(existing);
+      expect(store.getState().events.map((e) => e.id)).toEqual(['kept']);
+    });
+  });
+
+  // ==========================================================================
+  // Telling the partner's app
+  // ==========================================================================
+
+  describe('dates-changed broadcast', () => {
+    it('tells the partner after an add, an edit and a delete, and not after a failure', async () => {
+      const announce = vi.spyOn(moodSyncService, 'announceDatesChanged').mockResolvedValue();
+      const store = createTestStore();
+      store.setState({ partner: { id: 'PARTNER-ID' } } as Partial<TestStore>);
+      store.setState({ events: [event('a', '2026-09-12')] });
+      createEvent.mockResolvedValue(event('b', '2026-10-31'));
+      updateEvent.mockResolvedValue(event('a', '2026-09-13'));
+      deleteEvent.mockResolvedValue(undefined);
+
+      await store.getState().addEvent({ label: 'b', eventDate: '2026-10-31', icon: 'calendar' });
+      await store.getState().editEvent('a', { label: 'renamed' });
+      await store.getState().removeEvent('a');
+      expect(announce.mock.calls).toEqual([['PARTNER-ID'], ['PARTNER-ID'], ['PARTNER-ID']]);
+
+      updateEvent.mockRejectedValue(codedWriteError('transport', 'Network down'));
+      await store.getState().editEvent('b', { label: 'again' });
+      expect(announce).toHaveBeenCalledTimes(3);
+      announce.mockRestore();
     });
   });
 

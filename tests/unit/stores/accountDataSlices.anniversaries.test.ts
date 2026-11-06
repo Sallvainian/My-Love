@@ -72,6 +72,8 @@ vi.mock('../../../src/services/messageFavoritesApi', async (importOriginal) => (
   },
 }));
 
+import { moodSyncService } from '../../../src/api/moodSyncService';
+import { AccountDataError } from '../../../src/services/accountDataError';
 import type { ServerAnniversary } from '../../../src/services/anniversariesService';
 import { readLocalCopy, refreshLocalCopies, writeLocalCopy } from '../../../src/services/localCopy';
 import { ACCOUNT_OWNER_STORAGE_KEY } from '../../../src/stores/slices/authSlice';
@@ -118,6 +120,42 @@ beforeEach(() => {
   localStorage.removeItem(ACCOUNT_OWNER_STORAGE_KEY);
   setAnniversaries([]);
   setOnline(true);
+});
+
+describe('anniversaries changed or deleted by the partner', () => {
+  it('drops an anniversary whose edit finds no row, and still reports the failure', async () => {
+    setAnniversaries([
+      anniversary(4, 'Gone', { serverId: 'ann-4' }),
+      anniversary(5, 'Kept', { serverId: 'ann-5' }),
+    ]);
+    server.updateAnniversary.mockRejectedValue(new AccountDataError('not-found', 'Anniversary not found'));
+
+    await expect(
+      useAppStore.getState().updateAnniversary(4, { date: '2024-02-15', label: 'Renamed' })
+    ).rejects.toMatchObject({ code: 'not-found' });
+
+    expect(anniversaries().map((a) => a.serverId)).toEqual(['ann-5']);
+    expect(((await readLocalCopy(A, ANNIVERSARIES_COPY_KIND)) as Anniversary[]).map((a) => a.serverId)).toEqual([
+      'ann-5',
+    ]);
+  });
+
+  it('tells the partner after an add, an edit and a delete', async () => {
+    const announce = vi.spyOn(moodSyncService, 'announceDatesChanged').mockResolvedValue();
+    useAppStore.setState({ partner: { id: 'PARTNER-ID' } } as Partial<StoreState>);
+    setAnniversaries([anniversary(4, 'Old', { serverId: 'ann-4' })]);
+    server.createAnniversary.mockResolvedValue(serverAnniversary('ann-9', 'New'));
+    server.updateAnniversary.mockResolvedValue(serverAnniversary('ann-4', 'Renamed'));
+    server.deleteAnniversary.mockResolvedValue(undefined);
+
+    await useAppStore.getState().addAnniversary(anniversaryInput('New'));
+    await useAppStore.getState().updateAnniversary(4, { date: ANNIVERSARY_DATE, label: 'Renamed' });
+    await useAppStore.getState().removeAnniversary(4);
+
+    expect(announce.mock.calls).toEqual([['PARTNER-ID'], ['PARTNER-ID'], ['PARTNER-ID']]);
+    announce.mockRestore();
+    useAppStore.setState({ partner: null } as Partial<StoreState>);
+  });
 });
 
 describe('anniversaries: server first, then the settings mirror', () => {

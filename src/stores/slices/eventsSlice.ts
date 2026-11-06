@@ -42,6 +42,7 @@
  */
 
 import { isOnline } from '../../api/errorHandlers';
+import { moodSyncService } from '../../api/moodSyncService';
 import type {
   CoupleEvent,
   EventCreateInput,
@@ -356,6 +357,23 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
     pruneCompletedMutations();
   };
 
+  /**
+   * An edit or delete found no row: the event is gone on the server (the
+   * partner deleted it). Drop it from the list and the copy, as a confirmed
+   * delete would, so no screen keeps showing it. Only for the session that
+   * asked.
+   */
+  const dropGoneEvent = async (
+    requestedBy: string,
+    requestedInSession: number,
+    eventId: string
+  ): Promise<void> => {
+    if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+    recordMutation({ requestedBy, requestedInSession, kind: 'delete', eventId });
+    set((state) => ({ events: state.events.filter((event) => event.id !== eventId) }));
+    await saveEventsCopy(requestedBy, requestedInSession);
+  };
+
   const replayCompletedMutations = (events: CoupleEvent[], load: ActiveLoad): CoupleEvent[] => {
     let reconciled = events;
 
@@ -550,6 +568,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       set((state) => ({ events: sortByDate(upsertEvent(state.events, created)) }));
       await saveEventsCopy(requestedBy, requestedInSession);
       logger.debug('[EventsSlice] Added event:', created.id);
+      await moodSyncService.announceDatesChanged(get().partner?.id);
       return { success: true };
     } catch (error) {
       const failure = writeFailureOf(error, 'Failed to add event');
@@ -583,10 +602,14 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       }));
       await saveEventsCopy(requestedBy, requestedInSession);
       logger.debug('[EventsSlice] Edited event:', eventId);
+      await moodSyncService.announceDatesChanged(get().partner?.id);
       return { success: true };
     } catch (error) {
       const failure = writeFailureOf(error, 'Failed to update event');
       console.error('[EventsSlice] Error updating event:', error);
+      // The row is gone (the partner deleted it): drop it here too, so the
+      // list and the open page stop showing it.
+      if (failure.code === 'not-found') await dropGoneEvent(requestedBy, requestedInSession, eventId);
       return failure;
     }
   },
@@ -612,9 +635,15 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
       set((state) => ({ events: state.events.filter((event) => event.id !== eventId) }));
       await saveEventsCopy(requestedBy, requestedInSession);
       logger.debug('[EventsSlice] Removed event:', eventId);
+      await moodSyncService.announceDatesChanged(get().partner?.id);
       return { success: true };
     } catch (error) {
       const failure = writeFailureOf(error, 'Failed to delete event');
+      // Already gone (the partner deleted it first): the state asked for.
+      if (failure.code === 'not-found') {
+        await dropGoneEvent(requestedBy, requestedInSession, eventId);
+        return { success: true };
+      }
       console.error('[EventsSlice] Error deleting event:', error);
       return failure;
     }

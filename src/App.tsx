@@ -41,6 +41,7 @@ import {
   startPushRenewalOnForeground,
 } from './services/pushNotifications';
 import { clearSignOutNotice } from './services/signOutNotice';
+import { useDatesChangedListener } from './hooks/useDatesChangedListener';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/profileSlice';
@@ -520,6 +521,7 @@ function App() {
   // the same commit, and the listener waits for its answer instead of opening a
   // channel a linked account does not need.
   usePartnerLinkListener();
+  useDatesChangedListener();
 
   // Story 6.4: Task 2 - Network state detection with auto-sync on reconnect (AC #2)
   useEffect(() => {

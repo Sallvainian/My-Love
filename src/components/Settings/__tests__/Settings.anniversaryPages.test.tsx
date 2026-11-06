@@ -642,6 +642,19 @@ describe("Settings > Dates > an anniversary's page", () => {
     });
   });
 
+  describe('an anniversary deleted elsewhere while its page is open', () => {
+    it('goes back to the Dates list once it leaves the store', async () => {
+      renderAt('dates/anniversary/srv-1');
+      expect(await heading('First date')).toBeInTheDocument();
+
+      // The partner deleted it and a re-read dropped it from the store.
+      setAnniversaries([]);
+
+      expect(await heading('Dates')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates');
+    });
+  });
+
   describe('Delete anniversary', () => {
     async function openAnniversary(strict = false) {
       renderAt('dates/anniversary/srv-1', strict);

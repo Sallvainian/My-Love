@@ -335,6 +335,51 @@ describe('Settings > Dates > an event\'s page', () => {
     });
   });
 
+  describe('an event deleted elsewhere while its page is open', () => {
+    it('reads it by id, then goes back to the Dates list once', async () => {
+      const user = userEvent.setup();
+      await openFromDates(user);
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      loadEvent.mockClear();
+
+      // The partner deleted it and a re-read dropped it from the store.
+      setEvents([]);
+
+      await waitFor(() => expect(loadEvent).toHaveBeenCalledWith('event-1'));
+      expect(await heading('Dates')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates');
+    });
+
+    it('stays when the by-id read finds it (it only fell outside the loaded window)', async () => {
+      const user = userEvent.setup();
+      await openFromDates(user);
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      const held = useAppStore.getState().events;
+      loadEvent.mockImplementation(async () => {
+        act(() => useAppStore.setState({ events: held }));
+        return { status: 'success' };
+      });
+
+      setEvents([]);
+
+      await waitFor(() => expect(loadEvent).toHaveBeenCalled());
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/settings/dates/event/event-1');
+    });
+
+    it('leaves an open field page when the event goes', async () => {
+      const user = userEvent.setup();
+      await openFromDates(user);
+      expect(await heading('Weekend trip')).toBeInTheDocument();
+      await user.click(screen.getByTestId('settings-event-name'));
+      expect(await screen.findByTestId('settings-event-name-field')).toBeInTheDocument();
+
+      setEvents([]);
+
+      expect(await heading('Dates')).toBeInTheDocument();
+    });
+  });
+
   describe("a partner's event", () => {
     beforeEach(() => {
       setEvents([makeEvent({ userId: 'partner-1', description: 'Her pick\nsecond line' })]);

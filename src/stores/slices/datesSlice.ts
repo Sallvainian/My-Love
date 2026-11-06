@@ -48,6 +48,7 @@
  */
 
 import { ZodError } from 'zod/v4';
+import { moodSyncService } from '../../api/moodSyncService';
 import { lookupPartnerId } from '../../api/supabaseClient';
 import { AccountDataError, requireOnline } from '../../services/accountDataError';
 import { serializeAccountDataWrite } from '../../services/accountDataQueue';
@@ -337,6 +338,29 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
     }
   };
 
+  /**
+   * Drops one anniversary from the mirror and the copy: after a confirmed
+   * delete, or when an edit found no row because the partner deleted it. Only
+   * for the session that asked.
+   */
+  const dropGoneAnniversary = async (
+    requestedBy: string,
+    requestedInSession: number,
+    serverId: string
+  ): Promise<void> => {
+    if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
+    set((state) => {
+      if (!state.settings) return {};
+      return {
+        settings: withAnniversaries(
+          state.settings,
+          state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
+        ),
+      };
+    });
+    await saveAnniversariesCopy(requestedBy, requestedInSession);
+  };
+
   return {
     coupleSettings: null,
     remindersOff: null,
@@ -366,6 +390,7 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
           };
         });
         await saveAnniversariesCopy(requestedBy, requestedInSession);
+        await moodSyncService.announceDatesChanged(get().partner?.id);
       });
     },
 
@@ -382,7 +407,17 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
         if (!existing) throw new AccountDataError('not-found', 'Anniversary not found');
         if (!existing.serverId) throw notSynced();
 
-        const updated = await anniversariesService.updateAnniversary(existing.serverId, input);
+        let updated: ServerAnniversary;
+        try {
+          updated = await anniversariesService.updateAnniversary(existing.serverId, input);
+        } catch (error) {
+          // The row is gone (the partner deleted it): drop it here too, so the
+          // list and the open page stop showing it, then report the failure.
+          if (error instanceof AccountDataError && error.code === 'not-found') {
+            await dropGoneAnniversary(requestedBy, requestedInSession, existing.serverId);
+          }
+          throw error;
+        }
 
         if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
         set((state) => {
@@ -397,6 +432,7 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
           };
         });
         await saveAnniversariesCopy(requestedBy, requestedInSession);
+        await moodSyncService.announceDatesChanged(get().partner?.id);
       });
     },
 
@@ -415,17 +451,8 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
 
         await anniversariesService.deleteAnniversary(serverId);
 
-        if (get().userId !== requestedBy || get().authSessionVersion !== requestedInSession) return;
-        set((state) => {
-          if (!state.settings) return {};
-          return {
-            settings: withAnniversaries(
-              state.settings,
-              state.settings.relationship.anniversaries.filter((a) => a.serverId !== serverId)
-            ),
-          };
-        });
-        await saveAnniversariesCopy(requestedBy, requestedInSession);
+        await dropGoneAnniversary(requestedBy, requestedInSession, serverId);
+        await moodSyncService.announceDatesChanged(get().partner?.id);
       });
     },
 

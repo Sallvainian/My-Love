@@ -46,6 +46,8 @@ interface MoodSubscriber {
   onStatus?: (status: string) => void;
   /** Someone just accepted this account's partner request; see PARTNER_LINKED_EVENT. */
   onPartnerLinked?: () => void;
+  /** The partner just added, edited or deleted an event or anniversary; see DATES_CHANGED_EVENT. */
+  onDatesChanged?: () => void;
 }
 
 /**
@@ -59,6 +61,16 @@ interface MoodSubscriber {
  * payload is empty and trusted for nothing: it only prompts a server re-read.
  */
 export const PARTNER_LINKED_EVENT = 'partner_linked';
+
+/**
+ * Sent on `mood-updates:<partnerId>` by a device that just added, edited or
+ * deleted an event or an anniversary, so the partner's open app re-reads both
+ * instead of showing a date that is gone until it next loads them. Like
+ * PARTNER_LINKED_EVENT, the payload is empty and trusted for nothing: it only
+ * prompts a server re-read, and `couple_broadcast_partner_can_send` lets only
+ * the partner publish on the topic.
+ */
+export const DATES_CHANGED_EVENT = 'dates_changed';
 
 /**
  * A broadcast channel plus every consumer currently attached to it.
@@ -667,6 +679,10 @@ class MoodSyncService {
         });
         Array.from(entry.subscribers).forEach((s) => s.onPartnerLinked?.());
       })
+      .on('broadcast', { event: DATES_CHANGED_EVENT }, () => {
+        logger.debug('[MoodSyncService] Received a dates-changed broadcast');
+        Array.from(entry.subscribers).forEach((s) => s.onDatesChanged?.());
+      })
       .subscribe((status) => {
         this.handleMoodChannelStatus(topic, entry, status);
       });
@@ -827,7 +843,8 @@ class MoodSyncService {
   async subscribeMoodUpdates(
     callback: (mood: SupabaseMoodRecord) => void,
     onStatusChange?: (status: string) => void,
-    onPartnerLinked?: () => void
+    onPartnerLinked?: () => void,
+    onDatesChanged?: () => void
   ): Promise<() => void> {
     // Get current user ID - we subscribe to OUR OWN channel. Through
     // `getSession`, which answers with the stored session while the server is
@@ -859,7 +876,12 @@ class MoodSyncService {
     // anon key and the SELECT policy denies it.
     await supabase.realtime.setAuth();
 
-    const subscriber: MoodSubscriber = { onMood: callback, onStatus: onStatusChange, onPartnerLinked };
+    const subscriber: MoodSubscriber = {
+      onMood: callback,
+      onStatus: onStatusChange,
+      onPartnerLinked,
+      onDatesChanged,
+    };
 
     let entry = this.moodChannels.get(topic);
 
@@ -992,6 +1014,23 @@ class MoodSyncService {
    */
   async announcePartnerLinked(partnerId: string): Promise<void> {
     await sendEphemeralBroadcast(`mood-updates:${partnerId}`, PARTNER_LINKED_EVENT, {});
+  }
+
+  /**
+   * Tell the partner's open app that an event or anniversary was added, edited
+   * or deleted (DATES_CHANGED_EVENT), so it re-reads them. Best effort: never
+   * throws. A failed broadcast only means the partner sees the change on their
+   * next load of the dates.
+   *
+   * @param partnerId - The store's linked partner; none sends nothing
+   */
+  async announceDatesChanged(partnerId: string | null | undefined): Promise<void> {
+    if (!partnerId) return;
+    try {
+      await sendEphemeralBroadcast(`mood-updates:${partnerId}`, DATES_CHANGED_EVENT, {});
+    } catch (error) {
+      logger.debug('[MoodSyncService] Dates-changed broadcast failed:', error);
+    }
   }
 
   /**
