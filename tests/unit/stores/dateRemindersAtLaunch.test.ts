@@ -78,6 +78,7 @@ vi.mock('../../../src/services/localCopy', async (importOriginal) => {
 
 import { Capacitor } from '@capacitor/core';
 import {
+  dateReminderWorkSettled,
   replanDateReminders,
   scheduleDateRemindersAtLaunch,
   startDateReminderTriggers,
@@ -108,7 +109,6 @@ import {
   seedOneOfEachKind,
   scheduleReaders,
   spyOnRefreshers,
-  settleMs,
   ALL_REMINDER_IDS,
 } from './dateRemindersAtLaunchFixture';
 
@@ -642,7 +642,7 @@ describe('scheduleDateRemindersAtLaunch with a launch refresh', () => {
       void scheduleDateRemindersAtLaunch(owner(), refreshed);
 
       await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalledTimes(1));
-      await settleMs();
+      await dateReminderWorkSettled();
       expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
       expect(scheduledTitles()).toContain('Today: Wedding day @ 11/7 9:00');
 

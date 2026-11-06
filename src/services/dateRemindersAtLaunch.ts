@@ -204,6 +204,24 @@ export function replanDateReminders(owner?: LaunchOwner): Promise<void> {
   return slot.done;
 }
 
+// The date-copy refreshes a trigger started and has not seen end; a trigger
+// starts each one without returning it.
+const refreshesInFlight = new Set<Promise<void>>();
+
+/**
+ * Resolves once no date-copy refresh a trigger started and no re-plan is
+ * running or queued, including any re-plan a finishing refresh asks for. The
+ * triggers start their work without returning it, so this is how a test knows
+ * that work has ended before it checks that something did not happen. It
+ * does not wait for a token renewal's refresh that has not started yet, nor
+ * for the launch's wait on its refresh (`scheduleDateRemindersAtLaunch`).
+ */
+export async function dateReminderWorkSettled(): Promise<void> {
+  while (refreshesInFlight.size > 0 || running !== null || waiting !== null) {
+    await Promise.all([...refreshesInFlight, running, waiting?.done]);
+  }
+}
+
 /**
  * The signed-in start's trigger: re-plans at once from the saved copies, then,
  * when `refreshed` (the launch refresh) is given, once more after it settles.
@@ -264,13 +282,19 @@ export function startDateReminderTriggers(): () => void {
     await replanDateReminders(owner);
   };
 
+  /** Starts a refresh without waiting for it, keeping it in `refreshesInFlight` until it ends. */
+  const startRefresh = () => {
+    const refresh: Promise<void> = refreshDateCopies().finally(() => refreshesInFlight.delete(refresh));
+    refreshesInFlight.add(refresh);
+  };
+
   const onVisibilityChange = () => {
     if (document.visibilityState !== 'visible') return;
     void replanDateReminders();
     // A token that needs renewal makes every read fail and would burn the
     // throttle window; auth-js renews on its own foreground handler, and the
     // TOKEN_REFRESHED that follows does the refresh.
-    if (!storedTokenNeedsRenewal()) void refreshDateCopies();
+    if (!storedTokenNeedsRenewal()) startRefresh();
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -291,7 +315,7 @@ export function startDateReminderTriggers(): () => void {
     if (renewalTimer !== null) clearTimeout(renewalTimer);
     renewalTimer = setTimeout(() => {
       renewalTimer = null;
-      void refreshDateCopies();
+      startRefresh();
     }, 0);
   });
 

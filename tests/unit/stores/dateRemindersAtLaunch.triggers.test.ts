@@ -81,6 +81,7 @@ import { AUTH_STORAGE_KEY } from '../../../src/api/authStorage';
 import { partnerService } from '../../../src/api/partnerService';
 import {
   DATE_COPY_REFRESH_INTERVAL_MS,
+  dateReminderWorkSettled,
   replanDateReminders,
   startDateReminderTriggers,
 } from '../../../src/services/dateRemindersAtLaunch';
@@ -104,7 +105,6 @@ import {
   seedOneOfEachKind,
   scheduleReaders,
   spyOnRefreshers,
-  settleMs,
 } from './dateRemindersAtLaunchFixture';
 
 const { scheduledTitles, titlesOfSchedule } = scheduleReaders(localNotifications.schedule);
@@ -362,7 +362,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
   afterEach(async () => {
     held?.settle();
     stop();
-    await settleMs();
+    await dateReminderWorkSettled();
     restoreRefreshers();
     stop = () => {};
   });
@@ -387,8 +387,8 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     registerLocalCopy('love-notes', other);
     try {
       setVisible();
+      // Every registered refresher a refresh runs is called inside the return, so the seven being called means the rest were not.
       await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await settleMs();
     } finally {
       // Put the store's own refresher back; unregistering would delete the kind for later tests.
       registerLocalCopy('love-notes', realRefreshers.get('love-notes')!);
@@ -403,8 +403,9 @@ describe('the date copies refresh on a foreground return and a token renewal', (
 
     vi.setSystemTime(new Date(NOW.getTime() + DATE_COPY_REFRESH_INTERVAL_MS - 1));
     setVisible();
+    // The throttle decides inside the return, so no refresher has run by now if none will.
+    expect(refreshers.timesRefreshed()).toBe(1);
     await scheduledTimes(3);
-    await settleMs();
 
     expect(localNotifications.schedule).toHaveBeenCalledTimes(3);
     expect(refreshers.timesRefreshed()).toBe(1);
@@ -443,7 +444,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     await start();
     setVisible();
     await vi.waitFor(() => expect(refreshers.timesRefreshed()).toBe(1));
-    await settleMs();
+    await dateReminderWorkSettled();
 
     switchIdentity();
     setVisible();
@@ -458,7 +459,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     await scheduledTimes(1);
     setVisible();
     await scheduledTimes(2);
-    await settleMs();
+    // Offline is decided inside the return, so no refresher has run by now if none will.
     expect(refreshers.kindsRefreshed()).toBe(0);
 
     setOnline(true);
@@ -473,8 +474,8 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     state().clearAuth();
 
     setVisible();
-    await settleMs();
 
+    // Signed out is decided inside the return, so no refresher has run by now if none will.
     expect(refreshers.kindsRefreshed()).toBe(0);
   });
 
@@ -504,7 +505,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
 
     state().setAuthUser(B);
     held!.settle();
-    await settleMs();
+    await dateReminderWorkSettled();
 
     expect(localNotifications.schedule).toHaveBeenCalledTimes(1);
     expect(localNotifications.getPending).toHaveBeenCalledTimes(1);
@@ -536,9 +537,9 @@ describe('the date copies refresh on a foreground return and a token renewal', (
       storeSession(inMs);
 
       setVisible();
-      await scheduledTimes(1);
-      await settleMs();
+      // The token is read inside the return, so no refresher has run by now if none will.
       expect(refreshers.kindsRefreshed()).toBe(0);
+      await scheduledTimes(1);
 
       // Nothing was stamped, so the renewal's own event is not throttled out.
       emitAuth('TOKEN_REFRESHED', A);
@@ -570,6 +571,23 @@ describe('the date copies refresh on a foreground return and a token renewal', (
   });
 
   describe('TOKEN_REFRESHED', () => {
+    /**
+     * Runs `step` with the renewal's `setTimeout` faked, then runs the work it
+     * deferred to the next task and waits for any refresh or re-plan that
+     * started, so the caller can assert at once. Only the timers are added and
+     * removed: the file's faked `Date` and its time stay.
+     */
+    async function runDeferredRenewal(step: () => void) {
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      try {
+        step();
+        await vi.runOnlyPendingTimersAsync();
+      } finally {
+        vi.useFakeTimers({ toFake: ['Date'] });
+      }
+      await dateReminderWorkSettled();
+    }
+
     it('refreshes the seven kinds on the next task, then plans', async () => {
       await start();
 
@@ -587,8 +605,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
       setVisible();
       await scheduledTimes(2);
 
-      emitAuth('TOKEN_REFRESHED', A);
-      await settleMs();
+      await runDeferredRenewal(() => emitAuth('TOKEN_REFRESHED', A));
       expect(refreshers.timesRefreshed()).toBe(1);
 
       vi.setSystemTime(new Date(NOW.getTime() + DATE_COPY_REFRESH_INTERVAL_MS));
@@ -599,11 +616,12 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     it('refreshes once for a burst of renewals', async () => {
       await start();
 
-      emitAuth('TOKEN_REFRESHED', A);
-      emitAuth('TOKEN_REFRESHED', A);
-      await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
-      await settleMs();
+      await runDeferredRenewal(() => {
+        emitAuth('TOKEN_REFRESHED', A);
+        emitAuth('TOKEN_REFRESHED', A);
+      });
 
+      expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length);
       expect(refreshers.timesRefreshed()).toBe(1);
     });
 
@@ -616,8 +634,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     ] as const)('does nothing for %s', async (_name, event, userId) => {
       await start();
 
-      emitAuth(event, userId);
-      await settleMs();
+      await runDeferredRenewal(() => emitAuth(event, userId));
 
       expect(refreshers.kindsRefreshed()).toBe(0);
       expect(localNotifications.schedule).not.toHaveBeenCalled();
@@ -627,8 +644,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
       await start();
       setOnline(false);
 
-      emitAuth('TOKEN_REFRESHED', A);
-      await settleMs();
+      await runDeferredRenewal(() => emitAuth('TOKEN_REFRESHED', A));
 
       expect(refreshers.kindsRefreshed()).toBe(0);
     });
@@ -639,8 +655,7 @@ describe('the date copies refresh on a foreground return and a token renewal', (
 
       stop();
       expect(authEvents.listeners.size).toBe(0);
-      emitAuth('TOKEN_REFRESHED', A);
-      await settleMs();
+      await runDeferredRenewal(() => emitAuth('TOKEN_REFRESHED', A));
 
       expect(refreshers.kindsRefreshed()).toBe(0);
     });
@@ -648,9 +663,10 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     it('does nothing when stopped before the deferred refresh runs', async () => {
       await start();
 
-      emitAuth('TOKEN_REFRESHED', A);
-      stop();
-      await settleMs();
+      await runDeferredRenewal(() => {
+        emitAuth('TOKEN_REFRESHED', A);
+        stop();
+      });
 
       expect(refreshers.kindsRefreshed()).toBe(0);
     });
