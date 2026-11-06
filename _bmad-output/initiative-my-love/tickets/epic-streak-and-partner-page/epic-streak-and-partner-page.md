@@ -4,7 +4,7 @@ title: "Streak and Partner Page"
 parent: initiative-my-love
 covers: ["R5", "R6", "R7", "R8", "R9", "R11", "R17"]
 sources: []
-companions: []
+companions: ["_bmad-output/initiative-my-love/architecture-daily-question/architecture-daily-question.md"]
 after: []
 refined: false
 risk: medium
@@ -41,4 +41,4 @@ The couple watches one shared streak grow and sees how often they pick the same.
 ## Notes
 
 - Waits on epic 6 because: it counts the picks and the per-partner day epic 6 stores.
-- Waits on the architecture pass for how a day is settled; refined after it.
+- The architecture spine (companion) settles how a day is closed and how the streak is counted; refine against it.

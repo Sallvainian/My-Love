@@ -4,7 +4,7 @@ title: "Reply in Love Notes"
 parent: initiative-my-love
 covers: ["R10"]
 sources: []
-companions: []
+companions: ["_bmad-output/initiative-my-love/architecture-daily-question/architecture-daily-question.md"]
 after: []
 refined: false
 risk: medium
@@ -40,4 +40,4 @@ Partners talk about the day's answers where they already talk. Signal: a reply o
 - Waits on epic 6 because: the reply points at its stored question and sits on its reveal card.
 - Waits on epic 7 because: both change the reveal card.
 - Waits on epic 8 because: both add migrations, regenerate the database types and change epic 6's screens.
-- Waits on the architecture pass for how the stored question a reply points at is kept; refined after it.
+- The architecture spine (companion) settles how a reply points at its day's question; refine against it.

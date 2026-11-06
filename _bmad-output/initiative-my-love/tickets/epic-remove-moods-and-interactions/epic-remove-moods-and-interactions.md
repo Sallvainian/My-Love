@@ -4,7 +4,7 @@ title: "Remove Moods and Poke/Kiss/Fart"
 parent: initiative-my-love
 covers: ["R15", "R16", "R19"]
 sources: []
-companions: []
+companions: ["_bmad-output/initiative-my-love/architecture-daily-question/architecture-daily-question.md"]
 after: []
 refined: false
 risk: high
