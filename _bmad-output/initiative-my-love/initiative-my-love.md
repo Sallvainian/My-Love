@@ -2,7 +2,7 @@
 type: initiative
 title: "My-Love"
 sources: ["_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md", "AGENTS.md"]
-companions: []
+companions: ["_bmad-output/initiative-my-love/architecture-daily-question/architecture-daily-question.md"]
 after: []
 status: in-progress
 risk: low
@@ -21,7 +21,7 @@ Each partner has a reason to open the app every day, an open loop from the other
 ## Requirements
 
 - R1 (Decided: The daily question): each day the couple gets one this-or-that question with two options and each partner picks one option for themselves; met when both partners see the same question that day and each saved pick belongs to its picker alone.
-- R2 (Decided: The daily question): a partner's pick stays hidden from the other until the other has picked, then both picks show together (the reveal); met when nothing the app shows or receives carries the partner's pick before your own exists.
+- R2 (Decided: The daily question; Notes, Decision 2026-11-05): a partner's choice stays hidden from the other until the other has picked, then both choices show together (the reveal); that the partner has picked is shown; met when nothing the app shows or receives carries the partner's choice before your own pick exists.
 - R3 (Decided: The daily question; Mock-up assumptions; Notes, Decision 2026-11-05): each day each partner is asked "Write tomorrow's question?"; yes lets them type its two options (This / That) and it becomes the couple's next question, "No thanks, pick one for us" gives a random pool question; if both write one, the first sent is asked and the other joins the pool; met when a written question is asked of both the next day and a declined prompt yields a pool question.
 - R4 (Decided: The daily question; Mock-up assumptions): the pool, written by the coach, holds about 500 this-or-that questions; no question repeats for the couple until every pool question has been used; questions partners write join the pool; met by the pool count and by consecutive days drawing distinct questions until the pool is used up.
 - R5 (Decided: Streak; Mock-up assumptions): the couple shares one streak that goes up by one for each day both partners picked; a day without both picks is missed and holds the count, never resetting or raising it; met by the count over a sequence of done and missed days.
@@ -32,8 +32,8 @@ Each partner has a reason to open the app every day, an open loop from the other
 - R10 (Decided: Reveal and reply; design, Love Notes reply sent): the reveal's one action is Reply in Love Notes, spanning its card's full width; it opens Love Notes with the reply visibly attached to that day's question, as replying to a message in iPhone Messages, and both partners see the sent note with the question attached.
 - R11 (Decided: Partner page): the Partner page holds the streak and the past questions in place of the partner's mood card and recent-moods list; each past day is marked Same or Different with a running count ("Same pick on 9 of your 13 days").
 - R12 (Mock-up assumptions; Consequences): the Mood dock tab becomes Daily and the dock keeps five destinations.
-- R13 (Mock-up assumptions): the waiting screen has a Nudge button that sends the partner a push.
-- R14 (Mock-up assumptions; Notes, Decision 2026-11-05): pushes arrive for a new question at 8 AM, the partner picked, the partner nudged you, an 8 PM reminder when nobody has answered, and both answered, each timed on the recipient's own clock, with the copy on the mock-up's notifications screen.
+- R13 (Mock-up assumptions; Notes, Decision 2026-11-05): while a partner has picked and the other has not, the app asks "Do you want to nudge your partner?" right after the pick and the waiting screen has a Nudge button; a nudge sends the partner a push; each partner sends at most two nudges a day, one before 8 PM and one from 8 PM on their own clock, and the button greys out once the current one is spent; met when a third nudge on one day is refused.
+- R14 (Mock-up assumptions; Notes, Decision 2026-11-05): pushes arrive for a new question at 8 AM, the partner picked, the partner nudged you, an 8 PM reminder, and both answered, each timed on the recipient's own clock; the 8 PM reminder goes unless both have picked, telling a recipient who has not picked that they haven't done their daily yet (opens Daily) and one who has that their partner hasn't (opens the waiting screen to nudge); the 8 AM push carries no nudge; the rest of the copy is the mock-up's notifications screen.
 - R15 (Decided: The daily question; Consequences): the whole mood system is gone (the check-in with its 12 moods, note, Timeline and Calendar; the partner mood card and recent-moods list; mood realtime and mood notifications) and every stored mood is deleted, on the server and in each device's offline copies; met when no mood UI, mood row or device mood copy remains.
 - R16 (Decided: Partner page; Consequences): Poke, Kiss and Fart are gone with their interaction history, on the server and on devices.
 - R17 (Notes, Decision 2026-11-05): a pick made offline is kept on the device with the time it was made and sent the moment a connection returns; it counts for the date it was made even when it reaches the server after that day's midnight, and the streak is corrected when it lands; the reveal shows only once the server has it; met when a pick made offline at 11:50 PM and sent at 12:10 AM counts for the earlier date.
@@ -43,14 +43,14 @@ Each partner has a reason to open the app every day, an open loop from the other
 
 ## Constraints
 
-- C1 (Consequences): the server enforces the hidden pick, withholding the partner's pick row until the reader's own exists (RLS); hiding it in the UI alone does not meet R2.
+- C1 (Consequences): the server enforces the hidden choice, releasing the partner's choice only once the reader's own pick exists; hiding it in the UI alone does not meet R2.
 - C2 (Consequences): the nudge, partner-picked and both-answered build on the existing `send-push` Edge Function and Broadcast realtime, not on a new push service or channel.
 - C3 (project-context, Known pitfalls; `src/api/moodSyncService.ts`): `moodSyncService` hosts the refcounted Realtime registry that AGENTS.md routes new Realtime work through, and the `partner_linked` event that `partnerSlice` and `usePartnerLinkListener` use; removing moods keeps both working.
 - C4 (project-context, Maintained by hand; `src/services/dateReminders.ts` `reminderIdsToCancel`): every date-reminder re-plan cancels every pending local notification on the phone; if the 8 AM and 8 PM pushes are scheduled on the phone, the same change reserves their own ids and narrows that cancel, or each re-plan deletes them.
 
 ## Done when
 
-- In production both partners pick today's question, and a request made as the partner before their own pick gets no trace of the first pick.
+- In production both partners pick today's question, and a request made as the partner before their own pick gets no trace of the first pick's choice.
 - An automated test over faked days shows the streak, current run, colours, +1 animation and 25-day badges behaving as R5 to R9 say across done and missed days.
 - A reply sent from the reveal shows in both partners' Love Notes attached to its question.
 - Production has no mood or Poke/Kiss/Fart screen, server row or device copy left, and the dock reads Home, Daily, Love Notes, Photos, Partner.
@@ -87,4 +87,6 @@ Each partner has a reason to open the app every day, an open loop from the other
 - Decision: 2026-11-05 the daily question work is sliced into epics 6 to 10 by outcome, not by module, because the site, migrations and Edge Functions deploy together through `deploy.yml`: 6 Daily Question, 7 Streak and Partner Page, 8 Daily Pushes and Nudge, 9 Reply in Love Notes, 10 Remove Moods and Poke/Kiss/Fart. The tracer path runs through 6 and ends in 7.
 - Decision: 2026-11-05 an architecture pass (`bmad-architecture`) settles the decisions epics 6, 7 and 8 share (how a day is settled across the partners' clocks, how the 8 AM and 8 PM pushes are scheduled, how questions and picks are stored) before epic 6 is refined; its spine lands beside this file and the adopting epics cite it. Declined: a decision story opening epic 6.
 - Decision: 2026-11-05 Reply in Love Notes is its own epic, not part of epic 6, which already holds about ten stories; removal goes last, so the dock never loses its second destination.
-- Unknown: the architecture spine does not exist yet; epics 6, 7 and 8 are refined only after it.
+- Decision: 2026-11-05 during the architecture pass the owner made the 8 PM push depend on who has picked (R14) and capped nudges at two per partner per day, one offered right after their own pick and one from 8 PM, the waiting screen's button spending the same two (R13). "No trace" means the partner's choice: that the partner picked is shown, as the mock-up's "made their pick" push does (R2, C1).
+- Decision: 2026-11-05 the architecture spine, `architecture-daily-question/`, is a companion of this initiative and of epics 6 to 10, which build on its decisions.
+- Unknown: R3 asks each partner "Write tomorrow's question?" each day, while epic 6 asks it after the reveal; whether a partner whose partner never picks is still asked is settled in epic 6's refinement (the spine works either way).
