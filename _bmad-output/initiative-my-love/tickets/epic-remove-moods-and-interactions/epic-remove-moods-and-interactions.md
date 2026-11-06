@@ -26,6 +26,7 @@ The app carries no code or data for features the couple no longer uses. Signal: 
 - The hosted database has no mood or interaction rows or tables after the deploy, hosted-only objects included.
 - A device upgraded from the old build keeps no mood or interaction copy, unsent moods included.
 - Partner linking still updates the other partner live.
+- `tests/unit/stores/signOutClearsAccountState.test.ts` is no longer in `excludeGlobs` in `.tea/enforce-config.json`, and the TEA hook reports no H5 for any file it was split into.
 - Shipped to production through `deploy.yml`.
 
 ## Boundaries
@@ -43,3 +44,4 @@ The app carries no code or data for features the couple no longer uses. Signal: 
 - Waits on epic 7 because: the Partner page must stop reading moods and interactions first.
 - Waits on epic 8 because: both change `send-push` and the Settings notifications page.
 - Waits on epic 9 because: both add migrations and regenerate the database types.
+- Decision (2026-11-06): the story that removes the mood and interaction cases from `tests/unit/stores/signOutClearsAccountState.test.ts` also splits that file by subject, so each file it leaves is under the 1,000-line limit of TEA's write-time hook (rule H5, `.claude/hooks/tea-enforce.cjs`; ledger DW-466). The file is 1,069 lines on main and 1,088 once epic 6's cases land, and removing the mood and interaction cases alone would leave it barely under the limit. That story also removes the file from `excludeGlobs` in `.tea/enforce-config.json`, which excludes it from the hook until the split lands.
