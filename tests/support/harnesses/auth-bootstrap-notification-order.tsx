@@ -9,6 +9,7 @@ import { NOTES_CONFIG } from '../../../src/config/images';
 import { anniversariesService } from '../../../src/services/anniversariesService';
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
 import { hasNativeReminders } from '../../../src/services/dateReminders';
+import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { registerLocalCopy } from '../../../src/services/localCopy';
 import {
   REMINDERS_OFF_COPY_KIND,
@@ -99,7 +100,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
   const originalOnAuthStateChange = supabase.auth.onAuthStateChange;
   const originalGetEventsPage = eventsService.getEventsPage;
   const originalFetchAnniversaries = anniversariesService.fetchAnniversaries;
-  const originalSubscribeMoodUpdates = moodSyncService.subscribeMoodUpdates;
+  const originalSubscribePartnerEvents = moodSyncService.subscribePartnerEvents;
   const previousWelcome = localStorage.getItem('lastWelcomeView');
   type LookupResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
   type AuthCallback = (event: AuthChangeEvent, session: Session | null) => void | Promise<void>;
@@ -164,7 +165,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       supabase.auth.onAuthStateChange = originalOnAuthStateChange;
       eventsService.getEventsPage = originalGetEventsPage;
       anniversariesService.fetchAnniversaries = originalFetchAnniversaries;
-      moodSyncService.subscribeMoodUpdates = originalSubscribeMoodUpdates;
+      moodSyncService.subscribePartnerEvents = originalSubscribePartnerEvents;
       restoreCoupleSettingsRefresher?.();
       useAppStore.setState(originalState, true);
       if (previousWelcome === null) localStorage.removeItem('lastWelcomeView');
@@ -213,7 +214,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     // subscribe reads the session -- the very call this harness counts and
     // defers -- and looks the partner up with the fake token, which PostgREST
     // answers with 401.
-    moodSyncService.subscribeMoodUpdates = async () => () => {};
+    moodSyncService.subscribePartnerEvents = async () => () => {};
     // Same reason for the couple-settings refresher, one step earlier: its
     // partner lookup (`lookupPartnerId`) calls supabase.auth.getSession
     // directly — and for the partner, profile, mood-history, interactions,
@@ -230,6 +231,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     const unregisterPartnerNoop = registerLocalCopy(PARTNER_COPY_KIND, async () => {});
     const unregisterRemindersOffNoop = registerLocalCopy(REMINDERS_OFF_COPY_KIND, async () => {});
     const unregisterPushPreferencesNoop = registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, async () => {});
+    const unregisterDailyDaysNoop = registerLocalCopy(DAILY_DAYS_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
       unregisterProfileNoop();
@@ -240,6 +242,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       unregisterPartnerNoop();
       unregisterRemindersOffNoop();
       unregisterPushPreferencesNoop();
+      unregisterDailyDaysNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
       registerLocalCopy(PARTNER_COPY_KIND, () => useAppStore.getState().loadPartner());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
@@ -247,6 +250,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, () =>
         hasNativeReminders() ? useAppStore.getState().loadPushPreferences() : Promise.resolve()
       );
+      registerLocalCopy(DAILY_DAYS_COPY_KIND, () => useAppStore.getState().loadDailyDay());
       registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
       registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {
         if (!useAppStore.getState().userId) return;

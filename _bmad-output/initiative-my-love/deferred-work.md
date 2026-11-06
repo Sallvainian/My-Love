@@ -4034,6 +4034,56 @@ reason: Supabase's API-keys guide (https://supabase.com/docs/guides/api/api-keys
 status: done 2026-11-05
 resolution: both Edge Functions read their key through `supabase/functions/_shared/apiKeys.ts`: the `default` entry of `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` (hosted injects them), falling back to the legacy variable with a logged warning, because the local CLI 2.122.0 injects only the legacy ones (measured on its edge runtime container); `test.yml` runs the new `_shared` Deno tests. A new GitHub secret `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` holds the `sb_publishable_` key and `deploy.yml` and `bundle-size.yml` read it; against hosted the publishable key answers exactly as the legacy anon key did (auth settings 200; the same 42501 on a revoked table). fnox's `SUPABASE_SERVICE_KEY` now holds the `default` `sb_secret_` key, which the auth admin API accepts in both the `apikey` and the `Authorization: Bearer` header the scripts send. After the deploy, 2026-11-05/06: both functions' fresh boots on hosted logged no fallback warning, and the edge logs showed `send-push` under the `sb_secret_` key; the old `VITE_SUPABASE_ANON_KEY` GitHub secret was deleted (`gh secret delete`); the owner's iPhone shell switched to the `sb_publishable_` key once the live update applied (edge logs, grouped by `request.sb.apikey.apikey.prefix`); then the legacy keys were disabled through the Management API (`PUT /v1/projects/{ref}/api-keys/legacy?enabled=false`, 00:51 UTC on 2026-11-06; `enabled=true` reverts it). Checked after: the publishable key answers auth health and a table read with 200, the secret key an admin read with 200, the legacy anon key 401 "Legacy API keys are disabled", the site 200. The partner's shell was still on the pre-deploy build; its first open after the switch can sign it out once before the update applies, which the owner accepted.
 
+### DW-461: E2E workers will share one coach pool, which clearPairDays cannot clear and NO ACTION keeps from being deleted while any day uses a row.
+origin: spec-deferred 0cf81e0eb41d
+location: tests/support/factories/daily-question.ts; supabase/migrations/20261105010000_daily_question_days_and_picks.sql:102
+source_spec: `tickets/epic-daily-question/tickets/story-the-server-assigns-today-s-question-and-releases-a-pick-s-ch-plan.md`
+severity: medium
+reason: Coach rows have a null pair (daily_questions_coach_or_written), so a question one worker inserts is drawn by every worker's pair. clearPairDays deletes only the worker pair's couple_days rows. couple_days.question_id is NO ACTION, so deleting a test coach row raises 23503 while another worker's day still asks it. The row audit cannot see coach rows, which have no user column. Story 12's ticket says "Tests insert their own questions", so its specs meet this under parallel workers and burn-in: flaky question text or a failing teardown. The intent hands test-pool seeding to story 12, so this story ships no seeding helper.
+resolution: `tests/support/factories/daily-question.ts` now exports `ensureTestCoachQuestions(supabaseAdmin)`, which upserts three fixed-uuid coach rows with `ignoreDuplicates` and never deletes them, so no teardown meets the NO ACTION 23503 and every worker's pair draws from the same idempotent pool; a spec asserts that its pages agree with the question read through the admin client (`readPairQuestionTexts`), never a specific text. Used by `tests/e2e/daily/daily-question-pick-and-reveal.spec.ts` (story 6.12), which passed twice in a row on a local stack.
+status: done 2026-11-05
+
+### DW-462: AGENTS.md says useAppStore.ts composes 14 slices; with dailyQuestionSlice it composes 15.
+origin: spec-deferred a1bf1d8a5ceb
+location: AGENTS.md:26
+source_spec: `tickets/epic-daily-question/tickets/story-both-partners-pick-today-s-question-and-see-the-reveal-plan.md`
+severity: low
+reason: `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15 after this change; AGENTS.md line 26 still reads "composes 14 slices". The fix edits an agent-context file, so it is deferred rather than patched.
+status: open
+
+### DW-463: origin/main and this epic each hold a migration at version 20261105010000, so once both reach main the hosted deploy skips one of them.
+origin: spec-deferred f2b78a48ca13
+location: supabase/migrations/20261105010000_daily_question_days_and_picks.sql
+source_spec: `tickets/epic-daily-question/tickets/story-each-partner-s-day-runs-on-their-own-clock-plan.md`
+severity: high
+reason: `git ls-tree --name-only origin/main supabase/migrations/` lists `20261105010000_push_added_dates.sql` (and `20261105020000_remind_me_on_by_default.sql`); this epic's story 6.1 added `20261105010000_daily_question_days_and_picks.sql`. The migration history keys on the version alone, so whichever lands second is recorded as applied without running. Renaming an applied migration is outside this story; the epic PR must renumber the daily one past every main version before merging.
+status: done 2026-11-06
+resolution: renumbered to `20261105030000_daily_question_days_and_picks.sql`, after main's `20261105020000` and before this epic's `20261105210000_daily_question_own_clocks.sql`, which builds on it; the two pgTAP header comments that named the version follow, and the shared local stack's `schema_migrations` row was renamed to match. Done on `loop/integration` between stories 6.2 and the next, with the run stopped.
+
+### DW-464: The partner-connect poke test failed once while the realtime-recovery spec ran beside it.
+origin: spec-deferred d403f1340407
+location: tests/e2e/partner/partner-connect.spec.ts ("a poke reaches each linked partner live")
+source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
+severity: medium (unverified)
+reason: During story 6.6 the implementing agent's first combined run of `tests/e2e/daily/`, `partner-connect.spec.ts`, `realtime-recovery-after-renewal.spec.ts` and `login.spec.ts` (chromium, local stack) failed this test once: no `notification-badge` appeared. It passed in two reruns, and in the parent session's two full runs of the same set. The poke path (`interactionService`'s `postgres_changes` subscription) is not touched by that story, and the test was not run on the baseline, so whether it is a load-dependent flake or something else is unverified. To settle it, run `partner-connect.spec.ts` with `--repeat-each=10` next to the recovery spec on the baseline and on this branch. If it does fail, check whether the poke is inserted before the `postgres_changes` confirmation (the AGENTS.md pitfall), the way the recovery spec guards with POKES_ARMED_LOG.
+status: open
+
+### DW-465: The partner-connect poke test failed once while the realtime-recovery spec ran beside it (ledger DW-464).
+origin: spec-deferred 1e1c7fb40342
+location: tests/e2e/partner/partner-connect.spec.ts
+source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
+severity: medium
+reason: The implementing agent's first combined Playwright run failed "a poke reaches each linked partner live" once (no notification-badge); two reruns and the parent's two full runs passed. The poke path (interactionService postgres_changes) is untouched by this change and the baseline was not run, so it is unverified. Settle it with partner-connect.spec.ts --repeat-each=10 beside the recovery spec on the baseline and on this branch. (declared severity: medium (unverified))
+status: open
+
+### DW-466: 24 existing test-file violations of TEA's write-time hook rules.
+
+origin: installing TEA's write-time enforcement hook (`.claude/hooks/tea-enforce.cjs`, TEA 4.0.0), 2026-11-06
+location: H1 hard waits (`await new Promise((resolve) => setTimeout(resolve, N))`): src/components/MoodTracker/__tests__/MoodTracker.partnerLink.test.tsx:73,161,176; src/services/__tests__/dateReminders.test.ts:1080; src/services/__tests__/pushNotifications.test.ts:284,710; tests/api/push-love-note-trigger.spec.ts:247,446,505,837,908 (3 s each); tests/unit/services/nativeUpdates.test.ts:338; tests/unit/stores/countdownMarks.test.ts:76; tests/unit/stores/dateRemindersAtLaunch.test.ts:668,759,926; tests/unit/stores/pushPreferencesCopy.test.ts:74. H5 over 1,000 lines: src/services/__tests__/dateReminders.test.ts (1205), src/services/__tests__/pushNotifications.test.ts (1239), tests/api/push-love-note-trigger.spec.ts (1060), tests/unit/stores/dateRemindersAtLaunch.test.ts (1324), tests/unit/stores/eventsSlice.test.ts (1254), tests/unit/stores/signOutClearsAccountState.test.ts (1070), tests/e2e-archive/scripture-reflection-original.spec.ts (1155, frozen: never edit)
+severity: low
+reason: The hook's `--pre` blocks only violations a write adds, so these files can still be edited. But `--post` reports the whole file after every edit, and `--stop` sweeps each test file the turn touched and exits 2, so an agent that edits one of them is told to fix the old violations and gets one extra turn before it can stop. That includes a loop session working on something else. Each hard wait should become a wait on the thing it waits for, such as a fake timer, `vi.waitFor` or a polled assertion. Each oversize file should be split by subject. Counts come from running the hook's own `scanFile` over every file its `testGlobs` match.
+status: open
+
 ### DW-480: The date-copy refresh tests still hard-wait 20 ms through `settleMs`, which the H1 regex cannot see.
 origin: DW-466 fix (fix/dw-466-tea-hook-findings), 2026-11-06
 location: tests/unit/stores/dateRemindersAtLaunchFixture.ts (`settleMs`); tests/unit/stores/dateRemindersAtLaunch.triggers.test.ts (14 calls); tests/unit/stores/dateRemindersAtLaunch.test.ts (1 call)

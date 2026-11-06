@@ -5,12 +5,67 @@ import { SupabaseMoodSchema, TimestampSchema, UUIDSchema } from './supabaseSchem
 import type { SupabaseMood } from './supabaseSchemas';
 
 /**
+ * Sent on `mood-updates:<senderId>` by the account that just accepted
+ * `senderId`'s partner request, so the sender's open Partner tab re-reads its
+ * partner instead of showing "Connect" until a reload; see
+ * `moodSyncService.announcePartnerLinked`.
+ *
+ * It rides the sender's own mood topic because that is the one channel an
+ * unlinked account already listens on, and `couple_broadcast_partner_can_send`
+ * lets exactly the new partner publish there the moment the link exists. The
+ * payload is empty and trusted for nothing: it only prompts a server re-read.
+ */
+export const PARTNER_LINKED_EVENT = 'partner_linked';
+
+/**
+ * Sent on `mood-updates:<partnerId>` after a confirmed daily pick. The body is
+ * `{ day_id }` and nothing else: never a choice. The receiver re-reads that
+ * day from the server (architecture AD-11).
+ */
+export const DAILY_PICK_EVENT = 'daily_pick';
+
+/** Sent on `mood-updates:<partnerId>` by `moodSyncService.broadcastMoodToPartner`. */
+export const NEW_MOOD_EVENT = 'new_mood';
+
+/**
+ * Sent on `mood-updates:<partnerId>` by a device that just added, edited or
+ * deleted an event or an anniversary (`moodSyncService.announceDatesChanged`),
+ * so the partner's open app re-reads both instead of showing a date that is
+ * gone until it next loads them. Like PARTNER_LINKED_EVENT, the payload is
+ * empty and trusted for nothing: it only prompts a server re-read, and
+ * `couple_broadcast_partner_can_send` lets only the partner publish on the
+ * topic.
+ */
+export const DATES_CHANGED_EVENT = 'dates_changed';
+
+/** Every event the `mood-updates:<uuid>` channel binds, once each, when it is created. */
+export const PARTNER_EVENTS = [
+  PARTNER_LINKED_EVENT,
+  DAILY_PICK_EVENT,
+  NEW_MOOD_EVENT,
+  DATES_CHANGED_EVENT,
+] as const;
+
+export type PartnerEventName = (typeof PARTNER_EVENTS)[number];
+
+/** A validated partner broadcast. */
+export type PartnerEvent =
+  | { event: typeof PARTNER_LINKED_EVENT }
+  | { event: typeof DAILY_PICK_EVENT; day_id: string }
+  | { event: typeof NEW_MOOD_EVENT; mood: SupabaseMood }
+  | { event: typeof DATES_CHANGED_EVENT };
+
+/**
  * Wire validation for the two couple broadcast topics
  *
  * `love-notes:<uuid>` and `mood-updates:<uuid>` carry client-to-client
- * Realtime broadcasts. RLS on `realtime.messages` decides who may join and who
- * may send, but it says nothing about what a permitted sender puts in the
- * body — and until this module existed both receivers trusted the wire
+ * Realtime broadcasts. `mood-updates:<uuid>` carries one registry of partner
+ * events (`PartnerEvent`: `partner_linked`, `daily_pick`, `new_mood`,
+ * `dates_changed`), and
+ * `parsePartnerEvent` is the one door each of them passes through.
+ *
+ * RLS on `realtime.messages` decides who may join and who may send, but it
+ * says nothing about what a permitted sender puts in the body — and until this module existed both receivers trusted the wire
  * completely: `useRealtimeMessages` destructured `payload.payload.message`
  * straight into `addNote`, and `moodSyncService` hand-built a
  * `SupabaseMoodRecord` field by field with no parse.
@@ -54,6 +109,11 @@ import type { SupabaseMood } from './supabaseSchemas';
  */
 export interface LoveNoteBroadcastIdentity {
   currentUserId: string | null;
+  partnerId: string | null;
+}
+
+/** Identity a partner event is validated against. */
+export interface PartnerEventIdentity {
   partnerId: string | null;
 }
 
@@ -185,4 +245,59 @@ export function parseMoodBroadcast(
   // The sender never puts `updated_at` on the wire; the receiver has always
   // used the creation time in its place.
   return { ...mood, updated_at: mood.updated_at ?? mood.created_at };
+}
+
+/**
+ * Wire schema of a `daily_pick` body. Zod strips unknown keys, so a payload
+ * carrying anything beside `day_id` -- a choice above all -- reaches no
+ * handler with it.
+ */
+export const DailyPickBroadcastSchema = z.object({ day_id: UUIDSchema });
+
+/**
+ * Parse and authorize one partner broadcast, whichever event it is.
+ *
+ * - `partner_linked` and `dates_changed` are always returned: their bodies are
+ *   trusted for nothing, they only prompt a server re-read.
+ * - `new_mood` goes through `parseMoodBroadcast`.
+ * - `daily_pick` needs a known partner (a channel whose account changed is
+ *   muted that way) and a body of `{ day_id: uuid }`. It too only asks for a
+ *   server re-read, so nothing else on the wire is read.
+ *
+ * @param event - The broadcast's event name
+ * @param raw - The broadcast payload, unvalidated
+ * @param identity - The partner snapshot taken at join
+ * @returns The validated event, or `null` if it is unknown, malformed or
+ *   arrived while no partner was known
+ */
+export function parsePartnerEvent(
+  event: string,
+  raw: unknown,
+  identity: PartnerEventIdentity
+): PartnerEvent | null {
+  switch (event) {
+    case PARTNER_LINKED_EVENT:
+      return { event: PARTNER_LINKED_EVENT };
+    case DATES_CHANGED_EVENT:
+      return { event: DATES_CHANGED_EVENT };
+    case NEW_MOOD_EVENT: {
+      const mood = parseMoodBroadcast(raw, identity);
+      return mood ? { event: NEW_MOOD_EVENT, mood } : null;
+    }
+    case DAILY_PICK_EVENT: {
+      if (!identity.partnerId) {
+        logger.debug('[BroadcastValidation] Dropped a daily pick: no partner identity to check against');
+        return null;
+      }
+      const result = DailyPickBroadcastSchema.safeParse(raw);
+      if (!result.success) {
+        logger.debug('[BroadcastValidation] Dropped a malformed daily pick broadcast');
+        return null;
+      }
+      return { event: DAILY_PICK_EVENT, day_id: result.data.day_id };
+    }
+    default:
+      logger.debug('[BroadcastValidation] Dropped a partner broadcast of an unknown event');
+      return null;
+  }
 }

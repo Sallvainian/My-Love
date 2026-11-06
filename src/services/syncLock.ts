@@ -81,3 +81,36 @@ export async function waitForSyncLock(name: string): Promise<void> {
   if (!locks) return;
   await locks.request(name, async () => {});
 }
+
+/**
+ * Held by one `daily-days` copy merge at a time (`dailyDaysCopy.mergeDailyDay`),
+ * across tabs, so two read-modify-write merges never lose one another's entry.
+ */
+export const DAILY_DAYS_LOCK = 'my-love:daily-days';
+
+/** Tail of each name's in-memory queue, for contexts without `navigator.locks`. */
+const waitingChains = new Map<string, Promise<unknown>>();
+
+/**
+ * Run `fn` once every earlier holder of `name` has finished, and return its
+ * result. Unlike `withSyncLock` this never skips: it waits behind the holder,
+ * for a read-modify-write that must not lose a concurrent writer's change.
+ *
+ * Uses `navigator.locks.request(name, fn)` (no `ifAvailable`), so it is
+ * exclusive across tabs. Where `navigator.locks` is missing (happy-dom, an old
+ * browser) it falls back to a per-name promise chain, exclusive within this
+ * context only.
+ */
+export async function withWaitingLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (locks) return locks.request(name, fn);
+
+  const previous = waitingChains.get(name) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  const tail = run.catch(() => {});
+  waitingChains.set(name, tail);
+  void tail.then(() => {
+    if (waitingChains.get(name) === tail) waitingChains.delete(name);
+  });
+  return run;
+}

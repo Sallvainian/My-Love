@@ -81,15 +81,15 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
     async function subscribeToPartnerMoodUpdates() {
       try {
         setConnectionStatus('connecting');
-        const unsubscribeFn = await moodSyncService.subscribeMoodUpdates(
-          (newMood) => {
+        const unsubscribeFn = await moodSyncService.subscribePartnerEvents({
+          new_mood: ({ mood: newMood }) => {
             // Only update if this mood is from our partner
             if (newMood.user_id === partnerId) {
               logger.debug('[usePartnerMood] Received partner mood update:', newMood);
               setPartnerMood(newMood);
             }
           },
-          (status) => {
+          onStatus: (status) => {
             // Update connection status
             if (status === 'SUBSCRIBED') {
               setConnectionStatus('connected');
@@ -103,8 +103,8 @@ export function usePartnerMood(partnerId: string): UsePartnerMoodResult {
               // and a later SUBSCRIBED must not turn it into "no mood logged".
               setError((current) => (current === LOAD_ERROR ? current : REALTIME_LOST_ERROR));
             }
-          }
-        );
+          },
+        });
 
         if (!isMounted) {
           unsubscribeFn();

@@ -33,6 +33,7 @@ export type ViewType =
   | 'photos'
   | 'mood'
   | 'partner'
+  | 'daily'
   | 'notes'
   | 'settings';
 
@@ -81,6 +82,7 @@ const pathMap: Record<ViewType, string> = {
   photos: '/photos',
   mood: '/mood',
   partner: '/partner',
+  daily: '/daily',
   notes: '/notes',
   settings: '/settings',
 };

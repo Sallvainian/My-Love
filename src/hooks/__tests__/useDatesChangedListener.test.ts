@@ -8,7 +8,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('../../api/moodSyncService', () => ({
-  moodSyncService: { subscribeMoodUpdates: vi.fn() },
+  moodSyncService: { subscribePartnerEvents: vi.fn() },
 }));
 
 const state = {
@@ -29,7 +29,7 @@ vi.mock('../../stores/useAppStore', () => {
 import { moodSyncService } from '../../api/moodSyncService';
 import { useDatesChangedListener } from '../useDatesChangedListener';
 
-const subscribe = vi.mocked(moodSyncService.subscribeMoodUpdates);
+const subscribe = vi.mocked(moodSyncService.subscribePartnerEvents);
 
 describe('useDatesChangedListener', () => {
   let release: Mock<() => void>;
@@ -49,10 +49,10 @@ describe('useDatesChangedListener', () => {
   it('re-reads the events and the anniversaries when the partner changes a date', async () => {
     renderHook(() => useDatesChangedListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    const onDatesChanged = subscribe.mock.calls[0][3];
+    const onDatesChanged = subscribe.mock.calls[0][0].dates_changed;
     expect(onDatesChanged).toBeTypeOf('function');
 
-    act(() => onDatesChanged!());
+    act(() => onDatesChanged!({ event: 'dates_changed' }));
 
     expect(state.loadEvents).toHaveBeenCalledTimes(1);
     expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(1);
@@ -73,11 +73,11 @@ describe('useDatesChangedListener', () => {
   it('lets go of the channel on unmount and ignores a late broadcast', async () => {
     const hook = renderHook(() => useDatesChangedListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    const onDatesChanged = subscribe.mock.calls[0][3];
+    const onDatesChanged = subscribe.mock.calls[0][0].dates_changed;
     await act(async () => {});
 
     hook.unmount();
-    act(() => onDatesChanged!());
+    act(() => onDatesChanged!({ event: 'dates_changed' }));
 
     expect(release).toHaveBeenCalledTimes(1);
     expect(state.loadEvents).not.toHaveBeenCalled();
@@ -149,7 +149,7 @@ describe('useDatesChangedListener: what the broadcast cannot reach', () => {
   it('re-reads on a Realtime re-join, not on the first join', async () => {
     const hook = renderHook(() => useDatesChangedListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    const onStatus = subscribe.mock.calls[0][1]!;
+    const onStatus = subscribe.mock.calls[0][0].onStatus!;
 
     act(() => onStatus('SUBSCRIBED'));
     expect(state.loadEvents).not.toHaveBeenCalled();

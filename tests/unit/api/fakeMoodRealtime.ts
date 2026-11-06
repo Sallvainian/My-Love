@@ -24,6 +24,7 @@
  * reassign another module's binding.
  */
 import { type Mock, vi } from 'vitest';
+import type { PartnerEventHandlers, SupabaseMoodRecord } from '@/api/moodSyncService';
 
 type BroadcastHandler = (payload: { payload: Record<string, unknown> }) => void;
 type StatusHandler = (status: string) => void;
@@ -268,6 +269,24 @@ export function moodIdFor(label: string): string {
     moodIds.set(label, id);
   }
   return id;
+}
+
+/**
+ * The handlers a consumer that wants moods, status changes and the
+ * partner-linked prompt passes to `subscribePartnerEvents`. The mood callback
+ * receives the mood record itself, as it did before the registry carried more
+ * than one event.
+ */
+export function moodHandlers(
+  onMood: (mood: SupabaseMoodRecord) => void,
+  onStatus?: (status: string) => void,
+  onPartnerLinked?: () => void
+): PartnerEventHandlers {
+  return {
+    new_mood: ({ mood }) => onMood(mood),
+    onStatus,
+    partner_linked: onPartnerLinked ? () => onPartnerLinked() : undefined,
+  };
 }
 
 /** Resolve the oldest pending getSession with a valid session */

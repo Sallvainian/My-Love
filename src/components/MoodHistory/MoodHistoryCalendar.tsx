@@ -5,13 +5,13 @@ import { moodService } from '../../services/moodService';
 import { useAppStore } from '../../stores/useAppStore';
 import type { MoodEntry } from '../../types';
 import {
-  formatDateKey,
   generateCalendarDays,
   getMonthBoundaries,
   getMonthName,
   navigateToNextMonth,
   navigateToPreviousMonth,
 } from '../../utils/calendarHelpers';
+import { formatDateISO } from '../../utils/dateUtils';
 import { logger } from '../../utils/logger';
 import { CalendarDay } from './CalendarDay';
 import { MoodDetailModal } from './MoodDetailModal';
@@ -349,7 +349,7 @@ export function MoodHistoryCalendar() {
               );
             }
 
-            const dateKey = formatDateKey(day.date);
+            const dateKey = formatDateISO(day.date);
             const mood = moodMap.get(dateKey);
 
             return (
