@@ -5,8 +5,8 @@
  * edits Name, Date, Note and Icon, each on its own one-field page: Save returns
  * to the event page showing the new value, and the server row holds it. `Delete
  * event` asks first: Cancel keeps the event, Delete removes it and lands on the
- * Dates list. A reload on the event page stays on it. The partner's event opens
- * read-only: Date, Note and Icon with no chevrons, and no Delete.
+ * Dates list. A reload on the event page stays on it. The partner's event is
+ * edited and deleted the same way, and stays recorded under the partner.
  *
  * Seeds its own rows through the admin client and deletes only those by id, so
  * the pair's other rows are left alone. Bottom-dock form on a phone viewport, as
@@ -145,7 +145,7 @@ test.describe('Settings > Dates > an event\'s page', () => {
     expect(await row()).toBeUndefined();
   });
 
-  test("[P1] should open the partner's event read-only, with no Delete", async ({
+  test("[P1] should edit and delete the partner's event like an own one", async ({
     page,
     supabaseAdmin,
     interceptNetworkCall,
@@ -161,31 +161,43 @@ test.describe('Settings > Dates > an event\'s page', () => {
       icon: 'plane',
     });
     seededIds.push(id);
+    const row = async () =>
+      (await supabaseAdmin.from('events').select('user_id, description').eq('id', id)).data?.[0];
     await openSettingsFromHome(page, interceptNetworkCall);
 
     // WHEN: its row on the Dates list is tapped
     await page.getByTestId('settings-dates-row').click();
     await page.getByTestId(`settings-dates-event-${id}`).click();
 
-    // THEN: the page shows read-only Date, Note and Icon, with no chevrons, no field rows and no Delete
+    // THEN: the page shows the same editable rows and Delete as an own event
     await expect(page).toHaveURL(new RegExp(`/settings/dates/event/${id}$`));
     await expect(page.getByRole('heading', { level: 1, name: 'Event page partner' })).toBeVisible();
-    await expect(page.getByTestId('settings-event-date-readonly')).toContainText(
-      listDate(localDateFromIso(isoDateDaysFromNow(6, anchor)), new Date())
+    await expect(page.getByTestId('settings-event-name')).toHaveAccessibleName('Name, Event page partner');
+    await expect(page.getByTestId('settings-event-date')).toHaveAccessibleName(
+      `Date, ${listDate(localDateFromIso(isoDateDaysFromNow(6, anchor)), new Date())}`
     );
-    await expect(page.getByTestId('settings-event-note-readonly')).toContainText('Her idea');
-    await expect(page.getByTestId('settings-event-icon-readonly')).toContainText('Plane');
-    // Nothing to press and no chevrons: the only picture is the Icon row's glyph.
-    await expect(page.getByTestId('settings-event-page').locator('button')).toHaveCount(0);
-    await expect(page.getByTestId('settings-event-page').locator('svg')).toHaveCount(1);
-    await expect(page.getByTestId('settings-event-icon-readonly').locator('svg')).toBeVisible();
-    await expect(page.getByTestId('settings-event-name')).toHaveCount(0);
-    await expect(page.getByTestId('settings-event-delete')).toHaveCount(0);
+    await expect(page.getByTestId('settings-event-note')).toHaveAccessibleName('Note, Her idea');
+    await expect(page.getByTestId('settings-event-icon')).toHaveAccessibleName('Icon, Plane');
+    await expect(page.getByTestId('settings-event-delete')).toHaveText('Delete event');
 
-    // WHEN: back is tapped
-    await page.getByRole('button', { name: 'Back' }).click();
+    // WHEN: Note is changed and saved
+    await page.getByTestId('settings-event-note').click();
+    await expect(page).toHaveURL(new RegExp(`/settings/dates/event/${id}/note$`));
+    await page.getByTestId('settings-event-note-field').fill('Our idea');
+    await page.getByTestId('settings-field-save').click();
 
-    // THEN: the Dates list, one level up
+    // THEN: the row reads the new note, and the server holds it under the partner still
+    await expect(page).toHaveURL(new RegExp(`/settings/dates/event/${id}$`));
+    await expect(page.getByTestId('settings-event-note')).toHaveAccessibleName('Note, Our idea');
+    expect(await row()).toEqual({ user_id: partnerId, description: 'Our idea' });
+
+    // WHEN: Delete event is tapped and Delete confirmed
+    await page.getByTestId('settings-event-delete').click();
+    await page.getByTestId('settings-event-delete-confirmation-confirm').click();
+
+    // THEN: the Dates list, without the event, and the server row is gone
     await expect(page).toHaveURL(/\/settings\/dates$/);
+    await expect(page.getByTestId(`settings-dates-event-${id}`)).toHaveCount(0);
+    expect(await row()).toBeUndefined();
   });
 });

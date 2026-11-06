@@ -234,7 +234,7 @@ export async function readSavedCountdownMarks(userId: string): Promise<string[] 
   return parseSavedCountdownMarks(await readLocalCopy<unknown>(userId, COUNTDOWN_MARKS_COPY_KIND));
 }
 
-const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true });
+const AnniversaryInputSchema = AnniversarySchema.omit({ id: true, serverId: true, userId: true });
 
 /** Validate a form's anniversary before it is sent, with the form's error shape. */
 function parseAnniversaryInput(input: AnniversaryInput): AnniversaryInput {
@@ -253,6 +253,7 @@ function toMirrored(id: number, row: ServerAnniversary): Anniversary {
     label: row.label,
     ...(row.description ? { description: row.description } : {}),
     serverId: row.serverId,
+    userId: row.userId,
   };
 }
 
@@ -457,7 +458,7 @@ export const createDatesSlice: AppStateCreator<DatesSlice> = (set, get, _api) =>
       try {
         let applied = false;
         await serializeAccountDataWrite(async () => {
-          const rows = await anniversariesService.fetchAnniversaries(requestedBy);
+          const rows = await anniversariesService.fetchAnniversaries();
           if (!isCurrent()) return;
           set((state) => {
             if (!state.settings) return {};

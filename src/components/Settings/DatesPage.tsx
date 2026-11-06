@@ -5,7 +5,7 @@
  * The row is a label and a chevron, no value. The page lists every date in one
  * place, each row with its date on the right, in the groups Together (Together
  * since, Wedding), Birthdays (yours, then the partner's), Events (upcoming,
- * soonest first), Anniversaries (your own) and Past (past events, newest
+ * soonest first), Anniversaries (both partners') and Past (past events, newest
  * first, ending in a `Load more` row while either window has more). A group
  * with no rows is absent with its label. Everything is read from the store
  * slices that already hold it; the page writes nothing.
@@ -14,9 +14,11 @@
  * yet with a partner), and the partner's birthday row whenever a partner is
  * known; an unset couple date reads `Not set` and its target is the date's
  * one-field page (`…/date`), while a value not known yet is left empty, never
- * `Loading...`. Events are narrowed to the account's own only on a confirmed
- * unlinked answer (`partnerKnown`, no partner, no `partnerLoadError`), since a
- * saved copy could still hold a former partner's rows.
+ * `Loading...`. Events and anniversaries are narrowed to the account's own
+ * only on a confirmed unlinked answer (`partnerKnown`, no partner, no
+ * `partnerLoadError`), since a saved copy could still hold a former partner's
+ * rows (an anniversary saved before they were shared carries no owner and is
+ * the account's own).
  *
  * Settings does not refresh events (the `events` refresher skips this view), so
  * the page loads them on mount and on each connectivity change, as Home does;
@@ -24,7 +26,9 @@
  * A return to the list (back from a date's page or a form) keeps the store's
  * window when it holds a server page and no refresh was skipped meanwhile
  * (`eventsStale`), so a date just added beyond what a load reads stays listed
- * (a load itself keeps the rows `Load more` reached).
+ * (a load itself keeps the rows `Load more` reached). Anniversaries are read
+ * on mount and on each connectivity change too, every time: their read is not
+ * paged and keeps each row's local id, so it never drops a row just added.
  * `Load more` appends in place; its failure (or the offline refusal) keeps the
  * rows and shows its message in the Error box until the next `Load more` or
  * until the page is left.
@@ -91,6 +95,7 @@ export function DatesPage() {
   const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   const coupleSettings = useAppStore((s) => s.coupleSettings);
   const anniversaries = useAppStore((s) => s.settings?.relationship.anniversaries);
+  const loadAnniversariesFromServer = useAppStore((s) => s.loadAnniversariesFromServer);
   const ownProfile = useAppStore((s) => s.ownProfile);
   const partner = useAppStore((s) => s.partner);
   const partnerKnown = useAppStore((s) => s.partnerKnown);
@@ -152,6 +157,13 @@ export function DatesPage() {
     void loadEvents();
   }, [eventsStale, eventsIsLoading, isOnline, userId, loadEvents]);
 
+  // Anniversaries are not refreshed while Settings is open either, so the page
+  // asks for them on mount and on each connectivity change, as it does events.
+  useEffect(() => {
+    if (!userId) return;
+    void loadAnniversariesFromServer();
+  }, [userId, authSessionVersion, isOnline, loadAnniversariesFromServer]);
+
   const handleLoadMore = async () => {
     setLoadMoreError(null);
     const result = await loadMoreEvents();
@@ -189,6 +201,9 @@ export function DatesPage() {
     coupleSettings?.status === 'linked' || (coupleSettings === null && partner !== null);
   const confirmedUnlinked = partnerKnown && partner === null && !partnerLoadError;
   const visibleEvents = confirmedUnlinked ? events.filter((event) => event.userId === userId) : events;
+  const visibleAnniversaries = confirmedUnlinked
+    ? anniversaries?.filter((anniversary) => !anniversary.userId || anniversary.userId === userId)
+    : anniversaries;
   // Soonest first as the store keeps them; today counts as upcoming, as on Home.
   const upcoming = visibleEvents.filter((event) => getCalendarDaysDiff(event.date, now) >= 0);
   const past = visibleEvents.filter((event) => getCalendarDaysDiff(event.date, now) < 0).reverse();
@@ -273,7 +288,7 @@ export function DatesPage() {
       </SettingsGroup>
 
       <SettingsGroup label="Anniversaries" testId="settings-dates-anniversaries">
-        {anniversaries?.map((anniversary) => {
+        {visibleAnniversaries?.map((anniversary) => {
           const key = anniversary.serverId ?? String(anniversary.id);
           return (
             <SettingsRow

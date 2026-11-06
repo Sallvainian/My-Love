@@ -53,6 +53,7 @@ export interface Anniversary {
   label: string;
   description?: string;
   serverId?: string; // `public.anniversaries.id`
+  userId?: string; // The owner's id; absent on a copy saved before partners shared anniversaries, which held only the reader's own
 }
 
 export interface MoodEntry {

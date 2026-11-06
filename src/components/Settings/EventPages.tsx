@@ -5,16 +5,15 @@
  * `resolveSettingsPage` and titles the page with the event's name (`Event`
  * until the store holds it).
  *
- * An own event's page lists Name, Date, Note and Icon (each opens its field
- * page; the Icon row shows the event's glyph in accent, as a partner's
- * read-only Icon row does, and its page is
+ * An event's page lists Name, Date, Note and Icon (each opens its field
+ * page; the Icon row shows the event's glyph in accent, and its page is
  * `IconPicker`, the New event form's three tiles), then Remind me while the event is upcoming (today counts as upcoming,
  * as on the Dates list), then `Delete event` centered and danger, alone in its
  * own card. It asks first (`useDateDelete`, shared with the anniversary
  * page); offline it refuses before the dialog, with `offlineMessage('Events', 'delete')` in the page's Error box,
- * and a delete that fails shows its message there and re-enables the row. A
- * partner's event is read-only (Date, Note and Icon rows without chevrons, no
- * Delete, no footnote) and still has Remind me while upcoming. Past events
+ * and a delete that fails shows its message there and re-enables the row.
+ * Either partner edits and deletes any event, theirs or the other's, the same
+ * way; the event stays recorded under the person who added it. Past events
  * have no Remind me, since a reminder for a past date can never fire.
  *
  * Settings does not refresh events, so an event page whose event the store
@@ -32,7 +31,7 @@
  * event from the store before it resolves.
  *
  * The field pages are `OneFieldPage`s registered with `reloadsToParent`, and
- * write through `editEvent`; a partner's or unknown event gets no field.
+ * write through `editEvent`; an unknown event gets no field.
  * The limits mirror the table's CHECK constraints: a name of 1 to 100 and a
  * note of at most 500 code points.
  *
@@ -58,7 +57,7 @@ import { useFallBackToDates } from './dateNavigation';
 import { RemindMeGroup } from './RemindMe';
 import { FIELD_CLASS, NOTE_FIELD_CLASS, formatListDate } from './settingsFields';
 import { OneFieldPage } from './stack/OneFieldPage';
-import { ReadOnlyRow, SettingsGroup, SettingsRow } from './stack/SettingsRows';
+import { SettingsGroup, SettingsRow } from './stack/SettingsRows';
 import { ROW_BUTTON } from './SwitchRow';
 import { useDateDelete } from './useDateDelete';
 
@@ -219,87 +218,60 @@ export function EventPage({ eventId }: EventPageProps) {
   if (!event) return null;
 
   const now = new Date();
-  const own = event.userId === userId;
   const upcoming = getCalendarDaysDiff(event.date, now) >= 0;
   const target = (field: EventField) => `dates/event/${event.id}/${field}`;
 
   return (
     <DatePage testId="settings-event-page" error={error}>
-      {own ? (
-        <SettingsGroup>
-          <SettingsRow
-            key="name"
-            label="Name"
-            value={event.label}
-            truncateValue
-            target={target('name')}
-            testId="settings-event-name"
-          />
-          <SettingsRow
-            key="date"
-            label="Date"
-            value={formatListDate(event.date, now)}
-            target={target('date')}
-            testId="settings-event-date"
-          />
-          <SettingsRow
-            key="note"
-            label="Note"
-            value={event.description ?? ''}
-            truncateValue
-            target={target('note')}
-            testId="settings-event-note"
-          />
-          <SettingsRow
-            key="icon"
-            label="Icon"
-            value={iconLabel(event.icon)}
-            valueIcon={iconGlyph(event.icon)}
-            target={target('icon')}
-            testId="settings-event-icon"
-          />
-        </SettingsGroup>
-      ) : (
-        <SettingsGroup>
-          <ReadOnlyRow
-            key="date"
-            label="Date"
-            value={formatListDate(event.date, now)}
-            testId="settings-event-date-readonly"
-          />
-          <ReadOnlyRow
-            key="note"
-            label="Note"
-            value={event.description ?? ''}
-            testId="settings-event-note-readonly"
-          />
-          <ReadOnlyRow
-            key="icon"
-            label="Icon"
-            value={iconLabel(event.icon)}
-            valueIcon={iconGlyph(event.icon)}
-            testId="settings-event-icon-readonly"
-          />
-        </SettingsGroup>
-      )}
+      <SettingsGroup>
+        <SettingsRow
+          key="name"
+          label="Name"
+          value={event.label}
+          truncateValue
+          target={target('name')}
+          testId="settings-event-name"
+        />
+        <SettingsRow
+          key="date"
+          label="Date"
+          value={formatListDate(event.date, now)}
+          target={target('date')}
+          testId="settings-event-date"
+        />
+        <SettingsRow
+          key="note"
+          label="Note"
+          value={event.description ?? ''}
+          truncateValue
+          target={target('note')}
+          testId="settings-event-note"
+        />
+        <SettingsRow
+          key="icon"
+          label="Icon"
+          value={iconLabel(event.icon)}
+          valueIcon={iconGlyph(event.icon)}
+          target={target('icon')}
+          testId="settings-event-icon"
+        />
+      </SettingsGroup>
 
       {upcoming && <RemindMeGroup markKey={MARK_KEYS.event(event.id)} onError={setError} />}
 
-      {own && (
-        <SettingsGroup>
-          <button
-            key="delete"
-            type="button"
-            onClick={requestDelete}
-            disabled={deleting}
-            className={`${ROW_BUTTON} justify-center text-[15px] font-medium text-danger
-              disabled:cursor-not-allowed disabled:opacity-60`}
-            data-testid="settings-event-delete"
-          >
-            Delete event
-          </button>
-        </SettingsGroup>
-      )}
+      <SettingsGroup>
+        <button
+          key="delete"
+          type="button"
+          onClick={requestDelete}
+          disabled={deleting}
+          className={`${ROW_BUTTON} justify-center text-[15px] font-medium text-danger
+            disabled:cursor-not-allowed disabled:opacity-60`}
+          data-testid="settings-event-delete"
+        >
+          Delete event
+        </button>
+      </SettingsGroup>
 
       {confirmation}
     </DatePage>
@@ -321,12 +293,11 @@ interface EventFieldPageProps extends EventPageProps {
 }
 
 export function EventFieldPage({ eventId, field }: EventFieldPageProps) {
-  const userId = useAppStore((s) => s.userId);
   const event = useAppStore((s) => s.events.find((candidate) => candidate.id === eventId));
   const editEvent = useAppStore((s) => s.editEvent);
 
-  // A partner's or unknown event has no field to edit.
-  if (!event || event.userId !== userId) return null;
+  // An unknown event has no field to edit.
+  if (!event) return null;
 
   const offlineRefusal = offlineMessage('Events');
 

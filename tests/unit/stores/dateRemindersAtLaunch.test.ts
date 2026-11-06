@@ -796,6 +796,7 @@ describe('startDateReminderTriggers', () => {
   it('re-plans with an own edit: a real addAnniversary writes its copy and the plan includes it', async () => {
     vi.spyOn(anniversariesService, 'createAnniversary').mockResolvedValue({
       serverId: 'ann-new',
+      userId: A,
       date: '2022-11-04',
       label: 'Picnic',
     });

@@ -559,7 +559,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   },
 
   /**
-   * Edit one of the user's own events. A rejected or zero-row write throws in
+   * Edit one of the couple's events, either partner's. A rejected or zero-row write throws in
    * the service, so `events` is left exactly as it was.
    */
   editEvent: async (eventId: string, updates: EventUpdateInput) => {
@@ -592,7 +592,7 @@ export const createEventsSlice: AppStateCreator<EventsSlice> = (set, get, _api) 
   },
 
   /**
-   * Delete one of the user's own events.
+   * Delete one of the couple's events, either partner's.
    */
   removeEvent: async (eventId: string) => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();

@@ -1,15 +1,18 @@
--- Couple-shared events (EV-DB-001 .. 036)
+-- Couple-shared events (EV-DB-001 .. 038)
 --
--- The property under test: creator-only writes, both partners read. The
--- privilege layer cannot back this up -- UPDATE and DELETE must be granted for
--- the creator to use them, and a grant cannot distinguish creator from partner
--- -- so the four policy predicates pinned here are the entire security model
--- (20260818000002_create_events_table.sql).
+-- The property under test: both partners read, edit and delete every event;
+-- only the creator inserts under their own id, and no one changes a row's
+-- user_id. The privilege layer cannot back this up -- UPDATE and DELETE must be
+-- granted for the couple to use them, and a grant cannot tell the couple from
+-- a stranger -- so the four policy predicates pinned here and the
+-- keep_date_owner() trigger are the entire security model
+-- (20260818000002_create_events_table.sql,
+-- 20261105000000_partners_share_events_and_anniversaries.sql).
 --
--- The partner-write cases assert ROW COUNTS, not throws_ok: measured against
--- this project's stack, a partner's UPDATE or DELETE of the creator's row is
+-- The write cases assert ROW COUNTS, not throws_ok: measured against this
+-- project's stack, a stranger's UPDATE or DELETE of the couple's row is
 -- silently filtered to zero rows rather than raising, while a forged INSERT
--- and a row-donating UPDATE raise 42501.
+-- and a user_id rewrite raise 42501.
 --
 -- Helpers are declared inline rather than pulled from 00_helpers.sql: that file
 -- creates its schema inside a transaction that rolls back, so the objects do
@@ -17,7 +20,7 @@
 
 begin;
 
-select plan(36);
+select plan(38);
 
 create schema if not exists tests;
 
@@ -105,7 +108,7 @@ select is(
 select col_is_pk('public', 'events', 'id',
   'EV-DB-003: id is the primary key');
 
--- Exact set: the grants cannot express creator-only, so a fifth policy or a
+-- Exact set: the grants cannot express couple-only, so a fifth policy or a
 -- rename here is the only early warning that the security model moved.
 select policies_are('public', 'events',
   array['events_select', 'events_insert', 'events_update', 'events_delete'],
@@ -224,7 +227,7 @@ select is(
   'EV-DB-023: an unlinked user reads their own rows only');
 
 -- ---------------------------------------------------------------------------
--- Partner write: silently filtered to zero rows, no error
+-- Partner write: the creator's partner edits and deletes the creator's rows
 -- ---------------------------------------------------------------------------
 
 select tests.be_postgres();
@@ -233,7 +236,7 @@ do $$
 declare v_rows int;
 begin
   perform tests.authenticate_as(current_setting('tests.b')::uuid);
-  update public.events set label = 'hijacked'
+  update public.events set label = 'visit to boston'
    where id = 'e0000000-0000-0000-0000-0000000000aa';
   get diagnostics v_rows = row_count;
   perform tests.be_postgres();
@@ -243,21 +246,23 @@ $$;
 
 select is(
   current_setting('tests.ev_rows_partner_update')::int,
-  0,
-  'EV-DB-024: a partner''s UPDATE of the creator''s row affects zero rows');
+  1,
+  'EV-DB-024: a partner''s UPDATE of the creator''s row affects that row');
 
 select is(
-  (select label from public.events
+  (select label || ' / ' || user_id::text from public.events
     where id = 'e0000000-0000-0000-0000-0000000000aa'),
-  'visit to new york',
-  'EV-DB-025: the creator''s row is unchanged after the partner''s UPDATE attempt');
+  'visit to boston / ' || current_setting('tests.a'),
+  'EV-DB-025: the partner''s edit lands and the row stays the creator''s');
 
+-- A deletes B's event: deletion works in both directions, and A's own row is
+-- kept for the cases below.
 do $$
 declare v_rows int;
 begin
-  perform tests.authenticate_as(current_setting('tests.b')::uuid);
+  perform tests.authenticate_as(current_setting('tests.a')::uuid);
   delete from public.events
-   where id = 'e0000000-0000-0000-0000-0000000000aa';
+   where id = 'e0000000-0000-0000-0000-0000000000bb';
   get diagnostics v_rows = row_count;
   perform tests.be_postgres();
   perform set_config('tests.ev_rows_partner_delete', v_rows::text, false);
@@ -266,17 +271,47 @@ $$;
 
 select is(
   current_setting('tests.ev_rows_partner_delete')::int,
-  0,
-  'EV-DB-026: a partner''s DELETE of the creator''s row affects zero rows');
+  1,
+  'EV-DB-026: a partner''s DELETE of the other partner''s row affects that row');
 
 select is(
   (select count(*)::int from public.events
-    where id = 'e0000000-0000-0000-0000-0000000000aa'),
-  1,
-  'EV-DB-027: the creator''s row survives the partner''s DELETE attempt');
+    where id = 'e0000000-0000-0000-0000-0000000000bb'),
+  0,
+  'EV-DB-027: the row is gone after the partner''s DELETE');
 
 -- ---------------------------------------------------------------------------
--- What does raise: forged insert and row donation
+-- Stranger write: silently filtered to zero rows, no error
+-- ---------------------------------------------------------------------------
+
+do $$
+declare v_updated int; v_deleted int;
+begin
+  perform tests.authenticate_as(current_setting('tests.c')::uuid);
+  update public.events set label = 'hijacked'
+   where id = 'e0000000-0000-0000-0000-0000000000aa';
+  get diagnostics v_updated = row_count;
+  delete from public.events
+   where id = 'e0000000-0000-0000-0000-0000000000aa';
+  get diagnostics v_deleted = row_count;
+  perform tests.be_postgres();
+  perform set_config('tests.ev_rows_stranger_update', v_updated::text, false);
+  perform set_config('tests.ev_rows_stranger_delete', v_deleted::text, false);
+end
+$$;
+
+select is(
+  current_setting('tests.ev_rows_stranger_update')::int,
+  0,
+  'EV-DB-037: a stranger''s UPDATE of the couple''s row affects zero rows');
+
+select is(
+  current_setting('tests.ev_rows_stranger_delete')::int,
+  0,
+  'EV-DB-038: a stranger''s DELETE of the couple''s row affects zero rows');
+
+-- ---------------------------------------------------------------------------
+-- What does raise: forged insert and a user_id rewrite
 -- ---------------------------------------------------------------------------
 
 select tests.authenticate_as(current_setting('tests.b')::uuid);
@@ -289,8 +324,8 @@ select throws_ok(
   'new row violates row-level security policy for table "events"',
   'EV-DB-028: a user cannot insert an event under their partner''s user_id');
 
--- The UPDATE policy's WITH CHECK is what refuses this; without it Postgres
--- reuses USING as the check and the donation would succeed.
+-- WITH CHECK now admits either partner's id, so keep_date_owner() is what
+-- refuses this; without it the row would move to the partner.
 select tests.authenticate_as(current_setting('tests.a')::uuid);
 
 select throws_ok(
@@ -298,7 +333,7 @@ select throws_ok(
             where id = 'e0000000-0000-0000-0000-0000000000aa'$$,
          current_setting('tests.b')),
   '42501',
-  'new row violates row-level security policy for table "events"',
+  'A date keeps the person who added it',
   'EV-DB-029: a creator cannot donate a row by rewriting user_id to their partner''s');
 
 -- ---------------------------------------------------------------------------
@@ -332,7 +367,7 @@ select throws_ok(
   'EV-DB-032: a description over 500 characters is rejected by the CHECK');
 
 -- ---------------------------------------------------------------------------
--- The creator's own writes still work, so the policies are not just deny-all
+-- The creator's own writes still work
 -- ---------------------------------------------------------------------------
 
 select tests.be_postgres();

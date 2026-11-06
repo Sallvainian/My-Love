@@ -6,7 +6,8 @@
  * the anniversary page showing the new value, and the server row holds it. A
  * reload on the page stays on it. `Delete anniversary` asks first: Cancel keeps
  * the anniversary, Delete removes it and lands on the Dates list. An
- * anniversary the partner owns is never listed on the reader's Dates list.
+ * anniversary the partner owns is listed too, and is edited and deleted the
+ * same way, staying recorded under the partner.
  *
  * Seeds its own rows through the admin client and deletes only those by id, so
  * the pair's other rows are left alone. Bottom-dock form on a phone viewport,
@@ -77,12 +78,12 @@ test.describe("Settings > Dates > an anniversary's page", () => {
     // WHEN: the Dates list is opened
     await page.getByTestId('settings-dates-row').click();
 
-    // THEN: the own anniversary is listed and the partner's never is
+    // THEN: the own anniversary and the partner's are both listed
     const anniversaries = page.getByTestId('settings-dates-anniversaries');
     await expect(anniversaries).toContainText(label);
-    await expect(anniversaries).not.toContainText(partnerLabel);
+    await expect(anniversaries).toContainText(partnerLabel);
     await expect(page.getByTestId(`settings-dates-anniversary-${id}`)).toBeVisible();
-    await expect(page.getByText(partnerLabel)).toHaveCount(0);
+    await expect(page.getByTestId(`settings-dates-anniversary-${theirs!.id}`)).toBeVisible();
 
     // WHEN: the anniversary's row is tapped
     await page.getByTestId(`settings-dates-anniversary-${id}`).click();
@@ -161,6 +162,62 @@ test.describe("Settings > Dates > an anniversary's page", () => {
     // THEN: the app is on the Dates list, the anniversary is gone from it and from the server
     await expect(page).toHaveURL(/\/settings\/dates$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
+    await expect(page.getByTestId(`settings-dates-anniversary-${id}`)).toHaveCount(0);
+    expect(await row()).toBeUndefined();
+  });
+  test("[P1] should edit and delete the partner's anniversary like an own one", async ({
+    page,
+    supabaseAdmin,
+    interceptNetworkCall,
+  }, testInfo) => {
+    // GIVEN: an anniversary the partner made
+    const { partnerId } = await resolveOwnPair(supabaseAdmin);
+    const label = `Anniv theirs ${testInfo.workerIndex}-${Date.now()}`;
+    const { data: theirs, error } = await supabaseAdmin
+      .from('anniversaries')
+      .insert({ user_id: partnerId, event_date: '2021-09-09', label, description: 'Her pick' })
+      .select('id')
+      .single();
+    expect(error).toBeNull();
+    const id = theirs!.id;
+    seededIds.push(id);
+    const row = async () => {
+      const { data, error: readError } = await supabaseAdmin
+        .from('anniversaries')
+        .select('user_id, description')
+        .eq('id', id);
+      if (readError) throw new Error(`Could not read the anniversary row: ${readError.message}`);
+      return data[0];
+    };
+    await openSettingsFromHome(page, interceptNetworkCall);
+
+    // WHEN: its row on the Dates list is tapped
+    await page.getByTestId('settings-dates-row').click();
+    await page.getByTestId(`settings-dates-anniversary-${id}`).click();
+
+    // THEN: the page shows the same editable rows and Delete as an own anniversary
+    await expect(page).toHaveURL(new RegExp(`/settings/dates/anniversary/${id}$`));
+    await expect(page.getByRole('heading', { level: 1, name: label })).toBeVisible();
+    await expect(page.getByTestId('settings-anniversary-name')).toHaveAccessibleName(`Name, ${label}`);
+    await expect(page.getByTestId('settings-anniversary-note')).toHaveAccessibleName('Note, Her pick');
+    await expect(page.getByTestId('settings-anniversary-delete')).toHaveText('Delete anniversary');
+
+    // WHEN: Note is changed and saved
+    await page.getByTestId('settings-anniversary-note').click();
+    await page.getByTestId('settings-anniversary-note-field').fill('Our pick');
+    await page.getByTestId('settings-field-save').click();
+
+    // THEN: the row reads the new note, and the server holds it under the partner still
+    await expect(page).toHaveURL(new RegExp(`/settings/dates/anniversary/${id}$`));
+    await expect(page.getByTestId('settings-anniversary-note')).toHaveAccessibleName('Note, Our pick');
+    expect(await row()).toEqual({ user_id: partnerId, description: 'Our pick' });
+
+    // WHEN: Delete anniversary is tapped and Delete confirmed
+    await page.getByTestId('settings-anniversary-delete').click();
+    await page.getByTestId('settings-anniversary-delete-confirmation-confirm').click();
+
+    // THEN: the Dates list, without it, and the server row is gone
+    await expect(page).toHaveURL(/\/settings\/dates$/);
     await expect(page.getByTestId(`settings-dates-anniversary-${id}`)).toHaveCount(0);
     expect(await row()).toBeUndefined();
   });

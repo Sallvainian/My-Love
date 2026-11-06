@@ -108,7 +108,7 @@ test.describe('Settings > Dates > adding a date', () => {
     await navigateTo(page, 'home');
     await expect(page.getByTestId('countdown-timer').getByText(label)).toBeVisible();
 
-    // THEN: the partner's Dates list never shows it (anniversaries are private)
+    // THEN: the partner's Dates list shows it too (anniversaries are shared, as events are)
     const pair = getWorkerPairEmails();
     if (!pair) throw new Error('This test requires its worker-owned account pair');
     const baseURL = testInfo.project.use.baseURL ?? 'http://localhost:5173';
@@ -131,8 +131,7 @@ test.describe('Settings > Dates > adding a date', () => {
     await partnerPage.getByTestId('password-input').fill(TEST_USER_PASSWORD);
     await partnerPage.getByTestId('submit-button').click();
     await expect(partnerPage.getByTestId('app-container')).toBeVisible();
-    // The partner's own anniversaries read answers before the absence is
-    // asserted, so it is a real absence and not an assertion that beat the fetch.
+    // The partner's anniversaries read answers before the row is looked for.
     const partnerRead = observeOn({
       page: partnerPage,
       method: 'GET',
@@ -144,7 +143,7 @@ test.describe('Settings > Dates > adding a date', () => {
     await expect(partnerPage.getByTestId('settings-dates-birthdays')).toBeVisible();
     await expect(
       partnerPage.locator('[data-testid^="settings-dates-anniversary-"]').filter({ hasText: label })
-    ).toHaveCount(0);
+    ).toHaveCount(1);
   });
 
   test('[P1] should create nothing when Cancel is tapped on either form', async ({

@@ -126,7 +126,7 @@ describe('request bounds', () => {
   const signalOf = (index = 0) => argsOf('abortSignal', index)?.[0];
 
   it.each([
-    ['fetchAnniversaries', () => anniversariesService.fetchAnniversaries(A), { data: [], error: null }],
+    ['fetchAnniversaries', () => anniversariesService.fetchAnniversaries(), { data: [], error: null }],
     ['updateAnniversary', () => anniversariesService.updateAnniversary('ann-1', anniversaryInput()),
       { data: [anniversaryRow], error: null }],
     ['deleteAnniversary', () => anniversariesService.deleteAnniversary('ann-1'), { data: null, error: null }],
@@ -161,13 +161,14 @@ describe('request bounds', () => {
 });
 
 describe('anniversariesService', () => {
-  it('reads only the caller’s rows, as bare date strings, soonest first', async () => {
+  it('reads every row RLS lets the couple see, with its owner, as bare date strings, soonest first', async () => {
     results.push({ data: [anniversaryRow, { ...anniversaryRow, id: 'bad', event_date: 'infinity' }], error: null });
 
-    const rows = await anniversariesService.fetchAnniversaries(A);
+    const rows = await anniversariesService.fetchAnniversaries();
 
-    expect(rows).toEqual([{ serverId: 'ann-1', date: '2024-02-14', label: 'First date' }]);
-    expect(argsOf('eq')).toEqual(['user_id', A]);
+    expect(rows).toEqual([{ serverId: 'ann-1', userId: A, date: '2024-02-14', label: 'First date' }]);
+    // No owner filter: the partner's anniversaries come back too.
+    expect(argsOf('eq')).toBeUndefined();
     expect(argsOf('order')).toEqual(['event_date', { ascending: true }]);
   });
 
@@ -180,7 +181,13 @@ describe('anniversariesService', () => {
       'k-1'
     );
 
-    expect(created).toEqual({ serverId: 'ann-1', date: '2024-02-14', label: 'First date', description: 'dinner' });
+    expect(created).toEqual({
+      serverId: 'ann-1',
+      userId: A,
+      date: '2024-02-14',
+      label: 'First date',
+      description: 'dinner',
+    });
     expect(argsOf('upsert')).toEqual([
       { user_id: A, event_date: '2024-02-14', label: 'First date', description: 'dinner', client_key: 'k-1' },
       { onConflict: 'user_id,client_key', ignoreDuplicates: true },

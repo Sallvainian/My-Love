@@ -116,6 +116,9 @@ export const AnniversarySchema = z.object({
   // Optional, so a blob persisted before anniversaries moved to Supabase still
   // parses: a failed SettingsSchema parse drops ALL persisted settings.
   serverId: z.string().optional(),
+  // The owner's id. Optional for the same reason: a copy saved before
+  // anniversaries were shared with the partner holds only the reader's own.
+  userId: z.string().optional(),
 });
 
 /**

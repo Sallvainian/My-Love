@@ -8,7 +8,7 @@
  * Produced by the story-5 ATDD run (spec-dynamic-events, "Manage events in
  * Settings") and activated under the configured runner by DW-30.
  *
- * Test-design IDs covered: DE.5-API-001, DE.5-API-002, DE.5-API-003.
+ * Test-design IDs covered: DE.5-API-001, DE.5-API-002, DE.5-API-003, DE.5-API-004.
  * Those three IDs are new. `_bmad-output/test-artifacts/test-design-epic-5.md:288-290`
  * fixes the convention as `DE.5-<LEVEL>-<SEQ>` and lists levels `DB`, `UNIT`,
  * `COMP`, `E2E` — `API` is an extension introduced by this ATDD run and is not
@@ -52,6 +52,13 @@
  * Content and this file would be measuring a shape the service never sees. A
  * headerless write answers 204; that is deliberately not the shape under
  * test here.
+ *
+ * 2026-11-05: partners now edit and delete each other's events
+ * (`20261105000000_partners_share_events_and_anniversaries.sql`), so DE.5-API-001
+ * and -002 measure the partner's PATCH and DELETE succeeding with the one row,
+ * which stays the creator's; DE.5-API-004 keeps the zero-row shape measured, on
+ * an id that matches no row, which is what `eventsService`'s
+ * `data.length === 0` branch still reads.
  *
  * Isolation: rows belong to this worker's own pair only, resolved through
  * `getWorkerPairEmails()` (keyed on `TEST_PARALLEL_INDEX`, never
@@ -101,7 +108,7 @@ type EventRow = {
  * that a row created here must never shadow.
  */
 const SEEDED_LABEL = 'Events API Seeded Trip';
-const PARTNER_ATTEMPT_LABEL = 'Events API Partner Overwrite';
+const PARTNER_EDIT_LABEL = 'Events API Partner Edit';
 const CREATOR_EDIT_LABEL = 'Events API Creator Voyage';
 
 /**
@@ -137,15 +144,15 @@ async function seedCreatorEvent(
 test.describe('Events write wire shape over PostgREST — story 5', () => {
   // ==========================================================================
   // DE.5-API-001
-  // Risk: R-005. Precondition for `eventsService.updateEvent`'s
-  // `'Event not found or not yours to edit'` (src/services/eventsService.ts:400-414).
+  // The partner edits the creator's event: the one row comes back, edited, and
+  // still the creator's.
   // ==========================================================================
-  test('[P1] DE.5-API-001 a partner PATCH on the creator\'s event returns 200 with zero rows, not an error', async ({
+  test('[P1] DE.5-API-001 a partner PATCH on the creator\'s event returns 200 with the edited row, still the creator\'s', async ({
     supabaseAdmin,
     apiRequest,
     cleanup,
   }) => {
-    const { partnerId, eventId, seededDate } = await seedCreatorEvent(supabaseAdmin, cleanup, 30);
+    const { userId, partnerId, eventId, seededDate } = await seedCreatorEvent(supabaseAdmin, cleanup, 30);
 
     await log.step('Sign in as the PARTNER and PATCH the creator\'s row');
     const partnerToken = await getUserAccessToken(supabaseAdmin, partnerId);
@@ -160,36 +167,34 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
         Prefer: 'return=representation',
       },
       body: {
-        label: PARTNER_ATTEMPT_LABEL,
+        label: PARTNER_EDIT_LABEL,
         updated_at: new Date().toISOString(),
       },
     });
 
-    // THEN: RLS filters the write to nothing and PostgREST reports SUCCESS.
-    // A 403/404 here would mean the service's `data.length === 0` branch is
-    // unreachable and its error message never fires.
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(0);
+    expect(body).toHaveLength(1);
+    expect(body[0].id).toBe(eventId);
+    expect(body[0].label).toBe(PARTNER_EDIT_LABEL);
+    expect(body[0].user_id).toBe(userId);
 
-    await log.step('Confirm the creator\'s row is untouched');
+    await log.step('Confirm the edit landed and the row is still the creator\'s');
     const { data: afterRow, error: afterError } = await supabaseAdmin
       .from('events')
-      .select('label, event_date')
+      .select('label, event_date, user_id')
       .eq('id', eventId)
       .single();
 
     expect(afterError).toBeNull();
-    expect(afterRow?.label).toBe(SEEDED_LABEL);
-    expect(afterRow?.event_date).toBe(seededDate);
+    expect(afterRow).toEqual({ label: PARTNER_EDIT_LABEL, event_date: seededDate, user_id: userId });
   });
 
   // ==========================================================================
   // DE.5-API-002
-  // Risk: R-005. Precondition for `eventsService.deleteEvent`'s
-  // `'Event not found or not yours to delete'` (src/services/eventsService.ts:452-467).
+  // The partner deletes the creator's event: the deleted row comes back.
   // ==========================================================================
-  test('[P1] DE.5-API-002 a partner DELETE on the creator\'s event returns 200 with zero rows, not an error', async ({
+  test('[P1] DE.5-API-002 a partner DELETE on the creator\'s event returns 200 with the deleted row', async ({
     supabaseAdmin,
     apiRequest,
     cleanup,
@@ -210,25 +215,56 @@ test.describe('Events write wire shape over PostgREST — story 5', () => {
 
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(0);
+    expect(body).toHaveLength(1);
+    expect(body[0].id).toBe(eventId);
 
-    await log.step('Confirm the creator\'s row survives');
+    await log.step('Confirm the row is gone');
     const { data: survivors, error: surviveError } = await supabaseAdmin
       .from('events')
-      .select('id, label')
+      .select('id')
       .eq('id', eventId);
 
     expect(surviveError).toBeNull();
-    expect(survivors).toHaveLength(1);
-    expect(survivors?.[0]?.label).toBe(SEEDED_LABEL);
+    expect(survivors).toHaveLength(0);
+  });
+
+  // ==========================================================================
+  // DE.5-API-004
+  // Precondition for `eventsService.updateEvent`'s and `deleteEvent`'s
+  // not-found errors: a write that matches no row answers 200 with an empty
+  // array, not an error.
+  // ==========================================================================
+  test('[P1] DE.5-API-004 a PATCH and a DELETE that match no row return 200 with zero rows, not an error', async ({
+    supabaseAdmin,
+    apiRequest,
+    cleanup,
+  }) => {
+    const { userId } = await seedCreatorEvent(supabaseAdmin, cleanup, 50);
+    const token = await getUserAccessToken(supabaseAdmin, userId);
+    const missingId = crypto.randomUUID();
+
+    for (const method of ['PATCH', 'DELETE'] as const) {
+      await log.step(`${method} an id that matches no row`);
+      const { status, body } = await apiRequest<EventRow[]>({
+        method,
+        path: `/rest/v1/events?id=eq.${missingId}`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Prefer: 'return=representation',
+        },
+        ...(method === 'PATCH' ? { body: { label: PARTNER_EDIT_LABEL, updated_at: new Date().toISOString() } } : {}),
+      });
+
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(0);
+    }
   });
 
   // ==========================================================================
   // DE.5-API-003 — positive control.
-  // Without it, DE.5-API-001 and -002 would still pass if the endpoint were
-  // broken for everyone: a PATCH that matches nothing for ANY caller returns
-  // the same empty array. This test is what makes the zero-row result mean
-  // "RLS filtered it" rather than "the write path is dead".
+  // The creator's own edit still lands, so the policy change did not move the
+  // creator's path.
   // ==========================================================================
   test('[P1] DE.5-API-003 the creator\'s own PATCH on the same row returns 200 with exactly one updated row', async ({
     supabaseAdmin,

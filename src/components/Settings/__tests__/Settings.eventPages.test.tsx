@@ -340,28 +340,31 @@ describe('Settings > Dates > an event\'s page', () => {
       setEvents([makeEvent({ userId: 'partner-1', description: 'Her pick\nsecond line' })]);
     });
 
-    it('is read-only: Date, Note and Icon without chevrons, no Delete, no footnote', async () => {
+    it('is edited like an own event: Name, Date, Note and Icon open their pages, and Delete shows', async () => {
       renderAt('dates/event/event-1');
       await heading('Weekend trip');
 
-      const date = formatListDate(daysFromToday(10), new Date());
-      expect(screen.getByTestId('settings-event-date-readonly')).toHaveTextContent(`Date${date}`);
-      expect(screen.getByTestId('settings-event-note-readonly')).toHaveTextContent('Note');
-      expect(screen.getByTestId('settings-event-note-readonly')).toHaveTextContent('Her pick');
-      // The glyph in accent, with the icon's name kept as hidden text.
-      expect(screen.getByTestId('settings-event-icon-readonly')).toHaveTextContent('IconPlane');
-      expect(screen.getByTestId('settings-event-icon-readonly').querySelector('svg.text-accent')).not.toBeNull();
-      expect(screen.getByText('Plane')).toHaveClass('sr-only');
-      // Nothing to press but the bar's Back.
-      expect(screen.getAllByRole('button').map((button) => button.textContent || button.ariaLabel)).toHaveLength(1);
-      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
-      expect(screen.queryByTestId('settings-event-name')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('settings-event-delete')).not.toBeInTheDocument();
-      expect(screen.queryByText(/added this/)).not.toBeInTheDocument();
-      // No chevrons: the page's one picture is the Icon row's glyph.
-      const pictures = screen.getByTestId('settings-event-page').querySelectorAll('svg');
-      expect(pictures).toHaveLength(1);
-      expect(screen.getByTestId('settings-event-icon-readonly')).toContainElement(pictures[0] as unknown as HTMLElement);
+      for (const field of ['name', 'date', 'note', 'icon']) {
+        expect(screen.getByTestId(`settings-event-${field}`)).toHaveAttribute(
+          'data-settings-target',
+          `dates/event/event-1/${field}`
+        );
+      }
+      expect(screen.getByTestId('settings-event-note')).toHaveTextContent('Her pick');
+      expect(deleteRow()).toHaveTextContent('Delete event');
+      expect(screen.queryByTestId('settings-event-date-readonly')).not.toBeInTheDocument();
+    });
+
+    it('is deleted like an own event', async () => {
+      const user = userEvent.setup();
+      renderAt('dates/event/event-1');
+      await heading('Weekend trip');
+
+      await user.click(deleteRow());
+      await user.click(screen.getByTestId('settings-event-delete-confirmation-confirm'));
+
+      expect(removeEvent).toHaveBeenCalledWith('event-1');
+      expect(await heading('Dates')).toBeInTheDocument();
     });
 
     it('has Remind me while upcoming (the shell), and none once past', async () => {
@@ -377,18 +380,28 @@ describe('Settings > Dates > an event\'s page', () => {
       expect(remindMe()).not.toBeInTheDocument();
     });
 
-    it.each(['name', 'date', 'note', 'icon'])('renders no field on its %s page', async (field) => {
+    it.each(['name', 'date', 'note'])('opens the field on its %s page', async (field) => {
       renderAt('dates/event/event-1');
       await heading('Weekend trip');
 
       // A reload on a field page shows its parent, so push within the mounted stack.
       act(() => useAppStore.getState().openSettingsPage(`dates/event/event-1/${field}`));
 
-      await waitFor(() =>
-        expect(window.location.pathname).toBe(`/settings/dates/event/event-1/${field}`)
-      );
-      expect(screen.queryByTestId('settings-field-save')).not.toBeInTheDocument();
-      expect(document.querySelector('input, textarea')).toBeNull();
+      expect(await screen.findByTestId(`settings-event-${field}-field`)).toBeInTheDocument();
+      expect(screen.getByTestId('settings-field-save')).toBeInTheDocument();
+    });
+
+    it('saves an edit to its name', async () => {
+      const user = userEvent.setup();
+      renderAt('dates/event/event-1');
+      await heading('Weekend trip');
+      act(() => useAppStore.getState().openSettingsPage('dates/event/event-1/name'));
+
+      const field = await screen.findByTestId('settings-event-name-field');
+      await user.type(field, '!');
+      await user.click(screen.getByTestId('settings-field-save'));
+
+      expect(editEvent).toHaveBeenCalledWith('event-1', { label: 'Weekend trip!' });
     });
   });
 

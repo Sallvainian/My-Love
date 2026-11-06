@@ -187,6 +187,8 @@ beforeEach(() => {
       initializeApp: vi.fn(async () => {}),
       syncPendingMoods: vi.fn(async () => ({ synced: 0, failed: 0, skipped: false })),
       updateSyncStatus: vi.fn(async () => {}),
+      // Home re-reads anniversaries on arrival; no test here reads them.
+      loadAnniversariesFromServer: vi.fn(async () => true),
     },
     true
   );
@@ -805,5 +807,26 @@ describe('Home event-load session ownership', () => {
       '[App] Could not read the profile display name:',
       'Service unavailable'
     );
+  });
+});
+
+describe('Home re-reads anniversaries as it does events', () => {
+  it('asks on arrival, on every return to Home and on a connectivity change', async () => {
+    controlHomeLoads();
+    const loadAnniversariesFromServer = vi.fn(async () => true);
+    useAppStore.setState({ loadAnniversariesFromServer });
+    await renderHome();
+    const arrived = loadAnniversariesFromServer.mock.calls.length;
+    expect(arrived).toBeGreaterThan(0);
+
+    await act(async () => useAppStore.getState().setView('settings'));
+    await act(async () => useAppStore.getState().setView('home'));
+    expect(loadAnniversariesFromServer.mock.calls.length).toBeGreaterThan(arrived);
+
+    const returned = loadAnniversariesFromServer.mock.calls.length;
+    await act(async () =>
+      useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: false } })
+    );
+    expect(loadAnniversariesFromServer.mock.calls.length).toBeGreaterThan(returned);
   });
 });

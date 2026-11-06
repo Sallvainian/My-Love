@@ -94,9 +94,9 @@ function anniversaryInput(label = 'First date') {
   return { date: ANNIVERSARY_DATE, label };
 }
 
-/** A settings-mirror row; `fields` adds a serverId, a description or another date. */
+/** A settings-mirror row owned by A; `fields` adds a serverId, a description or another date. */
 function anniversary(id: number, label: string, fields: Partial<Anniversary> = {}): Anniversary {
-  return { id, date: ANNIVERSARY_DATE, label, ...fields };
+  return { id, userId: A, date: ANNIVERSARY_DATE, label, ...fields };
 }
 
 /** A row as `anniversariesService` answers it. */
@@ -105,7 +105,7 @@ function serverAnniversary(
   label: string,
   fields: Partial<ServerAnniversary> = {}
 ): ServerAnniversary {
-  return { serverId, date: ANNIVERSARY_DATE, label, ...fields };
+  return { serverId, userId: A, date: ANNIVERSARY_DATE, label, ...fields };
 }
 
 beforeEach(() => {
@@ -121,10 +121,11 @@ beforeEach(() => {
 });
 
 describe('anniversaries: server first, then the settings mirror', () => {
-  const created = serverAnniversary('ann-1', 'First date');
+  // Built per test: A changes in every beforeEach.
+  const created = () => serverAnniversary('ann-1', 'First date');
 
   it('writes the server, then mirrors the row with its server id', async () => {
-    server.createAnniversary.mockResolvedValue(created);
+    server.createAnniversary.mockResolvedValue(created());
 
     await useAppStore.getState().addAnniversary(anniversaryInput());
 
@@ -138,7 +139,7 @@ describe('anniversaries: server first, then the settings mirror', () => {
 
   it('a retried add that resolves to an already mirrored row does not list it twice', async () => {
     setAnniversaries([anniversary(3, 'First date', { serverId: 'ann-1' })]);
-    server.createAnniversary.mockResolvedValue(created);
+    server.createAnniversary.mockResolvedValue(created());
 
     await useAppStore.getState().addAnniversary(anniversaryInput(), 'submit-1');
 
@@ -169,7 +170,7 @@ describe('anniversaries: server first, then the settings mirror', () => {
     const inFlight = useAppStore.getState().addAnniversary(anniversaryInput());
     useAppStore.setState({ userId: 'USER-C' } as StoreState);
     setAnniversaries([anniversary(9, 'C only', { date: '2021-01-01' })]);
-    pending.settle(created);
+    pending.settle(created());
     await inFlight;
 
     expect(anniversaries()).toEqual([anniversary(9, 'C only', { date: '2021-01-01' })]);
@@ -183,7 +184,7 @@ describe('anniversaries: server first, then the settings mirror', () => {
     useAppStore.getState().clearAuth();
     useAppStore.getState().setAuthUser(A);
     const before = anniversaries();
-    pending.settle(created);
+    pending.settle(created());
     await inFlight;
 
     expect(anniversaries()).toEqual(before);
@@ -258,7 +259,7 @@ describe('loadAnniversariesFromServer', () => {
 
     await useAppStore.getState().loadAnniversariesFromServer();
 
-    expect(server.fetchAnniversaries).toHaveBeenCalledWith(A);
+    expect(server.fetchAnniversaries).toHaveBeenCalledWith();
     expect(anniversaries()).toEqual([
       anniversary(7, 'Fresh label', { serverId: 'ann-1' }),
       anniversary(9, 'From the other phone', { date: '2025-01-01', description: 'x', serverId: 'ann-2' }),
@@ -485,7 +486,7 @@ describe('anniversaries local copy', () => {
 
     await refreshLocalCopies();
 
-    expect(server.fetchAnniversaries).toHaveBeenCalledWith(A);
+    expect(server.fetchAnniversaries).toHaveBeenCalledWith();
     expect(anniversaries().map((a) => a.label)).toEqual(['Added on the other phone']);
   });
 });

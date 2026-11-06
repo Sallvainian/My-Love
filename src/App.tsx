@@ -129,6 +129,7 @@ function App() {
   const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
   const loadEvents = useAppStore((s) => s.loadEvents);
+  const loadAnniversariesFromServer = useAppStore((s) => s.loadAnniversariesFromServer);
   // The bundled rows are seeded by initializeApp; the message-data refresher maps
   // server keys onto them, so account-data sync waits until they exist.
   const messagesSeeded = useAppStore((s) => s.messages.length > 0);
@@ -627,6 +628,15 @@ function App() {
     // when nothing was ever saved; a failed refresh never blanks the last-good
     // list (eventsSlice).
   }, [authUserId, authSessionVersion, currentView, isOnline, loadEvents]);
+
+  // Anniversaries are re-read on the same occasions as events (every arrival at
+  // Home, and a connectivity change while there), so a partner's new
+  // anniversary shows as soon as their new event would. The refresher shows the
+  // saved copy first and keeps it when the read fails.
+  useEffect(() => {
+    if (!authUserId || currentView !== 'home') return;
+    void loadAnniversariesFromServer();
+  }, [authUserId, authSessionVersion, currentView, isOnline, loadAnniversariesFromServer]);
 
   // A view opens at its top. Every view but Love Notes scrolls the document
   // itself, so without this a view kept the scroll the one before it left,

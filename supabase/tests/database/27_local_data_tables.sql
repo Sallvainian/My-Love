@@ -1,10 +1,12 @@
--- Account data moved off the device (LD-DB-001 .. 070)
+-- Account data moved off the device (LD-DB-001 .. 072)
 --
--- The property under test: anniversaries, custom_messages and message_favorites
--- are private to their author. Unlike public.events the partner reads NOTHING
--- here -- no policy calls get_my_partner_id() -- so the partner and an
--- unrelated stranger must behave identically
--- (20260922000000_local_data_tables.sql).
+-- The property under test: custom_messages and message_favorites are private
+-- to their author -- no policy calls get_my_partner_id() -- so the partner and
+-- an unrelated stranger must behave identically
+-- (20260922000000_local_data_tables.sql). Anniversaries are shared as
+-- public.events are: both partners read, edit and delete them, a row is
+-- inserted only under its author's id, and no one changes that id
+-- (20261105000000_partners_share_events_and_anniversaries.sql).
 --
 -- Cross-user UPDATE and DELETE are asserted as ROW COUNTS: RLS filters them to
 -- zero rows rather than raising, while a forged INSERT and a row-donating
@@ -17,7 +19,7 @@
 
 begin;
 
-select plan(57);
+select plan(59);
 
 create schema if not exists tests;
 
@@ -122,7 +124,7 @@ select is((select relrowsecurity from pg_class where oid = 'public.message_favor
 select policies_are('public', 'anniversaries',
   array['anniversaries_select', 'anniversaries_insert', 'anniversaries_update',
         'anniversaries_delete'],
-  'LD-DB-009: anniversaries carries exactly the four owner policies');
+  'LD-DB-009: anniversaries carries exactly its four policies');
 select policies_are('public', 'custom_messages',
   array['custom_messages_select', 'custom_messages_insert', 'custom_messages_update',
         'custom_messages_delete'],
@@ -175,7 +177,8 @@ select ok(not has_table_privilege('authenticated', 'public.message_favorites', '
   'LD-DB-030: authenticated cannot UPDATE message_favorites');
 
 -- ---------------------------------------------------------------------------
--- Reads: the owner sees their row; the partner and a stranger see nothing
+-- Reads: the owner sees their rows; the partner sees only the anniversary;
+-- a stranger sees nothing
 -- ---------------------------------------------------------------------------
 
 select tests.authenticate_as(current_setting('tests.a')::uuid);
@@ -189,8 +192,8 @@ select is((select count(*)::int from public.message_favorites), 1,
 
 select tests.authenticate_as(current_setting('tests.b')::uuid);
 
-select is((select count(*)::int from public.anniversaries), 0,
-  'LD-DB-037: the partner reads no anniversaries');
+select is((select count(*)::int from public.anniversaries), 1,
+  'LD-DB-037: the partner reads the owner''s anniversary');
 select is((select count(*)::int from public.custom_messages), 0,
   'LD-DB-038: the partner reads no custom messages');
 select is((select count(*)::int from public.message_favorites), 0,
@@ -227,20 +230,31 @@ select throws_ok(
 select tests.be_postgres();
 
 -- ---------------------------------------------------------------------------
--- Cross-user UPDATE and DELETE are filtered to zero rows
+-- The partner edits and deletes the owner's anniversaries; a stranger cannot.
+-- Cross-user UPDATE and DELETE of the private tables are filtered to zero rows.
 -- ---------------------------------------------------------------------------
 
 select is(tests.rows_as(current_setting('tests.b')::uuid,
+  $$update public.anniversaries set label = 'first kiss'
+     where id = 'a0000000-0000-0000-0000-0000000000aa'$$), 1,
+  'LD-DB-049: the partner''s UPDATE of an anniversary affects that row');
+select is(tests.rows_as(current_setting('tests.c')::uuid,
   $$update public.anniversaries set label = 'hijacked'
      where id = 'a0000000-0000-0000-0000-0000000000aa'$$), 0,
-  'LD-DB-049: the partner''s UPDATE of an anniversary affects zero rows');
+  'LD-DB-071: a stranger''s UPDATE of an anniversary affects zero rows');
+select is(tests.rows_as(current_setting('tests.c')::uuid,
+  $$delete from public.anniversaries where id = 'a0000000-0000-0000-0000-0000000000aa'$$), 0,
+  'LD-DB-072: a stranger''s DELETE of an anniversary affects zero rows');
 select is(tests.rows_as(current_setting('tests.b')::uuid,
   $$update public.custom_messages set text = 'hijacked'
      where id = 'c0000000-0000-0000-0000-0000000000aa'$$), 0,
   'LD-DB-050: the partner''s UPDATE of a custom message affects zero rows');
+insert into public.anniversaries (id, user_id, event_date, label, client_key)
+values ('a0000000-0000-0000-0000-0000000000ab', current_setting('tests.a')::uuid,
+        date '2023-06-01', 'moved in', 'a:2023-06-01:k');
 select is(tests.rows_as(current_setting('tests.b')::uuid,
-  $$delete from public.anniversaries where id = 'a0000000-0000-0000-0000-0000000000aa'$$), 0,
-  'LD-DB-051: the partner''s DELETE of an anniversary affects zero rows');
+  $$delete from public.anniversaries where id = 'a0000000-0000-0000-0000-0000000000ab'$$), 1,
+  'LD-DB-051: the partner''s DELETE of an anniversary affects that row');
 select is(tests.rows_as(current_setting('tests.b')::uuid,
   $$delete from public.custom_messages where id = 'c0000000-0000-0000-0000-0000000000aa'$$), 0,
   'LD-DB-052: the partner''s DELETE of a custom message affects zero rows');
@@ -249,7 +263,7 @@ select is(tests.rows_as(current_setting('tests.c')::uuid,
   'LD-DB-053: a stranger''s DELETE of a favorite affects zero rows');
 
 -- ---------------------------------------------------------------------------
--- Row donation raises: UPDATE states WITH CHECK
+-- Row donation raises: WITH CHECK, and keep_date_owner() for anniversaries
 -- ---------------------------------------------------------------------------
 
 select tests.authenticate_as(current_setting('tests.a')::uuid);
@@ -257,7 +271,8 @@ select tests.authenticate_as(current_setting('tests.a')::uuid);
 select throws_ok(
   format($$update public.anniversaries set user_id = %L
             where id = 'a0000000-0000-0000-0000-0000000000aa'$$, current_setting('tests.b')),
-  '42501', null, 'LD-DB-054: an owner cannot donate an anniversary to the partner');
+  '42501', 'A date keeps the person who added it',
+  'LD-DB-054: an owner cannot donate an anniversary to the partner');
 select throws_ok(
   format($$update public.custom_messages set user_id = %L
             where id = 'c0000000-0000-0000-0000-0000000000aa'$$, current_setting('tests.b')),

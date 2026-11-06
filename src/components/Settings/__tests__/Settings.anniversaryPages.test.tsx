@@ -700,8 +700,9 @@ describe("Settings > Dates > an anniversary's page", () => {
       expect(window.location.pathname).toBe('/settings/dates');
       expect(replacesTo(replace, '/settings/dates')).toBe(1);
       expect(screen.queryByTestId('settings-dates-anniversary-srv-1')).not.toBeInTheDocument();
-      // The page held its anniversary, so the delete started no read.
-      expect(loadAnniversaries).not.toHaveBeenCalled();
+      // The page held its anniversary, so the delete started no read: the only
+      // reads are the Dates list's own on arrival, run twice by StrictMode.
+      expect(loadAnniversaries).toHaveBeenCalledTimes(2);
     });
 
     it('closes the dialog, disables the row while it runs, and re-enables it with the error on a failure', async () => {

@@ -13,8 +13,9 @@
  * `Delete anniversary` centered and danger, alone in its own card. It asks
  * first (`useDateDelete`, the flow the event page shares); offline it refuses before the dialog, with
  * `offlineMessage('Anniversaries', 'delete')` in the page's Error box, and a
- * delete that fails shows its message there and re-enables the row. Anniversaries
- * are private to their creator, so the page only ever shows the reader's own.
+ * delete that fails shows its message there and re-enables the row. Either
+ * partner edits and deletes any anniversary, theirs or the other's, as with
+ * events; it stays recorded under the person who added it.
  *
  * Nothing asks for anniversaries when Settings opens (the kind's refresher runs
  * on signed-in start and on a reconnect), so a page whose anniversary the store

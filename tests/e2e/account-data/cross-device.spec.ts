@@ -244,9 +244,12 @@ test.describe('Account data follows the account, not the browser', () => {
     await fresh.goto('/settings/dates');
     const anniversaryRows = await anniversaryRead;
     expect(anniversaryRows.status).toBe(200);
-    expect(anniversaryRows.responseJson).toEqual([
-      expect.objectContaining({ label: anniversaryLabel }),
-    ]);
+    // The read holds the partner's anniversaries too; only this account's
+    // rows were cleared, so exactly one of its own carries the label.
+    const ownRows = (anniversaryRows.responseJson as Array<{ user_id: string }>).filter(
+      (row) => row.user_id === userId
+    );
+    expect(ownRows).toEqual([expect.objectContaining({ label: anniversaryLabel })]);
     await expect(
       fresh
         .locator('[data-testid^="settings-dates-anniversary-"]')

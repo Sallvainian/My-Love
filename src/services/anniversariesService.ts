@@ -1,13 +1,14 @@
 /**
- * Anniversaries Service — the signed-in user's anniversary countdowns
+ * Anniversaries Service — the couple's anniversary countdowns
  * (`public.anniversaries`)
  *
  * Supabase is the source of truth; `settings.relationship.anniversaries` is a
  * read mirror that `datesSlice` keeps in step after every successful write
  * and replaces wholesale from `fetchAnniversaries` on every signed-in start.
  *
- * Private to the author: the table's RLS admits the owner only, so nothing here
- * filters for a partner. Writes are server-first and throw — see
+ * Shared like events: the table's RLS lets both partners read every row and
+ * only the owner write one, so the read asks for every row it may see and each
+ * row carries its owner's `userId`. Writes are server-first and throw — see
  * `accountDataError.ts` for the error convention, which follows `eventsService`.
  *
  * `event_date` is a Postgres `date` and comes back as a bare `"YYYY-MM-DD"`,
@@ -35,6 +36,8 @@ export interface AnniversaryInput {
 /** A server row in the app's shape. */
 export interface ServerAnniversary {
   serverId: string;
+  /** The owner's id: the signed-in user's, or the partner's. */
+  userId: string;
   date: string;
   label: string;
   description?: string;
@@ -45,6 +48,7 @@ const WHAT = 'Anniversaries';
 function toServerAnniversary(row: SupabaseAnniversaryRecord): ServerAnniversary {
   return {
     serverId: row.id,
+    userId: row.user_id,
     date: row.event_date,
     label: row.label,
     ...(row.description ? { description: row.description } : {}),
@@ -60,14 +64,13 @@ function requireCalendarDate(date: string): void {
 }
 
 export const anniversariesService = {
-  /** Every anniversary the user owns, soonest calendar date first. */
-  async fetchAnniversaries(userId: string): Promise<ServerAnniversary[]> {
+  /** Every anniversary the user and their partner own, soonest calendar date first. */
+  async fetchAnniversaries(): Promise<ServerAnniversary[]> {
     requireOnline(WHAT, 'load');
     try {
       const { data, error } = await supabase
         .from('anniversaries')
         .select('*')
-        .eq('user_id', userId)
         .order('event_date', { ascending: true })
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })

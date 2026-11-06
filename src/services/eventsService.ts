@@ -28,7 +28,7 @@
  * Every write failure carries an `EventWriteErrorCode` beside its message, so a
  * caller can distinguish a stale row from an offline or transport failure
  * without matching English prose. A write that matches zero rows also throws.
- * RLS filters a non-creator's UPDATE or DELETE silently — no error, no rows —
+ * RLS filters an outsider's UPDATE or DELETE silently — no error, no rows —
  * so without this the UI would report success for a no-op.
  *
  * No realtime and no offline write queue: every write needs the server. The
@@ -328,7 +328,7 @@ function afterCursor(cursor: EventPageCursor, ascending: boolean): string {
  *
  * Responsibilities:
  * - Read the couple's events (own + partner's, via the SELECT policy)
- * - Create, update and delete the signed-in user's own events
+ * - Create the signed-in user's events; update and delete the couple's
  * - Convert every row to the `CoupleEvent` domain type
  */
 class EventsService {
@@ -674,7 +674,7 @@ class EventsService {
   }
 
   /**
-   * Update one of the signed-in user's own events.
+   * Update one of the couple's events, either partner's.
    *
    * `updated_at` is set on every write: the migration comment at
    * `20260818000002_create_events_table.sql:38-41` records that the column is
@@ -687,7 +687,7 @@ class EventsService {
    *
    * @returns The updated event
    * @throws {EventWriteError} if the update matched no row — RLS filters a
-   *   non-creator's write silently, so zero rows is the only signal there is
+   *   write from outside the couple silently, so zero rows is the only signal there is
    * @throws {EventWriteError} if offline — no queue exists, so the write is lost
    * @throws {EventWriteError} with `transport` if the request fails mid-flight
    *   or PostgREST rejects it
@@ -758,7 +758,7 @@ class EventsService {
   }
 
   /**
-   * Delete one of the signed-in user's own events.
+   * Delete one of the couple's events, either partner's.
    *
    * @throws {EventWriteError} if the delete matched no row (same silent RLS
    *   filter as `updateEvent`)

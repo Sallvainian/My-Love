@@ -81,9 +81,11 @@ let selfId = '';
 const original = {
   loadEvents: useAppStore.getState().loadEvents,
   loadMoreEvents: useAppStore.getState().loadMoreEvents,
+  loadAnniversariesFromServer: useAppStore.getState().loadAnniversariesFromServer,
 };
 const loadEvents = vi.fn();
 const loadMoreEvents = vi.fn();
+const loadAnniversariesFromServer = vi.fn();
 
 /** Puts the slices the page reads in a state; anything left out stays at rest. */
 function setDates(state: {
@@ -143,6 +145,7 @@ describe('Settings > Dates', () => {
     backend.fetchOwnProfile.mockResolvedValue({ displayName: 'Casey', birthday: null });
     loadEvents.mockResolvedValue({ status: 'success' });
     loadMoreEvents.mockResolvedValue({ status: 'success' });
+    loadAnniversariesFromServer.mockResolvedValue(true);
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     accountCounter += 1;
     // A fresh account per case, so no earlier case's saved profile copy answers for this one.
@@ -154,6 +157,7 @@ describe('Settings > Dates', () => {
       settingsPath: '',
       loadEvents,
       loadMoreEvents,
+      loadAnniversariesFromServer,
       eventsIsLoading: false,
       eventsIsLoadingMore: false,
       syncStatus: { ...useAppStore.getState().syncStatus, isOnline: true },
@@ -183,6 +187,7 @@ describe('Settings > Dates', () => {
       settings: null,
       loadEvents: original.loadEvents,
       loadMoreEvents: original.loadMoreEvents,
+      loadAnniversariesFromServer: original.loadAnniversariesFromServer,
     });
   });
 
@@ -253,6 +258,7 @@ describe('Settings > Dates', () => {
         anniversaries: [
           { id: 1, date: '2020-09-09', label: 'First date', serverId: 'srv-1' },
           { id: 2, date: '2021-01-02', label: 'Moved in' },
+          { id: 3, date: '2019-05-05', label: 'Her pick', serverId: 'srv-3', userId: 'partner-1' },
         ],
         ownBirthday: '1990-04-04',
       });
@@ -308,14 +314,16 @@ describe('Settings > Dates', () => {
       expect(targetOf('event-e-far')).toBe('dates/event/e-far');
     });
 
-    it('lists anniversaries in store order, keyed by server id or device id', async () => {
+    it('lists anniversaries in store order, the partner\'s too, keyed by server id or device id', async () => {
       await openFull(userEvent.setup());
 
       const rows = within(screen.getByTestId('settings-dates-anniversaries')).getAllByRole('button');
       expect(rows.map((r) => r.getAttribute('data-testid'))).toEqual([
         'settings-dates-anniversary-srv-1',
         'settings-dates-anniversary-2',
+        'settings-dates-anniversary-srv-3',
       ]);
+      expect(targetOf('anniversary-srv-3')).toBe('dates/anniversary/srv-3');
       expect(rows[0]).toHaveAccessibleName('First date, 9 Sep');
       expect(rows[1]).toHaveAccessibleName('Moved in, 2 Jan');
       expect(targetOf('anniversary-srv-1')).toBe('dates/anniversary/srv-1');
@@ -409,6 +417,12 @@ describe('Settings > Dates', () => {
           makeEvent('mine-past', { userId: selfId, label: 'Mine past', date: daysFromToday(-3) }),
           makeEvent('theirs-past', { userId: 'partner-1', label: 'Theirs past', date: daysFromToday(-2) }),
         ],
+        anniversaries: [
+          { id: 1, date: '2020-09-09', label: 'Mine', serverId: 'a-mine', userId: selfId },
+          { id: 2, date: '2021-01-02', label: 'Theirs', serverId: 'a-theirs', userId: 'partner-1' },
+          // Saved before anniversaries were shared: no owner, so the account's own.
+          { id: 3, date: '2022-03-04', label: 'Old copy', serverId: 'a-old' },
+        ],
       });
       await renderSettings();
       await openDates(user);
@@ -427,6 +441,9 @@ describe('Settings > Dates', () => {
       expect(screen.getByTestId('settings-dates-event-mine-past')).toBeInTheDocument();
       expect(screen.queryByTestId('settings-dates-event-theirs')).not.toBeInTheDocument();
       expect(screen.queryByTestId('settings-dates-event-theirs-past')).not.toBeInTheDocument();
+      expect(screen.getByTestId('settings-dates-anniversary-a-mine')).toBeInTheDocument();
+      expect(screen.getByTestId('settings-dates-anniversary-a-old')).toBeInTheDocument();
+      expect(screen.queryByTestId('settings-dates-anniversary-a-theirs')).not.toBeInTheDocument();
     });
 
     it('keeps the partner events while the unlinked answer is unconfirmed', async () => {
@@ -437,11 +454,13 @@ describe('Settings > Dates', () => {
         partnerKnown: true,
         partnerLoadError: true,
         events: [makeEvent('theirs', { userId: 'partner-1' })],
+        anniversaries: [{ id: 1, date: '2021-01-02', label: 'Theirs', serverId: 'a-theirs', userId: 'partner-1' }],
       });
       await renderSettings();
       await openDates(user);
 
       expect(screen.getByTestId('settings-dates-event-theirs')).toBeInTheDocument();
+      expect(screen.getByTestId('settings-dates-anniversary-a-theirs')).toBeInTheDocument();
     });
   });
 
@@ -520,6 +539,24 @@ describe('Settings > Dates', () => {
         useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: true } });
       });
       expect(loadEvents.mock.calls.length).toBeGreaterThan(offline);
+    });
+
+    it('asks for the anniversaries when the page opens and on each connectivity change', async () => {
+      const user = userEvent.setup();
+      await renderSettings();
+      await openDates(user);
+      const opened = loadAnniversariesFromServer.mock.calls.length;
+      expect(opened).toBeGreaterThan(0);
+
+      act(() => {
+        useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: false } });
+      });
+      expect(loadAnniversariesFromServer.mock.calls.length).toBeGreaterThan(opened);
+      const offline = loadAnniversariesFromServer.mock.calls.length;
+      act(() => {
+        useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: true } });
+      });
+      expect(loadAnniversariesFromServer.mock.calls.length).toBeGreaterThan(offline);
     });
 
     it('shows no error when the initial load fails, and keeps the rows', async () => {
