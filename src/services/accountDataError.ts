@@ -19,6 +19,7 @@ export type AccountDataErrorCode =
   | 'not-found'
   | 'invalid-response'
   | 'day-changed'
+  | 'refused'
   | 'transport';
 
 export class AccountDataError extends Error {

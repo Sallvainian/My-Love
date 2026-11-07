@@ -13,6 +13,12 @@
  * (SQLSTATE `DQ001`) is `AccountDataError('day-changed', DAY_CHANGED_MESSAGE)`;
  * `DQ002` (outside the five-minute window) stays a transport error.
  *
+ * `submitWrittenQuestion` sends the day's writer's question for tomorrow
+ * (`submit_written_question`, AD-4) and answers the day's snapshot, whose
+ * `write.done` is then true. Online-only and throwing, as above. The server
+ * judges the options (R4); a refusal it raises for good (`DQ003` to `DQ006`) is
+ * `AccountDataError('refused', reason)`, shown as is.
+ *
  * `announceDailyPick` tells the partner's open Daily that a day changed: a
  * `daily_pick { day_id }` broadcast on their `mood-updates:<uid>` topic, never
  * a choice. It throws when the broadcast fails; the caller decides.
@@ -43,6 +49,7 @@ export type { DailyChoice, DailyDayAnswer, DailyDaySnapshot };
 
 const FETCH_CONTEXT = 'DailyQuestionApi.fetchDailyDay';
 const SUBMIT_CONTEXT = 'DailyQuestionApi.submitDailyPick';
+const WRITE_CONTEXT = 'DailyQuestionApi.submitWrittenQuestion';
 const FETCH_BY_ID_CONTEXT = 'DailyQuestionApi.fetchDailyDayById';
 
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
@@ -58,6 +65,17 @@ const PICK_REFUSAL_CODES: ReadonlySet<string> = new Set([PICK_DATE_MISMATCH, 'DQ
 /** Shown when a pick is refused because the date changed since the question was shown. */
 export const DAY_CHANGED_MESSAGE =
   "The date has changed since this question was shown. Check today's question and pick again.";
+
+/**
+ * What `submit_written_question` refuses with, by SQLSTATE. `DQ003` (an option
+ * the rules refuse) is the server's own message; the others have a fixed one.
+ */
+const WRITE_REFUSAL_MESSAGES: Readonly<Record<string, string | null>> = {
+  DQ003: null,
+  DQ004: "It is your partner's turn to write tomorrow's question.",
+  DQ005: "Send your own pick before writing tomorrow's question.",
+  DQ006: "Today's turn to write has ended. Tomorrow's question will come from the pool.",
+};
 
 /** `requireOnline` with the singular verb: "Your pick needs a connection to send." */
 function refuseOffline(what: string, action: NeedsConnectionAction): void {
@@ -187,5 +205,46 @@ export async function submitDailyPick(
       throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE, { cause: error });
     }
     throw toAccountDataError(SUBMIT_CONTEXT, error);
+  }
+}
+
+/**
+ * Send the caller's question for tomorrow, written on `dayId` (the caller's
+ * turn to write). The texts go as typed: the server trims and judges them.
+ * Returns the day's snapshot. Throws on any failure; a refusal the server
+ * raises for good is `AccountDataError('refused', reason)`.
+ */
+export async function submitWrittenQuestion(
+  dayId: string,
+  thisText: string,
+  thatText: string
+): Promise<DailyDaySnapshot> {
+  refuseOffline("Tomorrow's question", 'send');
+  try {
+    const { data, error } = await supabase
+      .rpc('submit_written_question', {
+        day_id: dayId,
+        this_text: thisText,
+        that_text: thatText,
+      })
+      .abortSignal(requestTimeout());
+    if (error) throw error;
+    const parsed = DailyDaySnapshotSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AccountDataError(
+        'invalid-response',
+        'The daily question answer was not understood.',
+        { cause: parsed.error }
+      );
+    }
+    return parsed.data;
+  } catch (error) {
+    if (isPostgrestError(error) && Object.hasOwn(WRITE_REFUSAL_MESSAGES, error.code)) {
+      logSupabaseError(WRITE_CONTEXT, error);
+      throw new AccountDataError('refused', WRITE_REFUSAL_MESSAGES[error.code] ?? error.message, {
+        cause: error,
+      });
+    }
+    throw toAccountDataError(WRITE_CONTEXT, error);
   }
 }

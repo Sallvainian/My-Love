@@ -40,6 +40,19 @@ export function dailyStateRank(state: DailyDaySnapshot['state']): number {
   return STATE_RANK[state];
 }
 
+/**
+ * `entry`, with `write.done` true when `other` (the same day) has it: a question
+ * once written stays written, so a read that started before the Send cannot
+ * reopen the prompt.
+ */
+export function keepWriteDone(
+  entry: DailyDaySnapshot,
+  other: DailyDaySnapshot | undefined
+): DailyDaySnapshot {
+  if (!other?.write.done || entry.write.done) return entry;
+  return { ...entry, write: { ...entry.write, done: true } };
+}
+
 /** The saved map with every entry that is not a valid snapshot dropped; `{}` for anything else. */
 function parseSavedDays(value: unknown): DailyDaysCopy {
   const days: DailyDaysCopy = {};
@@ -80,7 +93,8 @@ function prune(days: DailyDaysCopy): DailyDaysCopy {
  * Merge a successful server answer into the copy and return the answer to show.
  *
  * - `ok`: replaces the entry for `snapshot.day_id` unless the stored one ranks
- *   higher, then keeps the newest 31 days. Returns the merged entry.
+ *   higher, never moving `write.done` back to false, then keeps the newest 31
+ *   days. Returns the merged entry.
  * - `unlinked`: writes `{}`. Returns `unlinked`.
  *
  * Runs under `DAILY_DAYS_LOCK`, waiting for any other merge. Writes only while
@@ -101,7 +115,9 @@ export async function mergeDailyDay(
       const keepStored =
         stored !== undefined &&
         dailyStateRank(stored.state) > dailyStateRank(answer.snapshot.state);
-      const entry = keepStored ? stored : answer.snapshot;
+      const entry = keepStored
+        ? keepWriteDone(stored, answer.snapshot)
+        : keepWriteDone(answer.snapshot, stored);
       merged = { status: 'ok', snapshot: entry };
       next = prune({ ...days, [answer.snapshot.day_id]: entry });
     }

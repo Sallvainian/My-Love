@@ -21,6 +21,7 @@ import {
   dailySnapshot,
   revealSnapshot,
   waitingSnapshot,
+  writerSnapshot,
 } from '../stores/dailyQuestionFixture';
 
 const A = 'USER-A';
@@ -100,6 +101,27 @@ describe('mergeDailyDay', () => {
 
     expect(result).toEqual(ok(stored));
     expect(await savedMap()).toEqual(keyed(stored));
+  });
+
+  it('a late read with write.done false does not reopen a written turn', async () => {
+    const written = writerSnapshot('this', { write: { mine: true, done: true } });
+    await mergeDailyDay(A, ok(written), current);
+
+    const result = await mergeDailyDay(A, ok(writerSnapshot('this')), current);
+
+    expect(result).toEqual(ok(written));
+    expect(await savedMap()).toEqual(keyed(written));
+  });
+
+  it('a higher state with write.done false keeps write.done true', async () => {
+    const written = writerSnapshot('this', { write: { mine: true, done: true } });
+    await mergeDailyDay(A, ok(written), current);
+
+    const result = await mergeDailyDay(A, ok(revealSnapshot('this', 'that')), current);
+
+    expect(result).toEqual(
+      ok({ ...revealSnapshot('this', 'that'), write: { mine: false, done: true } })
+    );
   });
 
   it('keeps other days when one is merged', async () => {

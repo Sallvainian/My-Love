@@ -45,3 +45,15 @@ export function revealSnapshot(
     same: myChoice === partnerChoice,
   });
 }
+
+/** The viewer is the day's writer and picked `myChoice`: the turn to write is open (or `done`). */
+export function writerSnapshot(
+  myChoice: 'this' | 'that' = 'this',
+  overrides: Partial<DailyDaySnapshot> = {}
+): DailyDaySnapshot {
+  return {
+    ...waitingSnapshot(myChoice),
+    write: { mine: true, done: false },
+    ...overrides,
+  };
+}

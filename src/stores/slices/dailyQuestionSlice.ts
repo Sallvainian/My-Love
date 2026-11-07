@@ -44,6 +44,13 @@
  * `dailyQueuedPicks` mirrors the account's rows for the view. A
  * queued pick never enters `dailyDay` or the copy, so the reveal shows only
  * from a server snapshot. The rows survive sign-out; only the field is cleared.
+ *
+ * The day's writer is asked to write tomorrow's question (AD-4, AD-13):
+ * `submitWrittenQuestion` sends it and merges the returned snapshot (whose
+ * `write.done` is then true), and `declineWrittenQuestion` records the day in
+ * the device-state `daily-write-declined` kind (`services/dailyWriteDeclined.ts`)
+ * and in `dailyWriteDeclined`, which `loadDailyDay` fills from the kind. The
+ * view decides when to ask from the snapshot, this field and the device date.
  */
 
 import { isOnline } from '../../api/errorHandlers';
@@ -51,10 +58,12 @@ import { AccountDataError } from '../../services/accountDataError';
 import {
   DAILY_DAYS_COPY_KIND,
   dailyStateRank,
+  keepWriteDone,
   mergeDailyDay,
   readSavedDailyDay,
 } from '../../services/dailyDaysCopy';
 import type { StoredQueuedPick } from '../../services/dbSchema';
+import { addDeclinedWriteDay, readDeclinedWriteDays } from '../../services/dailyWriteDeclined';
 import { registerLocalCopy } from '../../services/localCopy';
 import {
   enqueuePick,
@@ -76,6 +85,7 @@ import {
   isPickRefusal,
   pickZone,
   submitDailyPick as submitDailyPickRequest,
+  submitWrittenQuestion as submitWrittenQuestionRequest,
 } from '../../api/dailyQuestionApi';
 import type { AppStateCreator } from '../types';
 
@@ -94,6 +104,8 @@ export interface DailyQuestionSlice {
   dailyDayError: string | null;
   /** The signed-in account's queued picks (pending and failed); never persisted here. */
   dailyQueuedPicks: QueuedDailyPick[];
+  /** The `day_id`s whose write prompt this account declined on this device. */
+  dailyWriteDeclined: string[];
 
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
   loadDailyDay: () => Promise<void>;
@@ -119,6 +131,18 @@ export interface DailyQuestionSlice {
    * `PICK_QUEUE_LOCK`. Never throws; does nothing signed out or offline.
    */
   drainQueuedPicks: () => Promise<void>;
+  /**
+   * Send the account's question for tomorrow, written on the shown day, and
+   * store the answer. Throws a plain `Error` when signed out or with no day
+   * shown, and otherwise the request's own error (`AccountDataError`).
+   */
+  submitWrittenQuestion: (thisText: string, thatText: string) => Promise<void>;
+  /**
+   * Record that the account declined to write for `dayId` on this device.
+   * Never throws: a write failure is logged, and `dailyWriteDeclined` is left
+   * as it was.
+   */
+  declineWrittenQuestion: (dayId: string) => Promise<void>;
 }
 
 /** What one drain pass ended on (see `drainOnce`). */
@@ -132,15 +156,21 @@ type DrainPassOutcome = 'done' | 'transient' | 'stale' | 'offline' | 'other-tab'
 const PICK_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000];
 const PICK_RETRY_MAX_DELAY_MS = 60_000;
 
-/** The answer to keep: `next`, unless it is the same day at an earlier state than `stored`. */
+/**
+ * The answer to keep: `next`, unless it is the same day at an earlier state than
+ * `stored`. For the same day `write.done` never goes back to false.
+ */
 function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): DailyDayAnswer {
   if (
     stored?.status === 'ok' &&
     next.status === 'ok' &&
-    stored.snapshot.day_id === next.snapshot.day_id &&
-    dailyStateRank(next.snapshot.state) < dailyStateRank(stored.snapshot.state)
+    stored.snapshot.day_id === next.snapshot.day_id
   ) {
-    return stored;
+    const keepStored = dailyStateRank(next.snapshot.state) < dailyStateRank(stored.snapshot.state);
+    const [kept, other] = keepStored
+      ? [stored.snapshot, next.snapshot]
+      : [next.snapshot, stored.snapshot];
+    return { status: 'ok', snapshot: keepWriteDone(kept, other) };
   }
   return next;
 }
@@ -291,6 +321,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     dailyDayLoading: false,
     dailyDayError: null,
     dailyQueuedPicks: [],
+    dailyWriteDeclined: [],
 
     loadDailyDay: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
@@ -304,11 +335,13 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       // or when the shown day is another one; the higher state wins for the
       // same day_id.
       const today = formatDateISO(new Date());
-      const [saved] = await Promise.all([
+      const [saved, declined] = await Promise.all([
         readSavedDailyDay(requestedBy, today),
+        readDeclinedWriteDays(requestedBy),
         showQueuedPicks(requestedBy, isCurrent),
       ]);
       if (!isCurrent()) return;
+      set({ dailyWriteDeclined: declined });
       if (saved) {
         const shown = get().dailyDay;
         const savedAnswer: DailyDayAnswer = { status: 'ok', snapshot: saved };
@@ -462,6 +495,48 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       })();
       drainInFlight = run;
       return run;
+    },
+
+    submitWrittenQuestion: async (thisText, thatText) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error("You must be signed in to send tomorrow's question");
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      const shown = get().dailyDay;
+      if (shown?.status !== 'ok') throw new Error('There is no question to write from yet');
+
+      const snapshot = await submitWrittenQuestionRequest(
+        shown.snapshot.day_id,
+        thisText,
+        thatText
+      );
+      if (!isCurrent()) return;
+      const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+      if (!isCurrent()) return;
+      set({
+        dailyDay: mergeAnswer(get().dailyDay, merged),
+        dailyDayError: null,
+      });
+    },
+
+    declineWrittenQuestion: async (dayId) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      try {
+        const declined = await addDeclinedWriteDay(requestedBy, dayId, isCurrent);
+        if (!isCurrent()) return;
+        set({ dailyWriteDeclined: declined });
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.error(
+          "[DailyQuestion] Could not save that tomorrow's question was declined:",
+          error
+        );
+      }
     },
   };
 };

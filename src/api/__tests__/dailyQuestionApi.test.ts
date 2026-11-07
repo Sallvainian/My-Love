@@ -38,6 +38,7 @@ import {
   isPickRefusal,
   pickZone,
   submitDailyPick,
+  submitWrittenQuestion,
 } from '../dailyQuestionApi';
 
 const ZONE = 'America/New_York';
@@ -337,6 +338,110 @@ describe('submitDailyPick', () => {
       message: 'You are offline. Your pick needs a connection to send.',
     });
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('submitWrittenQuestion', () => {
+  const refusal = (code: string, message: string) => ({
+    data: null,
+    error: { message, code, details: '', hint: '' },
+  });
+
+  it('calls submit_written_question with the day and the texts as typed', async () => {
+    const snapshot = dailySnapshot({ write: { mine: true, done: true } });
+    rpc.mockResolvedValue({ data: snapshot, error: null });
+
+    await expect(submitWrittenQuestion(DAY_ID, ' Beach ', 'Mountains')).resolves.toEqual(snapshot);
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('submit_written_question', {
+      day_id: DAY_ID,
+      this_text: ' Beach ',
+      that_text: 'Mountains',
+    });
+  });
+
+  it('bounds the request with a timeout signal', async () => {
+    rpc.mockResolvedValue({ data: dailySnapshot(), error: null });
+
+    await submitWrittenQuestion(DAY_ID, 'a', 'b');
+
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('throws on an answer that is not a snapshot', async () => {
+    rpc.mockResolvedValue({ data: { nope: true }, error: null });
+
+    await expect(submitWrittenQuestion(DAY_ID, 'a', 'b')).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+  });
+
+  it('refuses offline before any request', async () => {
+    setOnline(false);
+
+    await expect(submitWrittenQuestion(DAY_ID, 'a', 'b')).rejects.toMatchObject({
+      code: 'offline',
+      message: "You are offline. Tomorrow's question needs a connection to send.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'DQ004',
+      'Not the writer for this day',
+      "It is your partner's turn to write tomorrow's question.",
+    ],
+    ['DQ005', 'Pick before writing', "Send your own pick before writing tomorrow's question."],
+    [
+      'DQ006',
+      'The turn ended with its date',
+      "Today's turn to write has ended. Tomorrow's question will come from the pool.",
+    ],
+  ])('maps %s to a refused error with its own sentence', async (code, serverMessage, shown) => {
+    rpc.mockResolvedValue(refusal(code, serverMessage));
+
+    const failure = await submitWrittenQuestion(DAY_ID, 'a', 'b').catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(AccountDataError);
+    expect(failure).toMatchObject({ code: 'refused', message: shown });
+  });
+
+  it("shows a DQ003's own server message", async () => {
+    rpc.mockResolvedValue(refusal('DQ003', 'The two options must differ'));
+
+    await expect(submitWrittenQuestion(DAY_ID, 'Tea', 'tea')).rejects.toMatchObject({
+      name: 'AccountDataError',
+      code: 'refused',
+      message: 'The two options must differ',
+    });
+  });
+
+  it('keeps the server error as the cause of a refusal', async () => {
+    rpc.mockResolvedValue(refusal('DQ004', 'Not the writer for this day'));
+
+    const failure = (await submitWrittenQuestion(DAY_ID, 'a', 'b').catch(
+      (error: unknown) => error
+    )) as AccountDataError;
+
+    expect(failure.cause).toMatchObject({ code: 'DQ004' });
+  });
+
+  it('leaves any other error a transport error', async () => {
+    rpc.mockResolvedValue(refusal('XX000', 'boom'));
+
+    await expect(submitWrittenQuestion(DAY_ID, 'a', 'b')).rejects.toMatchObject({
+      code: 'transport',
+    });
+  });
+
+  it('leaves a network failure a transport error', async () => {
+    rpc.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(submitWrittenQuestion(DAY_ID, 'a', 'b')).rejects.toMatchObject({
+      code: 'transport',
+    });
   });
 });
 

@@ -144,3 +144,55 @@ export async function setPairDaysCreatedAt(
     throw new Error(`setPairDaysCreatedAt: failed to move the pair's days: ${error.message}`);
   }
 }
+
+/**
+ * The `couple_days.writer` of this worker pair's one day: the user whose turn
+ * it is to write tomorrow's question. Throws unless the pair has exactly one
+ * day (both pages must have opened `/daily` first, which assigns it).
+ */
+export async function readPairDayWriter(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: WorkerPairIds
+): Promise<string> {
+  const [userA, userB] = orderedPair(pair);
+  const { data, error } = await supabaseAdmin
+    .from('couple_days')
+    .select('writer')
+    .eq('user_a', userA)
+    .eq('user_b', userB);
+
+  if (error) {
+    throw new Error(`readPairDayWriter: failed to read the pair's days: ${error.message}`);
+  }
+  if (data?.length !== 1) {
+    throw new Error(`readPairDayWriter: expected one day for the pair, found ${data?.length ?? 0}`);
+  }
+  return data[0].writer;
+}
+
+/** A question this worker pair wrote, as stored. */
+export interface WrittenQuestionRow {
+  this_text: string;
+  that_text: string;
+  source_day_id: string | null;
+}
+
+/** The `daily_questions` rows the pair wrote (their `user_a/user_b` set), not the coach's. */
+export async function readPairWrittenQuestions(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: WorkerPairIds
+): Promise<WrittenQuestionRow[]> {
+  const [userA, userB] = orderedPair(pair);
+  const { data, error } = await supabaseAdmin
+    .from('daily_questions')
+    .select('this_text, that_text, source_day_id')
+    .eq('user_a', userA)
+    .eq('user_b', userB);
+
+  if (error) {
+    throw new Error(
+      `readPairWrittenQuestions: failed to read the pair's questions: ${error.message}`
+    );
+  }
+  return data ?? [];
+}

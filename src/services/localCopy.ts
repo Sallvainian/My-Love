@@ -36,6 +36,9 @@
  * - FILL SOURCES. A copy is written only from a server response, a Realtime
  *   event, or the user's own write (confirmed or queued). Never from a default,
  *   a guess, or another account's state.
+ *   The one exemption is a device-state kind, `daily-write-declined`
+ *   (`services/dailyWriteDeclined.ts`): it is written only by this device's
+ *   "No thanks" and never refreshed from the server (architecture AD-13).
  * - A FAILED SERVER READ changes nothing: the copy and the screen stay as they
  *   were. Only a successful read overwrites a copy — including "the server says
  *   there is nothing", which is saved as such.

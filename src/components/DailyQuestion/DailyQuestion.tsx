@@ -12,6 +12,16 @@
  * (`me`/`both`) always wins over it; a refused row (`failed`) gives the options
  * back beside the reason. A normal page inside `<main>`, so it gets the dock
  * clearance and side padding from there.
+ *
+ * The day's writer is asked to write tomorrow's question (AD-4, AD-13): a
+ * bottom sheet (`WriteQuestionSheet`) opens while the snapshot on screen holds
+ * the account's own server pick (`my_choice`, so a queued pick never opens it),
+ * `write.mine` is true and `write.done` false, the day is not in
+ * `dailyWriteDeclined`, and the snapshot's `day` is the device's date, once this
+ * mount's own read of the day has answered (the saved day shown first may be
+ * out of date). A tap on its scrim or Escape hides it until the next mount of
+ * this view; only a successful send (`write.done`) or "No thanks" ends it for
+ * the day.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -24,7 +34,9 @@ import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError } from '../../services/accountDataError';
 import type { QueuedDailyPick } from '../../stores/slices/dailyQuestionSlice';
 import { useAppStore } from '../../stores/useAppStore';
+import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
+import { WriteQuestionSheet } from './WriteQuestionSheet';
 
 const OPTION =
   'flex min-h-12 w-full items-center justify-center rounded-[14px] px-4 py-3 text-base font-semibold wrap-break-word transition-opacity focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50';
@@ -216,6 +228,7 @@ export function DailyQuestion() {
   const userId = useAppStore((state) => state.userId);
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
   const navigatePartner = useAppStore((state) => state.navigatePartner);
+  const writeDeclined = useAppStore((state) => state.dailyWriteDeclined);
   const partnerName = useAppStore((state) => state.partner?.displayName)?.trim() || 'Your partner';
 
   // The day-changed notice belongs to the session that raised it, so an account
@@ -226,11 +239,34 @@ export function DailyQuestion() {
   const clearDayChanged = useCallback(() => setDayChangedIn(null), []);
   const raiseDayChanged = useCallback(() => setDayChangedIn(sessionKey), [sessionKey]);
 
+  // The session whose read this mount has had answered (see the effect below).
+  const [readFor, setReadFor] = useState<string | null>(null);
+
+  // The write sheet, closed by a scrim tap or Escape, stays closed for this
+  // mount of Daily: the day it was closed for, so a new day can ask again.
+  const [writeClosedFor, setWriteClosedFor] = useState<string | null>(null);
+  const closeWriteSheet = useCallback(() => {
+    if (dailyDay?.status === 'ok') setWriteClosedFor(dailyDay.snapshot.day_id);
+  }, [dailyDay]);
+  const writeSnapshot = dailyDay?.status === 'ok' ? dailyDay.snapshot : null;
+  const showWriteSheet =
+    writeSnapshot !== null &&
+    writeSnapshot.my_choice !== null &&
+    writeSnapshot.write.mine &&
+    !writeSnapshot.write.done &&
+    !writeDeclined.includes(writeSnapshot.day_id) &&
+    writeSnapshot.day === formatDateISO(new Date()) &&
+    writeClosedFor !== writeSnapshot.day_id &&
+    readFor === sessionKey;
+
   // Re-read on each mount, and for a new session while the view stays open (an
-  // account switch clears `dailyDay` through signedOutState).
+  // account switch clears `dailyDay` through signedOutState). The sheet waits
+  // for this mount's read to answer: the day shown first may be a saved one
+  // whose turn was written on another device. A flag, not `dailyDayLoading`: a
+  // later background load must not take the sheet away mid-typing.
   useEffect(() => {
-    void loadDailyDay();
-  }, [loadDailyDay, userId, authSessionVersion]);
+    void loadDailyDay().then(() => setReadFor(sessionKey));
+  }, [loadDailyDay, sessionKey]);
 
   // The partner's pick shows without a reload (AD-11).
   useDailyPickListener();
@@ -301,6 +337,15 @@ export function DailyQuestion() {
           </div>
         )}
       </div>
+
+      {showWriteSheet && (
+        <WriteQuestionSheet
+          key={writeSnapshot.day_id}
+          dayId={writeSnapshot.day_id}
+          partnerName={partnerName}
+          onClose={closeWriteSheet}
+        />
+      )}
     </div>
   );
 }
