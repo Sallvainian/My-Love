@@ -672,13 +672,22 @@ describe('scheduleDateRemindersAtLaunch with a launch refresh', () => {
     expect(localNotifications.schedule).toHaveBeenCalledTimes(2);
   });
 
-  it('does not plan the second time for an owner the store has left', async () => {
+  // A switch to another account deletes the outgoing account's copies, so its
+  // plan would find nothing to schedule even without the identity check; the
+  // same account signed in again keeps them, so only the check stops that one.
+  it.each([
+    ['another account', () => state().setAuthUser(B)],
+    [
+      'the same account signed in again',
+      () => useAppStore.setState({ authSessionVersion: state().authSessionVersion + 1 } as StoreState),
+    ],
+  ])('does not plan the second time for an owner the store has left: %s', async (_name, leave) => {
     await seedOneOfEachKind();
     const gate = deferred<void>();
     const run = scheduleDateRemindersAtLaunch(owner(), gate.promise);
     await vi.waitFor(() => expect(localNotifications.schedule).toHaveBeenCalledTimes(1));
 
-    state().setAuthUser(B);
+    leave();
     gate.settle();
     await run;
 
