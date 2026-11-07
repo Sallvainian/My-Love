@@ -190,6 +190,7 @@ beforeEach(() => {
       syncPendingMoods: vi.fn(async () => ({ synced: 0, failed: 0, skipped: false })),
       updateSyncStatus: vi.fn(async () => {}),
       drainQueuedNotes: vi.fn(async () => {}),
+      drainQueuedPicks: vi.fn(async () => {}),
       // Home re-reads anniversaries on arrival; no test here reads them.
       loadAnniversariesFromServer: vi.fn(async () => true),
     },
@@ -493,5 +494,61 @@ describe('App drains the love-note send queue', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('App drains the daily-question pick queue', () => {
+  const drain = () => vi.mocked(useAppStore.getState().drainQueuedPicks);
+
+  it('on signed-in start', async () => {
+    await renderApp();
+
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(drain()).toHaveBeenCalled();
+  });
+
+  it('on the window online event while signed in', async () => {
+    await renderApp();
+    drain().mockClear();
+
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
+
+    expect(drain()).toHaveBeenCalledTimes(1);
+  });
+
+  it('not on a start while offline', async () => {
+    useAppStore.setState({ syncStatus: { ...useAppStore.getState().syncStatus, isOnline: false } });
+
+    await renderApp();
+
+    expect(screen.getByTestId('app-container')).toBeInTheDocument();
+    expect(drain()).not.toHaveBeenCalled();
+  });
+
+  it('not on the 5-minute interval', async () => {
+    // 'Date' too: faking timers without it would un-pin the clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    try {
+      await renderApp();
+      drain().mockClear();
+
+      await act(async () => {
+        vi.advanceTimersByTime(5 * 60 * 1000);
+      });
+
+      expect(drain()).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('not at all while signed out, including on the online event', async () => {
+    auth.getSession.mockResolvedValue(null);
+    await renderApp();
+    expect(screen.getByTestId('login-screen')).toBeInTheDocument();
+
+    await act(async () => window.dispatchEvent(new Event('online'))); // raw online: connectivity change, not a user action
+
+    expect(drain()).not.toHaveBeenCalled();
   });
 });

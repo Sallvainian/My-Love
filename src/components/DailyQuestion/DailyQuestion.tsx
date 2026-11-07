@@ -6,19 +6,23 @@
  * view shows the partner's choice only when the snapshot carries it. `unlinked`
  * renders no question and no pick control, only the invitation to link (Go to
  * Partner); a failed load never does. The slice shows the account's saved day
- * first, so a day seen earlier stays on screen offline. A normal page inside
- * `<main>`, so it gets the dock clearance and side padding from there.
+ * first, so a day seen earlier stays on screen offline. A pick made offline is
+ * queued (`dailyQueuedPicks`): while its row is pending the card shows it as
+ * the own pick with no options, never as a reveal, and the server's own pick
+ * (`me`/`both`) always wins over it; a refused row (`failed`) gives the options
+ * back beside the reason. A normal page inside `<main>`, so it gets the dock
+ * clearance and side padding from there.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { isOnline } from '../../api/errorHandlers';
 import {
   DAY_CHANGED_MESSAGE,
   type DailyChoice,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
 import { useDailyPickListener } from '../../hooks/useDailyPickListener';
-import { AccountDataError, offlineMessage } from '../../services/accountDataError';
+import { AccountDataError } from '../../services/accountDataError';
+import type { QueuedDailyPick } from '../../stores/slices/dailyQuestionSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 
@@ -52,11 +56,14 @@ function PickCard({
 
 function DayCard({
   snapshot,
+  queued,
   partnerName,
   onSendStart,
   onDayChanged,
 }: {
   snapshot: DailyDaySnapshot;
+  /** The account's queued pick for this day, if any. */
+  queued: QueuedDailyPick | null;
   partnerName: string;
   /** A Send began: the parent clears its day-changed notice. */
   onSendStart: () => void;
@@ -73,10 +80,6 @@ function DayCard({
   const send = useCallback(async () => {
     if (!selected) return;
     onSendStart();
-    if (!isOnline()) {
-      setSendError(offlineMessage('Your pick', 'send', 'needs'));
-      return;
-    }
     setSendError(null);
     setSending(true);
     try {
@@ -96,6 +99,14 @@ function DayCard({
 
   const mine = snapshot.my_choice ? question[snapshot.my_choice] : null;
   const theirs = snapshot.partner_choice ? question[snapshot.partner_choice] : null;
+  // The server's pick wins; a pending queued pick stands in for the own pick.
+  const waitingToSend = (state === 'none' || state === 'partner') && queued && !queued.failed;
+  const refused = (state === 'none' || state === 'partner') && queued?.failed ? queued : null;
+  const partnerStatus = (
+    <p className="text-[13px] leading-[1.4] text-muted" data-testid="daily-partner-status">
+      {state === 'partner' ? `${partnerName} has picked` : `${partnerName} hasn't picked yet`}
+    </p>
+  );
 
   return (
     <div className={`${CARD} gap-4 p-5`}>
@@ -106,7 +117,20 @@ function DayCard({
         {question.this} or {question.that}?
       </h1>
 
-      {(state === 'none' || state === 'partner') && (
+      {waitingToSend && (
+        <div className="flex flex-col gap-2">
+          <PickCard label="Your pick" text={question[queued.choice]} testId="daily-my-pick" />
+          <p className="text-[13px] leading-[1.4] text-muted" data-testid="daily-my-pick-time">
+            {pickedTime(queued.picked_at)}
+          </p>
+          <p className="text-[15px] font-semibold text-ink" data-testid="daily-pick-queued">
+            Waiting for a connection to send your pick.
+          </p>
+          {partnerStatus}
+        </div>
+      )}
+
+      {(state === 'none' || state === 'partner') && !waitingToSend && (
         <>
           <div className="flex flex-col gap-2">
             <button
@@ -130,9 +154,12 @@ function DayCard({
               {question.that}
             </button>
           </div>
-          <p className="text-[13px] leading-[1.4] text-muted" data-testid="daily-partner-status">
-            {state === 'partner' ? `${partnerName} has picked` : `${partnerName} hasn't picked yet`}
-          </p>
+          {partnerStatus}
+          {refused && (
+            <div className={FAILURE_BOX} role="alert" data-testid="daily-pick-failed">
+              Your pick could not be sent.{refused.failure ? ` ${refused.failure}` : ''}
+            </div>
+          )}
           <div className="flex">
             <button
               type="button"
@@ -185,6 +212,7 @@ export function DailyQuestion() {
   const loading = useAppStore((state) => state.dailyDayLoading);
   const loadError = useAppStore((state) => state.dailyDayError);
   const loadDailyDay = useAppStore((state) => state.loadDailyDay);
+  const queuedPicks = useAppStore((state) => state.dailyQueuedPicks);
   const userId = useAppStore((state) => state.userId);
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
   const navigatePartner = useAppStore((state) => state.navigatePartner);
@@ -224,6 +252,7 @@ export function DailyQuestion() {
           <DayCard
             key={dailyDay.snapshot.day_id}
             snapshot={dailyDay.snapshot}
+            queued={queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null}
             partnerName={partnerName}
             onSendStart={clearDayChanged}
             onDayChanged={raiseDayChanged}

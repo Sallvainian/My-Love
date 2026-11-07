@@ -31,6 +31,13 @@ export const MOOD_SYNC_LOCK = 'my-love:mood-sync';
 export const NOTE_QUEUE_LOCK = 'my-love:note-queue';
 
 /**
+ * Held by one daily-question pick queue drain at a time
+ * (`dailyQuestionSlice.drainQueuedPicks`), so two tabs never send the same
+ * queued pick concurrently.
+ */
+export const PICK_QUEUE_LOCK = 'my-love:pick-queue';
+
+/**
  * Outcome of a guarded section.
  *
  * `ran: false` means another context held the lock and the caller did nothing —

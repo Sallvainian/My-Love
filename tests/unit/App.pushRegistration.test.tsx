@@ -182,6 +182,7 @@ beforeEach(() => {
       syncPendingMoods: vi.fn(async () => ({ synced: 0, failed: 0, skipped: false })),
       updateSyncStatus: vi.fn(async () => {}),
       drainQueuedNotes: vi.fn(async () => {}),
+      drainQueuedPicks: vi.fn(async () => {}),
       // Home re-reads anniversaries on arrival; no test here reads them.
       loadAnniversariesFromServer: vi.fn(async () => true),
     },

@@ -92,8 +92,8 @@ describe('dbSchema', () => {
 
       expect(Array.from(unwrap(db).objectStoreNames)).not.toContain('photos');
       // Three survivors (message-favorites goes at v15) plus v12's local-copies,
-      // v13's image-cache and v14's note-queue.
-      expect(db.objectStoreNames.length).toBe(6);
+      // v13's image-cache, v14's note-queue and v16's pick-queue.
+      expect(db.objectStoreNames.length).toBe(7);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
       expect((await db.get('local-copies', ['USER-A', 'message-data']))?.value).toMatchObject({
         bundledFavoriteIds: [1],
@@ -109,7 +109,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       expect((await db.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V10' });
     });
   });
@@ -143,7 +143,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const copies = db.transaction('local-copies', 'readonly').objectStore('local-copies');
       expect(Array.from(copies.keyPath as string[])).toEqual(['userId', 'kind']);
       expect(copies.indexNames.contains('by-user')).toBe(true);
@@ -170,7 +170,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       expect(await db.get('local-copies', ['USER-A', 'partner'])).toMatchObject({
         value: { status: 'unlinked' },
       });
@@ -226,7 +226,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
       expect(Array.from(images.keyPath as string[])).toEqual(['userId', 'path']);
       expect(images.indexNames.contains('by-user')).toBe(true);
@@ -242,7 +242,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const images = db.transaction('image-cache', 'readonly').objectStore('image-cache');
       expect(images.indexNames.contains('by-user')).toBe(true);
       expect(
@@ -305,7 +305,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const queue = db.transaction('note-queue', 'readonly').objectStore('note-queue');
       expect(queue.keyPath).toBe('id');
       expect(queue.indexNames.contains('by-user')).toBe(true);
@@ -321,7 +321,7 @@ describe('dbSchema', () => {
 
       const db = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const queue = db.transaction('note-queue', 'readonly').objectStore('note-queue');
       expect(queue.indexNames.contains('by-user')).toBe(true);
       expect(await db.getAllFromIndex('note-queue', 'by-user', 'USER-A')).toEqual([

@@ -134,6 +134,7 @@ function App() {
   const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
   const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
+  const drainQueuedPicks = useAppStore((s) => s.drainQueuedPicks);
   const updateSyncStatus = useAppStore((s) => s.updateSyncStatus);
   const loadEvents = useAppStore((s) => s.loadEvents);
   const loadAnniversariesFromServer = useAppStore((s) => s.loadAnniversariesFromServer);
@@ -546,6 +547,9 @@ function App() {
       // Send love notes queued while offline (services/noteQueue.ts).
       if (useAppStore.getState().userId) void drainQueuedNotes();
 
+      // Send daily-question picks queued while offline (services/pickQueue.ts).
+      if (useAppStore.getState().userId) void drainQueuedPicks();
+
       // Refresh every local copy the offline spell left stale, without a reload.
       if (useAppStore.getState().userId) void refreshLocalCopies();
     };
@@ -569,7 +573,7 @@ function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [syncPendingMoods, drainQueuedNotes, updateSyncStatus]);
+  }, [syncPendingMoods, drainQueuedNotes, drainQueuedPicks, updateSyncStatus]);
 
   // Hybrid Sync Solution: Periodic background sync + immediate sync on mount
   useEffect(() => {
@@ -580,6 +584,7 @@ function App() {
         console.error('[App] Initial sync on mount failed:', error);
       });
       void drainQueuedNotes();
+      void drainQueuedPicks();
     }
 
     // Part 2: Periodic sync every 5 minutes while app is open
@@ -599,7 +604,7 @@ function App() {
       clearInterval(syncInterval);
       logger.debug('[App] Periodic sync interval cleared');
     };
-  }, [syncPendingMoods, drainQueuedNotes, isOnline, session]);
+  }, [syncPendingMoods, drainQueuedNotes, drainQueuedPicks, isOnline, session]);
 
   // Story 3 (dynamic events): load the couple's countdown events on first
   // Home render and on every later return to Home while signed in — covers

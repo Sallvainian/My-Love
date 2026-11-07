@@ -203,12 +203,12 @@ describe('dbSchema', () => {
       expect((await db.getAll('moods'))[0]).toMatchObject({ note: 'MOOD-AT-V7' });
       expect((await db.getAll('sw-auth'))[0]).toMatchObject({ accessToken: 'TOKEN-AT-V7' });
 
-      // Six stores (local-copies at v12, image-cache at v13, note-queue at
-      // v14; message-favorites is never created since v15);
+      // Seven stores (local-copies at v12, image-cache at v13, note-queue at
+      // v14, pick-queue at v16; message-favorites is never created since v15);
       // the v7 scripture stores are dropped on the way to v10 and photos on the
       // way to v11. The v7 moods index is untouched — a later branch must not
       // re-run the v7 swap over a store that has already had it.
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('photos');
       expect(remaining).not.toContain('scripture-sessions');
@@ -242,7 +242,7 @@ describe('dbSchema', () => {
       // It resolved rather than blocking, and the v7 row is still there:
       // winning the upgrade is not a reset.
       const afterMood = await openTestDb(DB_NAME, DB_VERSION, { upgrade: upgradeDb });
-      expect(afterMood.objectStoreNames.length).toBe(6);
+      expect(afterMood.objectStoreNames.length).toBe(7);
       expect((await afterMood.getAll('messages'))[0]).toMatchObject({ text: 'WRITTEN-AT-V7' });
 
       // The service that DOES read the store now connects at the same version,
@@ -370,7 +370,8 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
       expect(db.objectStoreNames.contains('image-cache')).toBe(true);
       expect(db.objectStoreNames.contains('note-queue')).toBe(true);
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.contains('pick-queue')).toBe(true);
+      expect(db.objectStoreNames.length).toBe(7);
 
       const remaining = Array.from(unwrap(db).objectStoreNames);
       expect(remaining).not.toContain('message-favorites');

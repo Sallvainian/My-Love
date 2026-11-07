@@ -61,18 +61,23 @@ describe('dbSchema', () => {
       expect(db.objectStoreNames.contains('local-copies')).toBe(true);
       expect(db.objectStoreNames.contains('image-cache')).toBe(true);
       expect(db.objectStoreNames.contains('note-queue')).toBe(true);
+      expect(db.objectStoreNames.contains('pick-queue')).toBe(true);
+      const pickQueue = db.transaction('pick-queue').store;
+      expect(pickQueue.keyPath).toEqual(['user_id', 'day_id']);
+      expect(pickQueue.indexNames.contains('by-user')).toBe(true);
+      expect(pickQueue.index('by-user').keyPath).toBe('user_id');
       // v11: photos live in Supabase; a fresh profile never gets the store.
       expect(unwrap(db).objectStoreNames.contains('photos')).toBe(false);
       // v15: favorites live in the message-data local copy.
       expect(unwrap(db).objectStoreNames.contains('message-favorites')).toBe(false);
     });
 
-    it('should create exactly 6 stores', async () => {
+    it('should create exactly 7 stores', async () => {
       const db = await openTestDb(DB_NAME, DB_VERSION, {
         upgrade: upgradeDb,
       });
 
-      expect(db.objectStoreNames.length).toBe(6);
+      expect(db.objectStoreNames.length).toBe(7);
     });
   });
 
@@ -98,7 +103,7 @@ describe('dbSchema', () => {
   });
 
   describe('STORE_NAMES constants', () => {
-    it('names the core stores messages, moods, sw-auth, local-copies, image-cache and note-queue', () => {
+    it('names the core stores messages, moods, sw-auth, local-copies, image-cache, note-queue and pick-queue', () => {
       expect(STORE_NAMES).toEqual({
         MESSAGES: 'messages',
         MOODS: 'moods',
@@ -106,6 +111,7 @@ describe('dbSchema', () => {
         LOCAL_COPIES: 'local-copies',
         IMAGE_CACHE: 'image-cache',
         NOTE_QUEUE: 'note-queue',
+        PICK_QUEUE: 'pick-queue',
       });
     });
   });
@@ -115,15 +121,16 @@ describe('dbSchema', () => {
       expect(DB_NAME).toBe('my-love-db');
     });
 
-    it('is at schema version 15, after custom messages moved onto the message-data copy', () => {
+    it('is at schema version 16, after the daily-question pick queue was added', () => {
       // v6 re-fires upgradeDb so profiles stranded at v5 by storage.ts's old
       // callback get their missing stores created; v7 swaps the moods index;
       // v8 adds by-user to messages; v9 stores favorites by account; v10 drops
       // the four scripture stores; v11 drops the unused photos store; v12 adds
       // the shared per-account local-copies store; v13 adds the per-account
       // image-cache store; v14 adds the per-account note-queue store; v15
-      // moves custom messages and favorites onto the message-data local copy.
-      expect(DB_VERSION).toBe(15);
+      // moves custom messages and favorites onto the message-data local copy; v16
+      // adds the per-account pick-queue store.
+      expect(DB_VERSION).toBe(16);
     });
   });
 });

@@ -43,6 +43,8 @@ export type StoredMoodEntry = MoodEntry;
  * - v15: Moved the signed-in account's custom messages and favorites into its
  *   `message-data` local copy; dropped every custom row, the messages `by-user`
  *   index and the `message-favorites` store
+ * - v16: Added pick-queue, per-account daily-question picks made offline and
+ *   waiting to be sent
  */
 export interface MyLoveDBSchema extends DBSchema {
   /**
@@ -108,6 +110,35 @@ export interface MyLoveDBSchema extends DBSchema {
     value: StoredQueuedNote;
     indexes: { 'by-user': string };
   };
+  /**
+   * The per-account daily-question pick queue (`src/services/pickQueue.ts`).
+   * One row per account and day, until the server has confirmed the pick.
+   */
+  'pick-queue': {
+    key: [string, string];
+    value: StoredQueuedPick;
+    indexes: { 'by-user': string };
+  };
+}
+
+/**
+ * One daily-question pick made by `user_id` while offline and not yet confirmed
+ * by the server. Plain data only; `picked_at` and the zone pair are the instant
+ * and zone the pick was made in, which the server dates it by.
+ */
+export interface StoredQueuedPick {
+  user_id: string;
+  day_id: string;
+  choice: 'this' | 'that';
+  /** ISO timestamp of the pick; the queue is sent oldest first. */
+  picked_at: string;
+  time_zone: string;
+  /** East-positive offset in minutes in force at `picked_at`. */
+  utc_offset_minutes: number;
+  /** True once the server refused it; it is no longer pending. */
+  failed: boolean;
+  /** The refusal's message while `failed`, else `null`. */
+  failure: string | null;
 }
 
 /**
@@ -215,7 +246,11 @@ export const DB_NAME = 'my-love-db';
 // `message-favorites` store are deleted, so rows left by accounts that signed
 // out long ago go too. Gated on those legacy structures existing (see
 // migrateMessageDataToLocalCopy), never on oldVersion.
-export const DB_VERSION = 15;
+//
+// v16 adds `pick-queue`, keyed [user_id, day_id] with a `by-user` index: daily
+// question picks made offline and waiting to be sent (see
+// src/services/pickQueue.ts). Same existence gate as v12.
+export const DB_VERSION = 16;
 
 /**
  * Store name constants for consistent access across services
@@ -227,11 +262,12 @@ export const STORE_NAMES = {
   LOCAL_COPIES: 'local-copies',
   IMAGE_CACHE: 'image-cache',
   NOTE_QUEUE: 'note-queue',
+  PICK_QUEUE: 'pick-queue',
 } as const;
 
 /**
  * Centralized IndexedDB upgrade function
- * Handles all store creation and migrations for v1-v15
+ * Handles all store creation and migrations for v1-v16
  *
  * Called by all services to ensure consistent database schema.
  * This fixes the tech debt where each service had duplicate upgrade logic.
@@ -346,6 +382,16 @@ export function upgradeDb(
   } else if (tx) {
     const queue = tx.objectStore('note-queue');
     if (!queue.indexNames.contains('by-user')) queue.createIndex('by-user', 'userId');
+  }
+
+  // v16: the per-account daily-question pick queue. Same existence gate as v12.
+  if (!db.objectStoreNames.contains('pick-queue')) {
+    const queue = db.createObjectStore('pick-queue', { keyPath: ['user_id', 'day_id'] });
+    queue.createIndex('by-user', 'user_id');
+    logger.debug('[dbSchema] Created pick-queue store (v16)');
+  } else if (tx) {
+    const queue = tx.objectStore('pick-queue');
+    if (!queue.indexNames.contains('by-user')) queue.createIndex('by-user', 'user_id');
   }
 
   // v15: custom messages and favorites move onto the `message-data` local

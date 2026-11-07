@@ -48,6 +48,13 @@ const FETCH_BY_ID_CONTEXT = 'DailyQuestionApi.fetchDailyDayById';
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
 const PICK_DATE_MISMATCH = 'DQ001';
 
+/**
+ * SQLSTATEs `submit_daily_pick` raises for a pick it refuses for good: `DQ001`
+ * (date mismatch), `DQ002` (outside the window), `P0002` (day not found) and
+ * `22023` (invalid choice or time). Anything else is a transient failure.
+ */
+const PICK_REFUSAL_CODES: ReadonlySet<string> = new Set([PICK_DATE_MISMATCH, 'DQ002', 'P0002', '22023']);
+
 /** Shown when a pick is refused because the date changed since the question was shown. */
 export const DAY_CHANGED_MESSAGE =
   "The date has changed since this question was shown. Check today's question and pick again.";
@@ -63,6 +70,27 @@ export function deviceZone(): { time_zone: string; utc_offset_minutes: number } 
     time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     utc_offset_minutes: -new Date().getTimezoneOffset(),
   };
+}
+
+/**
+ * The zone pair a pick made at `at` is dated by (AD-2): the device's IANA name
+ * and the east-positive offset in force at `at`, not at send time.
+ */
+export function pickZone(at: Date): { time_zone: string; utc_offset_minutes: number } {
+  return { time_zone: deviceZone().time_zone, utc_offset_minutes: -at.getTimezoneOffset() };
+}
+
+/**
+ * True when `error` is the server refusing a pick for good (see
+ * `PICK_REFUSAL_CODES`) or `AccountDataError('day-changed')`. Offline, network,
+ * timeout, 401/5xx and `invalid-response` failures are transient: a later
+ * attempt may succeed.
+ */
+export function isPickRefusal(error: unknown): error is AccountDataError {
+  if (!(error instanceof AccountDataError)) return false;
+  if (error.code === 'day-changed') return true;
+  const code = (error.cause as { code?: unknown } | null | undefined)?.code;
+  return typeof code === 'string' && PICK_REFUSAL_CODES.has(code);
 }
 
 /** The caller's day for today's date, or `unlinked`. Throws on any failure. */
@@ -122,12 +150,15 @@ export async function announceDailyPick(dayId: string): Promise<void> {
 
 /**
  * Send the caller's pick for `dayId`. `pickedAt` is the instant the pick was
- * made (default: now). Returns the day's snapshot. Throws on any failure.
+ * made (default: now) and `zone` the zone pair it was made in (default: the
+ * device's, with the offset in force at `pickedAt`). Returns the day's
+ * snapshot. Throws on any failure.
  */
 export async function submitDailyPick(
   dayId: string,
   choice: DailyChoice,
-  pickedAt: Date = new Date()
+  pickedAt: Date = new Date(),
+  zone: { time_zone: string; utc_offset_minutes: number } = pickZone(pickedAt)
 ): Promise<DailyDaySnapshot> {
   refuseOffline('Your pick', 'send');
   try {
@@ -138,8 +169,8 @@ export async function submitDailyPick(
         day_id: dayId,
         choice,
         picked_at: pickedAt.toISOString(),
-        time_zone: deviceZone().time_zone,
-        utc_offset_minutes: -pickedAt.getTimezoneOffset(),
+        time_zone: zone.time_zone,
+        utc_offset_minutes: zone.utc_offset_minutes,
       })
       .abortSignal(requestTimeout());
     if (error) throw error;

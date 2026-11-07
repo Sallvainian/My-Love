@@ -25,8 +25,7 @@ export async function clearPairDays(
   supabaseAdmin: TypedSupabaseClient,
   pair: WorkerPairIds
 ): Promise<void> {
-  const [userA, userB] =
-    pair.userId < pair.partnerId ? [pair.userId, pair.partnerId] : [pair.partnerId, pair.userId];
+  const [userA, userB] = orderedPair(pair);
 
   const { error } = await supabaseAdmin
     .from('couple_days')
@@ -85,8 +84,7 @@ export async function readPairQuestionTexts(
   supabaseAdmin: TypedSupabaseClient,
   pair: WorkerPairIds
 ): Promise<string[]> {
-  const [userA, userB] =
-    pair.userId < pair.partnerId ? [pair.userId, pair.partnerId] : [pair.partnerId, pair.userId];
+  const [userA, userB] = orderedPair(pair);
 
   const { data, error } = await supabaseAdmin
     .from('couple_days')
@@ -103,4 +101,46 @@ export async function readPairQuestionTexts(
     if (!question) throw new Error('readPairQuestionTexts: a day has no question row');
     return `${question.this_text} or ${question.that_text}?`;
   });
+}
+
+/** The pair in `couple_days` order: `user_a < user_b`. */
+function orderedPair(pair: WorkerPairIds): [string, string] {
+  return pair.userId < pair.partnerId ? [pair.userId, pair.partnerId] : [pair.partnerId, pair.userId];
+}
+
+/** The ids of this worker pair's `couple_days` rows. */
+export async function readPairDayIds(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: WorkerPairIds
+): Promise<string[]> {
+  const [userA, userB] = orderedPair(pair);
+  const { data, error } = await supabaseAdmin
+    .from('couple_days')
+    .select('id')
+    .eq('user_a', userA)
+    .eq('user_b', userB);
+
+  if (error) {
+    throw new Error(`readPairDayIds: failed to read the pair's days: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => row.id);
+}
+
+/** Set `created_at` on every `couple_days` row of this worker pair. */
+export async function setPairDaysCreatedAt(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: WorkerPairIds,
+  createdAt: Date
+): Promise<void> {
+  const [userA, userB] = orderedPair(pair);
+  const { error } = await supabaseAdmin
+    .from('couple_days')
+    .update({ created_at: createdAt.toISOString() })
+    .eq('user_a', userA)
+    .eq('user_b', userB);
+
+  if (error) {
+    throw new Error(`setPairDaysCreatedAt: failed to move the pair's days: ${error.message}`);
+  }
 }

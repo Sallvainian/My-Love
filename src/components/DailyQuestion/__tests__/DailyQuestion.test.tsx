@@ -40,7 +40,9 @@ vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
 import { DAY_CHANGED_MESSAGE } from '../../../api/dailyQuestionApi';
 import { AccountDataError } from '../../../services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../services/dailyDaysCopy';
+import { openMyLoveDB } from '../../../services/dbSchema';
 import { deleteAccountCopies, writeLocalCopy } from '../../../services/localCopy';
+import { enqueuePick } from '../../../services/pickQueue';
 import { useAppStore } from '../../../stores/useAppStore';
 import { DailyQuestion } from '../DailyQuestion';
 
@@ -71,7 +73,11 @@ beforeEach(async () => {
   useAppStore.getState().clearAuth();
   useAppStore.getState().setAuthUser('USER-A-ID');
   setPartner('Jessie');
-  // A day saved by an earlier test must not be shown first in this one.
+  // A day saved by an earlier test must not be shown first in this one, nor a
+  // pick it left in the queue.
+  const queueDb = await openMyLoveDB();
+  await queueDb.clear('pick-queue');
+  queueDb.close();
   await deleteAccountCopies('USER-A-ID');
   await deleteAccountCopies('USER-C-ID');
 });
@@ -336,7 +342,7 @@ describe('DailyQuestion', () => {
     expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Beach day');
   });
 
-  it('offline send: shows the offline message and sends nothing', async () => {
+  it('offline send: queues the pick, sends nothing, and shows it as the own pick with no options', async () => {
     const user = userEvent.setup();
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
 
@@ -345,11 +351,167 @@ describe('DailyQuestion', () => {
     setOnline(false);
     await user.click(screen.getByTestId('daily-send-pick'));
 
-    expect(screen.getByTestId('daily-send-error')).toHaveTextContent(
-      'You are offline. Your pick needs a connection to send.'
+    expect(await screen.findByTestId('daily-pick-queued')).toHaveTextContent(
+      'Waiting for a connection to send your pick.'
     );
     expect(submitDailyPickRequest).not.toHaveBeenCalled();
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Beach day');
+    expect(screen.getByTestId('daily-my-pick-time')).toHaveTextContent('12:00 PM');
+    expect(screen.getByTestId('daily-partner-status')).toHaveTextContent("Jessie hasn't picked yet");
+    expect(screen.queryByTestId('daily-send-error')).toBeNull();
+    expect(screen.queryByTestId('daily-option-this')).toBeNull();
+    expect(screen.queryByTestId('daily-option-that')).toBeNull();
+    expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+    expect(screen.queryByTestId('daily-reveal')).toBeNull();
+  });
+
+  it('a queued pick with the partner already picked shows "has picked", never the reveal', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ state: 'partner' })));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-that'));
+    setOnline(false);
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(await screen.findByTestId('daily-pick-queued')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Mountain day');
+    expect(screen.getByTestId('daily-partner-status')).toHaveTextContent('Jessie has picked');
+    expect(screen.queryByTestId('daily-reveal')).toBeNull();
+    expect(screen.queryByTestId('daily-reveal-partner')).toBeNull();
+  });
+
+  it('a pending queued row shows after a reload', async () => {
+    await enqueuePick({
+      user_id: 'USER-A-ID',
+      day_id: DAY_ID,
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: false,
+      failure: null,
+    });
+    fetchDailyDay.mockRejectedValue(new AccountDataError('offline', 'You are offline.'));
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: dailySnapshot() });
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-pick-queued')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Mountain day');
+    expect(screen.queryByTestId('daily-option-this')).toBeNull();
+  });
+
+  it('the server\'s own pick wins over a queued row', async () => {
+    await enqueuePick({
+      user_id: 'USER-A-ID',
+      day_id: DAY_ID,
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: false,
+      failure: null,
+    });
+    fetchDailyDay.mockResolvedValue(ok(waitingSnapshot('this')));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-waiting')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Beach day');
+    expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
+  });
+
+  it('a refused queued row shows the reason and gives the options back; a new Send replaces it', async () => {
+    const user = userEvent.setup();
+    await enqueuePick({
+      user_id: 'USER-A-ID',
+      day_id: DAY_ID,
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: true,
+      failure: 'Pick time outside the allowed window',
+    });
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-pick-failed')).toHaveTextContent(
+      'Your pick could not be sent. Pick time outside the allowed window'
+    );
+    expect(screen.getByTestId('daily-pick-failed')).toHaveAttribute('role', 'alert');
+    expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
+    await user.click(screen.getByTestId('daily-option-this'));
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(await screen.findByTestId('daily-waiting')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-pick-failed')).toBeNull();
+  });
+
+  it('a refused queued row with the partner already picked shows the failure and the options, never a reveal', async () => {
+    await enqueuePick({
+      user_id: 'USER-A-ID',
+      day_id: DAY_ID,
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: true,
+      failure: 'Pick time outside the allowed window',
+    });
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ state: 'partner' })));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-pick-failed')).toBeInTheDocument();
     expect(screen.getByTestId('daily-option-this')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-send-pick')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-partner-status')).toHaveTextContent('has picked');
+    expect(screen.queryByTestId('daily-reveal')).toBeNull();
+    expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
+  });
+
+  it('a queued row of another account is not shown', async () => {
+    await enqueuePick({
+      user_id: 'USER-B-ID',
+      day_id: DAY_ID,
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: false,
+      failure: null,
+    });
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-option-this')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
+  });
+
+  it('a pending row of another day_id does not show as the shown day\'s pick', async () => {
+    await enqueuePick({
+      user_id: 'USER-A-ID',
+      day_id: 'some-other-day',
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: false,
+      failure: null,
+    });
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-option-this')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-send-pick')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
+    expect(screen.queryByTestId('daily-my-pick')).toBeNull();
   });
 
   it('a failed send shows the error and keeps the options', async () => {
@@ -503,7 +665,7 @@ describe('DailyQuestion', () => {
       await act(async () => settle(waitingSnapshot('that')));
     });
 
-    it('clears at an offline Send too, beside the offline message', async () => {
+    it('clears at an offline Send too, beside the queued pick', async () => {
       const user = userEvent.setup();
       fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
       fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
@@ -520,9 +682,8 @@ describe('DailyQuestion', () => {
       await user.click(screen.getByTestId('daily-send-pick'));
 
       expect(screen.queryByTestId('daily-day-changed')).toBeNull();
-      expect(screen.getByTestId('daily-send-error')).toHaveTextContent(
-        'You are offline. Your pick needs a connection to send.'
-      );
+      expect(await screen.findByTestId('daily-pick-queued')).toBeInTheDocument();
+      expect(submitDailyPickRequest).not.toHaveBeenCalled();
     });
 
     it('clears on an account change', async () => {

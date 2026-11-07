@@ -35,6 +35,8 @@ import {
   announceDailyPick,
   fetchDailyDay,
   fetchDailyDayById,
+  isPickRefusal,
+  pickZone,
   submitDailyPick,
 } from '../dailyQuestionApi';
 
@@ -248,6 +250,23 @@ describe('submitDailyPick', () => {
     );
   });
 
+  it('sends the zone pair it is given, not the device\'s', async () => {
+    rpc.mockResolvedValue({ data: waitingSnapshot('this'), error: null });
+
+    await submitDailyPick(DAY_ID, 'this', new Date('2026-11-05T04:50:00.000Z'), {
+      time_zone: 'Asia/Tokyo',
+      utc_offset_minutes: 540,
+    });
+
+    expect(rpc).toHaveBeenCalledWith('submit_daily_pick', {
+      day_id: DAY_ID,
+      choice: 'this',
+      picked_at: '2026-11-05T04:50:00.000Z',
+      time_zone: 'Asia/Tokyo',
+      utc_offset_minutes: 540,
+    });
+  });
+
   it('defaults the pick instant to now', async () => {
     rpc.mockResolvedValue({ data: waitingSnapshot('that'), error: null });
 
@@ -318,5 +337,54 @@ describe('submitDailyPick', () => {
       message: 'You are offline. Your pick needs a connection to send.',
     });
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('pickZone', () => {
+  it('is the device zone name with the offset in force at the given instant', () => {
+    const at = new Date('2026-11-01T05:30:00.000Z');
+    vi.spyOn(at, 'getTimezoneOffset').mockReturnValue(240);
+
+    expect(pickZone(at)).toEqual({ time_zone: ZONE, utc_offset_minutes: -240 });
+  });
+});
+
+describe('isPickRefusal', () => {
+  async function failureOf(error: unknown): Promise<unknown> {
+    rpc.mockResolvedValue({ data: null, error });
+    return submitDailyPick(DAY_ID, 'this').catch((caught: unknown) => caught);
+  }
+
+  it.each(['DQ001', 'DQ002', 'P0002', '22023'])('is true for the RPC refusal %s', async (code) => {
+    expect(isPickRefusal(await failureOf({ message: 'refused', code, details: '', hint: '' }))).toBe(true);
+  });
+
+  it('is true for day-changed', () => {
+    expect(isPickRefusal(new AccountDataError('day-changed', DAY_CHANGED_MESSAGE))).toBe(true);
+  });
+
+  it.each(['XX000', '57014', '42501', 'PGRST301'])('is false for the other SQLSTATE %s', async (code) => {
+    expect(isPickRefusal(await failureOf({ message: 'other', code, details: '', hint: '' }))).toBe(false);
+  });
+
+  it('is false for offline, a network failure, a timeout and an unparsed answer', async () => {
+    expect(isPickRefusal(new AccountDataError('offline', 'You are offline.'))).toBe(false);
+
+    rpc.mockRejectedValue(new TypeError('Failed to fetch'));
+    expect(isPickRefusal(await submitDailyPick(DAY_ID, 'this').catch((e: unknown) => e))).toBe(false);
+
+    rpc.mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError'));
+    expect(isPickRefusal(await submitDailyPick(DAY_ID, 'this').catch((e: unknown) => e))).toBe(false);
+
+    rpc.mockResolvedValue({ data: { status: 'unlinked' }, error: null });
+    const unparsed = await submitDailyPick(DAY_ID, 'this').catch((e: unknown) => e);
+    expect(unparsed).toMatchObject({ code: 'invalid-response' });
+    expect(isPickRefusal(unparsed)).toBe(false);
+  });
+
+  it('is false for anything that is not an AccountDataError', () => {
+    expect(isPickRefusal(new Error('P0002'))).toBe(false);
+    expect(isPickRefusal({ code: 'DQ002' })).toBe(false);
+    expect(isPickRefusal(null)).toBe(false);
   });
 });
