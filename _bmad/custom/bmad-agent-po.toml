@@ -1,9 +1,0 @@
-# Owner-adopted rule from the epic 6 retrospective (2026-11-07, action item 6).
-# bmad-loop gives a ticket the thorough review only when its risk is high
-# (`thorough_review = "high-risk"` in .bmad-loop/policy.toml), so this rule
-# acts through the risk Sofia proposes.
-
-[agent]
-persistent_facts = [
-  "Risk floor: a ticket whose change adds or edits a `.github/workflows` job, or reads, writes, stores or passes on a password, key, token or other secret, is `risk = \"high\"` whatever its business impact, with that reason on the ticket, so the loop gives it the thorough review. (Epic 6, story 6.11: rated medium, its quick review missed ten findings the thorough review later caught, one of which would have published the test bots' passwords.)",
-]
