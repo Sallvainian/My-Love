@@ -71,7 +71,8 @@ export const DAY_CHANGED_MESSAGE =
 
 /**
  * What `submit_daily_pick` refuses with, by SQLSTATE, apart from `DQ001`
- * (`day-changed`). Each sentence says on its own that the pick was not sent.
+ * (`day-changed`). Each sentence stands on its own as the explanation, so
+ * Daily shows it with no lead-in.
  */
 const PICK_REFUSAL_MESSAGES: Readonly<Record<string, string>> = {
   DQ002:

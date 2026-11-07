@@ -2,9 +2,10 @@
  * Write tomorrow's question — the bottom sheet that asks the day's writer for
  * tomorrow's This-or-That (architecture AD-4, AD-13).
  *
- * It says "tomorrow" while the snapshot's `write.target_day` is the day after
- * `day` (or missing, from a snapshot saved before the server sent it). When a
- * partner whose clock is ahead has already opened tomorrow, the question goes to
+ * It says "tomorrow" while the snapshot's `write.target_day`, the date the
+ * question is asked, is the day after `day` (or missing, from a snapshot saved
+ * before the server sent it). When a partner whose clock is ahead has already
+ * opened tomorrow, or another written question is asked first, it is asked on
  * a later date, and the sheet names that date's weekday instead (DW-494).
  *
  * `DailyQuestion` decides when it shows (the writer's own server pick is in, the
@@ -62,7 +63,7 @@ interface WriteQuestionSheetProps {
   dayId: string;
   /** The shown day's `YYYY-MM-DD` date. */
   day: string;
-  /** The snapshot's `write.target_day`: the date the question would go to. */
+  /** The snapshot's `write.target_day`: the date the question is asked. */
   targetDay?: string;
   partnerName: string;
   /** Scrim or Escape: hide the sheet until the next mount of Daily. */

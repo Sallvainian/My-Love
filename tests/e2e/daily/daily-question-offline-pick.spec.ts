@@ -15,7 +15,8 @@
  *    day's `created_at` 10 minutes ahead, so the queued `picked_at` falls before
  *    the five-minute window. Back online the server refuses with `DQ002`, the
  *    page shows the clock sentence alone with the options and Send my pick
- *    again, and the row is `failed` with that sentence. There is no page clock and no faked response.
+ *    again, and the row is `failed` with that sentence. There is no page
+ *    clock and no faked response.
  *
  * Dev mode has no service worker, so a reload cannot happen while the context
  * is offline; neither test reloads. Listeners and request trackers are attached
@@ -51,6 +52,9 @@ test.use({ trace: 'off', video: 'off' });
 
 const GET_DAILY_DAY_PATH = '/rest/v1/rpc/get_daily_day';
 const SUBMIT_DAILY_PICK_PATH = '/rest/v1/rpc/submit_daily_pick';
+/** What a `DQ002` refusal shows and stores as the row's `failure`. */
+const CLOCK_REFUSAL =
+  "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.";
 
 interface QueuedPickRow {
   user_id: string;
@@ -280,9 +284,7 @@ test.describe(
       expect(refused.status).toBe(400);
       expect(refused.responseJson).toMatchObject({ code: 'DQ002' });
       await expect(page.getByTestId('daily-pick-failed')).toBeVisible();
-      await expect(page.getByTestId('daily-pick-failed')).toHaveText(
-        "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again."
-      );
+      await expect(page.getByTestId('daily-pick-failed')).toHaveText(CLOCK_REFUSAL);
       await expect(page.getByTestId('daily-pick-queued')).toHaveCount(0);
       await expect(page.getByTestId('daily-option-this')).toBeVisible();
       await expect(page.getByTestId('daily-option-that')).toBeVisible();
@@ -294,6 +296,7 @@ test.describe(
           expect(rows[0]).toMatchObject({ failed: true });
           expect(rows[0].failure).toEqual(expect.any(String));
           expect(rows[0].failure).not.toBe('');
+          expect(rows[0].failure).toBe(CLOCK_REFUSAL);
         }
       );
       const [failedRow] = await queuedPicks(page);
