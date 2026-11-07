@@ -209,8 +209,9 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
           </div>
         )}
 
-        {/* A failed read: above an empty list, or under the rows when a "more" failed. */}
-        {dailyHistoryError && !(days.length === 0 && dailyHistoryLoading) && (
+        {/* A failed read: above an empty list, or under the rows when a read failed
+            online. Offline, rows still shown stay valid and the banner says why. */}
+        {dailyHistoryError && (days.length === 0 ? !dailyHistoryLoading : isOnline) && (
           <div
             className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
             data-testid="partner-history-error"

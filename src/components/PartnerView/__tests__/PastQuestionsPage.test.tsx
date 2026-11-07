@@ -244,6 +244,25 @@ describe('PastQuestionsPage', () => {
       expect(error.nextElementSibling).toBe(screen.getByTestId('partner-history-sentinel'));
     });
 
+    it('shows no error under rows still shown while offline', () => {
+      state.syncStatus = { isOnline: false };
+      state.dailyHistoryError = 'You are offline. Past questions needs a connection to load.';
+      renderPage();
+
+      expect(screen.getAllByTestId('partner-history-row')).toHaveLength(1);
+      expect(screen.queryByTestId('partner-history-error')).not.toBeInTheDocument();
+    });
+
+    it('still shows the error above an empty list while offline', () => {
+      state.syncStatus = { isOnline: false };
+      state.dailyHistoryError = 'You are offline. Past questions needs a connection to load.';
+      renderPage({ history: [] });
+
+      expect(screen.getByTestId('partner-history-error')).toHaveTextContent(
+        'You are offline. Past questions needs a connection to load.'
+      );
+    });
+
     it('shows no loading block or error when the read succeeded', () => {
       renderPage();
 
