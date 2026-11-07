@@ -4,8 +4,10 @@
  * all when no day qualifies.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dailySnapshot, revealSnapshot } from '../../../../tests/unit/stores/dailyQuestionFixture';
+import { useAppStore } from '../../../stores/useAppStore';
 import { PastQuestionsCard } from '../PastQuestionsCard';
 
 const day = (
@@ -32,6 +34,19 @@ describe('PastQuestionsCard', () => {
       'd3 this or d3 that?',
       'd2 this or d2 that?',
     ]);
+  });
+
+  it('opens the history page from See all', async () => {
+    const openPartnerPage = vi.fn();
+    useAppStore.setState({ openPartnerPage });
+    render(<PastQuestionsCard history={[day('d1', 'this', 'this')]} />);
+
+    const seeAll = screen.getByTestId('partner-past-questions-see-all');
+    expect(seeAll).toHaveTextContent('See all');
+    expect(seeAll).toHaveClass('min-h-11', 'text-accent');
+    await userEvent.click(seeAll);
+
+    expect(openPartnerPage).toHaveBeenCalledWith('history');
   });
 
   it('shows the label and the section test id', () => {

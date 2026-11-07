@@ -5,14 +5,16 @@
  * days that both partners picked, each as `{this} or {that}?`, the two option
  * texts the pair chose (mine first) and the server's own Same or Different
  * (`snapshot.same`). A day without both choices is skipped, and the section
- * renders nothing when no day qualifies. There is no "See all" link yet: its
- * page is a later story.
+ * renders nothing when no day qualifies. The label row's "See all" opens the
+ * Past questions page (`/partner/history`, `PastQuestionsPage`) through
+ * `openPartnerPage('history')`.
  *
  * @component
  */
 
 import { Check } from 'lucide-react';
 import type { DailyDaySnapshot } from '../../api/dailyQuestionApi';
+import { useAppStore } from '../../stores/useAppStore';
 
 /** How many days the card shows. */
 const SHOWN_DAYS = 3;
@@ -27,14 +29,25 @@ function isShown(day: DailyDaySnapshot): day is ShownDay {
 }
 
 export function PastQuestionsCard({ history }: { history: DailyDaySnapshot[] }) {
+  const openPartnerPage = useAppStore((state) => state.openPartnerPage);
   const days = history.filter(isShown).slice(0, SHOWN_DAYS);
   if (days.length === 0) return null;
 
   return (
     <section className="flex flex-col gap-1.5" data-testid="partner-past-questions">
-      <p className="px-1 text-xs font-semibold tracking-[.08em] text-muted uppercase">
-        Past questions
-      </p>
+      <div className="flex items-center justify-between gap-2 px-1">
+        <p className="text-xs font-semibold tracking-[.08em] text-muted uppercase">
+          Past questions
+        </p>
+        <button
+          type="button"
+          onClick={() => openPartnerPage('history')}
+          className="-my-1 flex min-h-11 items-center rounded-full px-1 text-[13px] font-semibold text-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
+          data-testid="partner-past-questions-see-all"
+        >
+          See all
+        </button>
+      </div>
       <div className="rounded-[20px] border border-line bg-card px-3.5 shadow-card">
         {days.map((day) => {
           const same = day.same === true;

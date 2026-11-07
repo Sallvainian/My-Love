@@ -4339,3 +4339,11 @@ source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-pag
 severity: low
 reason: dailyQuestionSlice.dailyHistory is cleared only by signedOutState(); partner_linked does not touch it (usePartnerStreakListener.ts), and PartnerView renders it as soon as `partner` is set. Rare: the app has no unlink action (src/components/Settings/PartnerPage.tsx l.13-14), so the unlink is server-side and the relink must happen in the same session. Fix: reset or key the history on the partner id when it changes; story 9 (saved days record the partner they were read with) is the natural home.
 status: open
+
+### DW-511: After an in-session relink to a different partner whose first history page is full, the history merge keeps the previous pair's older rows below it and shows them under the new partner's name.
+origin: spec-deferred 0672eff09fcf
+location: src/stores/slices/dailyQuestionSlice.ts
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-see-all-opens-every-past-question-with-the-running-count-plan.md`
+severity: low
+reason: loadDailyHistory's full-page branch keeps loaded rows older than the new page's oldest day (dailyQuestionSlice.ts), and nothing resets dailyHistory on a partner change, only signedOutState(). Needs an in-session relink (the app has no unlink action) to a pair that already has 30+ done days; a new pair's first page is short and replaces everything. Fix: reset or key the history on the partner id; extends story 7's deferred relink finding, whose natural home is story 9.
+status: open

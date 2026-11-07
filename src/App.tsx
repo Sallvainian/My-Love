@@ -45,7 +45,12 @@ import { useDatesChangedListener } from './hooks/useDatesChangedListener';
 import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/profileSlice';
-import { isSettingsRoute, settingsPathFromRoute } from './stores/slices/navigationSlice';
+import {
+  isPartnerRoute,
+  isSettingsRoute,
+  partnerPathFromRoute,
+  settingsPathFromRoute,
+} from './stores/slices/navigationSlice';
 import { stripBasePath, withBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
@@ -129,6 +134,10 @@ function App() {
   const initializeApp = useAppStore((s) => s.initializeApp);
   const setView = useAppStore((s) => s.setView);
   const showSettingsPage = useAppStore((s) => s.showSettingsPage);
+  const showPartnerPage = useAppStore((s) => s.showPartnerPage);
+  const partnerPath = useAppStore((s) => s.partnerPath);
+  const hasPartner = useAppStore((s) => s.partner !== null);
+  const isLoadingPartner = useAppStore((s) => s.isLoadingPartner);
   const openSettingsPage = useAppStore((s) => s.openSettingsPage);
   const syncPendingMoods = useAppStore((s) => s.syncPendingMoods);
   const drainQueuedNotes = useAppStore((s) => s.drainQueuedNotes);
@@ -227,7 +236,7 @@ function App() {
         ? 'photos'
         : routePath === '/mood'
           ? 'daily'
-          : routePath === '/partner'
+          : isPartnerRoute(routePath)
             ? 'partner'
             : routePath === '/daily'
               ? 'daily'
@@ -240,6 +249,8 @@ function App() {
     redirectMoodRoute(routePath);
     // A reload on /settings/photos reopens the subpage; any other route clears it.
     showSettingsPage(settingsPathFromRoute(routePath));
+    // ...and a reload on /partner/history reopens the Past questions page.
+    showPartnerPage(partnerPathFromRoute(routePath));
 
     // AC-4.5.6: Browser back/forward button support
     const handlePopState = () => {
@@ -249,7 +260,7 @@ function App() {
           ? 'photos'
           : routePath === '/mood'
             ? 'daily'
-            : routePath === '/partner'
+            : isPartnerRoute(routePath)
               ? 'partner'
               : routePath === '/daily'
                 ? 'daily'
@@ -261,6 +272,7 @@ function App() {
       setView(view, true); // Skip history update to prevent loop
       redirectMoodRoute(routePath);
       showSettingsPage(settingsPathFromRoute(routePath));
+      showPartnerPage(partnerPathFromRoute(routePath));
       logger.debug(`[App] Popstate: navigated to ${view}`);
     };
 
@@ -269,7 +281,7 @@ function App() {
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [setView, showSettingsPage]);
+  }, [setView, showSettingsPage, showPartnerPage]);
 
   // Story 6.7: Check authentication status on mount
   useEffect(() => {
@@ -884,6 +896,11 @@ function App() {
   // it from `100dvh` instead left the installed iOS app about 60pt taller than
   // the screen, so the page scrolled and the composer drifted off the dock.
   const isScreenView = currentView === 'notes';
+  // The Partner view's Past questions page draws its own bar, as Settings does.
+  // Only while it is the page on screen (PartnerView shows it once a partner is
+  // loaded): the loading block and the load error keep the app header.
+  const hasPartnerOwnBar =
+    currentView === 'partner' && partnerPath !== '' && hasPartner && !isLoadingPartner;
 
   // Story 1.4 & 4.1/4.2 & 6.2 & 6.4: Render home, photos, mood, or partner view based on navigation
   return (
@@ -904,12 +921,16 @@ function App() {
           currentView={currentView}
           onViewChange={setView}
           settingsFromHome={settingsFromHome}
+          hasOwnBar={hasPartnerOwnBar}
         />
 
         {/* Story 1.5: Network Status Indicator - Shows banner when offline/connecting (AC-1.5.1).
             Settings renders it under its own bar instead: with no header above
-            it here, the banner would sit under the status bar. */}
-        {currentView !== 'settings' && <NetworkStatusIndicator showOnlyWhenOffline />}
+            it here, the banner would sit under the status bar. The Partner
+            view's Past questions page does the same. */}
+        {currentView !== 'settings' && !hasPartnerOwnBar && (
+          <NetworkStatusIndicator showOnlyWhenOffline />
+        )}
 
         {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
         <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />

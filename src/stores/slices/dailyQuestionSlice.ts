@@ -69,14 +69,22 @@
  * session is still current; a queued pick and a refused row do not.
  *
  * The couple's past questions (Partner page) live here as well: `dailyHistory`
- * holds the first page of `get_daily_history` (the pair's done days as
- * snapshots, newest first, at most 30; `null` before any answer, `[]` for none
- * or unlinked), `dailyHistoryLoading` a read in flight and `dailyHistoryError`
- * the message of the last failed read. `loadDailyHistory` replaces the field
- * with the first page; it never throws, a failure keeps the rows shown and sets
- * the error (an offline refusal is not logged), and only the newest started
- * read writes (its own sequence counter), nothing if the session changed. There
- * is no local copy. `signedOutState()` clears all three fields.
+ * holds `get_daily_history`'s pages read so far (the pair's done days as
+ * snapshots, newest first, 30 a page; `null` before any answer, `[]` for none
+ * or unlinked), `dailyHistoryLoading` a read of the first page in flight and
+ * `dailyHistoryError` the message of the last failed read. `loadDailyHistory`
+ * reads the first page and merges it: a full page replaces only the newest
+ * rows (loaded rows older than its oldest day stay, `dailyHistoryEnd` as it
+ * was, or false when none stay), a short page is the whole list (it replaces all and sets
+ * `dailyHistoryEnd`). `loadMoreDailyHistory` reads the page before the oldest
+ * row, appends the rows not yet present and sets `dailyHistoryEnd` when the page
+ * is short; it does nothing unless signed in with rows, not at the end and not
+ * already loading more (`dailyHistoryLoadingMore`), and writes nothing when the
+ * session changed or the list's oldest day is no longer the one it asked
+ * before. Both never throw: a failure keeps the rows shown and sets the error
+ * (an offline refusal is not logged). Only the newest started first-page read
+ * writes (its own sequence counter), nothing if the session changed. There is
+ * no local copy. `signedOutState()` clears all five fields.
  *
  * The streak's +1 (R4) is claimed through `claimStreakCelebration(streak)`: the
  * Daily view calls it for each `ok` streak it shows, and the device-state
@@ -126,6 +134,7 @@ import {
   fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
+  DAILY_HISTORY_PAGE_SIZE,
   fetchDailyHistory,
   isPickRefusal,
   pickZone,
@@ -163,9 +172,15 @@ export interface DailyQuestionSlice {
   dailyHistoryLoading: boolean;
   /** The message of the last failed history read; cleared by the next answer. */
   dailyHistoryError: string | null;
+  /** The oldest page of past questions has been read (a page shorter than a full one). */
+  dailyHistoryEnd: boolean;
+  /** A `loadMoreDailyHistory` request is in flight. */
+  dailyHistoryLoadingMore: boolean;
 
-  /** Read the first page of past questions, replacing the field. Never throws; a failure keeps what is shown. */
+  /** Read the first page of past questions and merge it into the field. Never throws; a failure keeps what is shown. */
   loadDailyHistory: () => Promise<void>;
+  /** Read the page of past questions before the oldest row shown and append it. Never throws; a failure keeps what is shown. */
+  loadMoreDailyHistory: () => Promise<void>;
   /** Read the couple's streak from the server. Never throws; a failure keeps what is shown. */
   loadCoupleStreak: () => Promise<void>;
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
@@ -407,6 +422,8 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     dailyHistory: null,
     dailyHistoryLoading: false,
     dailyHistoryError: null,
+    dailyHistoryEnd: false,
+    dailyHistoryLoadingMore: false,
 
     loadDailyHistory: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
@@ -421,7 +438,27 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       try {
         const days = await fetchDailyHistory();
         if (!isCurrent()) return;
-        set({ dailyHistory: days, dailyHistoryLoading: false, dailyHistoryError: null });
+        const loaded = get().dailyHistory ?? [];
+        const oldest = days[days.length - 1];
+        if (days.length >= DAILY_HISTORY_PAGE_SIZE && oldest) {
+          // A full first page: rows paged in below it stay, `dailyHistoryEnd` as it
+          // was; with none kept (an earlier empty read set it) there is more to page.
+          const kept = loaded.filter((row) => row.day < oldest.day);
+          set({
+            dailyHistory: [...days, ...kept],
+            ...(kept.length === 0 ? { dailyHistoryEnd: false } : {}),
+            dailyHistoryLoading: false,
+            dailyHistoryError: null,
+          });
+        } else {
+          // A short page is the whole list.
+          set({
+            dailyHistory: days,
+            dailyHistoryEnd: true,
+            dailyHistoryLoading: false,
+            dailyHistoryError: null,
+          });
+        }
       } catch (error) {
         if (!isCurrent()) return;
         // An offline refusal is expected, not a fault: the error is still set.
@@ -430,6 +467,45 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         }
         set({
           dailyHistoryLoading: false,
+          dailyHistoryError:
+            error instanceof Error ? error.message : 'Could not load your past questions.',
+        });
+      }
+    },
+
+    loadMoreDailyHistory: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      const loaded = get().dailyHistory;
+      const asked = loaded?.[loaded.length - 1]?.day;
+      if (!requestedBy || asked === undefined) return;
+      if (get().dailyHistoryEnd || get().dailyHistoryLoadingMore) return;
+      const inSession = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      set({ dailyHistoryLoadingMore: true });
+      try {
+        const days = await fetchDailyHistory(asked);
+        if (!inSession()) return;
+        const rows = get().dailyHistory ?? [];
+        // A first-page re-read can have replaced the tail while this ran.
+        if (rows[rows.length - 1]?.day !== asked) {
+          set({ dailyHistoryLoadingMore: false });
+          return;
+        }
+        const present = new Set(rows.map((row) => row.day_id));
+        set({
+          dailyHistory: [...rows, ...days.filter((row) => !present.has(row.day_id))],
+          dailyHistoryEnd: days.length < DAILY_HISTORY_PAGE_SIZE,
+          dailyHistoryLoadingMore: false,
+          dailyHistoryError: null,
+        });
+      } catch (error) {
+        if (!inSession()) return;
+        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+          console.error('[DailyQuestion] Failed to load more past questions:', error);
+        }
+        set({
+          dailyHistoryLoadingMore: false,
           dailyHistoryError:
             error instanceof Error ? error.message : 'Could not load your past questions.',
         });

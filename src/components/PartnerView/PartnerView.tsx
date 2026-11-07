@@ -23,12 +23,14 @@
  */
 
 import { Heart } from 'lucide-react';
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { usePartnerStreakListener } from '../../hooks/usePartnerStreakListener';
+import { replaceWithPartnerTop } from '../../stores/slices/navigationSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { PartnerConnect } from './PartnerConnect';
 import { PartnerLoadError } from './PartnerLoadError';
 import { PastQuestionsCard } from './PastQuestionsCard';
+import { PastQuestionsPage } from './PastQuestionsPage';
 import { StreakCard } from './StreakCard';
 
 export function PartnerView() {
@@ -44,6 +46,8 @@ export function PartnerView() {
   const loadCoupleStreak = useAppStore((state) => state.loadCoupleStreak);
   const dailyHistory = useAppStore((state) => state.dailyHistory);
   const loadDailyHistory = useAppStore((state) => state.loadDailyHistory);
+  const partnerPath = useAppStore((state) => state.partnerPath);
+  const showPartnerPage = useAppStore((state) => state.showPartnerPage);
 
   usePartnerStreakListener();
 
@@ -77,7 +81,42 @@ export function PartnerView() {
     }
   }, [partnerId, isOnline, loadCoupleStreak, loadDailyHistory]);
 
+  // The history page needs a partner: with none confirmed, `/partner/history`
+  // is replaced by `/partner` (the Connect UI).
+  // The first render has no partner and no loading flag yet (`loadPartner`
+  // raises it from its layout effect, after which this render's effects still
+  // run with its stale values), so "no partner" counts only after a load has
+  // been seen under way.
+  const sawLoading = useRef(false);
+  useEffect(() => {
+    // A partner already in the store is never loaded afresh (`loadPartner`
+    // raises the flag only when there is none), so seeing one counts too.
+    if (isLoadingPartner || partner) sawLoading.current = true;
+  }, [isLoadingPartner, partner]);
+  const unlinkedOnHistory =
+    partnerPath === 'history' && !partner && !isLoadingPartner && !partnerLoadError;
+  useEffect(() => {
+    if (!unlinkedOnHistory || !sawLoading.current) return;
+    // An entry the app created goes up with `history.back()`: replacing it would
+    // leave two identical /partner entries. A fresh load has nothing below it.
+    if (window.history.state?.inApp === true) window.history.back();
+    else replaceWithPartnerTop();
+    showPartnerPage('');
+  }, [unlinkedOnHistory, showPartnerPage]);
+
   const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
+
+  if (partner && !isLoadingPartner && partnerPath === 'history') {
+    return (
+      <div className="min-h-screen bg-page" data-testid="partner-view">
+        <PastQuestionsPage
+          partnerName={partner.displayName}
+          history={dailyHistory ?? []}
+          streak={streak}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-page" data-testid="partner-view">

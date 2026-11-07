@@ -185,9 +185,12 @@ export async function fetchCoupleStreak(): Promise<CoupleStreakAnswer> {
   }
 }
 
+/** How many days `get_daily_history` answers at most; a shorter page is the last one. */
+export const DAILY_HISTORY_PAGE_SIZE = 30;
+
 /**
  * The days of the caller's pair that both partners picked, newest first, at most
- * 30, before `before` (a `YYYY-MM-DD` date) when given. Throws on any failure.
+ * {@link DAILY_HISTORY_PAGE_SIZE}, before `before` (a `YYYY-MM-DD` date) when given. Throws on any failure.
  */
 export async function fetchDailyHistory(before?: string): Promise<DailyDaySnapshot[]> {
   refuseOffline('Past questions', 'load');

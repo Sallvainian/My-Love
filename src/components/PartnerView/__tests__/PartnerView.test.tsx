@@ -4,7 +4,7 @@
  * colours, and what the old mood view showed that this one must not.
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoupleStreakAnswer, DailyDaySnapshot } from '../../../api/validation/dailyQuestionSchemas';
 import { coupleStreak, revealSnapshot } from '../../../../tests/unit/stores/dailyQuestionFixture';
 
@@ -45,6 +45,11 @@ function makeState(overrides: Record<string, unknown> = {}) {
     dailyHistoryLoading: false,
     dailyHistoryError: null as string | null,
     loadDailyHistory: vi.fn(async () => {}),
+    loadMoreDailyHistory: vi.fn(async () => {}),
+    dailyHistoryEnd: false,
+    partnerPath: '',
+    showPartnerPage: vi.fn(),
+    openPartnerPage: vi.fn(),
     ...overrides,
   };
 }
@@ -257,6 +262,116 @@ describe('PartnerView', () => {
       render(<PartnerView />);
 
       expect(screen.queryByTestId('partner-past-questions')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('the history page (partnerPath history)', () => {
+    const history = [
+      { ...revealSnapshot('this', 'this'), day_id: 'd2', day: '2026-11-05' },
+      { ...revealSnapshot('this', 'that'), day_id: 'd1', day: '2026-11-04' },
+    ];
+
+    beforeEach(() => {
+      // Two entries, so the depth the entry claims is within the history.
+      window.history.replaceState(null, '', '/partner');
+      window.history.pushState({ inApp: true, depth: 1 }, '', '/partner/history');
+    });
+
+    afterEach(() => {
+      window.history.replaceState(null, '', '/');
+    });
+
+    it('with a partner: the page in place of the name, the streak card and the card', () => {
+      state = makeState({
+        partnerPath: 'history',
+        coupleStreak: okStreak({ same: 9, done: 13 }),
+        dailyHistory: history,
+      });
+      render(<PartnerView />);
+
+      expect(screen.getByTestId('partner-history')).toBeInTheDocument();
+      expect(screen.getByTestId('partner-history-summary')).toHaveTextContent(
+        'Same pick on 9 of your 13 days'
+      );
+      expect(screen.getAllByTestId('partner-history-row')).toHaveLength(2);
+      expect(screen.queryByTestId('partner-streak-card')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('partner-past-questions')).not.toBeInTheDocument();
+      // The load effect is shared.
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
+      expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    });
+
+    it('no partner confirmed on an entry the app created: goes back, so no /partner entry is doubled', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+      state = makeState({ partnerPath: 'history', partner: null, isLoadingPartner: true });
+      const { rerender } = render(<PartnerView />);
+      expect(back).not.toHaveBeenCalled();
+
+      state = { ...state, isLoadingPartner: false };
+      rerender(<PartnerView />);
+
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(window.location.pathname).toBe('/partner/history');
+      expect(state.showPartnerPage).toHaveBeenCalledWith('');
+      expect(screen.getByTestId('partner-search-card')).toBeInTheDocument();
+      back.mockRestore();
+    });
+
+    it('no partner confirmed on a fresh-load entry: replaces it with /partner', () => {
+      window.history.replaceState(null, '', '/partner/history');
+      const length = window.history.length;
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+      state = makeState({ partnerPath: 'history', partner: null, isLoadingPartner: true });
+      const { rerender } = render(<PartnerView />);
+
+      state = { ...state, isLoadingPartner: false };
+      rerender(<PartnerView />);
+
+      expect(back).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/partner');
+      expect(window.history.length).toBe(length);
+      expect(state.showPartnerPage).toHaveBeenCalledWith('');
+      back.mockRestore();
+    });
+
+    it('mounted with a partner, then a refresh answers unlinked: leaves the history page', () => {
+      const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+      state = makeState({ partnerPath: 'history' });
+      const { rerender } = render(<PartnerView />);
+      expect(back).not.toHaveBeenCalled();
+
+      state = { ...state, partner: null };
+      rerender(<PartnerView />);
+
+      expect(back).toHaveBeenCalledTimes(1);
+      expect(state.showPartnerPage).toHaveBeenCalledWith('');
+      back.mockRestore();
+    });
+
+    it('the first render, before any load is under way, does not redirect', () => {
+      state = makeState({ partnerPath: 'history', partner: null });
+      render(<PartnerView />);
+
+      expect(window.location.pathname).toBe('/partner/history');
+      expect(state.showPartnerPage).not.toHaveBeenCalled();
+    });
+
+    it('loading the partner: the loading block, and the entry stays', () => {
+      state = makeState({ partnerPath: 'history', partner: null, isLoadingPartner: true });
+      render(<PartnerView />);
+
+      expect(screen.getByText('Loading partner information...')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/partner/history');
+      expect(state.showPartnerPage).not.toHaveBeenCalled();
+    });
+
+    it('a failed read: the load-error card, and the entry stays', () => {
+      state = makeState({ partnerPath: 'history', partner: null, partnerLoadError: true });
+      render(<PartnerView />);
+
+      expect(screen.getByTestId('partner-load-error')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/partner/history');
+      expect(state.showPartnerPage).not.toHaveBeenCalled();
     });
   });
 

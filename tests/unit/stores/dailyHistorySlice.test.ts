@@ -4,6 +4,8 @@
  * Covers the answer replacing the field, the failed-read rule (a failure keeps
  * the rows shown), an offline refusal not being logged, the newest-read-wins
  * rule, the session check after the await, and sign-out clearing the fields.
+ * `loadMoreDailyHistory` and the first-page merge (a full page keeps the older
+ * rows paged in, a short page is the whole list) have their own describes.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
@@ -36,6 +38,7 @@ vi.mock('../../../src/services/dateReminders', async (importOriginal) => {
   return { ...actual, cancelDateReminders: vi.fn(actual.cancelDateReminders) };
 });
 
+import { DAILY_HISTORY_PAGE_SIZE } from '../../../src/api/dailyQuestionApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { cancelDateReminders } from '../../../src/services/dateReminders';
 import { deleteAccountImages } from '../../../src/services/imageCache';
@@ -55,6 +58,16 @@ function state() {
 
 const day = (id: string, date: string) => ({ ...revealSnapshot('this', 'that'), day_id: id, day: date });
 const PAGE = [day('d2', '2026-11-05'), day('d1', '2026-11-04')];
+
+/** `count` consecutive days, newest `2026-10-<newest>` down, ids `p<n>`. */
+const run = (count: number, newest = 31) =>
+  Array.from({ length: count }, (_, i) =>
+    day(`p${newest - i}`, `2026-10-${String(newest - i).padStart(2, '0')}`)
+  );
+
+/** `count` days older than every `run`: `2026-09-30` down, ids `o<n>`. */
+const older = (count: number) =>
+  Array.from({ length: count }, (_, i) => day(`o${i}`, `2026-09-${String(30 - i).padStart(2, '0')}`));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -266,15 +279,215 @@ describe('loadDailyHistory', () => {
     });
   });
 
-  it('sign-out clears the rows, the loading flag and the error', async () => {
+  it('sign-out clears the rows, the flags and the error', async () => {
     fetchDailyHistory.mockResolvedValueOnce(PAGE);
     await state().loadDailyHistory();
-    useAppStore.setState({ dailyHistoryLoading: true, dailyHistoryError: 'x' });
+    useAppStore.setState({
+      dailyHistoryLoading: true,
+      dailyHistoryError: 'x',
+      dailyHistoryEnd: true,
+      dailyHistoryLoadingMore: true,
+    });
 
     state().clearAuth();
 
     expect(state().dailyHistory).toBeNull();
     expect(state().dailyHistoryLoading).toBe(false);
     expect(state().dailyHistoryError).toBeNull();
+    expect(state().dailyHistoryEnd).toBe(false);
+    expect(state().dailyHistoryLoadingMore).toBe(false);
+  });
+});
+
+describe('loadDailyHistory merging pages', () => {
+  it('a short first page is the whole list and ends the paging', async () => {
+    fetchDailyHistory.mockResolvedValue(PAGE);
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toEqual(PAGE);
+    expect(state().dailyHistoryEnd).toBe(true);
+  });
+
+  it('a full first page leaves the end open', async () => {
+    fetchDailyHistory.mockResolvedValue(run(DAILY_HISTORY_PAGE_SIZE));
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toHaveLength(DAILY_HISTORY_PAGE_SIZE);
+    expect(state().dailyHistoryEnd).toBe(false);
+  });
+
+  it('a full first page after an empty read that set the end opens the paging again', async () => {
+    useAppStore.setState({ dailyHistory: [], dailyHistoryEnd: true });
+    fetchDailyHistory.mockResolvedValue(run(DAILY_HISTORY_PAGE_SIZE));
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toHaveLength(DAILY_HISTORY_PAGE_SIZE);
+    expect(state().dailyHistoryEnd).toBe(false);
+  });
+
+  it('a full re-read after paging keeps the rows older than its oldest day', async () => {
+    const first = run(30);
+    const tail = older(5);
+    useAppStore.setState({ dailyHistory: [...first, ...tail], dailyHistoryEnd: true });
+    const reread = [day('new', '2026-11-01'), ...first.slice(0, 29)];
+    fetchDailyHistory.mockResolvedValue(reread);
+
+    await state().loadDailyHistory();
+
+    // The newest day pushed the oldest first-page row off the re-read; it is
+    // older than the page's oldest day, so it is kept with the paged tail.
+    expect(state().dailyHistory).toEqual([...reread, first[29], ...tail]);
+    expect(state().dailyHistory?.[0].day_id).toBe('new');
+    // The end is left as it was.
+    expect(state().dailyHistoryEnd).toBe(true);
+  });
+
+  it('a short re-read after paging replaces everything and sets the end', async () => {
+    useAppStore.setState({ dailyHistory: [...run(30), ...older(5)], dailyHistoryEnd: false });
+    fetchDailyHistory.mockResolvedValue(PAGE.slice(0, 1));
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toEqual(PAGE.slice(0, 1));
+    expect(state().dailyHistoryEnd).toBe(true);
+  });
+});
+
+describe('loadMoreDailyHistory', () => {
+  const full = () => run(30);
+
+  it('reads the page before the oldest row and appends it; a short page ends the paging', async () => {
+    useAppStore.setState({ dailyHistory: full() });
+    const more = older(5);
+    fetchDailyHistory.mockResolvedValue(more);
+
+    await state().loadMoreDailyHistory();
+
+    expect(fetchDailyHistory).toHaveBeenCalledWith('2026-10-02');
+    expect(state().dailyHistory).toEqual([...full(), ...more]);
+    expect(state().dailyHistoryEnd).toBe(true);
+    expect(state().dailyHistoryLoadingMore).toBe(false);
+  });
+
+  it('a full page leaves the end open', async () => {
+    useAppStore.setState({ dailyHistory: run(30, 31) });
+    fetchDailyHistory.mockResolvedValue(older(30));
+
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistory).toHaveLength(60);
+    expect(state().dailyHistoryEnd).toBe(false);
+  });
+
+  it('skips rows already present', async () => {
+    useAppStore.setState({ dailyHistory: PAGE });
+    fetchDailyHistory.mockResolvedValue([PAGE[1], day('d0', '2026-11-03')]);
+
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistory?.map((row) => row.day_id)).toEqual(['d2', 'd1', 'd0']);
+  });
+
+  it.each([
+    ['signed out', () => state().clearAuth(), null],
+    ['nothing loaded', () => {}, null],
+    ['at the end', () => {}, PAGE],
+  ])('makes no request when %s', async (_name, arrange, rows) => {
+    useAppStore.setState({ dailyHistory: rows, dailyHistoryEnd: rows !== null });
+    arrange();
+
+    await state().loadMoreDailyHistory();
+
+    expect(fetchDailyHistory).not.toHaveBeenCalled();
+  });
+
+  it('makes no request for an empty list', async () => {
+    useAppStore.setState({ dailyHistory: [] });
+
+    await state().loadMoreDailyHistory();
+
+    expect(fetchDailyHistory).not.toHaveBeenCalled();
+  });
+
+  it('makes no request once the oldest page was read', async () => {
+    useAppStore.setState({ dailyHistory: full(), dailyHistoryEnd: true });
+
+    await state().loadMoreDailyHistory();
+
+    expect(fetchDailyHistory).not.toHaveBeenCalled();
+    expect(state().dailyHistory).toEqual(full());
+  });
+
+  it('makes no second request while one is loading more', async () => {
+    useAppStore.setState({ dailyHistory: full() });
+    const request = deferred<ReturnType<typeof run>>();
+    fetchDailyHistory.mockReturnValue(request.promise);
+
+    const first = state().loadMoreDailyHistory();
+    expect(state().dailyHistoryLoadingMore).toBe(true);
+    await state().loadMoreDailyHistory();
+    request.settle(older(5));
+    await first;
+
+    expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes nothing when a first-page read replaced the tail meanwhile', async () => {
+    useAppStore.setState({ dailyHistory: [...full(), ...older(5)] });
+    const request = deferred<ReturnType<typeof run>>();
+    fetchDailyHistory.mockReturnValue(request.promise);
+
+    const more = state().loadMoreDailyHistory();
+    // A short re-read replaced the whole list under it.
+    useAppStore.setState({ dailyHistory: PAGE, dailyHistoryEnd: true });
+    request.settle(older(3));
+    await more;
+
+    expect(state().dailyHistory).toEqual(PAGE);
+    expect(state().dailyHistoryEnd).toBe(true);
+    expect(state().dailyHistoryLoadingMore).toBe(false);
+  });
+
+  it('writes nothing after a sign-out', async () => {
+    useAppStore.setState({ dailyHistory: full() });
+    const request = deferred<ReturnType<typeof run>>();
+    fetchDailyHistory.mockReturnValue(request.promise);
+
+    const more = state().loadMoreDailyHistory();
+    state().clearAuth();
+    request.settle(older(5));
+    await more;
+
+    expect(state().dailyHistory).toBeNull();
+    expect(state().dailyHistoryLoadingMore).toBe(false);
+  });
+
+  it('a failure keeps the rows, sets the error and never throws', async () => {
+    useAppStore.setState({ dailyHistory: full() });
+    const failure = new AccountDataError('transport', 'boom');
+    fetchDailyHistory.mockRejectedValue(failure);
+
+    await expect(state().loadMoreDailyHistory()).resolves.toBeUndefined();
+
+    expect(state().dailyHistory).toEqual(full());
+    expect(state().dailyHistoryError).toBe('boom');
+    expect(state().dailyHistoryLoadingMore).toBe(false);
+    expect(console.error).toHaveBeenCalledWith(
+      '[DailyQuestion] Failed to load more past questions:',
+      failure
+    );
+  });
+
+  it('an offline refusal sets the error but is not logged', async () => {
+    useAppStore.setState({ dailyHistory: full() });
+    fetchDailyHistory.mockRejectedValue(new AccountDataError('offline', 'You are offline.'));
+
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistoryError).toBe('You are offline.');
+    expect(console.error).not.toHaveBeenCalled();
   });
 });

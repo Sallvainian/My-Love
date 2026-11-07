@@ -117,6 +117,8 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyHistory: null,
   dailyHistoryLoading: false,
   dailyHistoryError: null,
+  dailyHistoryEnd: false,
+  dailyHistoryLoadingMore: false,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -287,6 +289,8 @@ function seedSignedInSession(): void {
     ],
     dailyHistoryLoading: true,
     dailyHistoryError: SECRETS.dailyHistoryError,
+    dailyHistoryEnd: true,
+    dailyHistoryLoadingMore: true,
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device
