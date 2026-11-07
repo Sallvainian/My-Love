@@ -442,7 +442,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       }
       const run = (async () => {
         try {
-          let outcome: DrainPassOutcome = 'done';
+          let outcome: DrainPassOutcome;
           do {
             drainRequested = false;
             outcome = await drainOnce();
