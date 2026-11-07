@@ -95,6 +95,13 @@ export async function waitForSyncLock(name: string): Promise<void> {
  */
 export const DAILY_DAYS_LOCK = 'my-love:daily-days';
 
+/**
+ * Held by one `daily-write-declined` add at a time
+ * (`dailyWriteDeclined.addDeclinedWriteDay`), across tabs, so two
+ * read-modify-write adds never lose one another's day.
+ */
+export const DAILY_WRITE_DECLINED_LOCK = 'my-love:daily-write-declined';
+
 /** Tail of each name's in-memory queue, for contexts without `navigator.locks`. */
 const waitingChains = new Map<string, Promise<unknown>>();
 

@@ -133,5 +133,8 @@ export const DAILY_DAY_READ = '**/rest/v1/rpc/get_daily_day';
 /** A pick's send (`dailyQuestionApi.submitDailyPick`): the `submit_daily_pick` RPC. Observe it with `method: 'POST'`. */
 export const DAILY_PICK_SEND = '**/rest/v1/rpc/submit_daily_pick';
 
+/** The writer's question for tomorrow (`dailyQuestionApi.submitWrittenQuestion`): the `submit_written_question` RPC. Observe it with `method: 'POST'`. */
+export const WRITTEN_QUESTION_SEND = '**/rest/v1/rpc/submit_written_question';
+
 /** A named day's re-read after a partner's `daily_pick` (`dailyQuestionApi.fetchDailyDayById`): the `get_daily_day_by_id` RPC. Observe it with `method: 'POST'`. */
 export const DAILY_DAY_BY_ID_READ = '**/rest/v1/rpc/get_daily_day_by_id';

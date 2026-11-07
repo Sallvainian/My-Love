@@ -110,6 +110,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyDayLoading: false,
   dailyDayError: null,
   dailyQueuedPicks: [],
+  dailyWriteDeclined: [],
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -259,6 +260,8 @@ function seedSignedInSession(): void {
         failure: null,
       },
     ],
+    // The days whose write prompt this account declined on this device.
+    dailyWriteDeclined: ['DAY-DECLINED'],
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device

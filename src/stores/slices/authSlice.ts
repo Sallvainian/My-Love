@@ -255,6 +255,9 @@ export function signedOutState() {
     dailyDayError: null,
     // The queued rows stay on disk for their owner (CAP-7); only the view's copy goes.
     dailyQueuedPicks: [],
+    // The days this device's account declined to write for; the kind itself is
+    // deleted with the account's other copies.
+    dailyWriteDeclined: [],
 
     // navigationSlice — not account state, but a page pushed in the outgoing
     // session is not one the next sign-in just opened: left set, that page
