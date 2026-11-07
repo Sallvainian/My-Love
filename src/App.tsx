@@ -46,7 +46,7 @@ import { usePartnerLinkListener } from './hooks/usePartnerLinkListener';
 import { MESSAGE_DATA_COPY_KIND } from './stores/slices/messagesSlice';
 import { PROFILE_COPY_KIND } from './stores/slices/profileSlice';
 import { isSettingsRoute, settingsPathFromRoute } from './stores/slices/navigationSlice';
-import { stripBasePath } from './utils/basePath';
+import { stripBasePath, withBasePath } from './utils/basePath';
 import { logger } from './utils/logger';
 import { logStorageQuota } from './utils/storageMonitor';
 
@@ -210,13 +210,25 @@ function App() {
 
   // Story 4.5: Initial route detection and popstate listener (AC-4.5.5, AC-4.5.6)
   useEffect(() => {
+    // `/mood` opens Daily, which took Mood's dock slot (story 6.9). Rewrite the
+    // bar to `/daily`, keeping `history.state`, so the next Daily tap sees the
+    // current path and replaces the entry instead of stacking a second one.
+    const redirectMoodRoute = (routePath: string) => {
+      if (routePath !== '/mood') return;
+      window.history.replaceState(
+        window.history.state,
+        '',
+        withBasePath('/daily') + window.location.search + window.location.hash
+      );
+    };
+
     // AC-4.5.5: Initial route detection - set view based on URL
     const routePath = stripBasePath(window.location.pathname);
     const initialView =
       routePath === '/photos'
         ? 'photos'
         : routePath === '/mood'
-          ? 'mood'
+          ? 'daily'
           : routePath === '/partner'
             ? 'partner'
             : routePath === '/daily'
@@ -227,6 +239,7 @@ function App() {
                   ? 'settings'
                   : 'home';
     setView(initialView, true); // Skip history update on initial load
+    redirectMoodRoute(routePath);
     // A reload on /settings/photos reopens the subpage; any other route clears it.
     showSettingsPage(settingsPathFromRoute(routePath));
 
@@ -237,7 +250,7 @@ function App() {
         routePath === '/photos'
           ? 'photos'
           : routePath === '/mood'
-            ? 'mood'
+            ? 'daily'
             : routePath === '/partner'
               ? 'partner'
               : routePath === '/daily'
@@ -248,6 +261,7 @@ function App() {
                     ? 'settings'
                     : 'home';
       setView(view, true); // Skip history update to prevent loop
+      redirectMoodRoute(routePath);
       showSettingsPage(settingsPathFromRoute(routePath));
       logger.debug(`[App] Popstate: navigated to ${view}`);
     };

@@ -234,10 +234,10 @@ test.describe('Settings navigation rules', () => {
     page,
     interceptNetworkCall,
   }) => {
-    // GIVEN: Home, then Mood, Notes and Photos in turn through the dock
+    // GIVEN: Home, then Daily, Notes and Photos in turn through the dock
     await openHome(page, interceptNetworkCall);
-    await navigateTo(page, 'mood');
-    await expect(page).toHaveURL(/\/mood$/);
+    await navigateTo(page, 'daily');
+    await expect(page).toHaveURL(/\/daily$/);
     await navigateTo(page, 'notes');
     await expect(page).toHaveURL(/\/notes$/);
     await navigateTo(page, 'photos');
@@ -249,7 +249,7 @@ test.describe('Settings navigation rules', () => {
     // WHEN: back is pressed once
     await page.goBack();
 
-    // THEN: Home, not Notes or Mood, with Home lit
+    // THEN: Home, not Notes or Daily, with Home lit
     await expectHome(page);
 
     // WHEN: back is pressed on Home

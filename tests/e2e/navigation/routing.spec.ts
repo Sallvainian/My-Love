@@ -31,18 +31,50 @@ test.describe('URL Routing', () => {
   test('[P0] should load correct view from direct URL', async ({ page }) => {
     // GIVEN: User is authenticated (via auth fixture)
 
-    // WHEN: User navigates directly to /mood
+    // WHEN: User navigates directly to /mood, which Daily took over (story 6.9)
     await page.goto('/mood');
 
-    // THEN: Mood view is loaded (app chrome is visible)
+    // THEN: Daily is loaded (app chrome is visible) and the mood screen is not
     await expect(page.getByTestId('nav-dock')).toBeVisible();
+    await expect(page.getByTestId('daily-question-view')).toBeVisible();
+    await expect(page.getByTestId('mood-tracker')).toHaveCount(0);
 
-    // AND: The dock marks Mood as the current destination
-    await expect(page.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
+    // AND: The dock marks Daily as the current destination
+    await expect(page.getByTestId('nav-daily')).toHaveAttribute('aria-current', 'page');
+
+    // AND: The URL is rewritten to /daily
+    await expect(page).toHaveURL(/\/daily$/);
+  });
+
+  test('[P1] should open Daily on back to a /mood entry left from before Daily', async ({ page }) => {
+    // GIVEN: Home, with an older app-made /mood entry and a Photos entry above it,
+    // as a history kept from before Daily took Mood's slot (story 6.9).
+    // pushState fires no popstate, so the app stays on Home while they are made.
+    await page.goto('/');
+    await expectHome(page);
+    await page.evaluate(() => {
+      history.pushState({ view: 'mood', inApp: true, depth: 1 }, '', '/mood');
+      history.pushState({ view: 'photos', inApp: true, depth: 2 }, '', '/photos');
+    });
+
+    // WHEN: The browser goes back onto the /mood entry
+    await page.goBack();
+
+    // THEN: Daily shows, not the mood screen, and the bar reads /daily
+    await expect(page.getByTestId('daily-question-view')).toBeVisible();
+    await expect(page.getByTestId('mood-tracker')).toHaveCount(0);
+    await expect(page.getByTestId('nav-daily')).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveURL(/\/daily$/);
+    // AND: the entry keeps its state, so its depth still counts toward Home
+    expect(await page.evaluate(() => history.state)).toEqual({
+      view: 'mood',
+      inApp: true,
+      depth: 1,
+    });
   });
 
   test('[P0] should go back to Home, not the previous view, with the browser back button', async ({ page }) => {
-    // GIVEN: User navigated from home to photos to mood
+    // GIVEN: User navigated from home to photos to daily
     await page.goto('/');
     await expect(page.getByTestId('nav-dock')).toBeVisible();
 
@@ -50,9 +82,9 @@ test.describe('URL Routing', () => {
     await navigateTo(page, 'photos');
     await page.waitForURL('**/photos');
 
-    // Navigate to mood
-    await navigateTo(page, 'mood');
-    await page.waitForURL('**/mood');
+    // Navigate to daily
+    await navigateTo(page, 'daily');
+    await page.waitForURL('**/daily');
 
     // WHEN: User clicks browser back button
     await page.goBack();
@@ -89,8 +121,8 @@ test.describe('URL Routing', () => {
     await page.goto('/scripture');
     await expectHome(page);
 
-    await navigateTo(page, 'mood');
-    await page.waitForURL('**/mood');
+    await navigateTo(page, 'daily');
+    await page.waitForURL('**/daily');
 
     await page.goBack();
 

@@ -32,10 +32,10 @@ import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo, type NavDestination } from '../../support/helpers/navigation';
 import {
+  DAILY_DAY_READ,
   LOVE_NOTES_READ,
   PHOTOS_LIST_READ,
   UPCOMING_EVENTS_READ,
-  partnerLatestMoodRead,
   partnerMoodListRead,
 } from '../../support/helpers/reads';
 import { homeEventsSettled, openSettingsFromHome } from '../../support/helpers/settings-screen';
@@ -51,6 +51,8 @@ const PAGE_GROUND: Record<Scheme, string> = {
 interface ScreenRead {
   /** The read's glob; a function when it names this worker's partner. */
   url: string | ((partnerId: string) => string);
+  /** The read's HTTP method; a Supabase RPC is a POST. Defaults to GET. */
+  method?: 'GET' | 'POST';
   /** Armed before the step that sends it: the cold start (`goto`), or the
    * dock click (`dock`) for a read the screen's mount always sends after the
    * click. App's start-up refresh may send a read of the same rows too, and
@@ -78,14 +80,13 @@ const SIGNED_IN_SCREENS: Screen[] = [
     },
   },
   {
-    view: 'mood',
-    read: { url: partnerLatestMoodRead, armBefore: 'dock' },
+    view: 'daily',
+    // Today's day is read by the signed-in start's refresher, so the read is
+    // armed before the cold start. It is an RPC, hence the POST.
+    read: { url: DAILY_DAY_READ, method: 'POST', armBefore: 'goto' },
     ready: async (page) => {
-      await expect(page.getByTestId('mood-tracker')).toBeVisible();
-      await expect(page.getByTestId('mood-button-happy')).toBeVisible();
-      await expect(
-        page.getByTestId('partner-mood-display').or(page.getByTestId('no-mood-logged-state'))
-      ).toBeVisible();
+      await expect(page.getByTestId('daily-question-view')).toBeVisible();
+      await expect(page.getByTestId('daily-question')).toBeVisible();
     },
   },
   {
@@ -272,10 +273,10 @@ async function openSignedInScreen(
     return;
   }
 
-  const { url, armBefore } = screen.read;
+  const { url, method = 'GET', armBefore } = screen.read;
   const readUrl =
     typeof url === 'string' ? url : url((await resolveOwnPair(supabaseAdmin)).partnerId);
-  const arm = () => interceptNetworkCall({ method: 'GET', url: readUrl });
+  const arm = () => interceptNetworkCall({ method, url: readUrl });
 
   const coldRead = armBefore === 'goto' ? arm() : null;
   await page.goto('/');

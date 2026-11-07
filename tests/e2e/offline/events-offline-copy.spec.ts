@@ -95,8 +95,8 @@ test.describe('Events from the local copy', () => {
     await navigateTo(page, 'settings');
     await openDatesList(page);
     await expect(settingsRow(page)).toBeVisible();
-    await navigateTo(page, 'mood');
-    await expect(page.getByTestId('mood-tracker')).toBeVisible();
+    await navigateTo(page, 'daily');
+    await expect(page.getByTestId('daily-question-view')).toBeVisible();
 
     // WHEN offline in the same session, returning to Home through the dock.
     await goOffline(page, true);
@@ -112,8 +112,8 @@ test.describe('Events from the local copy', () => {
     await page.goto('/settings/dates');
     await expect(page.getByRole('heading', { level: 1, name: 'Dates' })).toBeVisible();
     await expect(settingsRow(page)).toBeVisible();
-    await navigateTo(page, 'mood');
-    await expect(page.getByTestId('mood-tracker')).toBeVisible();
+    await navigateTo(page, 'daily');
+    await expect(page.getByTestId('daily-question-view')).toBeVisible();
     await goOffline(page, true);
     await expectListedOffline(page);
     expect(await page.evaluate(() => window.__APP_STORE__?.getState().eventsError ?? null)).toBeNull();

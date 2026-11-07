@@ -153,7 +153,8 @@ export function onForegroundPush(handler: () => void): () => void {
 /** The view each `kind` the sender stamps on a payload opens (`send-push/payload.ts`, `withKind`). */
 const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
   love_note: 'notes',
-  mood: 'partner',
+  // A mood push opens Daily, which took Mood's dock slot (story 6.9).
+  mood: 'daily',
   interaction: 'partner',
   partner_request: 'partner',
   partner_accept: 'partner',

@@ -223,8 +223,8 @@ test.describe('Settings page stack', () => {
     await expect(page).toHaveURL(/\/settings\/photos$/);
 
     // WHEN: a dock view is opened and the browser goes back
-    await page.getByTestId('nav-mood').click();
-    await expect(page).toHaveURL(/\/mood$/);
+    await page.getByTestId('nav-daily').click();
+    await expect(page).toHaveURL(/\/daily$/);
     await page.goBack();
 
     // THEN: Home, the bottom of the history: a dock view sits on Home alone

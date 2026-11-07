@@ -114,12 +114,6 @@ export function partnerMoodListRead(partnerId: string): string {
   return `**/rest/v1/moods?*user_id=eq.${partnerId}*limit=30*`;
 }
 
-/** The partner's latest mood (`moodSyncService.getLatestPartnerMood`, one
- * row), shown on the Mood screen. */
-export function partnerLatestMoodRead(partnerId: string): string {
-  return `**/rest/v1/moods?*user_id=eq.${partnerId}*limit=1`;
-}
-
 /**
  * The `timeout` for the standalone `interceptNetworkCall` on a page in a second
  * browser context, which the fixture cannot reach (it is bound to `page` and

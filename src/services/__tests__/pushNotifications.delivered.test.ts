@@ -395,7 +395,7 @@ describe('viewForPush', () => {
     const { viewForPush } = await freshModule();
     const cases: [string, string][] = [
       ['love_note', 'notes'],
-      ['mood', 'partner'],
+      ['mood', 'daily'],
       ['interaction', 'partner'],
       ['partner_request', 'partner'],
       ['partner_accept', 'partner'],
@@ -417,7 +417,7 @@ describe('viewForPush', () => {
   it('lets a known kind win over the thread id', async () => {
     const { viewForPush } = await freshModule();
 
-    expect(viewForPush({ kind: 'mood', ...thread('love-notes') })).toBe('partner');
+    expect(viewForPush({ kind: 'mood', ...thread('love-notes') })).toBe('daily');
   });
 
   it('opens Love Notes for an old payload with no kind and thread love-notes', async () => {
@@ -581,7 +581,7 @@ describe('onPushTap', () => {
 
     expect(() => handlerFor('pushNotificationActionPerformed')(tap('mood'))).not.toThrow();
 
-    expect(after).toHaveBeenCalledExactlyOnceWith('partner');
+    expect(after).toHaveBeenCalledExactlyOnceWith('daily');
     expect(errorLog).toHaveBeenCalledTimes(1);
     errorLog.mockRestore();
   });

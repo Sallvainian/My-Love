@@ -24,7 +24,7 @@ vi.mock('../../../hooks/useSideColumn', () => ({
 const isNativePlatform = vi.hoisted(() => vi.fn(() => false));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform } }));
 
-const DOCK_DESTINATIONS: ViewType[] = ['home', 'mood', 'notes', 'photos', 'partner'];
+const DOCK_DESTINATIONS: ViewType[] = ['home', 'daily', 'notes', 'photos', 'partner'];
 const ALL_DESTINATIONS: ViewType[] = [...DOCK_DESTINATIONS, 'settings'];
 
 function renderNavigation(
@@ -168,7 +168,7 @@ describe('AppNavigation', () => {
       renderNavigation();
 
       expect(screen.getByTestId('nav-home')).toHaveAttribute('aria-label', 'Home');
-      expect(screen.getByTestId('nav-mood')).toHaveAttribute('aria-label', 'Mood');
+      expect(screen.getByTestId('nav-daily')).toHaveAttribute('aria-label', 'Daily');
       expect(screen.getByTestId('nav-notes')).toHaveAttribute('aria-label', 'Love Notes');
       expect(screen.getByTestId('nav-photos')).toHaveAttribute('aria-label', 'Photos');
       expect(screen.getByTestId('nav-partner')).toHaveAttribute('aria-label', 'Partner');
@@ -188,7 +188,7 @@ describe('AppNavigation', () => {
     it.each(ALL_DESTINATIONS)('reports %s when its control is clicked', async (view) => {
       const user = userEvent.setup();
       const { onViewChange } = renderNavigation({
-        currentView: view === 'home' ? 'mood' : 'home',
+        currentView: view === 'home' ? 'daily' : 'home',
       });
 
       await user.click(screen.getByTestId(`nav-${view}`));
@@ -254,10 +254,10 @@ describe('AppNavigation', () => {
     });
 
     it('never lights Home through the flag on another view', () => {
-      renderNavigation({ currentView: 'mood', settingsFromHome: true });
+      renderNavigation({ currentView: 'daily', settingsFromHome: true });
 
       expect(screen.getByTestId('nav-home')).not.toHaveAttribute('aria-current');
-      expect(screen.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByTestId('nav-daily')).toHaveAttribute('aria-current', 'page');
     });
   });
 
@@ -294,7 +294,7 @@ describe('AppNavigation', () => {
       expect(screen.getByRole('button', { name: 'Photos, 3 new items' })).toContainElement(plural);
 
       // A dock item with no count keeps its bare label.
-      expect(screen.getByRole('button', { name: 'Mood' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Daily' })).toBeInTheDocument();
     });
 
     it('ignores a settings count', () => {
@@ -318,7 +318,7 @@ describe('AppNavigation', () => {
   describe('Forms', () => {
     const LABELS: Partial<Record<ViewType, string>> = {
       home: 'Home',
-      mood: 'Mood',
+      daily: 'Daily',
       notes: 'Love Notes',
       photos: 'Photos',
       partner: 'Partner',
@@ -450,7 +450,7 @@ describe('AppNavigation', () => {
     it('switches form on a re-render, keeping the current view and moving data-dock', () => {
       const onViewChange = vi.fn();
       const { rerender } = render(
-        <AppNavigation currentView="mood" onViewChange={onViewChange} />
+        <AppNavigation currentView="daily" onViewChange={onViewChange} />
       );
       expect(screen.getByTestId('nav-dock')).toHaveAttribute('data-form', 'bottom');
 
@@ -460,7 +460,7 @@ describe('AppNavigation', () => {
         [null, null],
       ] as const) {
         sideColumn.current = side;
-        rerender(<AppNavigation currentView="mood" onViewChange={onViewChange} />);
+        rerender(<AppNavigation currentView="daily" onViewChange={onViewChange} />);
 
         expect(screen.getByTestId('nav-dock')).toHaveAttribute(
           'data-form',
@@ -468,20 +468,20 @@ describe('AppNavigation', () => {
         );
         if (dock) expect(document.documentElement).toHaveAttribute('data-dock', dock);
         else expect(document.documentElement).not.toHaveAttribute('data-dock');
-        expect(screen.getByTestId('nav-mood')).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByTestId('nav-daily')).toHaveAttribute('aria-current', 'page');
       }
       expect(onViewChange).not.toHaveBeenCalled();
     });
 
     it('moves Settings between the gear and the column on a form switch', () => {
       const onViewChange = vi.fn();
-      const { rerender } = render(<AppNavigation currentView="mood" onViewChange={onViewChange} />);
+      const { rerender } = render(<AppNavigation currentView="daily" onViewChange={onViewChange} />);
       const header = screen.getByTestId('app-header');
       const dock = screen.getByTestId('nav-dock');
 
       for (const side of [null, 'right', null] as const) {
         sideColumn.current = side;
-        rerender(<AppNavigation currentView="mood" onViewChange={onViewChange} />);
+        rerender(<AppNavigation currentView="daily" onViewChange={onViewChange} />);
 
         const settings = screen.getByTestId('nav-settings');
         expect(screen.getAllByTestId('nav-settings')).toHaveLength(1);
