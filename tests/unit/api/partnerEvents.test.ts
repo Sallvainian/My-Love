@@ -1,11 +1,12 @@
 /**
  * moodSyncService.subscribePartnerEvents — the partner event registry
  *
- * One `mood-updates:<uid>` channel carries three events (`PARTNER_EVENTS`:
- * `partner_linked`, `daily_pick`, `new_mood`). Each is validated by
- * `parsePartnerEvent` and fanned out to the subscribers' handler for that event
- * alone. The refcount, the reopen and the identity snapshot are covered by the
- * `moodSyncSubscription*` files; the Realtime fake is in `fakeMoodRealtime.ts`.
+ * One `mood-updates:<uid>` channel carries four events (`PARTNER_EVENTS`:
+ * `partner_linked`, `daily_pick`, `new_mood`, `dates_changed`). Each is
+ * validated by `parsePartnerEvent` and fanned out to the subscribers' handler
+ * for that event alone. The refcount, the reopen and the identity snapshot are
+ * covered by the `moodSyncSubscription*` files; the Realtime fake is in
+ * `fakeMoodRealtime.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
