@@ -64,12 +64,25 @@
  * last `ok` streak is the `daily-streak` local copy (`services/dailyStreakCopy.ts`):
  * `loadCoupleStreak` shows it first, but only over `null` (an answer in memory
  * is at least as new), and a successful answer then replaces it (`ok`) or
- * deletes it (`unlinked`); a failed read leaves it. Only the newest started
- * read writes (a sequence counter), and a read that outlives the session writes
- * nothing, to the field or to the copy. `signedOutState()` clears all three fields.
+ * deletes it (`unlinked`); a failed read leaves it. The copy is tagged with the
+ * partner it was read with and shown only for the current partner
+ * (`shownPartnerId`), as the saved days are. Only the newest started read writes
+ * (a sequence counter), and a read that outlives the session writes nothing, to
+ * the field or to the copy. `signedOutState()` clears all three fields.
  * Daily shows the streak too, so `submitDailyPick` and the queue drain re-read
  * it (`void loadCoupleStreak()`) after each pick the server confirmed, once the
  * session is still current; a queued pick and a refused row do not.
+ *
+ * When the shown partner changes from one id to another in a session (an unlink
+ * and a new link, or a refreshed partner read that answers a new id), the slice
+ * clears the streak, the past questions and their errors, loading flags and end
+ * flag, and the reads in flight for the old pair write nothing, to the fields
+ * or to the copy (the sequence counters and a generation are bumped). A streak
+ * that was shown or being read is then read again for the new partner, since
+ * Daily's read effect does not re-run on a partner change. Only a non-null id
+ * that differs from the last non-null one seen in the session counts: a first
+ * link and a reload of the same partner clear nothing, and an identity change
+ * (`userId`/`authSessionVersion`) forgets the last id.
  *
  * The couple's past questions (Partner page) live here as well: `dailyHistory`
  * holds `get_daily_history`'s pages read so far (the pair's done days as
@@ -84,9 +97,10 @@
  * is short; it does nothing unless signed in with rows, not at the end and not
  * already loading more (`dailyHistoryLoadingMore`), and writes nothing when the
  * session changed or the list's oldest day is no longer the one it asked
- * before. Both never throw: a failure keeps the rows shown and sets the error
- * (an offline refusal is not logged). Only the newest started first-page read
- * writes (its own sequence counter), nothing if the session changed. Every
+ * before, or when the pair changed. Both never throw: a failure keeps the rows
+ * shown and sets the error (an offline refusal is not logged). Only the newest
+ * started first-page read writes (its own sequence counter), nothing if the
+ * session or the pair changed. Every
  * page read is merged into the `daily-days` copy (the same map as Daily's days,
  * no cap), and a failed first read with nothing shown fills the list from that
  * copy (the current partner's `both` days, newest first, `dailyHistoryEnd`
@@ -314,6 +328,13 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
   // The shown history was filled from the copy after a failed first read: the
   // next successful first page replaces it instead of merging with it.
   let historyFromCopy = false;
+  // Bumped when the shown partner changes: a history read started under an
+  // older generation belongs to the old pair and writes nothing.
+  let pairGeneration = 0;
+  // The last non-null partner id seen in this identity, and the identity it was
+  // seen in (`userId:authSessionVersion`).
+  let lastPartnerId: string | null = null;
+  let seenIdentity = '';
 
   /** The partner the saved days are shown for: the store's, else the saved partner copy's; `null` when none. */
   const shownPartnerId = async (userId: string): Promise<string | null> => {
@@ -372,6 +393,28 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     }, delay);
   };
 
+  /** The old pair's streak and past questions are gone; their reads in flight write nothing. */
+  const clearPairData = (): void => {
+    // Daily's read effect does not re-run on a partner change, so a streak that
+    // was shown or being read is read again for the new partner.
+    const streakWanted = get().coupleStreak !== null || get().coupleStreakLoading;
+    streakSeq += 1;
+    historySeq += 1;
+    pairGeneration += 1;
+    historyFromCopy = false;
+    set({
+      coupleStreak: null,
+      coupleStreakLoading: false,
+      coupleStreakError: null,
+      dailyHistory: null,
+      dailyHistoryLoading: false,
+      dailyHistoryError: null,
+      dailyHistoryEnd: false,
+      dailyHistoryLoadingMore: false,
+    });
+    if (streakWanted && get().userId) void get().loadCoupleStreak();
+  };
+
   // Sign-out and an account switch change the identity in one set(); the
   // pending retry belongs to the old one.
   api.subscribe((state) => {
@@ -381,6 +424,19 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     ) {
       cancelDrainRetry();
     }
+
+    // A new partner id after another one (never a first link or the same
+    // partner again) ends the old pair's streak and past questions.
+    const identity = `${state.userId}:${state.authSessionVersion}`;
+    if (identity !== seenIdentity) {
+      seenIdentity = identity;
+      lastPartnerId = null;
+    }
+    const partnerId = state.partner?.id ?? null;
+    if (!partnerId) return;
+    const changed = lastPartnerId !== null && partnerId !== lastPartnerId;
+    lastPartnerId = partnerId;
+    if (changed) clearPairData();
   });
 
   /**
@@ -476,8 +532,11 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return;
       const mine = ++historySeq;
+      const generation = pairGeneration;
       const inSession = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairGeneration === generation;
       const isCurrent = () => inSession() && historySeq === mine;
 
       set({ dailyHistoryLoading: true });
@@ -543,8 +602,11 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       const asked = loaded?.[loaded.length - 1]?.day;
       if (!requestedBy || asked === undefined) return;
       if (get().dailyHistoryEnd || get().dailyHistoryLoadingMore) return;
+      const generation = pairGeneration;
       const inSession = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairGeneration === generation;
 
       set({ dailyHistoryLoadingMore: true });
       try {
@@ -592,7 +654,9 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       set({ coupleStreakLoading: true });
 
       // 1. The saved streak, at once, over nothing only.
-      const saved = await readSavedStreak(requestedBy);
+      const savedFor = await shownPartnerId(requestedBy);
+      if (!isCurrent()) return;
+      const saved = await readSavedStreak(requestedBy, savedFor);
       if (!isCurrent()) return;
       if (saved && get().coupleStreak === null) {
         set({ coupleStreak: { status: 'ok', streak: saved } });
@@ -604,7 +668,10 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         if (!isCurrent()) return;
         set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
         try {
-          await saveStreakAnswer(requestedBy, answer);
+          // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
+          const partnerId = answer.status === 'ok' ? await mergePartnerId(requestedBy) : null;
+          if (!isCurrent()) return;
+          await saveStreakAnswer(requestedBy, answer, partnerId);
         } catch (error) {
           console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
         }

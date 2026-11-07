@@ -175,13 +175,17 @@ function DayCard({
   snapshot,
   queued,
   partnerName,
+  partnerNameInline,
   onSendStart,
   onDayChanged,
 }: {
   snapshot: DailyDaySnapshot;
   /** The account's queued pick for this day, if any. */
   queued: QueuedDailyPick | null;
+  /** The partner's name, or "Your partner" (for the start of a sentence). */
   partnerName: string;
+  /** The partner's name, or "your partner" (for the middle of a sentence). */
+  partnerNameInline: string;
   /** A Send began: the parent clears its day-changed notice. */
   onSendStart: () => void;
   /** The pick was refused because the date changed; the parent shows the notice. */
@@ -300,7 +304,7 @@ function DayCard({
             </p>
           )}
           <p className="text-[15px] font-semibold text-ink" data-testid="daily-waiting">
-            Waiting on {partnerName}
+            Waiting on {partnerNameInline}
           </p>
         </div>
       )}
@@ -337,7 +341,10 @@ export function DailyQuestion() {
   const navigatePartner = useAppStore((state) => state.navigatePartner);
   const writeDeclined = useAppStore((state) => state.dailyWriteDeclined);
   const claimStreakCelebration = useAppStore((state) => state.claimStreakCelebration);
-  const partnerName = useAppStore((state) => state.partner?.displayName)?.trim() || 'Your partner';
+  const ownPartnerName = useAppStore((state) => state.partner?.displayName)?.trim();
+  // A nameless partner reads "Your partner" at the start of a sentence and "your partner" within one.
+  const partnerName = ownPartnerName || 'Your partner';
+  const partnerNameInline = ownPartnerName || 'your partner';
 
   // The day-changed notice belongs to the session that raised it, so an account
   // change hides it without an effect resetting state.
@@ -474,7 +481,7 @@ export function DailyQuestion() {
                 className="px-1 text-[15px] leading-[1.4] font-semibold text-ink"
                 data-testid="daily-streak-waiting"
               >
-                Your half is in. The streak lights up when {partnerName} answers too.
+                Your half is in. The streak lights up when {partnerNameInline} answers too.
               </p>
             )}
 
@@ -483,6 +490,7 @@ export function DailyQuestion() {
               snapshot={dailyDay.snapshot}
               queued={queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null}
               partnerName={partnerName}
+              partnerNameInline={partnerNameInline}
               onSendStart={clearDayChanged}
               onDayChanged={raiseDayChanged}
             />
@@ -535,7 +543,7 @@ export function DailyQuestion() {
       {celebrationShown && celebration.stage === 'up' && (
         <StreakUp
           streak={celebration.streak}
-          partnerName={partnerName}
+          partnerName={partnerNameInline}
           showReveal={
             !celebration.milestone && dailyDay?.status === 'ok' && dailyDay.snapshot.state === 'both'
           }
@@ -546,7 +554,7 @@ export function DailyQuestion() {
       {celebrationShown && celebration.stage === 'milestone' && (
         <Milestone
           streak={celebration.streak}
-          partnerName={partnerName}
+          partnerName={partnerNameInline}
           onClose={closeCelebration}
         />
       )}

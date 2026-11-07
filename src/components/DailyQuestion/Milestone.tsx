@@ -35,6 +35,7 @@ export function Milestone({
   onClose,
 }: {
   streak: Pick<CoupleStreak, 'held' | 'milestones'>;
+  /** Used within a sentence: the caller gives "your partner" for a nameless partner. */
   partnerName: string;
   onClose: () => void;
 }) {

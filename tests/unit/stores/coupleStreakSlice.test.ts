@@ -289,7 +289,7 @@ describe('the daily-streak local copy', () => {
 
     await state().loadCoupleStreak();
 
-    expect(await savedCopy()).toEqual(coupleStreak({ held: 12 }));
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 12 }), partner_id: null });
   });
 
   it('replaces an older saved streak with the new ok answer', async () => {
@@ -298,7 +298,7 @@ describe('the daily-streak local copy', () => {
 
     await state().loadCoupleStreak();
 
-    expect(await savedCopy()).toEqual(coupleStreak({ held: 3 }));
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 3 }), partner_id: null });
     expect(state().coupleStreak).toEqual(okStreak({ held: 3 }));
   });
 
@@ -457,7 +457,7 @@ describe('the daily-streak local copy', () => {
       older.settle(okStreak({ held: 7 }));
       await first;
 
-      expect(await savedCopy()).toEqual(coupleStreak({ held: 8 }));
+      expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 8 }), partner_id: null });
     });
   });
 
@@ -468,7 +468,7 @@ describe('the daily-streak local copy', () => {
 
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
     expect(state().coupleStreak).toEqual(okStreak({ held: 5 }));
-    expect(await savedCopy()).toEqual(coupleStreak({ held: 5 }));
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 5 }), partner_id: null });
   });
 
   it("sign-out deletes the outgoing account's copy and keeps another account's", async () => {
@@ -479,5 +479,239 @@ describe('the daily-streak local copy', () => {
 
     await vi.waitFor(async () => expect(await savedCopy(A)).toBeNull());
     expect(await savedCopy(B)).toEqual(coupleStreak({ held: 4 }));
+  });
+});
+
+describe('the partner changes in the session', () => {
+  const PARTNER_A = 'PARTNER-A-ID';
+  const PARTNER_C = 'PARTNER-C-ID';
+  const withPartner = (id: string) =>
+    useAppStore.setState({
+      partner: {
+        id,
+        email: 'p@example.com',
+        displayName: 'Harper',
+        linkedSince: null,
+        birthday: null,
+      },
+      partnerKnown: true,
+    });
+  const unlink = () => useAppStore.setState({ partner: null, partnerKnown: true });
+
+  beforeEach(() => {
+    // A read started by a partner change stays open unless a test answers it.
+    fetchCoupleStreak.mockReturnValue(new Promise(() => {}));
+  });
+
+  afterEach(() => {
+    useAppStore.setState({ partner: null, partnerKnown: false });
+  });
+
+  it('tags the saved streak with the partner in the store', async () => {
+    withPartner(PARTNER_A);
+    fetchCoupleStreak.mockResolvedValue(okStreak({ held: 6 }));
+
+    await state().loadCoupleStreak();
+
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 6 }), partner_id: PARTNER_A });
+  });
+
+  it('shows a saved streak first only for the partner it was read with', async () => {
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, {
+      ...coupleStreak({ held: 6 }),
+      partner_id: PARTNER_A,
+    });
+    withPartner(PARTNER_A);
+    fetchCoupleStreak.mockRejectedValue(new Error('boom'));
+
+    await state().loadCoupleStreak();
+
+    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+  });
+
+  it("does not show another partner's saved streak, so offline there is nothing to show", async () => {
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, {
+      ...coupleStreak({ held: 6 }),
+      partner_id: PARTNER_A,
+    });
+    withPartner(PARTNER_C);
+    fetchCoupleStreak.mockRejectedValue(
+      new AccountDataError('offline', 'You are offline. The streak needs a connection to load.')
+    );
+
+    await state().loadCoupleStreak();
+
+    expect(state().coupleStreak).toBeNull();
+    expect(state().coupleStreakError).toBe(
+      'You are offline. The streak needs a connection to load.'
+    );
+  });
+
+  it('an untagged saved streak is hidden for a known partner and shown when none is known', async () => {
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 6 }));
+    fetchCoupleStreak.mockRejectedValue(new Error('boom'));
+
+    withPartner(PARTNER_A);
+    await state().loadCoupleStreak();
+    expect(state().coupleStreak).toBeNull();
+
+    useAppStore.setState({ partner: null, partnerKnown: true, coupleStreak: null });
+    await state().loadCoupleStreak();
+    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+  });
+
+  it('a new partner clears the streak and its error, and reads it again for the new partner', () => {
+    withPartner(PARTNER_A);
+    useAppStore.setState({
+      coupleStreak: okStreak({ held: 6 }),
+      coupleStreakError: 'old',
+      coupleStreakLoading: true,
+    });
+
+    withPartner(PARTNER_C);
+
+    expect(state().coupleStreak).toBeNull();
+    expect(state().coupleStreakError).toBeNull();
+    // The old read's flag is gone; this one is the new partner's read.
+    expect(state().coupleStreakLoading).toBe(true);
+  });
+
+  it('a new partner after an unlink clears it too', () => {
+    withPartner(PARTNER_A);
+    useAppStore.setState({ coupleStreak: okStreak({ held: 6 }) });
+    unlink();
+    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+
+    withPartner(PARTNER_C);
+
+    expect(state().coupleStreak).toBeNull();
+  });
+
+  it('a first link and a reload of the same partner clear nothing', () => {
+    useAppStore.setState({ coupleStreak: okStreak({ held: 6 }) });
+    withPartner(PARTNER_A);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+
+    withPartner(PARTNER_A);
+    unlink();
+    withPartner(PARTNER_A);
+
+    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+  });
+
+  it('an identity change forgets the last partner', () => {
+    withPartner(PARTNER_A);
+    state().clearAuth();
+    state().setAuthUser(A);
+
+    useAppStore.setState({
+      partner: {
+        id: PARTNER_C,
+        email: 'p@example.com',
+        displayName: 'Harper',
+        linkedSince: null,
+        birthday: null,
+      },
+      partnerKnown: true,
+      coupleStreak: okStreak({ held: 2 }),
+    });
+
+    expect(state().coupleStreak).toEqual(okStreak({ held: 2 }));
+  });
+
+  it("a change during an in-flight read ends with the new partner's answer, no view needed", async () => {
+    withPartner(PARTNER_A);
+    const old = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak.mockReturnValueOnce(old.promise).mockResolvedValueOnce(okStreak({ held: 9 }));
+
+    const load = state().loadCoupleStreak();
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
+    withPartner(PARTNER_C);
+    await vi.waitFor(() => expect(state().coupleStreak).toEqual(okStreak({ held: 9 })));
+    old.settle(okStreak({ held: 1 }));
+    await load;
+
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 9 }));
+    expect(state().coupleStreakLoading).toBe(false);
+  });
+
+  it('a change with a streak shown starts a read for the new partner', async () => {
+    withPartner(PARTNER_A);
+    useAppStore.setState({ coupleStreak: okStreak({ held: 6 }) });
+    fetchCoupleStreak.mockResolvedValueOnce(okStreak({ held: 2 }));
+
+    withPartner(PARTNER_C);
+
+    await vi.waitFor(() => expect(state().coupleStreak).toEqual(okStreak({ held: 2 })));
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
+  });
+
+  it('a change with nothing shown or loading starts no read', async () => {
+    withPartner(PARTNER_A);
+
+    withPartner(PARTNER_C);
+    await Promise.resolve();
+
+    expect(fetchCoupleStreak).not.toHaveBeenCalled();
+    expect(state().coupleStreakLoading).toBe(false);
+  });
+
+  it('a change while signed out starts no read', async () => {
+    withPartner(PARTNER_A);
+    state().clearAuth();
+    useAppStore.setState({ coupleStreak: okStreak({ held: 6 }) });
+    withPartner(PARTNER_A);
+
+    withPartner(PARTNER_C);
+    await Promise.resolve();
+
+    expect(fetchCoupleStreak).not.toHaveBeenCalled();
+  });
+
+  it('a read in flight for the old partner writes nothing, to the field or the copy', async () => {
+    withPartner(PARTNER_A);
+    const request = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak.mockReturnValue(request.promise);
+
+    const load = state().loadCoupleStreak();
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalled());
+    withPartner(PARTNER_C);
+    request.settle(okStreak({ held: 9 }));
+    await load;
+
+    expect(state().coupleStreak).toBeNull();
+    // Only the new partner's read, still open, holds the flag.
+    expect(state().coupleStreakLoading).toBe(true);
+    expect(await savedCopy()).toBeNull();
+  });
+
+  it('a failure of the old partner read leaves no error behind', async () => {
+    withPartner(PARTNER_A);
+    const request = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak.mockReturnValue(request.promise);
+
+    const load = state().loadCoupleStreak();
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalled());
+    withPartner(PARTNER_C);
+    request.fail(new Error('late'));
+    await load;
+
+    expect(state().coupleStreakError).toBeNull();
+  });
+
+  it("the new partner's failed read shows no streak of the old pair", async () => {
+    withPartner(PARTNER_A);
+    fetchCoupleStreak.mockResolvedValueOnce(okStreak({ held: 6 }));
+    await state().loadCoupleStreak();
+    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+
+    withPartner(PARTNER_C);
+    fetchCoupleStreak.mockRejectedValueOnce(new AccountDataError('transport', 'boom'));
+    await state().loadCoupleStreak();
+
+    expect(state().coupleStreak).toBeNull();
+    expect(state().coupleStreakError).toBe('boom');
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 6 }), partner_id: PARTNER_A });
   });
 });

@@ -14,9 +14,12 @@
  * kept current by `usePartnerStreakListener`. The slice shows the saved
  * `daily-streak` copy first, so the card stays up offline and after a failed
  * read, and its local-copy refresher reads the streak again on signed-in start
- * and on `online`. The past questions are read in the same effect, so on the
- * same keys. Their pages are merged into the `daily-days` copy, so after a
- * failed first read with nothing shown (offline after a reload) the card shows
+ * and on `online`. The copy is tagged with its partner and shown only for the
+ * current one; when the partner changes to a new id in the session, the slice
+ * clears the old pair's streak and past questions (and starts the streak read
+ * again for the new one) before this effect re-reads. The past questions are
+ * read in the same effect, so on the same keys. Their pages are merged into the
+ * `daily-days` copy, so after a failed first read with nothing shown (offline after a reload) the card shows
  * the current partner's saved done days; it hides when it holds nothing. The old mood view
  * (`PartnerMoodView`) is no longer routed; its code stays for epic 10.
  *

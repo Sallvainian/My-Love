@@ -43,6 +43,7 @@ export function StreakUp({
   onContinue,
 }: {
   streak: CoupleStreak;
+  /** Used within a sentence: the caller gives "your partner" for a nameless partner. */
   partnerName: string;
   /** Today's snapshot on screen is `both`: the button opens the reveal. */
   showReveal: boolean;

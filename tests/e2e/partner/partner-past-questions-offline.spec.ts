@@ -12,6 +12,11 @@
  *    B to D). After A loads Partner and Daily online again, a reload with the
  *    reads aborted and the device offline shows none of A and B's questions,
  *    though the copy still holds their entries: the partner filter hides them.
+ * 4. Throwaway A, linked to B with done days, loads Partner online (the streak
+ *    and the history are saved under B). An admin relinks A to C; a reload with
+ *    the streak and history reads aborted (online, so the partner read answers
+ *    C) shows C's name and neither A and B's streak card nor any of their
+ *    questions (story 7.10, DW-504/DW-510/DW-511).
  *
  * Dev mode has no service worker, so a reload cannot happen while the context
  * is offline. Each reload runs online with the reads aborted (`abortReads`),
@@ -20,7 +25,7 @@
  * chunks are loaded.
  *
  * Accounts: tests 1 and 2 use this worker's pooled pair, whose days are cleared
- * before each test and again at teardown. Test 3 makes four throwaway accounts
+ * before each test and again at teardown. Tests 3 and 4 make throwaway accounts
  * and links and relinks only those; nothing links, unlinks or resets a pool
  * account.
  */
@@ -333,5 +338,80 @@ test.describe('Past questions offline, after a relink', () => {
 
     await log.step('AND the copy still holds the old pairing, hidden by the filter');
     expect(await savedDoneCount(page, b.userId)).toBe(3);
+  });
+
+  test("[P1] after a relink, a reload whose reads fail shows C's name and none of A and B's streak or questions", async ({
+    page,
+    supabaseAdmin,
+    cleanup,
+    interceptNetworkCall,
+  }) => {
+    const a = await createThrowaway(supabaseAdmin, cleanup, 'a');
+    const b = await createThrowaway(supabaseAdmin, cleanup, 'b');
+    const c = await createThrowaway(supabaseAdmin, cleanup, 'c');
+    await link(supabaseAdmin, a.userId, b.userId);
+    await seedPairDays(
+      supabaseAdmin,
+      { userId: a.userId, partnerId: b.userId },
+      [1, 2, 3].map((daysAgo) => ({ daysAgo, picks: 'both' as const }))
+    );
+    const oldTexts = await readPairQuestionTexts(supabaseAdmin, {
+      userId: a.userId,
+      partnerId: b.userId,
+    });
+    expect(oldTexts.length).toBeGreaterThanOrEqual(3);
+
+    await log.step("GIVEN A's Partner page showed the A-B streak and past questions online");
+    await dismissWelcomeSplash(page);
+    await signIn(page, a);
+    const history = interceptNetworkCall({ method: 'POST', url: DAILY_HISTORY_READ });
+    const streak = interceptNetworkCall({ method: 'POST', url: COUPLE_STREAK_READ });
+    await navigateTo(page, 'partner');
+    expect((await history).status).toBe(200);
+    expect((await streak).status).toBe(200);
+    await expect(page.getByTestId('partner-streak-card')).toBeVisible();
+    await expect(page.getByTestId('partner-past-question')).toHaveCount(3);
+    await recurseUntil(
+      async () => ({
+        streakFor: (await savedLocalCopy<{ partner_id?: string }>(page, 'daily-streak'))
+          ?.partner_id,
+        done: await savedDoneCount(page, b.userId),
+      }),
+      ({ streakFor, done }) => {
+        expect(streakFor).toBe(b.userId);
+        expect(done).toBe(3);
+      }
+    );
+
+    await log.step('WHEN an admin relinks A to C and A reloads with both reads aborted');
+    for (const id of [a.userId, b.userId, c.userId]) {
+      const { error } = await supabaseAdmin.from('users').update({ partner_id: null }).eq('id', id);
+      if (error) throw new Error(`unlink: ${error.message}`);
+    }
+    await link(supabaseAdmin, a.userId, c.userId);
+    const abortedHistory = await abortReads(page, DAILY_HISTORY_READ);
+    const abortedStreak = await abortReads(page, COUPLE_STREAK_READ);
+    await page.reload();
+
+    await log.step("THEN Partner shows C's name, the streak error, and nothing of A and B");
+    await expect(page.getByRole('heading', { level: 1, name: c.name })).toBeVisible();
+    await expect(page.getByTestId('partner-streak-error')).toBeVisible();
+    await recurseUntil(
+      async () => [abortedHistory.count(), abortedStreak.count()],
+      ([historyReads, streakReads]) => {
+        expect(historyReads).toBeGreaterThan(0);
+        expect(streakReads).toBeGreaterThan(0);
+      }
+    );
+    await expect(page.getByTestId('partner-streak-card')).toHaveCount(0);
+    await expect(page.getByTestId('partner-past-questions')).toHaveCount(0);
+    for (const text of oldTexts) {
+      await expect(page.getByTestId('partner-view')).not.toContainText(text);
+    }
+
+    await log.step("AND the copy still holds the A-B streak, tagged with B");
+    expect(
+      (await savedLocalCopy<{ partner_id?: string }>(page, 'daily-streak'))?.partner_id
+    ).toBe(b.userId);
   });
 });

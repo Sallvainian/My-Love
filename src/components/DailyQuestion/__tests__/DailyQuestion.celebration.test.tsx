@@ -197,6 +197,43 @@ describe('the streak +1 on Daily', () => {
     expect(screen.getByTestId('daily-reveal')).toBeInTheDocument();
   });
 
+  describe('a nameless linked partner', () => {
+    beforeEach(() => {
+      useAppStore.setState({
+        partner: { id: 'USER-B-ID', displayName: '', email: 'b@example.com' },
+      } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    });
+
+    it('the +1 reads "your partner" within its sentence and its reveal button', async () => {
+      await celebratedAt(1);
+      fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+      fetchCoupleStreak.mockResolvedValue(okStreak({ held: 2 }));
+
+      render(<DailyQuestion />);
+
+      expect(await screen.findByTestId('daily-streak-up-message')).toHaveTextContent(
+        'You and your partner both answered.'
+      );
+      expect(screen.getByTestId('daily-streak-up-continue')).toHaveTextContent(
+        "See your partner's pick"
+      );
+    });
+
+    it('the milestone screen reads "your partner" within its sentence', async () => {
+      await celebratedAt(24, 0);
+      fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+      fetchCoupleStreak.mockResolvedValue(okStreak({ held: 25, milestones: 1 }));
+      const user = userEvent.setup();
+
+      render(<DailyQuestion />);
+      await user.click(await screen.findByTestId('daily-streak-up-continue'));
+
+      expect(await screen.findByTestId('daily-milestone-message')).toHaveTextContent(
+        'You and your partner have answered together on 25 days.'
+      );
+    });
+  });
+
   it('catch-up: the snapshot is not both, so the button says Continue', async () => {
     await celebratedAt(1);
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));

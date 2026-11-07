@@ -136,6 +136,29 @@ describe('DailyQuestion', () => {
     );
   });
 
+  it('a nameless linked partner: "Your partner" starts a sentence, "your partner" sits within one', async () => {
+    setPartner('  ');
+    fetchDailyDay.mockResolvedValue(ok(waitingSnapshot('this')));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-waiting')).toHaveTextContent('Waiting on your partner');
+    expect(screen.getByTestId('daily-streak-waiting')).toHaveTextContent(
+      'Your half is in. The streak lights up when your partner answers too.'
+    );
+  });
+
+  it('a nameless linked partner, no picks yet: the status sentence starts with "Your partner"', async () => {
+    setPartner('');
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-partner-status')).toHaveTextContent(
+      "Your partner hasn't picked yet"
+    );
+  });
+
   it('partner picked: says so and shows no partner choice', async () => {
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ state: 'partner' })));
 
