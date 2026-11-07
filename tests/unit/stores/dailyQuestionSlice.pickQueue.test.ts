@@ -286,7 +286,9 @@ describe('drainQueuedPicks', () => {
     expect(state().dailyQueuedPicks).toEqual([]);
     expect(loadCoupleStreak).toHaveBeenCalledTimes(1);
     expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
-    expect(await copy()).toEqual({ [DAY_ID]: revealSnapshot('this', 'that') });
+    expect(await copy()).toEqual({
+      [DAY_ID]: { ...revealSnapshot('this', 'that'), partner_id: null },
+    });
     expect(state().dailyDay).toEqual(ok(revealSnapshot('this', 'that')));
   });
 
@@ -315,7 +317,7 @@ describe('drainQueuedPicks', () => {
     await state().drainQueuedPicks();
 
     expect(state().dailyDay).toEqual(ok(nextDay));
-    expect(await copy()).toEqual({ [DAY_ID]: waitingSnapshot('this') });
+    expect(await copy()).toEqual({ [DAY_ID]: { ...waitingSnapshot('this'), partner_id: null } });
     expect(await listQueuedPicks(A)).toEqual([]);
   });
 

@@ -8,6 +8,9 @@
  * days are the `daily-days` local copy (`services/dailyDaysCopy.ts`), which
  * `loadDailyDay` shows first for the device's date and every successful answer
  * (a read or a confirmed pick) is merged into. The view re-reads on each mount.
+ * Each merge tags the saved day with the partner it was read with, and the
+ * readers show only the current partner's days (the partner from the store or
+ * the saved partner copy; `lookupPartnerId()` tags a merge when neither is known).
  *
  * Only a successful answer writes `dailyDay` and the copy: a failed load keeps
  * what is shown and sets `dailyDayError`, and never turns into `unlinked`. A
@@ -83,8 +86,13 @@
  * session changed or the list's oldest day is no longer the one it asked
  * before. Both never throw: a failure keeps the rows shown and sets the error
  * (an offline refusal is not logged). Only the newest started first-page read
- * writes (its own sequence counter), nothing if the session changed. There is
- * no local copy. `signedOutState()` clears all five fields.
+ * writes (its own sequence counter), nothing if the session changed. Every
+ * page read is merged into the `daily-days` copy (the same map as Daily's days,
+ * no cap), and a failed first read with nothing shown fills the list from that
+ * copy (the current partner's `both` days, newest first, `dailyHistoryEnd`
+ * set); the next successful first page replaces such a list rather than
+ * merging with it, and a failed read never writes the copy.
+ * `signedOutState()` clears all five fields.
  *
  * The streak's +1 (R4) is claimed through `claimStreakCelebration(streak)`: the
  * Daily view calls it for each `ok` streak it shows, and the device-state
@@ -97,13 +105,16 @@
  */
 
 import { isOnline } from '../../api/errorHandlers';
+import { lookupPartnerId } from '../../api/supabaseClient';
 import { AccountDataError } from '../../services/accountDataError';
 import {
   DAILY_DAYS_COPY_KIND,
   dailyStateRank,
   keepWriteDone,
   mergeDailyDay,
+  mergeDailyDays,
   readSavedDailyDay,
+  readSavedDailyHistory,
 } from '../../services/dailyDaysCopy';
 import { type CelebrationClaim, claimCelebration } from '../../services/dailyCelebrated';
 import type { StoredQueuedPick } from '../../services/dbSchema';
@@ -142,6 +153,7 @@ import {
   submitWrittenQuestion as submitWrittenQuestionRequest,
 } from '../../api/dailyQuestionApi';
 import type { AppStateCreator } from '../types';
+import { readSavedPartner } from './partnerSlice';
 
 /** One of the account's queued picks, as the view needs it. */
 export type QueuedDailyPick = Pick<
@@ -299,6 +311,34 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
   let streakSeq = 0;
   // The newest started `loadDailyHistory`, the same way.
   let historySeq = 0;
+  // The shown history was filled from the copy after a failed first read: the
+  // next successful first page replaces it instead of merging with it.
+  let historyFromCopy = false;
+
+  /** The partner the saved days are shown for: the store's, else the saved partner copy's; `null` when none. */
+  const shownPartnerId = async (userId: string): Promise<string | null> => {
+    if (get().partnerKnown) return get().partner?.id ?? null;
+    const saved = await readSavedPartner(userId);
+    return saved?.status === 'linked' ? saved.partner.id : null;
+  };
+
+  /**
+   * The partner a merge tags its entries with: the linked id from the store or
+   * the saved partner copy when one is known, else `lookupPartnerId()`, where
+   * anything but a `linked` answer (or a throw) gives `null`.
+   */
+  const mergePartnerId = async (userId: string): Promise<string | null> => {
+    const known = get().partner?.id;
+    if (known) return known;
+    const saved = await readSavedPartner(userId);
+    if (saved?.status === 'linked') return saved.partner.id;
+    try {
+      const lookup = await lookupPartnerId();
+      return lookup?.status === 'linked' ? lookup.partnerId : null;
+    } catch {
+      return null;
+    }
+  };
 
   // The tab's running drain, and whether a call arrived while it ran.
   let drainInFlight: Promise<void> | null = null;
@@ -386,7 +426,14 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           });
           // A late pick can finish a past date: the streak corrects itself.
           void get().loadCoupleStreak();
-          const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+          const partnerId = await mergePartnerId(requestedBy);
+          if (!isCurrent()) return 'stale';
+          const merged = await mergeDailyDay(
+            requestedBy,
+            { status: 'ok', snapshot },
+            partnerId,
+            isCurrent
+          );
           if (!isCurrent()) return 'stale';
           showIfOnScreen(snapshot, merged);
         }
@@ -429,16 +476,17 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return;
       const mine = ++historySeq;
-      const isCurrent = () =>
-        get().userId === requestedBy &&
-        get().authSessionVersion === requestedInSession &&
-        historySeq === mine;
+      const inSession = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const isCurrent = () => inSession() && historySeq === mine;
 
       set({ dailyHistoryLoading: true });
       try {
         const days = await fetchDailyHistory();
         if (!isCurrent()) return;
-        const loaded = get().dailyHistory ?? [];
+        // A list filled from the copy is stale: this page is the first thing loaded.
+        const loaded = historyFromCopy ? [] : (get().dailyHistory ?? []);
+        historyFromCopy = false;
         const oldest = days[days.length - 1];
         if (days.length >= DAILY_HISTORY_PAGE_SIZE && oldest) {
           // A full first page: rows paged in below it stay, `dailyHistoryEnd` as it
@@ -459,6 +507,11 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
             dailyHistoryError: null,
           });
         }
+        // Save the page for offline; the session decides, not a newer read.
+        if (days.length === 0) return;
+        const partnerId = await mergePartnerId(requestedBy);
+        if (!inSession()) return;
+        await mergeDailyDays(requestedBy, days, partnerId, inSession);
       } catch (error) {
         if (!isCurrent()) return;
         // An offline refusal is expected, not a fault: the error is still set.
@@ -470,6 +523,17 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           dailyHistoryError:
             error instanceof Error ? error.message : 'Could not load your past questions.',
         });
+        // Nothing shown: fill the list from the copy (never written on a failure).
+        if (get().dailyHistory === null) {
+          const partnerId = await shownPartnerId(requestedBy);
+          if (!isCurrent()) return;
+          const saved = await readSavedDailyHistory(requestedBy, partnerId);
+          if (!isCurrent() || get().dailyHistory !== null) return;
+          if (saved.length > 0) {
+            set({ dailyHistory: saved, dailyHistoryEnd: true });
+            historyFromCopy = true;
+          }
+        }
       }
     },
 
@@ -499,6 +563,10 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           dailyHistoryLoadingMore: false,
           dailyHistoryError: null,
         });
+        if (days.length === 0) return;
+        const partnerId = await mergePartnerId(requestedBy);
+        if (!inSession()) return;
+        await mergeDailyDays(requestedBy, days, partnerId, inSession);
       } catch (error) {
         if (!inSession()) return;
         if (!(error instanceof AccountDataError && error.code === 'offline')) {
@@ -567,7 +635,9 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       // same day_id.
       const today = formatDateISO(new Date());
       const [saved, declined] = await Promise.all([
-        readSavedDailyDay(requestedBy, today),
+        shownPartnerId(requestedBy).then((partnerId) =>
+          readSavedDailyDay(requestedBy, today, partnerId)
+        ),
         readDeclinedWriteDays(requestedBy),
         showQueuedPicks(requestedBy, isCurrent),
       ]);
@@ -587,7 +657,10 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         // 2. The server's answer, merged into the copy and then shown.
         const answer = await fetchDailyDay();
         if (!isCurrent()) return;
-        const merged = await mergeDailyDay(requestedBy, answer, isCurrent);
+        // Only an `ok` answer is tagged; `unlinked` writes `{}` and needs no partner.
+        const partnerId = answer.status === 'ok' ? await mergePartnerId(requestedBy) : null;
+        if (!isCurrent()) return;
+        const merged = await mergeDailyDay(requestedBy, answer, partnerId, isCurrent);
         if (!isCurrent()) return;
         set({
           dailyDay: mergeAnswer(get().dailyDay, merged),
@@ -624,7 +697,14 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       try {
         const snapshot = await fetchDailyDayById(dayId);
         if (!isCurrent()) return;
-        const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+        const partnerId = await mergePartnerId(requestedBy);
+        if (!isCurrent()) return;
+        const merged = await mergeDailyDay(
+          requestedBy,
+          { status: 'ok', snapshot },
+          partnerId,
+          isCurrent
+        );
         if (!isCurrent()) return;
         showIfOnScreen(snapshot, merged);
       } catch (error) {
@@ -691,7 +771,14 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       // The pick may finish the day: re-read the streak, without waiting.
       void get().loadCoupleStreak();
       // A confirmed own write is a fill source for the copy.
-      const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+      const partnerId = await mergePartnerId(requestedBy);
+      if (!isCurrent()) return;
+      const merged = await mergeDailyDay(
+        requestedBy,
+        { status: 'ok', snapshot },
+        partnerId,
+        isCurrent
+      );
       if (!isCurrent()) return;
       set({
         dailyDay: mergeAnswer(get().dailyDay, merged),
@@ -745,7 +832,14 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         thatText
       );
       if (!isCurrent()) return;
-      const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+      const partnerId = await mergePartnerId(requestedBy);
+      if (!isCurrent()) return;
+      const merged = await mergeDailyDay(
+        requestedBy,
+        { status: 'ok', snapshot },
+        partnerId,
+        isCurrent
+      );
       if (!isCurrent()) return;
       set({
         dailyDay: mergeAnswer(get().dailyDay, merged),

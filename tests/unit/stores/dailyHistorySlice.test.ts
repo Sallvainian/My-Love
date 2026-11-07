@@ -42,7 +42,10 @@ import { DAILY_HISTORY_PAGE_SIZE } from '../../../src/api/dailyQuestionApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { cancelDateReminders } from '../../../src/services/dateReminders';
 import { deleteAccountImages } from '../../../src/services/imageCache';
-import { deleteAccountCopies } from '../../../src/services/localCopy';
+import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
+import * as localCopyModule from '../../../src/services/localCopy';
+import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
+import { lookupPartnerId } from '../../../src/api/supabaseClient';
 import { moodService } from '../../../src/services/moodService';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { accountDeletesSettled, setOnline } from './accountDataFixtures';
@@ -489,5 +492,217 @@ describe('loadMoreDailyHistory', () => {
 
     expect(state().dailyHistoryError).toBe('You are offline.');
     expect(console.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('the daily-days copy behind the past questions', () => {
+  afterEach(() => {
+    useAppStore.setState({ partner: null, partnerKnown: false });
+  });
+
+  const PARTNER_C = 'PARTNER-C';
+  const PARTNER_B = 'PARTNER-B';
+  const copyOf = () => readLocalCopy<Record<string, Record<string, unknown>>>(A, DAILY_DAYS_COPY_KIND);
+  const withPartner = (id: string) =>
+    useAppStore.setState({
+      partner: { id, email: 'p@example.com', displayName: 'Harper', linkedSince: null, birthday: null },
+      partnerKnown: true,
+    });
+  const offlineRefusal = () =>
+    new AccountDataError('offline', 'You are offline. Past questions needs a connection to load.');
+  /** A done day for the copy: the pair's both pick, tagged with `partner`. */
+  const savedDone = (id: string, date: string, partner: string | null) => ({
+    ...day(id, date),
+    partner_id: partner,
+  });
+
+  beforeEach(async () => {
+    useAppStore.setState({ partner: null, partnerKnown: false });
+    await deleteAccountCopies(A);
+    vi.mocked(lookupPartnerId).mockReset();
+  });
+
+  it('merges the first page into the copy, every day tagged with the partner in the store', async () => {
+    withPartner(PARTNER_C);
+    fetchDailyHistory.mockResolvedValue([day('d3', '2026-11-06'), ...PAGE]);
+
+    await state().loadDailyHistory();
+
+    const saved = await copyOf();
+    expect(Object.keys(saved ?? {}).sort()).toEqual(['d1', 'd2', 'd3']);
+    expect(Object.values(saved ?? {}).map((row) => row.partner_id)).toEqual([
+      PARTNER_C,
+      PARTNER_C,
+      PARTNER_C,
+    ]);
+    expect(lookupPartnerId).not.toHaveBeenCalled();
+  });
+
+  it('merges a loadMore page into the copy too', async () => {
+    withPartner(PARTNER_C);
+    useAppStore.setState({ dailyHistory: run(30) });
+    fetchDailyHistory.mockResolvedValue(older(3));
+
+    await state().loadMoreDailyHistory();
+
+    expect(Object.keys((await copyOf()) ?? {}).sort()).toEqual(['o0', 'o1', 'o2']);
+  });
+
+  it('tags with lookupPartnerId when neither the store nor the saved partner knows one', async () => {
+    vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'linked', partnerId: PARTNER_C });
+    fetchDailyHistory.mockResolvedValue(PAGE);
+
+    await state().loadDailyHistory();
+
+    expect((await copyOf())?.d2?.partner_id).toBe(PARTNER_C);
+  });
+
+  it.each([
+    ['an undefined answer', () => vi.mocked(lookupPartnerId).mockResolvedValue(undefined as never)],
+    [
+      'an error answer',
+      () => vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'error', reason: 'x' }),
+    ],
+    ['an unlinked answer', () => vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'unlinked' })],
+    ['a throw', () => vi.mocked(lookupPartnerId).mockRejectedValue(new Error('boom'))],
+  ])('tags null on %s from lookupPartnerId', async (_name, arrange) => {
+    arrange();
+    fetchDailyHistory.mockResolvedValue(PAGE);
+
+    await state().loadDailyHistory();
+
+    expect((await copyOf())?.d2?.partner_id).toBeNull();
+    expect(state().dailyHistory).toEqual(PAGE);
+  });
+
+  it('a failed write is logged and the list is still shown', async () => {
+    withPartner(PARTNER_C);
+    const failure = new Error('disk full');
+    vi.spyOn(localCopyModule, 'writeLocalCopy').mockRejectedValue(failure);
+    fetchDailyHistory.mockResolvedValue(PAGE);
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toEqual(PAGE);
+    expect(console.error).toHaveBeenCalledWith(
+      '[DailyQuestion] Failed to save the daily days copy:',
+      failure
+    );
+  });
+
+  it('offline with nothing shown, fills the list from the current partner\'s copy', async () => {
+    withPartner(PARTNER_C);
+    const mine = Array.from({ length: 35 }, (_, i) =>
+      savedDone(`c${i}`, `2026-${i < 20 ? '10' : '09'}-${String(30 - (i % 20)).padStart(2, '0')}`, PARTNER_C)
+    );
+    const other = [savedDone('b1', '2026-11-01', PARTNER_B), savedDone('b2', '2026-11-02', PARTNER_B)];
+    const notDone = {
+      ...savedDone('m1', '2026-11-03', PARTNER_C),
+      state: 'me',
+      partner_choice: null,
+    };
+    await writeLocalCopy(
+      A,
+      DAILY_DAYS_COPY_KIND,
+      Object.fromEntries([...mine, ...other, notDone].map((row) => [row.day_id, row]))
+    );
+    fetchDailyHistory.mockRejectedValue(offlineRefusal());
+
+    await state().loadDailyHistory();
+
+    const rows = state().dailyHistory ?? [];
+    expect(rows).toHaveLength(35);
+    expect(rows.every((row) => row.day_id.startsWith('c'))).toBe(true);
+    expect(rows.every((row) => !('partner_id' in row))).toBe(true);
+    const days = rows.map((row) => row.day);
+    expect(days).toEqual([...days].sort().reverse());
+    expect(state().dailyHistoryEnd).toBe(true);
+    expect(state().dailyHistoryError).toBe(offlineRefusal().message);
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('keeps the copy as it was after a failed read', async () => {
+    withPartner(PARTNER_C);
+    const saved = { d2: savedDone('d2', '2026-11-05', PARTNER_C) };
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved);
+    const writeSpy = vi.spyOn(localCopyModule, 'writeLocalCopy');
+    fetchDailyHistory.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyHistory();
+
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await copyOf()).toEqual(saved);
+  });
+
+  it('does not touch rows already shown when the read fails', async () => {
+    withPartner(PARTNER_C);
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { c1: savedDone('c1', '2026-10-01', PARTNER_C) });
+    useAppStore.setState({ dailyHistory: PAGE, dailyHistoryEnd: false });
+    fetchDailyHistory.mockRejectedValue(offlineRefusal());
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toEqual(PAGE);
+    expect(state().dailyHistoryEnd).toBe(false);
+  });
+
+  it('fills from the saved partner when the store has not loaded one yet', async () => {
+    await writeLocalCopy(A, 'partner', {
+      status: 'linked',
+      partner: { id: PARTNER_C, email: 'p@example.com', displayName: 'Harper', linkedSince: null, birthday: null },
+    });
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+      c1: savedDone('c1', '2026-10-01', PARTNER_C),
+      b1: savedDone('b1', '2026-10-02', PARTNER_B),
+    });
+    fetchDailyHistory.mockRejectedValue(offlineRefusal());
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory?.map((row) => row.day_id)).toEqual(['c1']);
+  });
+
+  it('shows nothing, and leaves the field null, when the copy holds no day for the partner', async () => {
+    withPartner(PARTNER_C);
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { b1: savedDone('b1', '2026-10-02', PARTNER_B) });
+    fetchDailyHistory.mockRejectedValue(offlineRefusal());
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toBeNull();
+  });
+
+  it('writes nothing from the copy after a sign-out while it is read', async () => {
+    withPartner(PARTNER_C);
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { c1: savedDone('c1', '2026-10-01', PARTNER_C) });
+    const request = deferred<typeof PAGE>();
+    fetchDailyHistory.mockReturnValue(request.promise);
+
+    const load = state().loadDailyHistory();
+    state().clearAuth();
+    request.fail(offlineRefusal());
+    await load;
+
+    expect(state().dailyHistory).toBeNull();
+  });
+
+  it('back online after a copy fill, a full server page replaces the list and opens the paging', async () => {
+    withPartner(PARTNER_C);
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+      c1: savedDone('c1', '2026-08-01', PARTNER_C),
+      c2: savedDone('c2', '2026-08-02', PARTNER_C),
+    });
+    fetchDailyHistory.mockRejectedValueOnce(offlineRefusal());
+    await state().loadDailyHistory();
+    expect(state().dailyHistory).toHaveLength(2);
+    expect(state().dailyHistoryEnd).toBe(true);
+    const fresh = run(DAILY_HISTORY_PAGE_SIZE);
+    fetchDailyHistory.mockResolvedValueOnce(fresh);
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistory).toEqual(fresh);
+    expect(state().dailyHistoryEnd).toBe(false);
+    expect(state().dailyHistoryError).toBeNull();
   });
 });

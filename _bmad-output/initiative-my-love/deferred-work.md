@@ -4193,7 +4193,8 @@ location: src/services/dailyDaysCopy.ts:71 (`readSavedDailyDay`), :103 (`mergeDa
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
 reason: `readSavedDailyDay` picks today's entry by date and rank across all `day_id`s, and `mergeDailyDay` never drops another `day_id` with the same `day`. After a reset or a relink this device never saw as `unlinked`, an old `both` entry is shown first. Online the server's answer replaces it, because `mergeAnswer` merges only within one `day_id`, so it flashes; offline it stays.
-status: open
+resolution: `mergeSnapshots` in `dailyDaysCopy.ts` drops every other `day_id` for a date the server has just answered, and each saved entry now records the partner it was read with (`partner_id`, the newest tag wins; a legacy entry reads as `null`), so `readSavedDailyDay` and the new `readSavedDailyHistory` show only the current partner's entries. The cap and `prune` went with it. Unit: `dailyDaysCopy.test.ts` (date drop, tag, filter, legacy entry, no cap), `dailyQuestionSlice.partner.test.ts` and `dailyHistorySlice.test.ts`. E2E: the relink test in `tests/e2e/partner/partner-past-questions-offline.spec.ts`, throwaway accounts only: after an admin relink A shows none of the old pairing's questions offline, and the copy still holds them. It fails with the partner filter removed.
+status: done 2026-11-07
 
 ### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only on their next open.
 origin: epic 6 retrospective (Diff-scope review, R4), 2026-11-06

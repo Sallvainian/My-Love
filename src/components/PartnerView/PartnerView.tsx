@@ -15,8 +15,9 @@
  * `daily-streak` copy first, so the card stays up offline and after a failed
  * read, and its local-copy refresher reads the streak again on signed-in start
  * and on `online`. The past questions are read in the same effect, so on the
- * same keys, and have no saved copy: the card shows what the last successful
- * read held and hides when it holds nothing. The old mood view
+ * same keys. Their pages are merged into the `daily-days` copy, so after a
+ * failed first read with nothing shown (offline after a reload) the card shows
+ * the current partner's saved done days; it hides when it holds nothing. The old mood view
  * (`PartnerMoodView`) is no longer routed; its code stays for epic 10.
  *
  * @component
@@ -71,8 +72,9 @@ export function PartnerView() {
   // again for a new partner. loadCoupleStreak shows the saved `daily-streak`
   // copy first; offline the read refuses and what is shown (the copy, if any)
   // stays. They are read offline too (not gated), and again when the device
-  // comes back online. The history has no copy, so offline it shows only what
-  // an earlier read in this session left.
+  // comes back online. The history shows no copy first: a refused first read
+  // with nothing shown fills it from the `daily-days` copy, and the next
+  // online read replaces that fill.
   const partnerId = partner?.id ?? null;
   useEffect(() => {
     if (partnerId) {

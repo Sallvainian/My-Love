@@ -287,7 +287,9 @@ describe('loadDailyDay', () => {
 });
 
 describe('the saved days copy', () => {
-  const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({ [snapshot.day_id]: snapshot });
+  const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({
+    [snapshot.day_id]: { ...snapshot, partner_id: null },
+  });
   const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
 
   it('shows the saved day for the device date before the fetch settles', async () => {
@@ -473,7 +475,9 @@ describe('the saved days copy', () => {
 
 describe('refreshDailyDay', () => {
   const saved = (...snapshots: Array<ReturnType<typeof dailySnapshot>>) =>
-    Object.fromEntries(snapshots.map((snapshot) => [snapshot.day_id, snapshot]));
+    Object.fromEntries(
+      snapshots.map((snapshot) => [snapshot.day_id, { ...snapshot, partner_id: null }])
+    );
   const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
   const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
 
