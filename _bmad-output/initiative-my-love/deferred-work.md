@@ -4176,7 +4176,8 @@ location: src/hooks/useDailyPickListener.ts:43-49 (`subscribePartnerEvents` hand
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
 reason: `useDailyPickListener` registers only `daily_pick` and `onStatus` on the partner-event registry; `partner_linked` reaches only `usePartnerLinkListener`, which reloads the partner and pending requests but not the day. So an account whose request is accepted while Daily is open keeps seeing "Link with your partner" until it leaves Daily and comes back, or until the new partner's first pick reaches it through `showIfOnScreen`'s empty-screen rule (`dailyQuestionSlice.ts:202`), a path no test covers from an `unlinked` screen. A fix re-reads the day on `partner_linked`; the retrospective leaves open whether that waits for epic 7's Partner page rebuild.
-status: open
+resolution: `useDailyPickListener` now registers `partner_linked` on its subscriber and re-reads today's day (`loadDailyDay`) under the same `active` guard; the subscriber is held while the account is unlinked, as the topic is the account's own `mood-updates:<uid>`, and `mergeAnswer` replaces `unlinked` with the server's `ok`. Unit: `useDailyPickListener.test.ts` (a `partner_linked` calls `loadDailyDay`, and not after unmount). E2E: `tests/e2e/daily/daily-question-partner-linked.spec.ts`, two throwaway accounts: A sits on /daily showing the invitation, B accepts from its Partner tab, and A's Daily shows today's question with no reload. Both fail with the handler removed. `seedRequest` and `acceptFromPartnerTab` moved from `partner-connect.spec.ts` into `tests/support/helpers/partner-requests.ts` for both specs.
+status: done 2026-11-06
 
 ### DW-491: The write sheet opens after a failed or offline read, though it is meant to wait for the server's answer.
 origin: epic 6 retrospective (Diff-scope review, R2), 2026-11-06
