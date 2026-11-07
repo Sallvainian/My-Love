@@ -67,6 +67,13 @@
  * Daily shows the streak too, so `submitDailyPick` and the queue drain re-read
  * it (`void loadCoupleStreak()`) after each pick the server confirmed, once the
  * session is still current; a queued pick and a refused row do not.
+ *
+ * The streak's +1 (R4) is claimed through `claimStreakCelebration(streak)`: the
+ * Daily view calls it for each `ok` streak it shows, and the device-state
+ * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
+ * whether that held total is new to this device. It holds no state here, so
+ * sign-out needs nothing in `signedOutState()` (the kind goes with
+ * `deleteAccountCopies`). It never throws.
  */
 
 import { isOnline } from '../../api/errorHandlers';
@@ -78,6 +85,7 @@ import {
   mergeDailyDay,
   readSavedDailyDay,
 } from '../../services/dailyDaysCopy';
+import { type CelebrationClaim, claimCelebration } from '../../services/dailyCelebrated';
 import type { StoredQueuedPick } from '../../services/dbSchema';
 import { addDeclinedWriteDay, readDeclinedWriteDays } from '../../services/dailyWriteDeclined';
 import {
@@ -97,6 +105,7 @@ import { formatDateISO } from '../../utils/dateUtils';
 
 import {
   DAY_CHANGED_MESSAGE,
+  type CoupleStreak,
   type CoupleStreakAnswer,
   type DailyChoice,
   type DailyDayAnswer,
@@ -174,6 +183,14 @@ export interface DailyQuestionSlice {
    * as it was.
    */
   declineWrittenQuestion: (dayId: string) => Promise<void>;
+  /**
+   * Ask whether `streak`'s held total is new to this device (`claimCelebration`)
+   * and, when it is, record it as celebrated. Resolves `{ play: true, previous }`
+   * once per new held total, else `{ play: false }`. Never throws: a failure is
+   * logged and answers `{ play: false }`, as does no signed-in user or a session
+   * that changed meanwhile.
+   */
+  claimStreakCelebration: (streak: CoupleStreak) => Promise<CelebrationClaim>;
 }
 
 /** What one drain pass ended on (see `drainOnce`). */
@@ -620,6 +637,23 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           "[DailyQuestion] Could not save that tomorrow's question was declined:",
           error
         );
+      }
+    },
+
+    claimStreakCelebration: async (streak) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return { play: false };
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      try {
+        const claim = await claimCelebration(requestedBy, streak, isCurrent);
+        return isCurrent() ? claim : { play: false };
+      } catch (error) {
+        if (isCurrent()) {
+          console.error('[DailyQuestion] Could not record the streak celebration:', error);
+        }
+        return { play: false };
       }
     },
   };

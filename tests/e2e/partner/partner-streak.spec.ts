@@ -33,6 +33,7 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
+import { dismissStreakUp } from '../../support/helpers/streak-up';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
 type Scheme = 'light' | 'dark';
@@ -238,8 +239,12 @@ test.describe('Partner page streak', () => {
     await partnerPage.getByTestId('daily-send-pick').click();
     expect((await partnerPick).status).toBe(200);
     await expect(partnerPage.getByTestId('daily-reveal')).toBeVisible();
+    // The day is finished: the +1 screen shows on both pages (the partner's at once,
+    // the worker's when the pick arrives) and covers the dock; the sheet waits behind it.
+    await dismissStreakUp(partnerPage);
     if (writerPage === partnerPage) await partnerPage.getByTestId('daily-write-decline').click();
     await expect(writerPage.getByTestId('daily-write-sheet')).toHaveCount(0);
+    await dismissStreakUp(page);
 
     await log.step('Each opens Partner and sees the streak');
     const ownStreak = interceptNetworkCall({ method: 'POST', url: COUPLE_STREAK_READ });

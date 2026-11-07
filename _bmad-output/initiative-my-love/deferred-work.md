@@ -4323,3 +4323,11 @@ source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the
 severity: low
 reason: DailyQuestion.tsx:316 falls back to 'Your partner' when `state.partner?.displayName` is empty (users.display_name is nullable, and the partner copy can be unfilled or its read failed), and line 393 puts that value mid-sentence. The fallback predates this change and already reads "Waiting on Your partner" in DayCard. Rare (a linked partner normally has a name and the copy fills on sign-in) and the fix needs a separate lowercase value for mid-sentence use, so it is filed rather than patched.
 status: open
+
+### DW-509: A failed IndexedDB read of daily-celebrated is taken as "nothing stored", so the claim re-seeds over a good stored value.
+origin: spec-deferred 2354bd4b96ec
+location: src/services/dailyCelebrated.ts (claimCelebration)
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
+severity: low
+reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it.
+status: open

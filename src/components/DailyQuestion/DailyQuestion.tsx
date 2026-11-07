@@ -32,9 +32,24 @@
  * (`me`), a sentence says the streak lights up when the partner answers. A
  * streak that is null, unlinked or failed to load shows none of these and
  * reports no error here; the view re-reads it on each mount.
+ *
+ * The streak's +1 (R4): for each `ok` streak shown, saved or fresh, the view
+ * claims a celebration (`claimStreakCelebration`, the device-state
+ * `daily-celebrated` kind). A claim whose held total is above the one this
+ * device last celebrated has already stored it, and answers `play`: the
+ * full-screen `StreakUp` shows over the view until its button closes it, so a
+ * reload or a second tab never replays it. A claim is not cancelled by a
+ * re-render, only by unmount, because it has already written, and is made only
+ * after this mount's own read of the day has answered, so a mount that a dock
+ * walk through Home unmounts at once claims nothing; the overlay belongs to the
+ * session that raised it. The write sheet waits while the overlay
+ * shows. Only Daily claims: the Partner page shows the count without playing it.
+ * The root carries `data-streak-claimed` (the held total of the last claim this
+ * mount has had answered, whether or not it played), so a test can wait for the
+ * answer before asserting that no overlay came.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Flame, Snowflake } from 'lucide-react';
 import {
   type CoupleStreak,
@@ -50,6 +65,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 import { StreakWeek } from '../shared/StreakWeek';
+import { StreakUp } from './StreakUp';
 import { WriteQuestionSheet } from './WriteQuestionSheet';
 
 const OPTION =
@@ -313,6 +329,7 @@ export function DailyQuestion() {
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
   const navigatePartner = useAppStore((state) => state.navigatePartner);
   const writeDeclined = useAppStore((state) => state.dailyWriteDeclined);
+  const claimStreakCelebration = useAppStore((state) => state.claimStreakCelebration);
   const partnerName = useAppStore((state) => state.partner?.displayName)?.trim() || 'Your partner';
 
   // The day-changed notice belongs to the session that raised it, so an account
@@ -322,6 +339,17 @@ export function DailyQuestion() {
   const showDayChanged = dayChangedIn === sessionKey;
   const clearDayChanged = useCallback(() => setDayChangedIn(null), []);
   const raiseDayChanged = useCallback(() => setDayChangedIn(sessionKey), [sessionKey]);
+
+  // The +1 overlay, kept with the session that raised it so an account change
+  // hides it, like the day-changed notice above.
+  const [celebration, setCelebration] = useState<{
+    session: string;
+    streak: CoupleStreak;
+  } | null>(null);
+  // The held total of the last claim this mount has had answered, play or not.
+  const [claimedHeld, setClaimedHeld] = useState<number | null>(null);
+  const celebrationShown = celebration !== null && celebration.session === sessionKey;
+  const closeCelebration = useCallback(() => setCelebration(null), []);
 
   // The session whose read this mount has had answered (see the effect below).
   const [readFor, setReadFor] = useState<string | null>(null);
@@ -341,7 +369,8 @@ export function DailyQuestion() {
     !writeDeclined.includes(writeSnapshot.day_id) &&
     writeSnapshot.day === formatDateISO(new Date()) &&
     writeClosedFor !== writeSnapshot.day_id &&
-    readFor === sessionKey;
+    readFor === sessionKey &&
+    !celebrationShown;
 
   // Re-read on each mount, and for a new session while the view stays open (an
   // account switch clears `dailyDay` through signedOutState). The sheet waits
@@ -357,11 +386,42 @@ export function DailyQuestion() {
   // read leaves the header without a chip, with no strip and no banner.
   const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
 
+  // Claim the +1 for each `ok` streak the view shows, once this mount's own
+  // read of the day has answered (`readFor`). A claim has already written by
+  // the time it answers, so a re-render must not cancel it: only unmount does
+  // (the ref), as nothing is left to show it on. The wait matters because a
+  // dock tap from a page above Home walks back to Home first (`setView`): Daily
+  // mounts, unmounts and mounts again within milliseconds, and a claim made by
+  // that first, short-lived mount would store the held total with nothing to
+  // play it on. Its read never answers in time; the second mount's does.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const shownStreak = dailyDay?.status === 'ok' && readFor === sessionKey ? streak : null;
+  useEffect(() => {
+    if (!shownStreak) return;
+    void claimStreakCelebration(shownStreak).then((claim) => {
+      if (!mounted.current) return;
+      // One batch: the answer is observable (`data-streak-claimed`) in the same
+      // commit that shows the overlay, or the absence of one.
+      if (claim.play) setCelebration({ session: sessionKey, streak: shownStreak });
+      setClaimedHeld(shownStreak.held);
+    });
+  }, [shownStreak, sessionKey, claimStreakCelebration]);
+
   // The partner's pick shows without a reload (AD-11).
   useDailyPickListener();
 
   return (
-    <div className="min-h-screen bg-page" data-testid="daily-question-view">
+    <div
+      className="min-h-screen bg-page"
+      data-testid="daily-question-view"
+      data-streak-claimed={claimedHeld ?? undefined}
+    >
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-3 pb-6">
         {showDayChanged && (
           <p
@@ -447,6 +507,15 @@ export function DailyQuestion() {
           </div>
         )}
       </div>
+
+      {celebrationShown && (
+        <StreakUp
+          streak={celebration.streak}
+          partnerName={partnerName}
+          showReveal={dailyDay?.status === 'ok' && dailyDay.snapshot.state === 'both'}
+          onContinue={closeCelebration}
+        />
+      )}
 
       {showWriteSheet && (
         <WriteQuestionSheet

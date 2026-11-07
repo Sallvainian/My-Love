@@ -8,9 +8,14 @@
  * weekday letter. The caller picks the test-id prefix (`<prefix>-week` for the
  * grid, `<prefix>-day` for each date) and the label's colour class.
  *
+ * `fillDay` names a date whose dot scales and fades in (the +1 screen's newest
+ * done date); `reduceMotion` shows it filled with no movement. Without
+ * `fillDay` nothing moves, so the Partner card and Daily's strip are unchanged.
+ *
  * @component
  */
 
+import { m as motion } from 'motion/react';
 import { Check, Snowflake } from 'lucide-react';
 import type { CoupleStreak } from '../../api/dailyQuestionApi';
 import { parseEventDate } from '../../services/eventsService';
@@ -47,12 +52,18 @@ export function StreakWeek({
   week,
   testIdPrefix,
   labelClass,
+  fillDay,
+  reduceMotion = false,
 }: {
   week: CoupleStreak['week'];
   /** `partner-streak` or `daily-streak`. */
   testIdPrefix: string;
   /** Text colour class of the weekday labels. */
   labelClass: string;
+  /** A date whose dot fills in with a scale and fade; none by default. */
+  fillDay?: string;
+  /** Show `fillDay` filled at once, with no movement. */
+  reduceMotion?: boolean;
 }) {
   const lastIndex = week.length - 1;
 
@@ -68,7 +79,19 @@ export function StreakWeek({
             data-state={entry.state}
           >
             <span className={isToday ? 'rounded-full outline-2 outline-offset-2 outline-ink' : ''}>
-              <WeekDot state={entry.state} />
+              {entry.day === fillDay && !reduceMotion ? (
+                <motion.span
+                  className="inline-flex"
+                  initial={{ opacity: 0, scale: 0.3 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 18, delay: 0.95 }}
+                  data-testid={`${testIdPrefix}-day-fill`}
+                >
+                  <WeekDot state={entry.state} />
+                </motion.span>
+              ) : (
+                <WeekDot state={entry.state} />
+              )}
             </span>
             <span className={`text-[11px] font-semibold ${labelClass}`}>
               {isToday ? 'Today' : weekdayLetter(entry.day)}

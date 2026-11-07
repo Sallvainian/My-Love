@@ -43,6 +43,7 @@ import {
   DAILY_PICK_SEND,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
+import { dismissStreakUp } from '../../support/helpers/streak-up';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts);
@@ -189,6 +190,8 @@ test.describe('Daily streak', () => {
     await expect(page.getByTestId('daily-streak-waiting')).toHaveCount(0);
 
     await log.step('The Partner card shows the same orange');
+    // The partner's pick finished the day while Daily was open: the +1 screen covers the dock.
+    await dismissStreakUp(page);
     await navigateTo(page, 'partner');
     const card = page.getByTestId('partner-streak-card');
     await expect(card).toHaveAttribute('data-state', 'orange');

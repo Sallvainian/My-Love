@@ -37,6 +37,7 @@ import {
 } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { trackReads } from '../../support/helpers/request-tracker';
+import { dismissStreakUp } from '../../support/helpers/streak-up';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -149,6 +150,8 @@ writerTest.describe('Daily question: write tomorrow', () => {
 
     await log.step('The writer picks and the sheet shows right after');
     await pickThis(writerPage);
+    // The writer's pick finished the day: the +1 screen shows first and the sheet waits behind it.
+    await dismissStreakUp(writerPage);
     const sheet = writerPage.getByTestId('daily-write-sheet');
     await expect(sheet).toBeVisible();
     await expect(sheet).toContainText("Write tomorrow's question?");
