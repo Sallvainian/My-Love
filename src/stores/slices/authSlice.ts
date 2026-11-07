@@ -253,6 +253,8 @@ export function signedOutState() {
     dailyDay: null,
     dailyDayLoading: false,
     dailyDayError: null,
+    // The queued rows stay on disk for their owner (CAP-7); only the view's copy goes.
+    dailyQueuedPicks: [],
 
     // navigationSlice — not account state, but a page pushed in the outgoing
     // session is not one the next sign-in just opened: left set, that page

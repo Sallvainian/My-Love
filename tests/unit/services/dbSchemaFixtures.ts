@@ -16,6 +16,7 @@ export const ALL_STORES = [
   'local-copies',
   'image-cache',
   'note-queue',
+  'pick-queue',
 ] as const;
 
 /**

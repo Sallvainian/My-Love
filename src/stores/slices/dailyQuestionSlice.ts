@@ -31,8 +31,22 @@
  * date is not the shown day's `day`. It then re-reads the day and throws
  * `AccountDataError('day-changed', DAY_CHANGED_MESSAGE)`. The server's `DQ001`
  * (the same mismatch, seen in the zone sent) takes the same path.
+ *
+ * A pick made offline is queued, not refused (AD-12): `submitDailyPick` writes
+ * it to the `pick-queue` store (`services/pickQueue.ts`) with its `picked_at`
+ * and zone pair, and `drainQueuedPicks` sends the signed-in account's pending
+ * rows, oldest first, under `PICK_QUEUE_LOCK`, on start and on `online`
+ * (`App.tsx`). A confirmed row is removed and announced as above; a refusal
+ * (`isPickRefusal`) marks it failed with its message; any other failure leaves
+ * it pending, and a pass that stops that way while online is retried on a
+ * backoff (5 s, 10 s, 20 s, 40 s, then every 60 s) until a pass completes; a
+ * session change cancels it, and offline the `online` event drains instead.
+ * `dailyQueuedPicks` mirrors the account's rows for the view. A
+ * queued pick never enters `dailyDay` or the copy, so the reveal shows only
+ * from a server snapshot. The rows survive sign-out; only the field is cleared.
  */
 
+import { isOnline } from '../../api/errorHandlers';
 import { AccountDataError } from '../../services/accountDataError';
 import {
   DAILY_DAYS_COPY_KIND,
@@ -40,7 +54,15 @@ import {
   mergeDailyDay,
   readSavedDailyDay,
 } from '../../services/dailyDaysCopy';
+import type { StoredQueuedPick } from '../../services/dbSchema';
 import { registerLocalCopy } from '../../services/localCopy';
+import {
+  enqueuePick,
+  listQueuedPicks,
+  markQueuedPickFailed,
+  removeQueuedPick,
+} from '../../services/pickQueue';
+import { PICK_QUEUE_LOCK, waitForSyncLock, withSyncLock } from '../../services/syncLock';
 import { formatDateISO } from '../../utils/dateUtils';
 
 import {
@@ -51,9 +73,17 @@ import {
   announceDailyPick,
   fetchDailyDay,
   fetchDailyDayById,
+  isPickRefusal,
+  pickZone,
   submitDailyPick as submitDailyPickRequest,
 } from '../../api/dailyQuestionApi';
 import type { AppStateCreator } from '../types';
+
+/** One of the account's queued picks, as the view needs it. */
+export type QueuedDailyPick = Pick<
+  StoredQueuedPick,
+  'day_id' | 'choice' | 'picked_at' | 'failed' | 'failure'
+>;
 
 export interface DailyQuestionSlice {
   /** The last server answer for today, or `null` before any. */
@@ -62,6 +92,8 @@ export interface DailyQuestionSlice {
   dailyDayLoading: boolean;
   /** The message of the last failed load; cleared by the next answer. */
   dailyDayError: string | null;
+  /** The signed-in account's queued picks (pending and failed); never persisted here. */
+  dailyQueuedPicks: QueuedDailyPick[];
 
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
   loadDailyDay: () => Promise<void>;
@@ -77,11 +109,28 @@ export interface DailyQuestionSlice {
    * - a plain `Error` when signed out or with no day shown;
    * - `AccountDataError('day-changed')`, after starting a re-read of the day,
    *   when the device date is not the shown day or the server answers `DQ001`;
-   * - `AccountDataError('offline')` without a connection;
    * - the request's own error otherwise.
+   * Without a connection it queues the pick (no request) and resolves; a queue
+   * write failure throws.
    */
   submitDailyPick: (choice: DailyChoice) => Promise<void>;
+  /**
+   * Send the account's pending queued picks, oldest first, under
+   * `PICK_QUEUE_LOCK`. Never throws; does nothing signed out or offline.
+   */
+  drainQueuedPicks: () => Promise<void>;
 }
+
+/** What one drain pass ended on (see `drainOnce`). */
+type DrainPassOutcome = 'done' | 'transient' | 'stale' | 'offline' | 'other-tab' | 'failed';
+
+/**
+ * After a pass stops on a transient failure while online, the drain runs
+ * again after 5 s, 10 s, 20 s and 40 s, then every 60 s, until a pass
+ * completes. Offline, the `online` event triggers it instead.
+ */
+const PICK_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000];
+const PICK_RETRY_MAX_DELAY_MS = 60_000;
 
 /** The answer to keep: `next`, unless it is the same day at an earlier state than `stored`. */
 function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): DailyDayAnswer {
@@ -96,14 +145,152 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
   return next;
 }
 
-export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (set, get, _api) => {
+export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (set, get, api) => {
   // A signed-in start and the window `online` event refresh the saved days.
   registerLocalCopy(DAILY_DAYS_COPY_KIND, () => get().loadDailyDay());
+
+  /** Re-read the account's queued picks into `dailyQueuedPicks`, while `isCurrent()`. */
+  const showQueuedPicks = async (userId: string, isCurrent: () => boolean): Promise<void> => {
+    const rows = await listQueuedPicks(userId);
+    if (!isCurrent()) return;
+    set({
+      dailyQueuedPicks: rows.map((row) => ({
+        day_id: row.day_id,
+        choice: row.choice,
+        picked_at: row.picked_at,
+        failed: row.failed,
+        failure: row.failure,
+      })),
+    });
+  };
+
+  /**
+   * Show a merged answer when its day is the one on screen, or today's with
+   * nothing on screen; any other day (the partner may be on another date, R9)
+   * is in the copy already and stays off the screen.
+   */
+  const showIfOnScreen = (snapshot: DailyDaySnapshot, merged: DailyDayAnswer): void => {
+    const shown = get().dailyDay;
+    const isShownDay = shown?.status === 'ok' && shown.snapshot.day_id === snapshot.day_id;
+    const fillsEmptyScreen = shown?.status !== 'ok' && snapshot.day === formatDateISO(new Date());
+    if (isShownDay || fillsEmptyScreen) {
+      set({ dailyDay: mergeAnswer(shown, merged), dailyDayError: null });
+    }
+  };
+
+  // The tab's running drain, and whether a call arrived while it ran.
+  let drainInFlight: Promise<void> | null = null;
+  let drainRequested = false;
+
+  // The retry after a pass stops on a transient failure while online. One timer
+  // at a time; `retryAttempt` picks its delay and resets on a completed pass.
+  // `retryFor` is the session it was set for: any change of account or session
+  // cancels it (the subscription below), and a timer that fires anyway
+  // re-checks the session before it drains.
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let retryAttempt = 0;
+  let retryFor: { userId: string; authSessionVersion: number } | null = null;
+
+  const cancelDrainRetry = () => {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+    retryFor = null;
+    retryAttempt = 0;
+  };
+
+  const scheduleDrainRetry = (userId: string, authSessionVersion: number) => {
+    if (retryTimer !== null) return;
+    const delay = PICK_RETRY_DELAYS_MS[retryAttempt] ?? PICK_RETRY_MAX_DELAY_MS;
+    retryAttempt += 1;
+    retryFor = { userId, authSessionVersion };
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (get().userId !== userId || get().authSessionVersion !== authSessionVersion) return;
+      void get().drainQueuedPicks();
+    }, delay);
+  };
+
+  // Sign-out and an account switch change the identity in one set(); the
+  // pending retry belongs to the old one.
+  api.subscribe((state) => {
+    if (
+      retryFor &&
+      (state.userId !== retryFor.userId || state.authSessionVersion !== retryFor.authSessionVersion)
+    ) {
+      cancelDrainRetry();
+    }
+  });
+
+  /**
+   * One pass over the signed-in account's pending rows. Never throws. Answers
+   * what the pass ended on, which decides the retry.
+   */
+  const drainOnce = async (): Promise<DrainPassOutcome> => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy || !isOnline()) return 'offline';
+    const isCurrent = () =>
+      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+    let result: DrainPassOutcome;
+    try {
+      const pass = await withSyncLock<DrainPassOutcome>(PICK_QUEUE_LOCK, async () => {
+        const pending = (await listQueuedPicks(requestedBy)).filter((row) => !row.failed);
+        for (const row of pending) {
+          if (!isCurrent()) return 'stale';
+          if (!isOnline()) return 'offline';
+          let snapshot: DailyDaySnapshot;
+          try {
+            // No device-date check: a late pick is the server's to date by
+            // its own `picked_at` and the zone it was made in.
+            snapshot = await submitDailyPickRequest(
+              row.day_id,
+              row.choice,
+              new Date(row.picked_at),
+              { time_zone: row.time_zone, utc_offset_minutes: row.utc_offset_minutes }
+            );
+          } catch (error) {
+            if (isPickRefusal(error)) {
+              await markQueuedPickFailed(requestedBy, row.day_id, error.message);
+              continue;
+            }
+            console.error('[DailyQuestion] Could not send a queued pick:', error);
+            return 'transient';
+          }
+          // Confirmed: the pick is committed, whatever the session did meanwhile.
+          await removeQueuedPick(requestedBy, row.day_id);
+          if (!isCurrent()) return 'stale';
+          void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
+            console.error('[DailyQuestion] Could not announce the pick:', error);
+          });
+          const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+          if (!isCurrent()) return 'stale';
+          showIfOnScreen(snapshot, merged);
+        }
+        return 'done';
+      });
+      if (pass.ran) {
+        result = pass.result;
+      } else {
+        // Another tab is sending: look at what it did once it lets go. Its
+        // own retry covers a transient stop there.
+        result = 'other-tab';
+        await waitForSyncLock(PICK_QUEUE_LOCK);
+        if (isCurrent()) await get().loadDailyDay();
+      }
+    } catch (error) {
+      console.error('[DailyQuestion] Could not send the queued picks:', error);
+      result = 'failed';
+    }
+    // The field is refreshed on every path; an unreadable queue reads as empty.
+    await showQueuedPicks(requestedBy, isCurrent);
+    return result;
+  };
 
   return {
     dailyDay: null,
     dailyDayLoading: false,
     dailyDayError: null,
+    dailyQueuedPicks: [],
 
     loadDailyDay: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
@@ -117,7 +304,10 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       // or when the shown day is another one; the higher state wins for the
       // same day_id.
       const today = formatDateISO(new Date());
-      const saved = await readSavedDailyDay(requestedBy, today);
+      const [saved] = await Promise.all([
+        readSavedDailyDay(requestedBy, today),
+        showQueuedPicks(requestedBy, isCurrent),
+      ]);
       if (!isCurrent()) return;
       if (saved) {
         const shown = get().dailyDay;
@@ -172,16 +362,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         if (!isCurrent()) return;
         const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
         if (!isCurrent()) return;
-
-        const shown = get().dailyDay;
-        const isShownDay = shown?.status === 'ok' && shown.snapshot.day_id === snapshot.day_id;
-        const fillsEmptyScreen =
-          shown?.status !== 'ok' && snapshot.day === formatDateISO(new Date());
-        // Any other day (the partner may be on another date, R9) is in the copy
-        // now and stays off the screen.
-        if (isShownDay || fillsEmptyScreen) {
-          set({ dailyDay: mergeAnswer(shown, merged), dailyDayError: null });
-        }
+        showIfOnScreen(snapshot, merged);
       } catch (error) {
         if (!isCurrent()) return;
         console.error('[DailyQuestion] Failed to re-read a day:', error);
@@ -203,6 +384,24 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE);
       }
 
+      if (!isOnline()) {
+        // The pick waits in the queue with the instant and zone it was made in.
+        await enqueuePick({
+          user_id: requestedBy,
+          day_id: shown.snapshot.day_id,
+          choice,
+          picked_at: pickedAt.toISOString(),
+          ...pickZone(pickedAt),
+          failed: false,
+          failure: null,
+        });
+        await showQueuedPicks(requestedBy, isCurrent);
+        // The connection may have returned while the row was being written: an
+        // `online` drain that read the queue before it would have missed it.
+        if (isOnline() && isCurrent()) void get().drainQueuedPicks();
+        return;
+      }
+
       let snapshot: DailyDaySnapshot;
       try {
         snapshot = await submitDailyPickRequest(shown.snapshot.day_id, choice, pickedAt);
@@ -212,6 +411,13 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         }
         throw error;
       }
+      // The pick is committed: any row for the day (a failed one) is done.
+      try {
+        await removeQueuedPick(requestedBy, snapshot.day_id);
+      } catch (error) {
+        console.error('[DailyQuestion] Could not clear the queued pick:', error);
+      }
+      await showQueuedPicks(requestedBy, isCurrent);
       if (!isCurrent()) return;
       // Tell the partner's open Daily, without waiting for it: the pick is
       // confirmed and stays shown whatever the broadcast does.
@@ -225,6 +431,37 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         dailyDay: mergeAnswer(get().dailyDay, merged),
         dailyDayError: null,
       });
+    },
+
+    drainQueuedPicks: () => {
+      // One drain per tab: a call while one runs asks for one more pass, so the
+      // lock is only ever found held by another tab.
+      if (drainInFlight) {
+        drainRequested = true;
+        return drainInFlight;
+      }
+      const run = (async () => {
+        try {
+          let outcome: DrainPassOutcome = 'done';
+          do {
+            drainRequested = false;
+            outcome = await drainOnce();
+          } while (drainRequested);
+
+          // A transient stop while online retries on a backoff; a completed
+          // pass resets it. Known offline, the `online` event drains instead.
+          const { userId, authSessionVersion } = get();
+          if (outcome === 'done' || outcome === 'offline') {
+            cancelDrainRetry();
+          } else if ((outcome === 'transient' || outcome === 'failed') && userId && isOnline()) {
+            scheduleDrainRetry(userId, authSessionVersion);
+          }
+        } finally {
+          drainInFlight = null;
+        }
+      })();
+      drainInFlight = run;
+      return run;
     },
   };
 };

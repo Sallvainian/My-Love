@@ -109,6 +109,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyDay: null,
   dailyDayLoading: false,
   dailyDayError: null,
+  dailyQueuedPicks: [],
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -248,6 +249,16 @@ function seedSignedInSession(): void {
         same: false,
       }),
     },
+    // The view's copy of the account's queued picks (the rows stay on disk).
+    dailyQueuedPicks: [
+      {
+        day_id: 'DAY-QUEUED',
+        choice: 'this',
+        picked_at: '2026-11-05T23:50:00.000Z',
+        failed: false,
+        failure: null,
+      },
+    ],
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device
