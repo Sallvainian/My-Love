@@ -497,13 +497,22 @@ describe('the date copies refresh on a foreground return and a token renewal', (
     expect(titlesOfSchedule(0)).toContain('Today: Jessie turns 31 @ 11/9 9:00');
   });
 
-  it('does nothing after the refresh for an owner the store has left', async () => {
+  // A switch to another account deletes the outgoing account's copies, so its
+  // plan would find nothing to schedule even without the identity check; the
+  // same account signed in again keeps them, so only the check stops that one.
+  it.each([
+    ['another account', () => state().setAuthUser(B)],
+    [
+      'the same account signed in again',
+      () => useAppStore.setState({ authSessionVersion: state().authSessionVersion + 1 } as StoreState),
+    ],
+  ])('does nothing after the refresh for an owner the store has left: %s', async (_name, leave) => {
     await start(deferred<void>());
     setVisible();
     await scheduledTimes(1);
     await vi.waitFor(() => expect(refreshers.kindsRefreshed()).toBe(DATE_KINDS.length));
 
-    state().setAuthUser(B);
+    leave();
     held!.settle();
     await dateReminderWorkSettled();
 
