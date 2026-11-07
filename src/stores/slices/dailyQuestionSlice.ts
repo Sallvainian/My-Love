@@ -57,10 +57,13 @@
  * 'unlinked' }`, or `null` before any), `coupleStreakLoading` a read in flight
  * and `coupleStreakError` the message of the last failed read.
  * `loadCoupleStreak` never throws; a failure keeps the answer shown and sets
- * the error, and only a successful answer writes the field and clears it. It is
- * online-only with no saved copy. Only the newest started read writes (a
- * sequence counter), and a read that outlives the session writes nothing.
- * `signedOutState()` clears all three fields.
+ * the error, and only a successful answer writes the field and clears it. The
+ * last `ok` streak is the `daily-streak` local copy (`services/dailyStreakCopy.ts`):
+ * `loadCoupleStreak` shows it first, but only over `null` (an answer in memory
+ * is at least as new), and a successful answer then replaces it (`ok`) or
+ * deletes it (`unlinked`); a failed read leaves it. Only the newest started
+ * read writes (a sequence counter), and a read that outlives the session writes
+ * nothing, to the field or to the copy. `signedOutState()` clears all three fields.
  */
 
 import { isOnline } from '../../api/errorHandlers';
@@ -74,6 +77,11 @@ import {
 } from '../../services/dailyDaysCopy';
 import type { StoredQueuedPick } from '../../services/dbSchema';
 import { addDeclinedWriteDay, readDeclinedWriteDays } from '../../services/dailyWriteDeclined';
+import {
+  DAILY_STREAK_COPY_KIND,
+  readSavedStreak,
+  saveStreakAnswer,
+} from '../../services/dailyStreakCopy';
 import { registerLocalCopy } from '../../services/localCopy';
 import {
   enqueuePick,
@@ -198,6 +206,7 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
 export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (set, get, api) => {
   // A signed-in start and the window `online` event refresh the saved days.
   registerLocalCopy(DAILY_DAYS_COPY_KIND, () => get().loadDailyDay());
+  registerLocalCopy(DAILY_STREAK_COPY_KIND, () => get().loadCoupleStreak());
 
   /** Re-read the account's queued picks into `dailyQueuedPicks`, while `isCurrent()`. */
   const showQueuedPicks = async (userId: string, isCurrent: () => boolean): Promise<void> => {
@@ -359,10 +368,24 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         streakSeq === mine;
 
       set({ coupleStreakLoading: true });
+
+      // 1. The saved streak, at once, over nothing only.
+      const saved = await readSavedStreak(requestedBy);
+      if (!isCurrent()) return;
+      if (saved && get().coupleStreak === null) {
+        set({ coupleStreak: { status: 'ok', streak: saved } });
+      }
+
       try {
+        // 2. The server's answer, shown and then saved.
         const answer = await fetchCoupleStreak();
         if (!isCurrent()) return;
         set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
+        try {
+          await saveStreakAnswer(requestedBy, answer);
+        } catch (error) {
+          console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
+        }
       } catch (error) {
         if (!isCurrent()) return;
         // An offline refusal is expected, not a fault: the error is still set.

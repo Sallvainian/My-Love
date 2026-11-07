@@ -10,7 +10,10 @@
  *   - a partner: their name, then the streak card.
  *
  * The streak is read when a partner is present (keyed on the partner's id) and
- * kept current by `usePartnerStreakListener`. The old mood view
+ * kept current by `usePartnerStreakListener`. The slice shows the saved
+ * `daily-streak` copy first, so the card stays up offline and after a failed
+ * read, and its local-copy refresher reads the streak again on signed-in start
+ * and on `online`. The old mood view
  * (`PartnerMoodView`) is no longer routed; its code stays for epic 10.
  *
  * @component
@@ -55,8 +58,9 @@ export function PartnerView() {
   }, [isOnline, loadPendingRequests]);
 
   // The streak is read once a partner is present, and again for a new partner.
-  // Offline the read refuses and the answer already shown (if any) stays; it is
-  // read offline too (not gated), and again when the device comes back online.
+  // loadCoupleStreak shows the saved `daily-streak` copy first; offline the
+  // read refuses and what is shown (the copy, if any) stays. It is read offline
+  // too (not gated), and again when the device comes back online.
   const partnerId = partner?.id ?? null;
   useEffect(() => {
     if (partnerId) void loadCoupleStreak();

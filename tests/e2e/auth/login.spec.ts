@@ -133,6 +133,16 @@ test.describe('Login Flow', () => {
       })
     );
 
+    // Same reason, for the streak refresher: get_couple_streak is a POST too.
+    // playwright-utils deviation: the route must be installed before the next navigation and answer every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/rpc/get_couple_streak', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'unlinked' }),
+      })
+    );
+
     // GIVEN: User is on login screen
     await page.goto('/');
     await expect(page.getByTestId('login-screen')).toBeVisible();

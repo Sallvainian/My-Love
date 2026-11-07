@@ -20,12 +20,12 @@
  * before the test and again at teardown. Nothing links, unlinks or resets a
  * pool account.
  */
-import type { Page } from '@playwright/test';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
 import { clearPairDays } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { abortReads } from '../../support/helpers/abort-reads';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import { DAILY_DAY_READ, SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
@@ -37,17 +37,6 @@ import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 test.use({ trace: 'off', video: 'off' });
 
 const OFFLINE_LOAD_MESSAGE = "You are offline. Today's question needs a connection to load.";
-
-/** Route `get_daily_day` to an abort and count the requests it took. */
-async function abortDailyReads(page: Page): Promise<{ count: () => number }> {
-  let aborted = 0;
-  // playwright-utils deviation: the route must be installed before the navigation it serves and count and abort every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
-  await page.route(DAILY_DAY_READ, (route) => {
-    aborted += 1;
-    return route.abort();
-  });
-  return { count: () => aborted };
-}
 
 test.describe('Daily: saved day offline and the invitation to link', () => {
   test.describe.configure({ timeout: 120_000 });
@@ -119,7 +108,7 @@ test.describe('Daily: saved day offline and the invitation to link', () => {
     );
 
     // WHEN: the page reloads without a server answer and the device goes offline.
-    const aborted = await abortDailyReads(page);
+    const aborted = await abortReads(page, DAILY_DAY_READ);
     await page.reload();
     await expect(page.getByTestId('daily-question')).toBeVisible();
     // The read really hit the aborted route, so the question came from the copy.
@@ -145,7 +134,7 @@ test.describe('Daily: saved day offline and the invitation to link', () => {
     await dismissWelcomeSplash(page);
 
     // GIVEN: a fresh context (an empty copy) whose Daily read is aborted.
-    const aborted = await abortDailyReads(page);
+    const aborted = await abortReads(page, DAILY_DAY_READ);
     await page.goto('/daily');
 
     // THEN: the failed read is an error with Retry, not the invitation and not a question.
