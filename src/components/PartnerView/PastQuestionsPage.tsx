@@ -61,11 +61,13 @@ interface PastQuestionsPageProps {
 export function PastQuestionsPage({ partnerName, history, streak }: PastQuestionsPageProps) {
   const showPartnerPage = useAppStore((state) => state.showPartnerPage);
   const loadMoreDailyHistory = useAppStore((state) => state.loadMoreDailyHistory);
+  const loadDailyHistory = useAppStore((state) => state.loadDailyHistory);
   const dailyHistoryEnd = useAppStore((state) => state.dailyHistoryEnd);
   const dailyHistoryLoading = useAppStore((state) => state.dailyHistoryLoading);
   const dailyHistoryLoadingMore = useAppStore((state) => state.dailyHistoryLoadingMore);
   const dailyHistoryError = useAppStore((state) => state.dailyHistoryError);
   const dailyHistoryErrorOffline = useAppStore((state) => state.dailyHistoryErrorOffline);
+  const dailyHistoryErrorMore = useAppStore((state) => state.dailyHistoryErrorMore);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -220,15 +222,17 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
             data-testid="partner-history-error"
           >
             <span>{dailyHistoryError}</span>
-            {/* The sentinel stays in view after a failed "more", so the observer
-                never asks again: the person does. At the end there is no more to
-                ask for (a list filled from the copy is at its end too). */}
-            {days.length > 0 && isOnline && !dailyHistoryEnd && (
+            {/* Nothing re-asks after a failed read under the rows (the sentinel
+                stays in view after a "more"), so the person does: Retry runs the
+                read that failed. A failed "more" at the end has none left to ask. */}
+            {days.length > 0 && isOnline && !(dailyHistoryErrorMore && dailyHistoryEnd) && (
               <button
                 type="button"
                 className={SECONDARY_BUTTON}
-                disabled={dailyHistoryLoadingMore}
-                onClick={() => void loadMoreDailyHistory()}
+                disabled={dailyHistoryErrorMore ? dailyHistoryLoadingMore : dailyHistoryLoading}
+                onClick={() =>
+                  void (dailyHistoryErrorMore ? loadMoreDailyHistory() : loadDailyHistory())
+                }
                 data-testid="partner-history-retry"
               >
                 Retry

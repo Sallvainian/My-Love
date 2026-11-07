@@ -23,11 +23,13 @@ import { PastQuestionsPage } from '../PastQuestionsPage';
 const state = {
   showPartnerPage: vi.fn(),
   loadMoreDailyHistory: vi.fn(async () => {}),
+  loadDailyHistory: vi.fn(async () => {}),
   dailyHistoryEnd: false,
   dailyHistoryLoading: false,
   dailyHistoryError: null as string | null,
   dailyHistoryErrorOffline: false,
   dailyHistoryLoadingMore: false,
+  dailyHistoryErrorMore: false,
   syncStatus: { isOnline: true },
 };
 
@@ -90,11 +92,13 @@ describe('PastQuestionsPage', () => {
     observers = [];
     state.showPartnerPage = vi.fn();
     state.loadMoreDailyHistory = vi.fn(async () => {});
+    state.loadDailyHistory = vi.fn(async () => {});
     state.dailyHistoryEnd = false;
     state.dailyHistoryLoading = false;
     state.dailyHistoryError = null;
     state.dailyHistoryErrorOffline = false;
     state.dailyHistoryLoadingMore = false;
+    state.dailyHistoryErrorMore = false;
     state.syncStatus = { isOnline: true };
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     window.history.replaceState(null, '', '/partner/history');
@@ -281,6 +285,7 @@ describe('PastQuestionsPage', () => {
 
     it('offers Retry under the rows after a failed load-more online, which asks for the page again', async () => {
       state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryErrorMore = true;
       renderPage();
       expect(state.loadMoreDailyHistory).not.toHaveBeenCalled();
 
@@ -291,18 +296,40 @@ describe('PastQuestionsPage', () => {
       await userEvent.setup().click(retry);
 
       expect(state.loadMoreDailyHistory).toHaveBeenCalledTimes(1);
+      expect(state.loadDailyHistory).not.toHaveBeenCalled();
+    });
+
+    it('after a failed first-page re-read over the rows, Retry re-reads the first page', async () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryEnd = true;
+      renderPage();
+
+      await userEvent.setup().click(screen.getByTestId('partner-history-retry'));
+
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
+      expect(state.loadMoreDailyHistory).not.toHaveBeenCalled();
+    });
+
+    it('disables a first-page Retry while that read is in flight', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryLoading = true;
+      renderPage();
+
+      expect(screen.getByTestId('partner-history-retry')).toBeDisabled();
     });
 
     it('disables Retry while a load-more is in flight', () => {
       state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryErrorMore = true;
       state.dailyHistoryLoadingMore = true;
       renderPage();
 
       expect(screen.getByTestId('partner-history-retry')).toBeDisabled();
     });
 
-    it('offers no Retry under the rows at the end of the list, where there is no more to ask for', () => {
+    it('offers no Retry for a failed load-more at the end of the list, where there is no more to ask for', () => {
       state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryErrorMore = true;
       state.dailyHistoryEnd = true;
       renderPage();
 

@@ -200,6 +200,8 @@ export interface DailyQuestionSlice {
   dailyHistoryError: string | null;
   /** That failed read was an offline refusal, not a server or network fault. */
   dailyHistoryErrorOffline: boolean;
+  /** That failed read was a `loadMoreDailyHistory`, not the first page. */
+  dailyHistoryErrorMore: boolean;
   /** The oldest page of past questions has been read (a page shorter than a full one). */
   dailyHistoryEnd: boolean;
   /** A `loadMoreDailyHistory` request is in flight. */
@@ -412,6 +414,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       dailyHistoryLoading: false,
       dailyHistoryError: null,
       dailyHistoryErrorOffline: false,
+      dailyHistoryErrorMore: false,
       dailyHistoryEnd: false,
       dailyHistoryLoadingMore: false,
     });
@@ -529,6 +532,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     dailyHistoryLoading: false,
     dailyHistoryError: null,
     dailyHistoryErrorOffline: false,
+    dailyHistoryErrorMore: false,
     dailyHistoryEnd: false,
     dailyHistoryLoadingMore: false,
 
@@ -561,6 +565,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
             dailyHistoryLoading: false,
             dailyHistoryError: null,
             dailyHistoryErrorOffline: false,
+            dailyHistoryErrorMore: false,
           });
         } else {
           // A short page is the whole list.
@@ -570,6 +575,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
             dailyHistoryLoading: false,
             dailyHistoryError: null,
             dailyHistoryErrorOffline: false,
+            dailyHistoryErrorMore: false,
           });
         }
         // Save the page for offline; the session decides, not a newer read.
@@ -588,6 +594,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           dailyHistoryError:
             error instanceof Error ? error.message : 'Could not load your past questions.',
           dailyHistoryErrorOffline: error instanceof AccountDataError && error.code === 'offline',
+          dailyHistoryErrorMore: false,
         });
         // Nothing shown: fill the list from the copy (never written on a failure).
         if (get().dailyHistory === null) {
@@ -632,6 +639,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           dailyHistoryLoadingMore: false,
           dailyHistoryError: null,
           dailyHistoryErrorOffline: false,
+          dailyHistoryErrorMore: false,
         });
         if (days.length === 0) return;
         const partnerId = await mergePartnerId(requestedBy);
@@ -647,6 +655,7 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           dailyHistoryError:
             error instanceof Error ? error.message : 'Could not load your past questions.',
           dailyHistoryErrorOffline: error instanceof AccountDataError && error.code === 'offline',
+          dailyHistoryErrorMore: true,
         });
       }
     },

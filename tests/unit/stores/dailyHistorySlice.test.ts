@@ -175,6 +175,7 @@ describe('loadDailyHistory', () => {
     expect(state().dailyHistory).toEqual(PAGE);
     expect(state().dailyHistoryError).toBe('boom');
     expect(state().dailyHistoryErrorOffline).toBe(false);
+    expect(state().dailyHistoryErrorMore).toBe(false);
   });
 
   it('an offline refusal sets the error but is not logged', async () => {
@@ -189,6 +190,16 @@ describe('loadDailyHistory', () => {
     );
     expect(state().dailyHistoryErrorOffline).toBe(true);
     expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('a first-page failure after a failed load-more marks the error as the first page\'s', async () => {
+    useAppStore.setState({ dailyHistoryError: 'more failed', dailyHistoryErrorMore: true });
+    fetchDailyHistory.mockRejectedValueOnce(new Error('boom'));
+
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistoryError).toBe('boom');
+    expect(state().dailyHistoryErrorMore).toBe(false);
   });
 
   it('a later successful read clears an offline refusal', async () => {
@@ -492,6 +503,7 @@ describe('loadMoreDailyHistory', () => {
     expect(state().dailyHistory).toEqual(full());
     expect(state().dailyHistoryError).toBe('boom');
     expect(state().dailyHistoryLoadingMore).toBe(false);
+    expect(state().dailyHistoryErrorMore).toBe(true);
     expect(console.error).toHaveBeenCalledWith(
       '[DailyQuestion] Failed to load more past questions:',
       failure
@@ -506,6 +518,7 @@ describe('loadMoreDailyHistory', () => {
 
     expect(state().dailyHistoryError).toBe('You are offline.');
     expect(state().dailyHistoryErrorOffline).toBe(true);
+    expect(state().dailyHistoryErrorMore).toBe(true);
     expect(console.error).not.toHaveBeenCalled();
   });
 });
