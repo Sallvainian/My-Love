@@ -379,7 +379,9 @@ jobs:
 
   # Daily on the real site, after every deploy. health-check proves the site
   # answers; this proves the hidden-pick gate and the reveal (R1, R2) work in
-  # production, with two real sign-ins and a real second pick. It signs in only
+  # production, with two real sign-ins and a real second pick, and that each
+  # Partner page then shows the streak and today's question in Past questions
+  # (epic streak-and-partner-page R6, R7). It signs in only
   # the two claude bot accounts and clears only their pair's days through the
   # reset_bot_daily_days() RPC, so it needs no Supabase secret (service-role)
   # key and never gets one. It runs npm code, so it has no environment and

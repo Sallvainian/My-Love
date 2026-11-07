@@ -1,5 +1,7 @@
 /**
- * Live check: Daily on the real site (epic daily-question, story 6.11; R1, R2).
+ * Live check: Daily on the real site (epic daily-question, story 6.11; R1, R2),
+ * and the streak and Past questions on its Partner page (epic
+ * streak-and-partner-page, story 7.11; R6, R7).
  *
  * `deploy.yml` runs this after every deploy (`live-daily-check`) against the
  * deployed site and its hosted project, with `playwright.live.config.ts`. It
@@ -8,7 +10,12 @@
  * question; bot A picks This and waits; bot B's own RPC answers before B's pick
  * (`get_daily_day`, `get_daily_day_by_id`) carry no choice, mark or count; B's
  * page says A has picked and shows no reveal; B picks That; both pages, after a
- * reload, show the reveal with "Different picks".
+ * reload, show the reveal with "Different picks". Then each bot loads its
+ * Partner page (story 7.11): the streak card is orange with 1 day answered
+ * together and 1 in a row, and Past questions holds today's question alone,
+ * that bot's pick first, marked Different. One day is all there is, because the
+ * reset leaves the pair only today and the streak counts from the pair's first
+ * day.
  *
  * It touches only the bot pair: it signs in `claude-bot@test.example.com`
  * (`CLAUDE_BOT_PASSWORD`) and `claude-bot-partner@test.example.com`
@@ -28,7 +35,13 @@ import { interceptNetworkCall } from '@seontechnologies/playwright-utils/interce
 import { expect, test, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database.types';
-import { DAILY_DAY_READ, DAILY_PICK_SEND, SECOND_CONTEXT_READ_TIMEOUT } from '../support/helpers/reads';
+import {
+  COUPLE_STREAK_READ,
+  DAILY_DAY_READ,
+  DAILY_HISTORY_READ,
+  DAILY_PICK_SEND,
+  SECOND_CONTEXT_READ_TIMEOUT,
+} from '../support/helpers/reads';
 import { dismissWelcomeSplash } from '../support/helpers/welcome-splash';
 
 type BotClient = SupabaseClient<Database>;
@@ -232,8 +245,47 @@ async function openDaily(page: Page, goto: () => Promise<unknown>): Promise<unkn
   return result.responseJson;
 }
 
+/**
+ * Load the Partner page and wait for its own streak and past-questions reads,
+ * both 200. A fresh load, not the dock: after the second pick Daily's +1 screen
+ * and the write-tomorrow sheet cover the dock, and neither shows on Partner.
+ */
+async function openPartner(page: Page): Promise<void> {
+  const streak = observeRpc(page, COUPLE_STREAK_READ);
+  const history = observeRpc(page, DAILY_HISTORY_READ);
+  await page.goto('/partner');
+  const [streakResult, historyResult] = await Promise.all([streak, history]);
+  expect(streakResult.status).toBe(200);
+  expect(historyResult.status).toBe(200);
+}
+
+/** The Partner page after the pair's one finished day: 1 and 1 in orange, today's question Different. */
+async function expectOneDayTogether(
+  page: Page,
+  question: string,
+  mine: string,
+  theirs: string
+): Promise<void> {
+  const card = page.getByTestId('partner-streak-card');
+  await expect(card).toBeVisible();
+  await expect(card).toHaveAttribute('data-state', 'orange');
+  await expect(page.getByTestId('partner-streak-held')).toHaveText('1');
+  await expect(card).toContainText('day answered together');
+  await expect(page.getByTestId('partner-streak-run')).toHaveText('1');
+  await expect(card).toContainText('in a row');
+
+  const rows = page.getByTestId('partner-past-questions').getByTestId('partner-past-question');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute('data-same', 'false');
+  await expect(rows.first().getByTestId('partner-past-question-text')).toHaveText(question);
+  await expect(rows.first().getByTestId('partner-past-question-picks')).toHaveText(
+    `${mine} · ${theirs}`
+  );
+  await expect(rows.first().getByTestId('partner-past-question-mark')).toHaveText('Different');
+}
+
 test.describe('Live Daily check', () => {
-  test('[P0] the bot pair sees one question, a hidden pick, and the reveal on the second pick', async ({
+  test('[P0] the bot pair sees one question, a hidden pick, the reveal on the second pick, and the day on Partner', async ({
     browser,
     baseURL,
   }) => {
@@ -346,6 +398,12 @@ test.describe('Live Daily check', () => {
       await expect(pageA.getByTestId('daily-reveal-mine')).toHaveText(thisText);
       await expect(pageA.getByTestId('daily-reveal-partner')).toHaveText(thatText);
       await expect(pageA.getByTestId('daily-reveal-mark')).toHaveText('Different picks');
+
+      // Each Partner page shows the finished day: the streak and today's question.
+      await openPartner(pageA);
+      await expectOneDayTogether(pageA, questionA, thisText, thatText);
+      await openPartner(pageB);
+      await expectOneDayTogether(pageB, questionA, thatText, thisText);
     } finally {
       for (const context of contexts) await context.close().catch(() => undefined);
       // Local scope: only the sessions these two API clients opened end.
