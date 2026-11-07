@@ -1020,6 +1020,10 @@ export type Database = {
           remaining: number
         }[]
       }
+      couple_streak: {
+        Args: { at: string; user_a: string; user_b: string; viewer: string }
+        Returns: Json
+      }
       daily_day_snapshot: {
         Args: { at: string; day_id: string; viewer: string }
         Returns: Json
@@ -1040,6 +1044,7 @@ export type Database = {
           is_taken: boolean
         }[]
       }
+      get_couple_streak: { Args: Record<PropertyKey, never>; Returns: Json }
       get_daily_day: {
         Args: {
           reported_at: string

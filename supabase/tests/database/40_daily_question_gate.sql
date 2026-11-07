@@ -6,8 +6,8 @@
 --     daily_picks; no anon or authenticated privilege on any of them (SELECT
 --     included); service_role holds column SELECT on every daily_picks column
 --     except `choice` and no table privilege.
---   * The seven internal functions are denied to anon and authenticated; the
---     three client RPCs are granted to authenticated only.
+--   * The eight internal functions are denied to anon and authenticated; the
+--     six client RPCs are granted to authenticated only.
 --   * Every client RPC called as the second partner BEFORE their own pick
 --     returns no choice, Same/Different mark or count for that day, and a
 --     direct select on daily_picks is denied. Every new client RPC is added
@@ -40,6 +40,11 @@
 --     44_reset_bot_daily_days.sql.
 --   * DW-494 (20261107000000) added write.target_day to the snapshot; its
 --     cases live in 42_daily_question_written_questions.sql.
+--   * Story 7.1 (20261107010000) added couple_streak (the eighth internal
+--     function) and the client RPC get_couple_streak (the sixth), which B calls
+--     before their own pick: held, done, same, run and missed stay 0, today is grey and
+--     open in the week, and no choice is in the answer. After B's pick held is 1
+--     and today is orange. The projection cases live in 45_couple_streak.sql.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -49,7 +54,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(112);
+select plan(119);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -165,11 +170,12 @@ select is(
                      'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)',
                      'record_user_time_zone(uuid, text, integer, timestamptz, timestamptz)',
                      'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)',
-                     'record_written_question(uuid, uuid, text, text, timestamptz)']) as f(sig),
+                     'record_written_question(uuid, uuid, text, text, timestamptz)',
+                     'couple_streak(uuid, uuid, uuid, timestamptz)']) as f(sig),
         unnest(array['anon', 'authenticated']) as r(rolename)
    where has_function_privilege(r.rolename, 'public.' || f.sig, 'EXECUTE')),
   0,
-  'DAILY-012: the seven internal functions are executable by neither anon nor authenticated'
+  'DAILY-012: the eight internal functions are executable by neither anon nor authenticated'
 );
 
 select is(
@@ -178,10 +184,11 @@ select is(
                      'visible_daily_picks(uuid, timestamptz)', 'daily_day_snapshot(uuid, uuid, timestamptz)',
                      'record_user_time_zone(uuid, text, integer, timestamptz, timestamptz)',
                      'record_daily_pick(uuid, uuid, text, timestamptz, text, integer, timestamptz)',
-                     'record_written_question(uuid, uuid, text, text, timestamptz)']) as f(sig)
+                     'record_written_question(uuid, uuid, text, text, timestamptz)',
+                     'couple_streak(uuid, uuid, uuid, timestamptz)']) as f(sig)
    where has_function_privilege('service_role', 'public.' || f.sig, 'EXECUTE')),
-  7,
-  'DAILY-013: service_role keeps EXECUTE on the seven internal functions'
+  8,
+  'DAILY-013: service_role keeps EXECUTE on the eight internal functions'
 );
 
 select ok(
@@ -189,8 +196,9 @@ select ok(
   and has_function_privilege('authenticated', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.submit_written_question(uuid, text, text)', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.get_daily_day_by_id(uuid)', 'EXECUTE')
-  and has_function_privilege('authenticated', 'public.reset_bot_daily_days()', 'EXECUTE'),
-  'DAILY-014: the five client RPCs are executable by authenticated'
+  and has_function_privilege('authenticated', 'public.reset_bot_daily_days()', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.get_couple_streak()', 'EXECUTE'),
+  'DAILY-014: the six client RPCs are executable by authenticated'
 );
 
 select ok(
@@ -198,8 +206,9 @@ select ok(
   and not has_function_privilege('anon', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.submit_written_question(uuid, text, text)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.get_daily_day_by_id(uuid)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.reset_bot_daily_days()', 'EXECUTE'),
-  'DAILY-015: the five client RPCs are not executable by anon'
+  and not has_function_privilege('anon', 'public.reset_bot_daily_days()', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.get_couple_streak()', 'EXECUTE'),
+  'DAILY-015: the six client RPCs are not executable by anon'
 );
 
 -- ============================================
@@ -293,6 +302,11 @@ select throws_ok(
   'Authentication required',
   'DAILY-109: get_daily_day_by_id rejects a NULL auth.uid()'
 );
+select throws_ok(
+  $$select public.get_couple_streak()$$,
+  'Authentication required',
+  'DAILY-113: get_couple_streak rejects a NULL auth.uid()'
+);
 
 -- ============================================
 -- Unlinked caller
@@ -310,6 +324,15 @@ select is(
   (select count(*)::int from public.couple_days),
   0,
   'DAILY-033: and no couple_days row is created'
+);
+
+select tests.authenticate_as((select u_id from t_ids));
+select set_config('tests.u_streak', public.get_couple_streak()::text, false);
+reset role;
+select is(
+  current_setting('tests.u_streak')::jsonb,
+  '{"status": "unlinked"}'::jsonb,
+  'DAILY-114: an unlinked caller gets {status: unlinked} from get_couple_streak'
 );
 
 -- ============================================
@@ -390,6 +413,11 @@ select is(
 select tests.authenticate_as((select b_id from t_ids));
 select set_config('tests.b_before', public.get_daily_day('UTC', 0, now())::text, false);
 select set_config('tests.b_by_id', public.get_daily_day_by_id(current_setting('tests.day')::uuid)::text, false);
+select set_config('tests.b_streak', public.get_couple_streak()::text, false);
+select throws_ok(
+  format($$select public.couple_streak(%L, %L, %L, now())$$, (select a_id from t_ids), (select b_id from t_ids), (select b_id from t_ids)),
+  '42501', null, 'DAILY-115: B cannot call couple_streak directly'
+);
 select throws_ok(
   $$select * from public.daily_picks$$,
   '42501', null, 'DAILY-042: B cannot select daily_picks directly before picking'
@@ -459,6 +487,29 @@ select ok(
     '$.** ? (@ == "this" || @ == "that")'
   ),
   'DAILY-105: and no "this" or "that" value appears anywhere in it'
+);
+select is(
+  (current_setting('tests.b_streak')::jsonb #>> '{streak,held}') || '/'
+    || (current_setting('tests.b_streak')::jsonb #>> '{streak,done}') || '/'
+    || (current_setting('tests.b_streak')::jsonb #>> '{streak,same}') || '/'
+    || (current_setting('tests.b_streak')::jsonb #>> '{streak,run}') || '/'
+    || (current_setting('tests.b_streak')::jsonb #>> '{streak,missed}'),
+  '0/0/0/0/0',
+  'DAILY-116: B''s streak, before B''s own pick, counts nothing for the day A picked: held, done, same, run and missed are 0'
+);
+select is(
+  (current_setting('tests.b_streak')::jsonb #>> '{status}') || '/'
+    || (current_setting('tests.b_streak')::jsonb #>> '{streak,today_state}') || '/'
+    || (current_setting('tests.b_streak')::jsonb #>> '{streak,week,6,state}'),
+  'ok/grey/open',
+  'DAILY-117: today is grey and open in B''s week'
+);
+select ok(
+  not jsonb_path_exists(
+    current_setting('tests.b_streak')::jsonb,
+    '$.** ? (@ == "this" || @ == "that")'
+  ),
+  'DAILY-118: and no "this" or "that" value appears anywhere in it'
 );
 select is(
   (select count(*)::int from public.visible_daily_picks((select b_id from t_ids), now())),
@@ -572,6 +623,16 @@ select is(
     || (current_setting('tests.b_by_id_after')::jsonb ->> 'partner_choice'),
   'both/this',
   'DAILY-106: after B''s pick, B''s by-id answer carries the partner''s choice'
+);
+
+select tests.authenticate_as((select b_id from t_ids));
+select set_config('tests.b_streak_after', public.get_couple_streak()::text, false);
+reset role;
+select is(
+  (current_setting('tests.b_streak_after')::jsonb #>> '{streak,held}') || '/'
+    || (current_setting('tests.b_streak_after')::jsonb #>> '{streak,today_state}'),
+  '1/orange',
+  'DAILY-119: after B''s pick the day is done: held 1, today orange'
 );
 
 select tests.authenticate_as((select a_id from t_ids));
