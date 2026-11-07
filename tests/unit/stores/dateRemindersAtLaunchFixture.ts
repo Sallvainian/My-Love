@@ -150,7 +150,5 @@ export function scheduleReaders(schedule: ScheduleMock) {
   return { scheduledTitles, titlesOfSchedule };
 }
 
-export const settleMs = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** Every id a date reminder can hold: what each re-plan cancels. */
 export const ALL_REMINDER_IDS = Array.from({ length: MAX_SCHEDULED_REMINDERS }, (_, i) => ({ id: i + 1 }));
