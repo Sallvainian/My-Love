@@ -4223,3 +4223,11 @@ source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
 reason: The notice is cleared only by the next Send (`onSendStart={clearDayChanged}`). When the re-read day is already picked, no Send is rendered, so the notice stays until Daily is reopened.
 status: open
+
+### DW-497: The hosted database has never been compared with the migrations as a whole, so objects no migration created can still be there.
+origin: owner request during loop run 20261105-224246-5db5 (story 6.11's live check), 2026-11-07
+location: the hosted Supabase project; supabase/migrations/
+source_spec: none
+severity: low
+reason: AGENTS.md records that the hosted database carries objects no migration created (tables and a function removed at e5f1ab6d, two photos policies at 8f9d35d4), and each was found only when a migration touched that table. Nothing compares the whole hosted schema with what the migrations build, so a leftover policy, grant or function elsewhere is found only by chance. A one-off, read-only comparison (`supabase db diff --linked`, or the hosted catalog read table by table) would list every difference; each leftover is then dropped by a migration with `drop … if exists` after the owner approves it. The post-deploy live check (story 6.11) covers Daily's gate only, not drift elsewhere.
+status: open
