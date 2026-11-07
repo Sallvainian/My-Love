@@ -11,7 +11,8 @@
  * Each entry also records the partner it was read with (`partner_id`, the newest
  * tag wins; an entry saved before the tag reads as `null`), and the readers
  * give only the current partner's entries, so an old pairing's day stays saved
- * but hidden. Callers never see `partner_id`. A failed server read never
+ * but hidden; `readSavedDailyDay` also gives an untagged entry, so the day saved
+ * before the tag still shows offline. Callers never see `partner_id`. A failed server read never
  * reaches this module; an `unlinked` answer is saved as `{}` because the server
  * said there is no day. Sign-out removes the kind with the account's other
  * copies (`deleteAccountCopies`).
