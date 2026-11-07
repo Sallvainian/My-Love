@@ -4241,3 +4241,11 @@ source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
 reason: `write.target_day` is computed when the snapshot is read. When the partner whose clock is ahead opens the next date, or another written question takes that date, while the writer's sheet is open, the date the question is asked moves on but the sheet keeps the day it named until the snapshot is read again; the question is then asked a day later than the sheet said. The snapshot the send returns carries the new date, but the sheet closes on that send.
 status: open
+
+### DW-499: The live Daily check once stalled on the writer's reload: the page sent no day read and missed the partner's pick broadcast.
+origin: deploy run 42340556736 (merge of PR #486), Live Daily Check, attempt 1, 2026-11-06; attempt 2 passed unchanged
+location: tests/live/daily-question-live.spec.ts (the writer's `openDaily(pageA, () => pageA.reload())` after B's pick); src/components/DailyQuestion/DailyQuestion.tsx; src/stores/slices/dailyQuestionSlice.ts
+source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
+severity: low
+reason: After both bots picked (both `submit_daily_pick` calls 200), Claude Bot's page, the day's writer with the write sheet open, was reloaded and never sent `get_daily_day` in the 180 s test timeout; its failure screenshot still shows the waiting state under the sheet. The hosted edge logs also show no `daily_pick` broadcast to Claude Bot's channel after Claude Partner's pick, where the passing run at 04:23 UTC the same day sent one. Every server answer was 200, and Claude Partner's page showed the reveal. The page videos were cut short, so where the writer's page stopped is unknown. Reproduce with the live spec run repeatedly against the hosted site before changing code.
+status: open
