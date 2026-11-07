@@ -12,7 +12,7 @@
  *
  * It touches only the bot pair: it signs in `claude-bot@test.example.com`
  * (`CLAUDE_BOT_PASSWORD`) and `claude-bot-partner@test.example.com`
- * (`PUSH_FIXTURE_PASSWORD`) with the publishable key and nothing else, and
+ * (`CLAUDE_BOT_PARTNER_PASSWORD`) with the publishable key and nothing else, and
  * clears only their pair's days through their own `reset_bot_daily_days()` RPC,
  * so a rerun starts from an empty pair. The Supabase secret key appears nowhere.
  *
@@ -37,7 +37,7 @@ const BOT_A_EMAIL = 'claude-bot@test.example.com';
 const BOT_A_PASSWORD_VAR = 'CLAUDE_BOT_PASSWORD';
 const BOT_A_NAME = 'Claude Bot';
 const BOT_B_EMAIL = 'claude-bot-partner@test.example.com';
-const BOT_B_PASSWORD_VAR = 'PUSH_FIXTURE_PASSWORD';
+const BOT_B_PASSWORD_VAR = 'CLAUDE_BOT_PARTNER_PASSWORD';
 const BOT_B_NAME = 'Claude Partner';
 
 const UTC_ZONE = { time_zone: 'UTC', utc_offset_minutes: 0 } as const;

@@ -418,7 +418,7 @@ jobs:
           LIVE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           LIVE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
           CLAUDE_BOT_PASSWORD: ${{ secrets.CLAUDE_BOT_PASSWORD }}
-          PUSH_FIXTURE_PASSWORD: ${{ secrets.PUSH_FIXTURE_PASSWORD }}
+          CLAUDE_BOT_PARTNER_PASSWORD: ${{ secrets.CLAUDE_BOT_PARTNER_PASSWORD }}
 
       - name: Upload report
         if: failure()

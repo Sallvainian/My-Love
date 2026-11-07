@@ -15,6 +15,7 @@ import { readBody, runNodeScript } from '../../support/helpers/node-script';
 // to an http: URL, so the repo path is resolved from cwd instead.
 const SCRIPT = path.resolve(process.cwd(), 'scripts', 'provision-push-fixtures.mjs');
 const FAKE_PASSWORD = 'unit-test-only-push-password-not-a-secret';
+const FAKE_PARTNER_PASSWORD = 'unit-test-only-claude-partner-password-not-a-secret';
 const SERVICE_KEY = 'unit-test-push-service-key';
 const RILEY = 'push-fixture@test.example.com';
 const AVERY = 'push-fixture-partner@test.example.com';
@@ -125,6 +126,7 @@ function fixtureEnv(url: string, overrides: Record<string, string> = {}): Record
     SUPABASE_URL: url,
     SUPABASE_SERVICE_KEY: SERVICE_KEY,
     PUSH_FIXTURE_PASSWORD: FAKE_PASSWORD,
+    CLAUDE_BOT_PARTNER_PASSWORD: FAKE_PARTNER_PASSWORD,
     ...overrides,
   };
 }
@@ -143,6 +145,7 @@ describe('scripts/provision-push-fixtures.mjs', () => {
 
   it.each([
     ['PUSH_FIXTURE_PASSWORD', { PUSH_FIXTURE_PASSWORD: '' }],
+    ['CLAUDE_BOT_PARTNER_PASSWORD', { CLAUDE_BOT_PARTNER_PASSWORD: '' }],
     ['SUPABASE_URL (or VITE_SUPABASE_URL)', { SUPABASE_URL: '' }],
     ['SUPABASE_SERVICE_KEY', { SUPABASE_SERVICE_KEY: '' }],
   ])('exits 1 naming %s when it is missing, before any request', async (name, override) => {
@@ -154,6 +157,7 @@ describe('scripts/provision-push-fixtures.mjs', () => {
     expect(status).toBe(1);
     expect(output).toContain(`missing required environment: ${name}`);
     expect(output).not.toContain(FAKE_PASSWORD);
+    expect(output).not.toContain(FAKE_PARTNER_PASSWORD);
     expect(output).not.toContain(SERVICE_KEY);
     expect(stub.seen).toHaveLength(0);
   });
@@ -194,7 +198,8 @@ describe('scripts/provision-push-fixtures.mjs', () => {
     expect(bodies[5]).toMatchObject({ display_name: 'Avery' });
     expect(bodies[6]).toEqual({ partner_id: avery });
     expect(bodies[7]).toEqual({ partner_id: riley });
-    expect(bodies[9]).toEqual({ password: FAKE_PASSWORD });
+    // Claude Partner gets its own password, never the fixture pair's.
+    expect(bodies[9]).toEqual({ password: FAKE_PARTNER_PASSWORD });
 
     expect(output).toContain(`${RILEY} (Riley) created (${riley})`);
     expect(output).toContain(`${AVERY} (Avery) created (${avery})`);
@@ -243,7 +248,7 @@ describe('scripts/provision-push-fixtures.mjs', () => {
         `/auth/v1/admin/users/${avery}`,
         { password: FAKE_PASSWORD, email_confirm: true, user_metadata: { display_name: 'Avery' } },
       ],
-      [`/auth/v1/admin/users/${CLAUDE_PARTNER_ID}`, { password: FAKE_PASSWORD }],
+      [`/auth/v1/admin/users/${CLAUDE_PARTNER_ID}`, { password: FAKE_PARTNER_PASSWORD }],
     ]);
     const links = stub.seen
       .filter((r) => r.method === 'PATCH' && r.body.includes('partner_id'))
@@ -262,6 +267,7 @@ describe('scripts/provision-push-fixtures.mjs', () => {
       VITE_SUPABASE_URL: `${stub.url}/`,
       SUPABASE_SERVICE_KEY: SERVICE_KEY,
       PUSH_FIXTURE_PASSWORD: FAKE_PASSWORD,
+      CLAUDE_BOT_PARTNER_PASSWORD: FAKE_PARTNER_PASSWORD,
     });
     expect(status).toBe(0);
     expect(stub.seen[0].url).toBe('/auth/v1/admin/users?page=1&per_page=100');
@@ -272,6 +278,7 @@ describe('scripts/provision-push-fixtures.mjs', () => {
     const { status, output } = await runScript(fixtureEnv(stub.url));
     expect(status).toBe(0);
     expect(output).not.toContain(FAKE_PASSWORD);
+    expect(output).not.toContain(FAKE_PARTNER_PASSWORD);
     expect(output).not.toContain(SERVICE_KEY);
   });
 
