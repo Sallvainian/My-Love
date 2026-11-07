@@ -26,6 +26,7 @@ const state = {
   dailyHistoryEnd: false,
   dailyHistoryLoading: false,
   dailyHistoryError: null as string | null,
+  dailyHistoryErrorOffline: false,
   syncStatus: { isOnline: true },
 };
 
@@ -91,6 +92,7 @@ describe('PastQuestionsPage', () => {
     state.dailyHistoryEnd = false;
     state.dailyHistoryLoading = false;
     state.dailyHistoryError = null;
+    state.dailyHistoryErrorOffline = false;
     state.syncStatus = { isOnline: true };
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     window.history.replaceState(null, '', '/partner/history');
@@ -244,18 +246,30 @@ describe('PastQuestionsPage', () => {
       expect(error.nextElementSibling).toBe(screen.getByTestId('partner-history-sentinel'));
     });
 
-    it('shows no error under rows still shown while offline', () => {
+    it('shows no offline refusal under rows still shown while offline', () => {
       state.syncStatus = { isOnline: false };
       state.dailyHistoryError = 'You are offline. Past questions needs a connection to load.';
+      state.dailyHistoryErrorOffline = true;
       renderPage();
 
       expect(screen.getAllByTestId('partner-history-row')).toHaveLength(1);
       expect(screen.queryByTestId('partner-history-error')).not.toBeInTheDocument();
     });
 
-    it('still shows the error above an empty list while offline', () => {
+    it('shows no offline refusal under the rows once back online, before the re-read answers', () => {
+      state.syncStatus = { isOnline: true };
+      state.dailyHistoryError = 'You are offline. Past questions needs a connection to load.';
+      state.dailyHistoryErrorOffline = true;
+      renderPage();
+
+      expect(screen.getAllByTestId('partner-history-row')).toHaveLength(1);
+      expect(screen.queryByTestId('partner-history-error')).not.toBeInTheDocument();
+    });
+
+    it('still shows the offline refusal above an empty list', () => {
       state.syncStatus = { isOnline: false };
       state.dailyHistoryError = 'You are offline. Past questions needs a connection to load.';
+      state.dailyHistoryErrorOffline = true;
       renderPage({ history: [] });
 
       expect(screen.getByTestId('partner-history-error')).toHaveTextContent(

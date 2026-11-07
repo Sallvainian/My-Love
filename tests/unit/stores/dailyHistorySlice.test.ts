@@ -174,6 +174,7 @@ describe('loadDailyHistory', () => {
 
     expect(state().dailyHistory).toEqual(PAGE);
     expect(state().dailyHistoryError).toBe('boom');
+    expect(state().dailyHistoryErrorOffline).toBe(false);
   });
 
   it('an offline refusal sets the error but is not logged', async () => {
@@ -186,7 +187,20 @@ describe('loadDailyHistory', () => {
     expect(state().dailyHistoryError).toBe(
       'You are offline. Past questions needs a connection to load.'
     );
+    expect(state().dailyHistoryErrorOffline).toBe(true);
     expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('a later successful read clears an offline refusal', async () => {
+    fetchDailyHistory.mockRejectedValueOnce(new AccountDataError('offline', 'You are offline.'));
+    await state().loadDailyHistory();
+    expect(state().dailyHistoryErrorOffline).toBe(true);
+
+    fetchDailyHistory.mockResolvedValueOnce(PAGE);
+    await state().loadDailyHistory();
+
+    expect(state().dailyHistoryError).toBeNull();
+    expect(state().dailyHistoryErrorOffline).toBe(false);
   });
 
   it('a later successful read clears the error', async () => {
@@ -491,6 +505,7 @@ describe('loadMoreDailyHistory', () => {
     await state().loadMoreDailyHistory();
 
     expect(state().dailyHistoryError).toBe('You are offline.');
+    expect(state().dailyHistoryErrorOffline).toBe(true);
     expect(console.error).not.toHaveBeenCalled();
   });
 });

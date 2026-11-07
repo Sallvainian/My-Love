@@ -63,6 +63,7 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
   const dailyHistoryEnd = useAppStore((state) => state.dailyHistoryEnd);
   const dailyHistoryLoading = useAppStore((state) => state.dailyHistoryLoading);
   const dailyHistoryError = useAppStore((state) => state.dailyHistoryError);
+  const dailyHistoryErrorOffline = useAppStore((state) => state.dailyHistoryErrorOffline);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -209,9 +210,9 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
           </div>
         )}
 
-        {/* A failed read: above an empty list, or under the rows when a read failed
-            online. Offline, rows still shown stay valid and the banner says why. */}
-        {dailyHistoryError && (days.length === 0 ? !dailyHistoryLoading : isOnline) && (
+        {/* A failed read: above an empty list, or under the rows unless it was the
+            offline refusal; those rows stay valid and the banner says why. */}
+        {dailyHistoryError && (days.length === 0 ? !dailyHistoryLoading : !dailyHistoryErrorOffline) && (
           <div
             className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
             data-testid="partner-history-error"

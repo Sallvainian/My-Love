@@ -117,6 +117,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyHistory: null,
   dailyHistoryLoading: false,
   dailyHistoryError: null,
+  dailyHistoryErrorOffline: false,
   dailyHistoryEnd: false,
   dailyHistoryLoadingMore: false,
 };
@@ -289,6 +290,7 @@ function seedSignedInSession(): void {
     ],
     dailyHistoryLoading: true,
     dailyHistoryError: SECRETS.dailyHistoryError,
+    dailyHistoryErrorOffline: true,
     dailyHistoryEnd: true,
     dailyHistoryLoadingMore: true,
 

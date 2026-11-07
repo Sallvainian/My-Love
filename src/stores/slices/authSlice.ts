@@ -266,6 +266,7 @@ export function signedOutState() {
     dailyHistory: null,
     dailyHistoryLoading: false,
     dailyHistoryError: null,
+    dailyHistoryErrorOffline: false,
     dailyHistoryEnd: false,
     dailyHistoryLoadingMore: false,
 
