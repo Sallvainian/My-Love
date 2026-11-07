@@ -169,7 +169,7 @@ function DayCard({
           {partnerStatus}
           {refused && (
             <div className={FAILURE_BOX} role="alert" data-testid="daily-pick-failed">
-              Your pick could not be sent.{refused.failure ? ` ${refused.failure}` : ''}
+              {refused.failure || 'Your pick could not be sent.'}
             </div>
           )}
           <div className="flex">
@@ -342,6 +342,8 @@ export function DailyQuestion() {
         <WriteQuestionSheet
           key={writeSnapshot.day_id}
           dayId={writeSnapshot.day_id}
+          day={writeSnapshot.day}
+          targetDay={writeSnapshot.write.target_day}
           partnerName={partnerName}
           onClose={closeWriteSheet}
         />

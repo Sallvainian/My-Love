@@ -50,6 +50,9 @@ import { DailyQuestion } from '../DailyQuestion';
 const SAME_DAY = new Date(2026, 10, 5, 12);
 /** One minute past local midnight: the device's date is no longer the fixture's day. */
 const NEXT_DAY = new Date(2026, 10, 6, 0, 1);
+/** The sentence a `DQ002` refusal is stored with (`submitDailyPick`). */
+const CLOCK_REFUSAL =
+  "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.";
 
 const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as const, snapshot });
 
@@ -422,7 +425,7 @@ describe('DailyQuestion', () => {
     expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
   });
 
-  it('a refused queued row shows the reason and gives the options back; a new Send replaces it', async () => {
+  it('a refused queued row shows the reason on its own and gives the options back; a new Send replaces it', async () => {
     const user = userEvent.setup();
     await enqueuePick({
       user_id: 'USER-A-ID',
@@ -432,16 +435,16 @@ describe('DailyQuestion', () => {
       time_zone: 'America/New_York',
       utc_offset_minutes: -300,
       failed: true,
-      failure: 'Pick time outside the allowed window',
+      failure: CLOCK_REFUSAL,
     });
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
     submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
 
     render(<DailyQuestion />);
 
-    expect(await screen.findByTestId('daily-pick-failed')).toHaveTextContent(
-      'Your pick could not be sent. Pick time outside the allowed window'
-    );
+    expect(await screen.findByTestId('daily-pick-failed')).toHaveTextContent(CLOCK_REFUSAL);
+    // The sentence says the pick was not sent; nothing is put before it.
+    expect(screen.getByTestId('daily-pick-failed').textContent).toBe(CLOCK_REFUSAL);
     expect(screen.getByTestId('daily-pick-failed')).toHaveAttribute('role', 'alert');
     expect(screen.queryByTestId('daily-pick-queued')).toBeNull();
     await user.click(screen.getByTestId('daily-option-this'));
@@ -449,6 +452,26 @@ describe('DailyQuestion', () => {
 
     expect(await screen.findByTestId('daily-waiting')).toBeInTheDocument();
     expect(screen.queryByTestId('daily-pick-failed')).toBeNull();
+  });
+
+  it('a refused queued row with no stored reason says the pick could not be sent', async () => {
+    await enqueuePick({
+      user_id: 'USER-A-ID',
+      day_id: DAY_ID,
+      choice: 'that',
+      picked_at: SAME_DAY.toISOString(),
+      time_zone: 'America/New_York',
+      utc_offset_minutes: -300,
+      failed: true,
+      failure: null,
+    });
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-pick-failed')).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId('daily-pick-failed').textContent).toBe('Your pick could not be sent.');
+    expect(screen.getByTestId('daily-option-this')).toBeInTheDocument();
   });
 
   it('a refused queued row with the partner already picked shows the failure and the options, never a reveal', async () => {
@@ -460,7 +483,7 @@ describe('DailyQuestion', () => {
       time_zone: 'America/New_York',
       utc_offset_minutes: -300,
       failed: true,
-      failure: 'Pick time outside the allowed window',
+      failure: CLOCK_REFUSAL,
     });
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ state: 'partner' })));
 

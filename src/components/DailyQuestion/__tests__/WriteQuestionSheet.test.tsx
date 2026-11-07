@@ -3,7 +3,7 @@
  * (WriteQuestionSheet.tsx, DailyQuestion.tsx) against the real store, with only
  * the API module mocked: one test per row of the story's matrix.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -121,6 +121,59 @@ describe("the write tomorrow's question sheet", () => {
       'No thanks, pick one for us'
     );
     expect(dialog).toHaveTextContent('Jessie will see');
+  });
+
+  /** The sheet's four lines that name the day the question goes to. */
+  function dayWording() {
+    return {
+      eyebrow: screen.getByTestId('daily-write-eyebrow').textContent,
+      title: within(screen.getByRole('dialog')).getByRole('heading').textContent,
+      line: screen.getByTestId('daily-write-when').textContent,
+      send: screen.getByTestId('daily-write-send').textContent,
+    };
+  }
+
+  const TOMORROW_WORDING = {
+    eyebrow: 'Tomorrow',
+    title: "Write tomorrow's question?",
+    line: "Jessie gets it tomorrow. You'll answer it too.",
+    send: 'Send for tomorrow',
+  };
+
+  it.each([
+    ['the day after the shown day', '2026-11-06'],
+    ['missing (a snapshot saved before the server sent it)', undefined],
+  ])('says tomorrow when write.target_day is %s', async (_label, targetDay) => {
+    await open(writer({ write: { mine: true, done: false, target_day: targetDay } }));
+
+    await screen.findByTestId('daily-write-sheet');
+    expect(dayWording()).toEqual(TOMORROW_WORDING);
+    expect(screen.getByRole('dialog')).toHaveAccessibleName("Write tomorrow's question?");
+  });
+
+  it('says tomorrow across a month end', async () => {
+    vi.setSystemTime(new Date(2026, 10, 30, 12));
+    await open(
+      writer({ day: '2026-11-30', write: { mine: true, done: false, target_day: '2026-12-01' } })
+    );
+
+    await screen.findByTestId('daily-write-sheet');
+    expect(dayWording()).toEqual(TOMORROW_WORDING);
+  });
+
+  it("names the target date's weekday when the question goes to a later date", async () => {
+    // 2026-11-05 is a Thursday; tomorrow already has a day, so it goes to Saturday.
+    await open(writer({ write: { mine: true, done: false, target_day: '2026-11-07' } }));
+
+    await screen.findByTestId('daily-write-sheet');
+    expect(dayWording()).toEqual({
+      eyebrow: 'Saturday',
+      title: "Write Saturday's question?",
+      line: "Jessie gets it on Saturday. You'll answer it too.",
+      send: 'Send for Saturday',
+    });
+    expect(screen.getByRole('dialog')).toHaveAccessibleName("Write Saturday's question?");
+    expect(screen.getByRole('dialog')).not.toHaveTextContent(/tomorrow/i);
   });
 
   it("opens right after the writer's own pick is confirmed", async () => {

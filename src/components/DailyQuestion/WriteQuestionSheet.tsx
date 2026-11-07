@@ -2,6 +2,12 @@
  * Write tomorrow's question — the bottom sheet that asks the day's writer for
  * tomorrow's This-or-That (architecture AD-4, AD-13).
  *
+ * It says "tomorrow" while the snapshot's `write.target_day`, the date the
+ * question is asked, is the day after `day` (or missing, from a snapshot saved
+ * before the server sent it). When a partner whose clock is ahead has already
+ * opened tomorrow, or another written question is asked first, it is asked on
+ * a later date, and the sheet names that date's weekday instead (DW-494).
+ *
  * `DailyQuestion` decides when it shows (the writer's own server pick is in, the
  * turn is not done or declined, and the day is today). The sheet holds two
  * fields and a "This or That?" preview, and does not validate: the server judges
@@ -22,6 +28,7 @@
 import { Shuffle } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import {
   FAILURE_BOX,
@@ -37,15 +44,40 @@ const SHEET_SCRIM =
 const SHEET_PANEL =
   'flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-t-[28px] bg-card px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] outline-hidden';
 
+/**
+ * The weekday name (`Thursday`) of `targetDay` when it is not the day after
+ * `day`; null for tomorrow, a missing target or a date that does not parse.
+ */
+function laterWeekday(day: string, targetDay: string | undefined): string | null {
+  if (!targetDay) return null;
+  const from = parseEventDate(day);
+  const target = parseEventDate(targetDay);
+  if (!from || !target) return null;
+  const tomorrow = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1);
+  if (target.getTime() === tomorrow.getTime()) return null;
+  return target.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
 interface WriteQuestionSheetProps {
   /** The day the sheet writes from (the shown day). */
   dayId: string;
+  /** The shown day's `YYYY-MM-DD` date. */
+  day: string;
+  /** The snapshot's `write.target_day`: the date the question is asked. */
+  targetDay?: string;
   partnerName: string;
   /** Scrim or Escape: hide the sheet until the next mount of Daily. */
   onClose: () => void;
 }
 
-export function WriteQuestionSheet({ dayId, partnerName, onClose }: WriteQuestionSheetProps) {
+export function WriteQuestionSheet({
+  dayId,
+  day,
+  targetDay,
+  partnerName,
+  onClose,
+}: WriteQuestionSheetProps) {
+  const weekday = laterWeekday(day, targetDay);
   const submitWrittenQuestion = useAppStore((state) => state.submitWrittenQuestion);
   const declineWrittenQuestion = useAppStore((state) => state.declineWrittenQuestion);
 
@@ -110,17 +142,21 @@ export function WriteQuestionSheet({ dayId, partnerName, onClose }: WriteQuestio
         data-testid="daily-write-panel"
       >
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-semibold tracking-[.08em] text-accent uppercase">
-            Tomorrow
+          <span
+            className="text-xs font-semibold tracking-[.08em] text-accent uppercase"
+            data-testid="daily-write-eyebrow"
+          >
+            {weekday ?? 'Tomorrow'}
           </span>
           <h2
             id={titleId}
             className="font-serif text-[24px] leading-[1.15] font-semibold text-ink"
           >
-            Write tomorrow&apos;s question?
+            Write {weekday ?? 'tomorrow'}&apos;s question?
           </h2>
-          <p className="text-[15px] leading-[1.4] text-muted">
-            {partnerName} gets it tomorrow. You&apos;ll answer it too.
+          <p className="text-[15px] leading-[1.4] text-muted" data-testid="daily-write-when">
+            {partnerName} gets it {weekday ? `on ${weekday}` : 'tomorrow'}. You&apos;ll answer it
+            too.
           </p>
         </div>
 
@@ -189,7 +225,7 @@ export function WriteQuestionSheet({ dayId, partnerName, onClose }: WriteQuestio
               onClick={() => void send()}
               data-testid="daily-write-send"
             >
-              Send for tomorrow
+              Send for {weekday ?? 'tomorrow'}
             </button>
           </div>
           <div className="flex">

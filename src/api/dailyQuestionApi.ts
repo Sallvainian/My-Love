@@ -11,7 +11,10 @@
  * from `toAccountDataError`, and an answer that does not parse is a failure too
  * (never `unlinked`). A pick the server dates to another day than the one shown
  * (SQLSTATE `DQ001`) is `AccountDataError('day-changed', DAY_CHANGED_MESSAGE)`;
- * `DQ002` (outside the five-minute window) stays a transport error.
+ * the other refusals it raises for good (`DQ002`, outside the five-minute
+ * window; `P0002`, day not found; `22023`, invalid choice or time) are
+ * `AccountDataError('refused', sentence)` with a plain sentence of their own
+ * (`PICK_REFUSAL_MESSAGES`), the server error kept as `cause`.
  *
  * `submitWrittenQuestion` sends the day's writer's question for tomorrow
  * (`submit_written_question`, AD-4) and answers the day's snapshot, whose
@@ -65,6 +68,18 @@ const PICK_REFUSAL_CODES: ReadonlySet<string> = new Set([PICK_DATE_MISMATCH, 'DQ
 /** Shown when a pick is refused because the date changed since the question was shown. */
 export const DAY_CHANGED_MESSAGE =
   "The date has changed since this question was shown. Check today's question and pick again.";
+
+/**
+ * What `submit_daily_pick` refuses with, by SQLSTATE, apart from `DQ001`
+ * (`day-changed`). Each sentence stands on its own as the explanation, so
+ * Daily shows it with no lead-in.
+ */
+const PICK_REFUSAL_MESSAGES: Readonly<Record<string, string>> = {
+  DQ002:
+    "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.",
+  P0002: "This question isn't available any more. Open Daily again to see today's question.",
+  '22023': "This pick couldn't be sent. Please pick again.",
+};
 
 /**
  * What `submit_written_question` refuses with, by SQLSTATE. `DQ003` (an option
@@ -203,6 +218,10 @@ export async function submitDailyPick(
     if (isPostgrestError(error) && error.code === PICK_DATE_MISMATCH) {
       logSupabaseError(SUBMIT_CONTEXT, error);
       throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE, { cause: error });
+    }
+    if (isPostgrestError(error) && Object.hasOwn(PICK_REFUSAL_MESSAGES, error.code)) {
+      logSupabaseError(SUBMIT_CONTEXT, error);
+      throw new AccountDataError('refused', PICK_REFUSAL_MESSAGES[error.code], { cause: error });
     }
     throw toAccountDataError(SUBMIT_CONTEXT, error);
   }
