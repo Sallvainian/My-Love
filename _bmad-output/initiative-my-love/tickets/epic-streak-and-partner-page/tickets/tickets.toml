@@ -1,0 +1,132 @@
+# Epic 7, Streak and Partner Page: every planned story in build order.
+# Stories 1 (server) and 2 (client) together are the tracer bullet: both
+# partners pick on Daily and each Partner page shows the streak at 1.
+# One lane: every story from 2 on changes dailyQuestionSlice, and 1 and 7 both
+# add migrations, the AD-5 gate pgTAP file and the generated types, so each
+# story waits on the one before it. Story 4 adds the E2E helper that seeds a
+# pair's past days, which stories 6, 7 and 8 use.
+# A story that adds a subscriber to the partner-event registry names what its
+# screen does on every event in PARTNER_EVENTS (partner_linked, daily_pick,
+# new_mood, dates_changed) and on SUBSCRIBED, and tests each (epic 6
+# retrospective, item 10).
+
+[[entry]]
+id = 1
+type = "story"
+title = "The server counts the couple's streak"
+description = "Server half of the tracer; story 2 builds the Partner page on it. A migration adds spine AD-7's internal couple_streak(user_a, user_b, viewer, at) and the client RPC get_couple_streak() (security definer, search_path '', in FN-GRANT-008, types regenerated with npm run db:types), answering { status: 'ok', streak } | { status: 'unlinked' } and throwing on failure, as get_daily_day does. streak holds held, run, today_state (grey | orange | blue for the viewer's date), milestones (floor(held / 25)), same, done, missed (the closed dates missed in a row since the newest done day, 0 when the newest closed day is done) and week (the viewer's last seven dates ending today, each done, missed or open), so no client works out a day's state. A day is done when both picks exist and closed once the later partner's local midnight has passed (AD-3); a missed day is any closed date since the couple's first day that is not done, dates with no row included. Nothing is stored, so a pick that reaches the server after midnight corrects the count by itself. get_couple_streak goes in the AD-5 gate pgTAP file."
+verify = "supabase test db over fixed instants: held, run, missed and today_state follow done and missed days, a run of missed days staying blue until both pick; partners an hour apart close a day only after the later midnight; a pick made at 11:50 PM and submitted at 12:10 AM raises held for the earlier date; relinking the same partner counts the unlinked days as missed; week marks each of the last seven dates; an unlinked caller gets status unlinked; the gate file shows nothing get_couple_streak returns counts today before the second partner's own pick; npm run db:types leaves the committed types unchanged."
+covers = ["R1", "R2", "R3", "R5", "R8"]
+after = ["6.2"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 2
+type = "story"
+title = "The Partner page shows the couple's streak in place of the partner's moods"
+description = "Client half of the tracer, on story 1's get_couple_streak. Builds the Partner page in a new folder, src/components/PartnerView/ (spine Conventions; epic 10 deletes PartnerMoodView/; not PartnerPage, which Settings/PartnerPage.tsx already exports), on the same partner view: the partner's name and the design's streak card (held as 'days answered together', run as 'in a row', the week strip, 'Next milestone: {n} days · {k} to go'), orange, grey or blue by today_state, with the plain flame. Partner search, sent and received requests, accept and decline move into the new folder unchanged, test ids kept, and so does PartnerLoadError, with Settings/PartnerPage.tsx's import repointed; an unlinked answer shows only them. The mood card, recent moods, Poke/Kiss/Fart tiles and the mood toast leave the page; their code stays for epic 10. The streak lives in dailyQuestionSlice (session check, field in signedOutState). Registry (epic 6 retrospective item 10): SUBSCRIBED and partner_linked re-read the streak (partner_linked the partner too, as usePartnerLinkListener does); daily_pick re-reads the streak; new_mood and dates_changed do nothing. E2E: partner-mood.spec.ts, partner-kit.spec.ts, interaction-record-ownership.spec.ts, interaction-subscription-warning.spec.ts and interactions-offline-copy.spec.ts, whose subject is a removed part, are deleted; the mood or Poke/Kiss/Fart steps in realtime-recovery-after-renewal.spec.ts, needs-a-connection.spec.ts, partner-offline-copy.spec.ts, mood-offline-copy.spec.ts, dock.spec.ts, settings-navigation-rules.spec.ts and theme-sweep.spec.ts are removed or pointed at the new page; partner-connect.spec.ts runs on the new page. Seen running when done: two linked accounts on a local stack both pick on Daily, and each Partner page shows 1 day answered together, 1 in a row, in orange."
+verify = "Playwright on a local stack: an unlinked account's Partner page searches, requests and links as before; after both partners of a linked pair pick, each Partner page shows 1 day answered together and 1 in a row in orange, with no mood card, recent moods or Poke/Kiss/Fart tiles; Settings' partner page still shows its load error; a unit test per partner event and SUBSCRIBED shows the page re-reading on SUBSCRIBED, partner_linked and daily_pick and doing nothing on new_mood and dates_changed; the slice's streak field clears on sign-out; the full E2E suite passes."
+covers = ["R1", "R2", "R3", "R6"]
+after = [1, "6.6"]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "The streak shows offline from its saved copy"
+description = "Spine AD-13's streak snapshot becomes the localCopy kind daily-streak: an ok answer from get_couple_streak replaces it, an unlinked answer removes it, and a failed read never touches it. Its registerLocalCopy read is stubbed in auth-bootstrap-notification-order.tsx and login.spec.ts. Every screen that shows the slice's streak shows the saved one offline and after a failed read, a failed read never blanks a streak already shown, and with nothing saved and no connection it says the streak needs a connection. Sign-out deletes the kind with the account's other kinds."
+verify = "Playwright on a local stack: a linked account that loaded the Partner page goes offline and still sees its streak after a reload; a failed get_couple_streak keeps the streak shown; unit tests show an ok answer writing the copy, an unlinked one removing it and a failure leaving it."
+covers = ["R6"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Daily shows the streak, the week and a missed day"
+description = "On Daily, from the design's Today's question, Waiting on Jessie, Both answered and After a missed day screens: the streak chip beside the date (held with the plain flame, '{run} in a row' under it; grey, orange, or blue with the snowflake, by today_state), the week strip, the waiting screen's 'Your half is in. The streak lights up when {partner} answers too.', and while blue the missed-day banner 'Your streak went cold' with '{Yesterday was | The last {missed} days were} missed, so it's frozen at {held}. You keep the {held}. Both answer today to light it back up.' The streak is re-read once the own pick is confirmed, a queued pick sent later by story 6.7's drain included, so a late pick's correction shows. Registry (item 10), on useDailyPickListener's existing subscriber: SUBSCRIBED re-reads the day as now, and the streak; partner_linked already re-reads the day (DW-490, PR #490) and now re-reads the streak too; daily_pick re-reads the day as it does now, and the streak; new_mood and dates_changed do nothing. Adds the E2E helper that seeds a pair's past done and missed days, which stories 6, 7 and 8 use; linking in its E2E goes through seedRequest and acceptFromPartnerTab in tests/support/helpers/partner-requests.ts."
+verify = "Playwright on a local stack over seeded days: the chip, week strip and banner on Daily, and the streak card on the Partner page, show grey, orange and blue as today_state says, and the waiting screen shows its sentence; a pick queued offline and sent on reconnect updates the streak; an account whose request is accepted while Daily is open sees the streak without leaving Daily (linked through tests/support/helpers/partner-requests.ts); unit tests show Daily's handling of SUBSCRIBED and each partner event."
+covers = ["R3", "R8"]
+after = [3, "6.7"]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 5
+type = "story"
+title = "The streak's +1 plays once for each new day"
+description = "Spine AD-13's device-state kind daily-celebrated { held, milestones }, written only by the animation; a first read with nothing stored seeds it from the current streak without playing. Story 6 reads and writes its milestones. The localCopy.ts header exempts it from the server-fill rule in the same change, and sign-out deletes it. The design's Streak goes up by one screen (the flame lighting from grey, held rolling up with '+1', today filling in the week strip, 'You and {partner} both answered. {run} days in a row!', and 'See {partner}'s pick' opening the reveal) plays whenever Daily is on screen and the streak's held exceeds the stored one: at once after the second pick, and for the first picker on the next open of Daily or when the partner's pick arrives while Daily is open. The Partner page shows the new count without playing it or changing the stored one. Reduce Motion shows the end state without movement. The counter keeps the plain flame."
+verify = "Playwright on a local stack: the second picker sees the +1 at once; the first sees it on the next open of Daily, and in a second run while Daily is open when the partner's pick arrives; each sees it once, with no replay after a reload; opening the Partner page first shows the new count and Daily then still plays it; unit tests show the first read seeding without playing and Reduce Motion showing no movement."
+covers = ["R4"]
+after = [4]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Every 25 days the milestone screen shows its badge"
+description = "When the +1 takes milestones past story 5's stored daily-celebrated.milestones, the design's 25-day milestone screen follows it: the flaming heart with flickering flames and a beating heart; '{held}' over 'days answered together' and 'You and {partner} have answered together on {held} days.' (the mock-up's 'in a row' wording replaced, since milestones count the held total); 'New badge unlocked' with four badges, those reached in full colour and the rest grey, from the block of four holding the newest reached (25 to 100, then 125 to 200); Continue and Close both going on to the reveal. Shown once per milestone per device, as a full-screen overlay clear of all four safe-area insets; Reduce Motion stops the flames and the beat. The flaming heart appears nowhere else. Its E2E seeds days with story 4's helper."
+verify = "Playwright on a local stack with 24 done days seeded through story 4's helper: the 25th day's second pick shows the +1, then the milestone screen with the 25 badge in colour and 50, 75 and 100 grey, and never again after a reload; unit tests show the badge block for 130 days and Reduce Motion stopping the animation."
+covers = ["R5"]
+after = [5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "The Partner page lists past questions marked Same or Different"
+description = "The client RPC get_daily_history(before) (spine AD-15, AD-16: day snapshots of the couple's done days, newest first, 30 to a page before the given day; gate file, FN-GRANT-008, types), whose pages story 8 loads, and the design's Past questions card on the Partner page: the three newest days, each with its question, '{my pick} · {partner's pick}', and Same with a green check or Different, plus See all (story 8). The loaded history lives in dailyQuestionSlice (session check, field in signedOutState). The page's daily_pick and SUBSCRIBED handling from story 2 re-reads the history too; its other events are unchanged. Its E2E seeds days with story 4's helper."
+verify = "supabase test db shows get_daily_history returning done days newest first, 30 to a page, and nothing of today before the reader's own pick; Playwright on a local stack with days seeded through story 4's helper shows the three newest with both picks and Same or Different, and a new day appearing after both pick without a reload; the slice's history field clears on sign-out."
+covers = ["R7"]
+after = [6]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "See all opens every past question with the running count"
+description = "See all opens the design's Past questions page at /partner/history: 'Same pick on {same} of your {done} days' from the streak, then every done day newest first with its date, 'You: {pick}' and '{partner}: {pick}', and Same or Different, loading story 7's get_daily_history pages 30 at a time as the list nears its end. It is a page of the Partner view, not a new view: both URL ternaries in App.tsx open /partner/history as partner; opening it pushes one history entry, so its back arrow and browser back (and with them the shell's edge swipe, which walks the same history) return to Partner; the dock keeps Partner highlighted; a reload stays on it; and on a fresh load its back arrow replaces the entry with Partner, as a Settings page does. It reserves --dock-clearance and pads by --dock-left and --dock-right. Its E2E seeds days with story 4's helper."
+verify = "Playwright on a local stack with 35 done days seeded through story 4's helper: See all shows the count and 30 rows and scrolling loads the other 5; the back arrow and browser back return to Partner; a reload of /partner/history stays on it; Partner stays highlighted in both dock forms."
+covers = ["R7"]
+after = [7]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Past questions show offline"
+description = "History days merge into the daily-days copy through mergeDailyDay (spine AD-13: one map keyed by day_id, never a second copy), so the Past questions card, the See all page and the count show offline. The copy keeps every saved day: MAX_SAVED_DAILY_DAYS and its prune go (owner, 2026-11-07; the 31-day cap was picked in story 6.5 only to show today offline, and a day costs a few hundred bytes). A day from another pairing is never shown, on Daily as well: each saved day records the partner it was read with and only the current partner's are shown, and a server answer for a date drops every other day_id saved for that date. Together these close DW-492, both after a relink and after reset_bot_daily_days. Its relink E2E uses throwaway accounts, never the worker-pool pairs (AGENTS.md)."
+verify = "Playwright on a local stack: a linked account that loaded Past questions goes offline and still sees them and the count after a reload; two throwaway accounts relinked to other partners see neither Daily nor Past questions show the old pair's days; with 35 done days seeded through story 4's helper, offline See all shows all 35 rows under its count; unit tests show a failed read never dropping saved days, no cap on saved days, and a server answer for a date dropping that date's other day_ids."
+covers = ["R7"]
+after = [8]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Refactor sweep"
+description = "Cleanup only, scoped at its start from the review findings and plan notes stories 1 to 9 deferred; scope pushed out of another story becomes a new story. It also checks every review rejection that said a fix needed code the story did not have (a helper, a map, an API) against what later stories of this epic built, and takes it up where that code now exists (epic 6 retrospective item 8)."
+verify = "The deferred items picked at its start, and each rejection whose missing code now exists, are fixed or recorded in deferred-work.md, and the unit, E2E and supabase test db suites pass."
+covers = []
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 11
+type = "story"
+title = "After every deploy, the live check also reads the streak"
+description = "Extends tests/live/daily-question-live.spec.ts (story 6.11): after the reveal, each bot's Partner page shows 1 day answered together and 1 in a row in orange, and today's question in Past questions marked Same or Different, since reset_bot_daily_days leaves the pair only today. The spec keeps its rules: the two bot accounts only, never the Supabase secret key, never the owner's or partner's account. A defect this check finds that predates it gets its own new story rather than a fix inside this one (date-reminders retrospective item 11, carried forward by epic 6 retrospective item 11)."
+verify = "On a fresh local stack the extended spec passes twice in a row; on main, the deploy's Live Daily Check passes with the streak and Past questions assertions."
+covers = ["R6", "R7"]
+after = [10, "6.11"]
+hitl = false
+risk = "medium"
