@@ -28,6 +28,12 @@
  * throwing, as above; a failure or an answer that does not parse is never
  * mapped to `unlinked`.
  *
+ * `fetchDailyHistory` reads the pair's past questions (`get_daily_history`): an
+ * array of day snapshots of the days both partners picked, newest first, at
+ * most 30, all before `before` when given (the next page is the call with the
+ * oldest day in hand). `[]` means nothing to show, unlinked included. Online-only
+ * and throwing, as above.
+ *
  * `announceDailyPick` tells the partner's open Daily that a day changed: a
  * `daily_pick { day_id }` broadcast on their `mood-updates:<uid>` topic, never
  * a choice. It throws when the broadcast fails; the caller decides.
@@ -55,6 +61,7 @@ import {
   CoupleStreakAnswerSchema,
   type DailyDaySnapshot,
   DailyDaySnapshotSchema,
+  DailyHistorySchema,
 } from './validation/dailyQuestionSchemas';
 
 export type { CoupleStreak, CoupleStreakAnswer, DailyChoice, DailyDayAnswer, DailyDaySnapshot };
@@ -64,6 +71,7 @@ const SUBMIT_CONTEXT = 'DailyQuestionApi.submitDailyPick';
 const WRITE_CONTEXT = 'DailyQuestionApi.submitWrittenQuestion';
 const FETCH_BY_ID_CONTEXT = 'DailyQuestionApi.fetchDailyDayById';
 const STREAK_CONTEXT = 'DailyQuestionApi.fetchCoupleStreak';
+const HISTORY_CONTEXT = 'DailyQuestionApi.fetchDailyHistory';
 
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
 const PICK_DATE_MISMATCH = 'DQ001';
@@ -174,6 +182,29 @@ export async function fetchCoupleStreak(): Promise<CoupleStreakAnswer> {
     return parsed.data;
   } catch (error) {
     throw toAccountDataError(STREAK_CONTEXT, error);
+  }
+}
+
+/**
+ * The days of the caller's pair that both partners picked, newest first, at most
+ * 30, before `before` (a `YYYY-MM-DD` date) when given. Throws on any failure.
+ */
+export async function fetchDailyHistory(before?: string): Promise<DailyDaySnapshot[]> {
+  refuseOffline('Past questions', 'load');
+  try {
+    const call =
+      before === undefined ? supabase.rpc('get_daily_history') : supabase.rpc('get_daily_history', { before });
+    const { data, error } = await call.abortSignal(requestTimeout());
+    if (error) throw error;
+    const parsed = DailyHistorySchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AccountDataError('invalid-response', 'The past questions answer was not understood.', {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  } catch (error) {
+    throw toAccountDataError(HISTORY_CONTEXT, error);
   }
 }
 

@@ -29,6 +29,7 @@ import { navigateTo } from '../../support/helpers/navigation';
 import {
   COUPLE_STREAK_READ,
   DAILY_DAY_READ,
+  DAILY_HISTORY_READ,
   DAILY_PICK_SEND,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
@@ -165,10 +166,19 @@ async function openStubbedPartner(
     timeout: 15000,
   });
 
+  // The past questions are read with the streak; none here.
+  const history = fulfillOn({
+    page,
+    method: 'POST',
+    url: DAILY_HISTORY_READ,
+    fulfillResponse: { status: 200, body: [] },
+    timeout: 15000,
+  });
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme });
   await page.goto('/partner');
-  await Promise.all([partnerLink, partnerProfile, requests, streak]);
+  await Promise.all([partnerLink, partnerProfile, requests, streak, history]);
 }
 
 test.describe('Partner page streak', () => {

@@ -114,6 +114,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   coupleStreak: null,
   coupleStreakLoading: false,
   coupleStreakError: null,
+  dailyHistory: null,
+  dailyHistoryLoading: false,
+  dailyHistoryError: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -130,6 +133,8 @@ const SECRETS = {
   dailyQuestionThis: 'THE-DAILY-QUESTION-THIS-TEXT',
   dailyQuestionThat: 'THE-DAILY-QUESTION-THAT-TEXT',
   coupleStreakError: 'THE-COUPLE-STREAK-READ-FAILURE',
+  dailyHistoryThis: 'THE-PAST-QUESTION-THIS-TEXT',
+  dailyHistoryError: 'THE-PAST-QUESTIONS-READ-FAILURE',
   userId: 'USER-A-ID',
 };
 
@@ -270,6 +275,18 @@ function seedSignedInSession(): void {
     coupleStreak: { status: 'ok', streak: coupleStreak({ held: 31, run: 4, milestones: 1 }) },
     coupleStreakLoading: true,
     coupleStreakError: SECRETS.coupleStreakError,
+    // The past questions the account was shown, a read in flight and a failed read.
+    dailyHistory: [
+      dailySnapshot({
+        state: 'both',
+        my_choice: 'this',
+        partner_choice: 'that',
+        same: false,
+        question: { this: SECRETS.dailyHistoryThis, that: SECRETS.dailyQuestionThat },
+      }),
+    ],
+    dailyHistoryLoading: true,
+    dailyHistoryError: SECRETS.dailyHistoryError,
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device

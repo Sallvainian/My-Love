@@ -68,6 +68,16 @@
  * it (`void loadCoupleStreak()`) after each pick the server confirmed, once the
  * session is still current; a queued pick and a refused row do not.
  *
+ * The couple's past questions (Partner page) live here as well: `dailyHistory`
+ * holds the first page of `get_daily_history` (the pair's done days as
+ * snapshots, newest first, at most 30; `null` before any answer, `[]` for none
+ * or unlinked), `dailyHistoryLoading` a read in flight and `dailyHistoryError`
+ * the message of the last failed read. `loadDailyHistory` replaces the field
+ * with the first page; it never throws, a failure keeps the rows shown and sets
+ * the error (an offline refusal is not logged), and only the newest started
+ * read writes (its own sequence counter), nothing if the session changed. There
+ * is no local copy. `signedOutState()` clears all three fields.
+ *
  * The streak's +1 (R4) is claimed through `claimStreakCelebration(streak)`: the
  * Daily view calls it for each `ok` streak it shows, and the device-state
  * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
@@ -116,6 +126,7 @@ import {
   fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
+  fetchDailyHistory,
   isPickRefusal,
   pickZone,
   submitDailyPick as submitDailyPickRequest,
@@ -146,7 +157,15 @@ export interface DailyQuestionSlice {
   coupleStreakLoading: boolean;
   /** The message of the last failed streak read; cleared by the next answer. */
   coupleStreakError: string | null;
+  /** The first page of the pair's past questions, newest first, or `null` before any answer. */
+  dailyHistory: DailyDaySnapshot[] | null;
+  /** A `loadDailyHistory` request is in flight. */
+  dailyHistoryLoading: boolean;
+  /** The message of the last failed history read; cleared by the next answer. */
+  dailyHistoryError: string | null;
 
+  /** Read the first page of past questions, replacing the field. Never throws; a failure keeps what is shown. */
+  loadDailyHistory: () => Promise<void>;
   /** Read the couple's streak from the server. Never throws; a failure keeps what is shown. */
   loadCoupleStreak: () => Promise<void>;
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
@@ -263,6 +282,8 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
 
   // The newest started `loadCoupleStreak`: an older read that lands later writes nothing.
   let streakSeq = 0;
+  // The newest started `loadDailyHistory`, the same way.
+  let historySeq = 0;
 
   // The tab's running drain, and whether a call arrived while it ran.
   let drainInFlight: Promise<void> | null = null;
@@ -383,6 +404,37 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     coupleStreak: null,
     coupleStreakLoading: false,
     coupleStreakError: null,
+    dailyHistory: null,
+    dailyHistoryLoading: false,
+    dailyHistoryError: null,
+
+    loadDailyHistory: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const mine = ++historySeq;
+      const isCurrent = () =>
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        historySeq === mine;
+
+      set({ dailyHistoryLoading: true });
+      try {
+        const days = await fetchDailyHistory();
+        if (!isCurrent()) return;
+        set({ dailyHistory: days, dailyHistoryLoading: false, dailyHistoryError: null });
+      } catch (error) {
+        if (!isCurrent()) return;
+        // An offline refusal is expected, not a fault: the error is still set.
+        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+          console.error('[DailyQuestion] Failed to load the past questions:', error);
+        }
+        set({
+          dailyHistoryLoading: false,
+          dailyHistoryError:
+            error instanceof Error ? error.message : 'Could not load your past questions.',
+        });
+      }
+    },
 
     loadCoupleStreak: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();

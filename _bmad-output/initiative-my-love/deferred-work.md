@@ -4331,3 +4331,11 @@ source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-
 severity: low
 reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it.
 status: open
+
+### DW-510: After an in-session unlink and relink to a different partner, the Partner page shows the previous pair's past questions under the new partner's name until the new history read lands, or indefinitely
+origin: spec-deferred 744eb5a8fd58
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-lists-past-questions-marked-same-or-differe-plan.md`
+severity: low
+reason: dailyQuestionSlice.dailyHistory is cleared only by signedOutState(); partner_linked does not touch it (usePartnerStreakListener.ts), and PartnerView renders it as soon as `partner` is set. Rare: the app has no unlink action (src/components/Settings/PartnerPage.tsx l.13-14), so the unlink is server-side and the relink must happen in the same session. Fix: reset or key the history on the partner id when it changes; story 9 (saved days record the partner they were read with) is the natural home.
+status: open

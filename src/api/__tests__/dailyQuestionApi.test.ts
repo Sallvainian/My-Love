@@ -41,6 +41,7 @@ import {
   fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
+  fetchDailyHistory,
   isPickRefusal,
   pickZone,
   submitDailyPick,
@@ -205,6 +206,66 @@ describe('fetchCoupleStreak', () => {
     await expect(fetchCoupleStreak()).rejects.toMatchObject({
       code: 'offline',
       message: 'You are offline. The streak needs a connection to load.',
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchDailyHistory', () => {
+  it('calls get_daily_history with no arguments by default and bounds the request', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await fetchDailyHistory();
+
+    expect(rpc).toHaveBeenCalledWith('get_daily_history');
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('sends before only when given', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await fetchDailyHistory('2030-01-06');
+
+    expect(rpc).toHaveBeenCalledWith('get_daily_history', { before: '2030-01-06' });
+  });
+
+  it('returns the parsed snapshots in the order sent', async () => {
+    const newest = dailySnapshot({ day_id: 'day-2', day: '2026-11-05' });
+    const older = dailySnapshot({ day_id: 'day-1', day: '2026-11-04' });
+    rpc.mockResolvedValue({ data: [newest, older], error: null });
+
+    await expect(fetchDailyHistory()).resolves.toEqual([newest, older]);
+  });
+
+  it('returns an empty array as nothing to show', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await expect(fetchDailyHistory()).resolves.toEqual([]);
+  });
+
+  it('throws on a PostgREST error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom', code: 'XX000', details: '', hint: '' } });
+
+    await expect(fetchDailyHistory()).rejects.toBeInstanceOf(AccountDataError);
+  });
+
+  it.each([
+    ['null', null],
+    ['an object', { status: 'unlinked' }],
+    ['an entry that is not a snapshot', [{ day: '2026-11-05' }]],
+    ['an entry with an unknown state', [{ ...dailySnapshot(), state: 'x' }]],
+  ])('throws invalid-response on %s', async (_label, data) => {
+    rpc.mockResolvedValue({ data, error: null });
+
+    await expect(fetchDailyHistory()).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('refuses offline before any request', async () => {
+    setOnline(false);
+
+    await expect(fetchDailyHistory()).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. Past questions needs a connection to load.',
     });
     expect(rpc).not.toHaveBeenCalled();
   });

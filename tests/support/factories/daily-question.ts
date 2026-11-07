@@ -184,6 +184,38 @@ export async function readPairQuestionTexts(
   });
 }
 
+/** One of the pair's days as stored: its date and its question's two options. */
+export interface PairQuestionByDay {
+  day: string;
+  this: string;
+  that: string;
+}
+
+/** This worker pair's days newest first, each with its date and question (`day` is `YYYY-MM-DD`). */
+export async function readPairQuestionsByDay(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: WorkerPairIds
+): Promise<PairQuestionByDay[]> {
+  const [userA, userB] = orderedPair(pair);
+
+  const { data, error } = await supabaseAdmin
+    .from('couple_days')
+    .select('day, daily_questions!couple_days_question_id_fkey(this_text, that_text)')
+    .eq('user_a', userA)
+    .eq('user_b', userB)
+    .order('day', { ascending: false });
+
+  if (error) {
+    throw new Error(`readPairQuestionsByDay: failed to read the pair's days: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => {
+    const question = row.daily_questions;
+    if (!question) throw new Error('readPairQuestionsByDay: a day has no question row');
+    return { day: row.day, this: question.this_text, that: question.that_text };
+  });
+}
+
 /** The pair in `couple_days` order: `user_a < user_b`. */
 function orderedPair(pair: WorkerPairIds): [string, string] {
   return pair.userId < pair.partnerId ? [pair.userId, pair.partnerId] : [pair.partnerId, pair.userId];

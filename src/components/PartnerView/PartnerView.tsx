@@ -7,13 +7,16 @@
  *     `PartnerLoadError`, never the Connect UI;
  *   - no partner, nothing failed: `PartnerConnect` alone (search, requests,
  *     linking), whatever the slice holds for the streak;
- *   - a partner: their name, then the streak card.
+ *   - a partner: their name, then the streak card, then (when the history holds
+ *     a day both partners picked) the Past questions card.
  *
  * The streak is read when a partner is present (keyed on the partner's id) and
  * kept current by `usePartnerStreakListener`. The slice shows the saved
  * `daily-streak` copy first, so the card stays up offline and after a failed
  * read, and its local-copy refresher reads the streak again on signed-in start
- * and on `online`. The old mood view
+ * and on `online`. The past questions are read in the same effect, so on the
+ * same keys, and have no saved copy: the card shows what the last successful
+ * read held and hides when it holds nothing. The old mood view
  * (`PartnerMoodView`) is no longer routed; its code stays for epic 10.
  *
  * @component
@@ -25,6 +28,7 @@ import { usePartnerStreakListener } from '../../hooks/usePartnerStreakListener';
 import { useAppStore } from '../../stores/useAppStore';
 import { PartnerConnect } from './PartnerConnect';
 import { PartnerLoadError } from './PartnerLoadError';
+import { PastQuestionsCard } from './PastQuestionsCard';
 import { StreakCard } from './StreakCard';
 
 export function PartnerView() {
@@ -38,6 +42,8 @@ export function PartnerView() {
   const coupleStreakLoading = useAppStore((state) => state.coupleStreakLoading);
   const coupleStreakError = useAppStore((state) => state.coupleStreakError);
   const loadCoupleStreak = useAppStore((state) => state.loadCoupleStreak);
+  const dailyHistory = useAppStore((state) => state.dailyHistory);
+  const loadDailyHistory = useAppStore((state) => state.loadDailyHistory);
 
   usePartnerStreakListener();
 
@@ -57,14 +63,19 @@ export function PartnerView() {
     }
   }, [isOnline, loadPendingRequests]);
 
-  // The streak is read once a partner is present, and again for a new partner.
-  // loadCoupleStreak shows the saved `daily-streak` copy first; offline the
-  // read refuses and what is shown (the copy, if any) stays. It is read offline
-  // too (not gated), and again when the device comes back online.
+  // The streak and the past questions are read once a partner is present, and
+  // again for a new partner. loadCoupleStreak shows the saved `daily-streak`
+  // copy first; offline the read refuses and what is shown (the copy, if any)
+  // stays. They are read offline too (not gated), and again when the device
+  // comes back online. The history has no copy, so offline it shows only what
+  // an earlier read in this session left.
   const partnerId = partner?.id ?? null;
   useEffect(() => {
-    if (partnerId) void loadCoupleStreak();
-  }, [partnerId, isOnline, loadCoupleStreak]);
+    if (partnerId) {
+      void loadCoupleStreak();
+      void loadDailyHistory();
+    }
+  }, [partnerId, isOnline, loadCoupleStreak, loadDailyHistory]);
 
   const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
 
@@ -116,6 +127,8 @@ export function PartnerView() {
                 {coupleStreakError}
               </div>
             ) : null}
+
+            {dailyHistory && dailyHistory.length > 0 && <PastQuestionsCard history={dailyHistory} />}
           </>
         )}
       </div>

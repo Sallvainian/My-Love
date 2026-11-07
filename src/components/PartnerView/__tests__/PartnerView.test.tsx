@@ -5,8 +5,8 @@
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CoupleStreakAnswer } from '../../../api/validation/dailyQuestionSchemas';
-import { coupleStreak } from '../../../../tests/unit/stores/dailyQuestionFixture';
+import type { CoupleStreakAnswer, DailyDaySnapshot } from '../../../api/validation/dailyQuestionSchemas';
+import { coupleStreak, revealSnapshot } from '../../../../tests/unit/stores/dailyQuestionFixture';
 
 vi.mock('../../../hooks/usePartnerStreakListener', () => ({
   usePartnerStreakListener: vi.fn(),
@@ -41,6 +41,10 @@ function makeState(overrides: Record<string, unknown> = {}) {
     coupleStreakLoading: false,
     coupleStreakError: null as string | null,
     loadCoupleStreak: vi.fn(async () => {}),
+    dailyHistory: null as DailyDaySnapshot[] | null,
+    dailyHistoryLoading: false,
+    dailyHistoryError: null as string | null,
+    loadDailyHistory: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -178,6 +182,34 @@ describe('PartnerView', () => {
       expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
     });
 
+    it('reads the past questions with the streak: with a partner, not without, again for a new one', () => {
+      const { rerender } = render(<PartnerView />);
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
+
+      state = { ...state, partner: { ...PARTNER, id: 'partner-2' } };
+      rerender(<PartnerView />);
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(2);
+
+      rerender(<PartnerView />);
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(2);
+
+      cleanup();
+      state = makeState({ partner: null });
+      render(<PartnerView />);
+      expect(state.loadDailyHistory).not.toHaveBeenCalled();
+    });
+
+    it('reads the past questions offline too, and again when the device comes back online', () => {
+      state = makeState({ syncStatus: { isOnline: false } });
+      const { rerender } = render(<PartnerView />);
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
+
+      state = { ...state, syncStatus: { isOnline: true } };
+      rerender(<PartnerView />);
+
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(2);
+    });
+
     it('reads the streak offline too, and again when the device comes back online', () => {
       state = makeState({ syncStatus: { isOnline: false } });
       const { rerender } = render(<PartnerView />);
@@ -187,6 +219,44 @@ describe('PartnerView', () => {
       rerender(<PartnerView />);
 
       expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('the past questions card', () => {
+    const history = [
+      { ...revealSnapshot('this', 'this'), day_id: 'd2', day: '2026-11-05' },
+      { ...revealSnapshot('this', 'that'), day_id: 'd1', day: '2026-11-04' },
+    ];
+
+    it('shows under the streak card when the history holds a day', () => {
+      state = makeState({ coupleStreak: okStreak(), dailyHistory: history });
+      render(<PartnerView />);
+
+      const streak = screen.getByTestId('partner-streak-card');
+      const past = screen.getByTestId('partner-past-questions');
+      expect(streak.compareDocumentPosition(past) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getAllByTestId('partner-past-question')).toHaveLength(2);
+    });
+
+    it.each([[null], [[]]])('is absent when the history is %j', (dailyHistory) => {
+      state = makeState({ coupleStreak: okStreak(), dailyHistory });
+      render(<PartnerView />);
+
+      expect(screen.queryByTestId('partner-past-questions')).not.toBeInTheDocument();
+    });
+
+    it('stays up after a failed refresh', () => {
+      state = makeState({ dailyHistory: history, dailyHistoryError: 'boom' });
+      render(<PartnerView />);
+
+      expect(screen.getByTestId('partner-past-questions')).toBeInTheDocument();
+    });
+
+    it('is absent without a partner, whatever the slice holds', () => {
+      state = makeState({ partner: null, dailyHistory: history });
+      render(<PartnerView />);
+
+      expect(screen.queryByTestId('partner-past-questions')).not.toBeInTheDocument();
     });
   });
 

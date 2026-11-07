@@ -80,3 +80,9 @@ export const CoupleStreakAnswerSchema = z.discriminatedUnion('status', [
 ]);
 
 export type CoupleStreakAnswer = z.infer<typeof CoupleStreakAnswerSchema>;
+
+/**
+ * `get_daily_history`: the pair's done days as day snapshots, newest first, at
+ * most 30 per page. An unlinked caller gets `[]`, not a status.
+ */
+export const DailyHistorySchema = z.array(DailyDaySnapshotSchema);

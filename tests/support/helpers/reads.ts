@@ -118,6 +118,9 @@ export const DAILY_DAY_READ = '**/rest/v1/rpc/get_daily_day';
 /** The couple's streak on the Partner screen (`dailyQuestionApi.fetchCoupleStreak`): the `get_couple_streak` RPC. Observe it with `method: 'POST'`. */
 export const COUPLE_STREAK_READ = '**/rest/v1/rpc/get_couple_streak';
 
+/** The couple's past questions on the Partner screen (`dailyQuestionApi.fetchDailyHistory`): the `get_daily_history` RPC. Observe it with `method: 'POST'`. */
+export const DAILY_HISTORY_READ = '**/rest/v1/rpc/get_daily_history';
+
 /** A pick's send (`dailyQuestionApi.submitDailyPick`): the `submit_daily_pick` RPC. Observe it with `method: 'POST'`. */
 export const DAILY_PICK_SEND = '**/rest/v1/rpc/submit_daily_pick';
 

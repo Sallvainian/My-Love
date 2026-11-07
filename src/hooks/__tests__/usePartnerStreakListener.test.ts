@@ -1,8 +1,10 @@
 /**
  * usePartnerStreakListener — one subscriber on the shared partner channel while
- * the account is signed in and online. A `daily_pick` re-reads the streak; a
- * `partner_linked` re-reads the streak, the partner and the pending requests;
- * every SUBSCRIBED re-reads the streak, because a broadcast is never replayed.
+ * the account is signed in and online. A `daily_pick` re-reads the streak and
+ * the past questions; a `partner_linked` re-reads the streak, the partner and
+ * the pending requests (not the history: a new partner id re-runs the page's
+ * load effect); every SUBSCRIBED re-reads the streak and the past questions,
+ * because a broadcast is never replayed.
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -16,6 +18,7 @@ const state = {
   authSessionVersion: 0,
   syncStatus: { isOnline: true },
   loadCoupleStreak: vi.fn(async () => {}),
+  loadDailyHistory: vi.fn(async () => {}),
   loadPartner: vi.fn(async () => {}),
   loadPendingRequests: vi.fn(async () => {}),
 };
@@ -56,13 +59,14 @@ describe('usePartnerStreakListener', () => {
     expect(handlers.dates_changed).toBeUndefined();
   });
 
-  it('re-reads the streak when a daily_pick arrives', async () => {
+  it('re-reads the streak and the past questions when a daily_pick arrives', async () => {
     renderHook(() => usePartnerStreakListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
 
     act(() => subscribe.mock.calls[0][0].daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
 
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
     expect(state.loadPartner).not.toHaveBeenCalled();
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });
@@ -76,9 +80,10 @@ describe('usePartnerStreakListener', () => {
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
     expect(state.loadPartner).toHaveBeenCalledTimes(1);
     expect(state.loadPendingRequests).toHaveBeenCalledTimes(1);
+    expect(state.loadDailyHistory).not.toHaveBeenCalled();
   });
 
-  it('re-reads the streak on every SUBSCRIBED, and on no other status', async () => {
+  it('re-reads the streak and the past questions on every SUBSCRIBED, and on no other status', async () => {
     renderHook(() => usePartnerStreakListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
     const onStatus = subscribe.mock.calls[0][0].onStatus!;
@@ -86,9 +91,11 @@ describe('usePartnerStreakListener', () => {
     act(() => onStatus('SUBSCRIBED'));
     act(() => onStatus('SUBSCRIBED'));
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(state.loadDailyHistory).toHaveBeenCalledTimes(2);
 
     for (const status of ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED']) act(() => onStatus(status));
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(state.loadDailyHistory).toHaveBeenCalledTimes(2);
     expect(state.loadPartner).not.toHaveBeenCalled();
   });
 
@@ -113,6 +120,7 @@ describe('usePartnerStreakListener', () => {
     act(() => handlers.onStatus!('SUBSCRIBED'));
 
     expect(state.loadCoupleStreak).not.toHaveBeenCalled();
+    expect(state.loadDailyHistory).not.toHaveBeenCalled();
     expect(state.loadPartner).not.toHaveBeenCalled();
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });

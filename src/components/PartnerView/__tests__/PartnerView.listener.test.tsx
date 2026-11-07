@@ -1,7 +1,7 @@
 /**
  * PartnerView with the real usePartnerStreakListener: only the registry's
  * `subscribePartnerEvents` is mocked, and its handlers are captured and fired.
- * SUBSCRIBED, partner_linked and daily_pick re-read; new_mood and dates_changed
+ * SUBSCRIBED, partner_linked and daily_pick re-read (the past questions too, except on partner_linked); new_mood and dates_changed
  * are not this page's events and read nothing extra.
  */
 import { act, cleanup, render, waitFor } from '@testing-library/react';
@@ -42,6 +42,10 @@ function makeState() {
     coupleStreakLoading: false,
     coupleStreakError: null,
     loadCoupleStreak: vi.fn(async () => {}),
+    dailyHistory: null,
+    dailyHistoryLoading: false,
+    dailyHistoryError: null,
+    loadDailyHistory: vi.fn(async () => {}),
   };
 }
 
@@ -54,6 +58,7 @@ async function mount() {
   const handlers = subscribe.mock.calls[0][0];
   // The mount's own reads are not what is being counted.
   state.loadCoupleStreak.mockClear();
+  state.loadDailyHistory.mockClear();
   state.loadPartner.mockClear();
   state.loadPendingRequests.mockClear();
   return handlers;
@@ -67,12 +72,13 @@ describe('PartnerView re-reading through the real listener', () => {
     state = makeState();
   });
 
-  it('SUBSCRIBED re-reads the streak only', async () => {
+  it('SUBSCRIBED re-reads the streak and the past questions only', async () => {
     const handlers = await mount();
 
     act(() => handlers.onStatus!('SUBSCRIBED'));
 
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
     expect(state.loadPartner).not.toHaveBeenCalled();
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });
@@ -85,14 +91,17 @@ describe('PartnerView re-reading through the real listener', () => {
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
     expect(state.loadPartner).toHaveBeenCalledTimes(1);
     expect(state.loadPendingRequests).toHaveBeenCalledTimes(1);
+    // A new partner id re-runs the page's own load effect instead.
+    expect(state.loadDailyHistory).not.toHaveBeenCalled();
   });
 
-  it('daily_pick re-reads the streak only', async () => {
+  it('daily_pick re-reads the streak and the past questions only', async () => {
     const handlers = await mount();
 
     act(() => handlers.daily_pick!({ event: 'daily_pick', day_id: 'DAY-1' }));
 
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
     expect(state.loadPartner).not.toHaveBeenCalled();
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });
@@ -108,6 +117,7 @@ describe('PartnerView re-reading through the real listener', () => {
     expect(handlers.new_mood).toBeUndefined();
     expect(handlers.dates_changed).toBeUndefined();
     expect(state.loadCoupleStreak).not.toHaveBeenCalled();
+    expect(state.loadDailyHistory).not.toHaveBeenCalled();
     expect(state.loadPartner).not.toHaveBeenCalled();
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });

@@ -262,6 +262,10 @@ export function signedOutState() {
     coupleStreak: null,
     coupleStreakLoading: false,
     coupleStreakError: null,
+    // The past questions the outgoing account was shown, and their read state.
+    dailyHistory: null,
+    dailyHistoryLoading: false,
+    dailyHistoryError: null,
 
     // navigationSlice — not account state, but a page pushed in the outgoing
     // session is not one the next sign-in just opened: left set, that page
