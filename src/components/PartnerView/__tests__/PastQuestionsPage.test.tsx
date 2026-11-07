@@ -411,6 +411,51 @@ describe('PastQuestionsPage', () => {
       expect(observers[0].disconnect).toHaveBeenCalled();
     });
 
+    it('watches again once a first-page refresh settles with the same rows, so a sentinel in view loads the next page', () => {
+      const props = {
+        partnerName: 'Jessie',
+        history: [day('d1', 'this', 'this')],
+        streak: coupleStreak({ same: 9, done: 13 }),
+      };
+      const { rerender } = renderPage();
+      expect(observers).toHaveLength(1);
+
+      state.dailyHistoryLoading = true;
+      rerender(<PastQuestionsPage {...props} />);
+      expect(observers[0].disconnect).toHaveBeenCalled();
+      expect(observers).toHaveLength(1);
+
+      state.dailyHistoryLoading = false;
+      rerender(<PastQuestionsPage {...props} />);
+      expect(observers).toHaveLength(2);
+
+      intersect(true);
+      expect(state.loadMoreDailyHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not watch while a first page has failed, and watches again once it is read', () => {
+      const props = {
+        partnerName: 'Jessie',
+        history: [day('d1', 'this', 'this')],
+        streak: coupleStreak({ same: 9, done: 13 }),
+      };
+      state.dailyHistoryError = 'Could not load your past questions.';
+      const { rerender } = renderPage();
+      expect(observers).toHaveLength(0);
+
+      state.dailyHistoryError = null;
+      rerender(<PastQuestionsPage {...props} />);
+      expect(observers).toHaveLength(1);
+    });
+
+    it('still watches after a failed load-more, which the next page answers', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryErrorMore = true;
+      renderPage();
+
+      expect(observers).toHaveLength(1);
+    });
+
     it('does not watch at the end of the history', () => {
       state.dailyHistoryEnd = true;
       renderPage();

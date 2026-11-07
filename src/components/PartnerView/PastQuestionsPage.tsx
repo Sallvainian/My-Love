@@ -78,12 +78,17 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
   }, []);
 
   // Re-observed whenever the rows change (a sentinel still in view after a page
-  // landed reports again and loads the next one) and when the device comes back
-  // online (a "more" that failed offline is tried again).
+  // landed reports again and loads the next one), when the device comes back
+  // online (a "more" that failed offline is tried again) and when a first-page
+  // read settles, even one that added no row. Nothing is observed while that
+  // read runs or while it has failed: an older page cannot answer a failed
+  // first page, whose Retry is the way on.
   const rowCount = days.length;
+  const firstPageFailed = dailyHistoryError !== null && !dailyHistoryErrorMore;
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel || dailyHistoryEnd || typeof IntersectionObserver === 'undefined') return;
+    if (dailyHistoryLoading || firstPageFailed) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void loadMoreDailyHistory();
@@ -92,7 +97,7 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [rowCount, dailyHistoryEnd, isOnline, loadMoreDailyHistory]);
+  }, [rowCount, dailyHistoryEnd, isOnline, dailyHistoryLoading, firstPageFailed, loadMoreDailyHistory]);
 
   const goBack = () => {
     if (window.history.state?.inApp === true) {
