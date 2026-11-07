@@ -400,6 +400,58 @@ describe('loadMoreDailyHistory', () => {
     expect(state().dailyHistoryLoadingMore).toBe(false);
   });
 
+  it('a successful load-more clears a failed load-more\'s error', async () => {
+    useAppStore.setState({
+      dailyHistory: full(),
+      dailyHistoryError: 'boom',
+      dailyHistoryErrorMore: true,
+    });
+    fetchDailyHistory.mockResolvedValue(older(5));
+
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistoryError).toBeNull();
+    expect(state().dailyHistoryErrorMore).toBe(false);
+  });
+
+  it('a successful load-more keeps a failed first page\'s error, which only a first-page read clears', async () => {
+    useAppStore.setState({
+      dailyHistory: full(),
+      dailyHistoryError: 'boom',
+      dailyHistoryErrorOffline: false,
+      dailyHistoryErrorMore: false,
+    });
+    fetchDailyHistory.mockResolvedValue(older(5));
+
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistory).toEqual([...full(), ...older(5)]);
+    expect(state().dailyHistoryError).toBe('boom');
+    expect(state().dailyHistoryErrorMore).toBe(false);
+  });
+
+  it('a failed load-more keeps a failed first page\'s error, so a later load-more cannot clear it', async () => {
+    useAppStore.setState({
+      dailyHistory: full(),
+      dailyHistoryError: 'first page failed',
+      dailyHistoryErrorOffline: false,
+      dailyHistoryErrorMore: false,
+    });
+    fetchDailyHistory.mockRejectedValueOnce(new AccountDataError('transport', 'more failed'));
+
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistoryError).toBe('first page failed');
+    expect(state().dailyHistoryErrorMore).toBe(false);
+    expect(state().dailyHistoryLoadingMore).toBe(false);
+
+    fetchDailyHistory.mockResolvedValueOnce(older(5));
+    await state().loadMoreDailyHistory();
+
+    expect(state().dailyHistoryError).toBe('first page failed');
+    expect(state().dailyHistoryErrorMore).toBe(false);
+  });
+
   it('a full page leaves the end open', async () => {
     useAppStore.setState({ dailyHistory: run(30, 31) });
     fetchDailyHistory.mockResolvedValue(older(30));

@@ -637,9 +637,11 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           dailyHistory: [...rows, ...days.filter((row) => !present.has(row.day_id))],
           dailyHistoryEnd: days.length < DAILY_HISTORY_PAGE_SIZE,
           dailyHistoryLoadingMore: false,
-          dailyHistoryError: null,
-          dailyHistoryErrorOffline: false,
-          dailyHistoryErrorMore: false,
+          // An older page answers only a failed "more": a failed first page
+          // stays failed (and its Retry stays) until the first page is read.
+          ...(get().dailyHistoryErrorMore
+            ? { dailyHistoryError: null, dailyHistoryErrorOffline: false, dailyHistoryErrorMore: false }
+            : {}),
         });
         if (days.length === 0) return;
         const partnerId = await mergePartnerId(requestedBy);
@@ -649,6 +651,12 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         if (!inSession()) return;
         if (!(error instanceof AccountDataError && error.code === 'offline')) {
           console.error('[DailyQuestion] Failed to load more past questions:', error);
+        }
+        // A failed first page still pending outranks this: it keeps the error
+        // (and its Retry) until a first-page read answers.
+        if (get().dailyHistoryError !== null && !get().dailyHistoryErrorMore) {
+          set({ dailyHistoryLoadingMore: false });
+          return;
         }
         set({
           dailyHistoryLoadingMore: false,
