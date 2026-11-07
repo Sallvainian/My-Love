@@ -5,6 +5,7 @@
     "scripts/provision-push-fixtures.mjs",
     "scripts/sim-driver/dates.ts",
     "scripts/sim-driver/provision.ts",
+    "tests/live/*.spec.ts",
     "tests/support/harnesses/*.{ts,tsx}"
   ],
   "ignore": [

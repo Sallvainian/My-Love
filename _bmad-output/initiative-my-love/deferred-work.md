@@ -4151,3 +4151,19 @@ source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-da
 severity: low
 reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined.
 status: open
+
+### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
+origin: spec-deferred b8c1506b047a
+location: tests/live/daily-question-live.spec.ts:313
+source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
+severity: medium
+reason: Before this change nothing checked Daily on the live site; this change adds the hidden-pick and reveal checks but each page reads its state after `pageB.reload()` / `pageA.reload()` (tests/live/daily-question-live.spec.ts), so a hosted Realtime or broadcast-authorization break is not caught. tests/e2e/daily/daily-question-live-pick.spec.ts checks the no-reload update locally only. A no-reload step needs the channel-joined wait that spec uses (the `SUBSCRIBED` log), which is more than a trivial addition.
+status: open
+
+### DW-489: Through the mise shims, a local Playwright run aimed at any stack but the default one reaches the default (shared) stack anyway, so a local run of the live spec on an isolated stack signs the bots up
+origin: spec-deferred 6aa6294b27c9
+location: playwright.config.ts:40
+source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
+severity: medium
+reason: Reproduced on 2026-11-07 in story 6.11's follow-up review. `npx` is a mise shim that puts the pinned `supabase` first on PATH, so `supabase status -o env` in playwright.config.ts succeeds against the default project and force-sets VITE_SUPABASE_URL to it, overriding the caller's value (a stub `supabase` placed first on PATH did not help). Separately, `npx vite --mode test` through the shim receives fnox's hosted VITE_* values, which vite.config.ts's local-supabase-in-test-mode plugin deletes, so the app falls back to .env.test, which is the default stack, while the spec's own API clients use the caller's stack. Running node and npx from the node install directory (not the shims) kept both on the isolated stack. The plan's earlier note blamed a different `supabase` that fails; the observed cause is the pinned one succeeding. The live spec's localhost guard cannot tell one local stack from another.
+status: open

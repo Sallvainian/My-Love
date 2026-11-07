@@ -12,13 +12,18 @@
 //     trigger seeds that name only on insert.
 //   * Links the pair with two service-role updates of public.users.partner_id,
 //     as linkUserPair in tests/support/auth/global-setup.ts does.
-//   * Sets claude-bot-partner@test.example.com's password to the same value, so
-//     the checks can send notes from the website as Claude Partner.
+//   * Sets claude-bot-partner@test.example.com's password to its own value,
+//     CLAUDE_BOT_PARTNER_PASSWORD, so the checks can send notes from the
+//     website as Claude Partner. It is not the fixture pair's password: the
+//     live Daily check in deploy.yml signs in as Claude Partner, so that
+//     password is a GitHub secret, and a shared one would let whoever holds
+//     that secret sign in as Riley and Avery too.
 //   * Re-running it changes nothing but the passwords and names it resets; it
 //     never creates a second account for an address.
 //
-// Required: PUSH_FIXTURE_PASSWORD, SUPABASE_URL (or VITE_SUPABASE_URL) and
-// SUPABASE_SERVICE_KEY. Any of them unset or empty exits 1 before a request.
+// Required: PUSH_FIXTURE_PASSWORD, CLAUDE_BOT_PARTNER_PASSWORD, SUPABASE_URL
+// (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_KEY. Any of them unset or empty
+// exits 1 before a request.
 // A non-2xx answer exits 1 naming the step and its HTTP status.
 //
 // This script never prints a password or key: output is limited to step names,
@@ -47,13 +52,15 @@ export class StepError extends Error {
 
 export function readConfig(env) {
   const password = env.PUSH_FIXTURE_PASSWORD || '';
+  const partnerPassword = env.CLAUDE_BOT_PARTNER_PASSWORD || '';
   const url = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
   const serviceKey = env.SUPABASE_SERVICE_KEY || '';
   const missing = [];
   if (!password) missing.push('PUSH_FIXTURE_PASSWORD');
+  if (!partnerPassword) missing.push('CLAUDE_BOT_PARTNER_PASSWORD');
   if (!url) missing.push('SUPABASE_URL (or VITE_SUPABASE_URL)');
   if (!serviceKey) missing.push('SUPABASE_SERVICE_KEY');
-  return { url, serviceKey, password, missing };
+  return { url, serviceKey, password, partnerPassword, missing };
 }
 
 function headers(serviceKey, extra = {}) {
@@ -170,7 +177,7 @@ export async function provisionPushFixtures(env, log = console.log) {
     log(`${NAME}: user not found: ${CLAUDE_PARTNER_EMAIL}`);
     return 1;
   }
-  const status = await updateUser(config, claudePartner.id, { password: config.password }, 'partner-password');
+  const status = await updateUser(config, claudePartner.id, { password: config.partnerPassword }, 'partner-password');
   log(`${NAME}: ${CLAUDE_PARTNER_EMAIL} password set (${claudePartner.id}, HTTP ${status})`);
   return 0;
 }

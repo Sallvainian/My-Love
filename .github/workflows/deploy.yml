@@ -15,6 +15,7 @@ on:
       - 'tests/**'
       - '**/*.md'
       - 'playwright.config.ts'
+      - 'playwright.live.config.ts'
       - 'vitest.config.ts'
       - 'tsconfig.test.json'
       - 'tsconfig.tsr.json'
@@ -375,3 +376,56 @@ jobs:
           echo "Deployment URL: ${{ vars.SITE_URL }}"
           echo "Status: Healthy"
           echo ""
+
+  # Daily on the real site, after every deploy. health-check proves the site
+  # answers; this proves the hidden-pick gate and the reveal (R1, R2) work in
+  # production, with two real sign-ins and a real second pick. It signs in only
+  # the two claude bot accounts and clears only their pair's days through the
+  # reset_bot_daily_days() RPC, so it needs no Supabase secret (service-role)
+  # key and never gets one. It runs npm code, so it has no environment and
+  # reads no deploy credential. Its secrets: the two the build already uses,
+  # plus the two bot passwords. On failure it uploads screenshots and videos
+  # only: this repo is public, so every artifact is downloadable by anyone, and
+  # a trace or the HTML report records the passwords typed into the login form
+  # and the token requests. The config turns traces off for the same reason.
+  live-daily-check:
+    name: Live Daily Check
+    runs-on: ubuntu-latest
+    needs: health-check
+    # The workflow's concurrency group queues the next deploy behind this job,
+    # so a hang must not hold it for GitHub's six-hour default.
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Check Daily on the live site
+        run: npx playwright test --config=playwright.live.config.ts
+        env:
+          LIVE_BASE_URL: ${{ vars.SITE_URL }}
+          LIVE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          LIVE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY }}
+          CLAUDE_BOT_PASSWORD: ${{ secrets.CLAUDE_BOT_PASSWORD }}
+          CLAUDE_BOT_PARTNER_PASSWORD: ${{ secrets.CLAUDE_BOT_PARTNER_PASSWORD }}
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-daily-check-report
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+          retention-days: 7
