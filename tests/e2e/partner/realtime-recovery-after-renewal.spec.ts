@@ -12,12 +12,6 @@
  * token renews (`TOKEN_REFRESHED`, about 85-115 s after load) and the live
  * feeds have to recover without a reload:
  *
- *  - pokes (`interactionService` + `interactionsSlice`): the public channel
- *    never fires a second SUBSCRIBED after the token swap, so the partner
- *    snapshot stayed null and every live poke was refused as "from no partner".
- *    The poke is sent only once the server has confirmed row delivery to the
- *    renewed identity and the history re-read that confirmation starts has
- *    settled, so the badge can only come from the live row;
  *  - love notes (`useRealtimeMessages`): the feed gives up while the token is
  *    stale and is re-armed by the renewal;
  *  - a partner's daily pick on the Daily screen (`useDailyPickListener` over
@@ -29,21 +23,16 @@
  *    reload and no new `get_daily_day` read, only the `get_daily_day_by_id`
  *    re-read the `daily_pick` broadcast asks for.
  *
- * The poke screen only mounts its tiles once it knows the partner, which a
- * cold stale boot never does, so that context saves the partner local copy on
- * a valid session first and is then expired and reloaded.
- *
- * Three receiving contexts, one per screen, each signed in as the worker's
+ * Two receiving contexts, one per screen, each signed in as the worker's
  * user from a fresh `signInWithPassword` session. The worker's shared storage
  * state is deliberately not reused: a refresh rotates its refresh token and can
  * revoke the session family other specs in the worker rely on. Each context
- * gets its own session, so the three refreshes cannot rotate one another's
+ * gets its own session, so the two refreshes cannot rotate one another's
  * token either. The server sessions are left to expire; a sign-out would
  * default to the global scope and revoke the worker's shared one.
  *
  * The sender is the worker's partner, from the ordinary partner storage state,
- * through the real UI for the daily pick and the note; the poke is an admin
- * insert, as in `interactions-offline-copy.spec.ts`.
+ * through the real UI for the daily pick and the note.
  *
  * Nothing here links, unlinks or resets an account. Teardown deletes only the
  * rows carrying this test's own text or id, and clears the pair's days, which a
@@ -59,19 +48,16 @@ import { test, expect } from '../../support/merged-fixtures';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
-import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 import { clearPairDays } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { DAILY_DAY_BY_ID_READ, DAILY_DAY_READ, DAILY_PICK_SEND } from '../../support/helpers/reads';
-import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { recurseUntil } from '../../support/helpers/recurse';
 import {
   MOOD_SUBSCRIBED_LOG,
   type ReadTracker,
   trackReads,
 } from '../../support/helpers/request-tracker';
-import { deleteRowById } from '../../support/helpers/teardown';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 
 /** The SDK's token refresh, the only request the test cuts off. */
@@ -84,9 +70,6 @@ const isRefreshResponse = (response: Response) =>
 
 /** `sessionService.ts`: the app gave up waiting and uses the stored session. */
 const STORED_SESSION_WARNING = 'INITIAL_SESSION carried no session; using the stored one';
-
-/** `interactionService`: the server confirmed the poke channel's row delivery. */
-const POKES_ARMED_LOG = /\[InteractionService\] postgres_changes subscription confirmed/;
 
 /** `useRealtimeMessages` reporting a join, as the sibling realtime specs read it. */
 const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
@@ -134,10 +117,6 @@ type ReceivingPage = {
 
 const storageKey = () =>
   `sb-${new URL(process.env.SUPABASE_URL!).hostname.split('.')[0]}-auth-token`;
-
-/** The partner the poke screen checks incoming rows against (`interactionPartnerId`). */
-const partnerSnapshot = (page: Page) =>
-  page.evaluate(() => window.__APP_STORE__?.getState().interactionPartnerId ?? null);
 
 const pastExpiry = () => Math.floor(Date.now() / 1000) - EXPIRED_BY_SECONDS;
 
@@ -210,57 +189,13 @@ async function bootExpired(
   return receiving;
 }
 
-/**
- * The partner screen only mounts the poke tiles once it knows the partner, and
- * a cold boot that cannot read the server never does: it shows "Couldn't load
- * your partner". The partner is kept as a local copy, so this context first
- * opens the screen on a valid session to save it, then expires the stored
- * session, cuts the refresh off and reloads: the app boots with the partner
- * from its copy and a session it cannot use.
- */
-async function bootExpiredWithSavedPartner(
-  browser: Browser,
-  cleanup: Cleanup,
-  baseURL: string,
-  email: string,
-  path: string,
-  trackedTable: string
-): Promise<ReceivingPage> {
-  const context = await newReceivingContext(browser, baseURL, email, null);
-  cleanup.defer('close a receiving context', () => closeContext(context));
-  const page = await context.newPage();
-  await dismissWelcomeSplash(page);
-  // Before the first load and the reload after it, so no read goes unseen.
-  const reads = trackReads(page, trackedTable);
-  await page.goto(path);
-  await expect(page.getByTestId('poke-kiss-interface')).toBeVisible();
-  await recurseUntil(
-    () => savedLocalCopy<{ status: string }>(page, 'partner'),
-    (copy) => {
-      expect(copy?.status, 'the partner local copy is saved').toBe('linked');
-    }
-  );
-
-  await context.route(REFRESH_ROUTE, (route) => route.abort());
-  await page.evaluate(
-    ({ key, expiresAt }) => {
-      const stored = JSON.parse(localStorage.getItem(key)!);
-      localStorage.setItem(key, JSON.stringify({ ...stored, expires_at: expiresAt }));
-    },
-    { key: storageKey(), expiresAt: pastExpiry() }
-  );
-  const receiving = receivingPage(context, page, reads);
-  await page.reload();
-  return receiving;
-}
-
 test.describe('Realtime recovery after the token renews', () => {
-  // Boot-to-renewal alone is ~85-115 s, run once for all three contexts
+  // Boot-to-renewal alone is ~85-115 s, run once for both contexts
   // together; the rest are bounded waits on top of it.
   test.describe.configure({ timeout: 300_000 });
 
   test(
-    '[P1] DW-378-E2E-001 a poke, a daily pick and a note arrive live after an expired session renews',
+    '[P1] DW-378-E2E-001 a daily pick and a note arrive live after an expired session renews',
     async ({
       browser,
       baseURL,
@@ -300,8 +235,8 @@ test.describe('Realtime recovery after the token renews', () => {
         }
       });
 
-      await log.step('Boot three receiving contexts on an expired session, refresh cut off');
-      const [daily, partner, notes] = await Promise.all([
+      await log.step('Boot two receiving contexts on an expired session, refresh cut off');
+      const [daily, notes] = await Promise.all([
         bootExpired(
           browser,
           cleanup,
@@ -311,48 +246,17 @@ test.describe('Realtime recovery after the token renews', () => {
           '/rest/v1/rpc/get_daily_day',
           'POST'
         ),
-        bootExpiredWithSavedPartner(
-          browser,
-          cleanup,
-          origin,
-          pair.user1Email,
-          '/partner',
-          '/rest/v1/interactions'
-        ),
         bootExpired(browser, cleanup, origin, pair.user1Email, '/notes', '/rest/v1/love_notes_visible'),
       ]);
-      // Tracked from before each page's load: a poke or a note is only live if
+      // Tracked from before each page's load: a pick or a note is only live if
       // no read of its list delivered it instead.
-      const interactionReads = partner.reads!;
       const noteReads = notes.reads!;
       const dailyReads: ReadTracker = daily.reads!;
 
-      await Promise.all([
-        daily.storedSessionWarning,
-        partner.storedSessionWarning,
-        notes.storedSessionWarning,
-      ]);
-
-      await log.step('The poke screen is up on the saved partner, with no partner snapshot');
-      await expect(partner.page.getByTestId('poke-kiss-interface')).toBeVisible();
-      await expect(partner.page.getByTestId('notification-badge')).toHaveCount(0);
-      // The state the fix is for: every lookup failed, so the snapshot every
-      // incoming poke is checked against is empty.
-      expect(await partnerSnapshot(partner.page)).toBeNull();
+      await Promise.all([daily.storedSessionWarning, notes.storedSessionWarning]);
 
       await log.step('Let the refresh through and wait for each context to renew');
-      const renewals = Promise.all([
-        daily.armRenewal(),
-        partner.armRenewal(),
-        notes.armRenewal(),
-      ]);
-      // The server's confirmation that the poke channel now delivers rows to
-      // the renewed identity: it comes a few seconds after the token, and a row
-      // inserted before it can be missed (`interactionService.ts`).
-      const pokesArmed = partner.page.waitForEvent('console', {
-        predicate: (message) => POKES_ARMED_LOG.test(message.text()),
-        timeout: RENEWAL_TIMEOUT_MS,
-      });
+      const renewals = Promise.all([daily.armRenewal(), notes.armRenewal()]);
       // Armed before the unroute below: the Daily screen subscribed at boot on
       // a token it cannot use, and its channel joins once the renewal lands.
       const dailyJoined = daily.page.waitForEvent('console', {
@@ -365,7 +269,7 @@ test.describe('Realtime recovery after the token renews', () => {
       });
       // Before the renewal the screen has no question: every read failed.
       await expect(daily.page.getByTestId('daily-question')).toHaveCount(0);
-      for (const receiving of [daily, partner, notes]) {
+      for (const receiving of [daily, notes]) {
         await receiving.context.unroute(REFRESH_ROUTE);
       }
       await renewals;
@@ -385,25 +289,6 @@ test.describe('Realtime recovery after the token renews', () => {
         async () => dailyReads.inFlight(),
         (inFlight) => {
           expect(inFlight, 'no get_daily_day read is in flight on the receiver').toBe(0);
-        },
-        { timeout: 15_000 }
-      );
-
-      // The poke screen re-resolves its partner snapshot after the renewal,
-      // and re-reads its history once the channel is armed; the poke is sent
-      // after both, with no read in flight.
-      await expect
-        .poll(() => partnerSnapshot(partner.page), {
-          message: 'the poke screen re-resolves its partner after the renewal',
-          timeout: 60_000,
-        })
-        .toBe(partnerId);
-      await pokesArmed;
-      await recurseUntil(
-        async () => ({ started: interactionReads.started(), inFlight: interactionReads.inFlight() }),
-        ({ started, inFlight }) => {
-          expect(started, 'the armed channel re-read the history').toBeGreaterThan(0);
-          expect(inFlight, 'no interactions read is in flight').toBe(0);
         },
         { timeout: 15_000 }
       );
@@ -477,21 +362,7 @@ test.describe('Realtime recovery after the token renews', () => {
       await sender.getByLabel(/send message/i).click();
       expect((await noteBroadcast).status).toBe(202);
 
-      await log.step('And pokes: an admin insert from the partner, on the poke screen');
-      const readsBeforePoke = interactionReads.started();
-      const { data: poke, error: pokeError } = await supabaseAdmin
-        .from('interactions')
-        .insert(
-          createInteractionInsert({ type: 'poke', from_user_id: partnerId, to_user_id: userId })
-        )
-        .select('id')
-        .single();
-      expect(pokeError).toBeNull();
-      cleanup.defer('delete the poke this test created', () =>
-        deleteRowById(supabaseAdmin, 'interactions', poke!.id)
-      );
-
-      await log.step('All three arrive live, with no reload');
+      await log.step('Both arrive live, with no reload');
       expect((await dayReRead).status).toBe(200);
       await expect(daily.page.getByTestId('daily-partner-status')).toContainText('has picked');
       await expect(daily.page.getByTestId('daily-reveal')).toHaveCount(0);
@@ -504,10 +375,6 @@ test.describe('Realtime recovery after the token renews', () => {
       noteRowCommitted = true;
       expect(noteReads.started(), 'no love-notes read may deliver the note instead').toBe(
         noteReadsBeforeSend
-      );
-      await expect(partner.page.getByTestId('notification-badge')).toBeVisible();
-      expect(interactionReads.started(), 'no interactions read may deliver the poke instead').toBe(
-        readsBeforePoke
       );
     }
   );

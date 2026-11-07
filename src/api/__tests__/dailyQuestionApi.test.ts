@@ -6,7 +6,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setOnline } from '../../../tests/unit/stores/navigatorFixtures';
-import { DAY_ID, dailySnapshot, waitingSnapshot } from '../../../tests/unit/stores/dailyQuestionFixture';
+import {
+  DAY_ID,
+  coupleStreak,
+  dailySnapshot,
+  waitingSnapshot,
+} from '../../../tests/unit/stores/dailyQuestionFixture';
 
 const rpc = vi.fn();
 const abortSignal = vi.fn();
@@ -33,8 +38,10 @@ import { AccountDataError } from '../../services/accountDataError';
 import {
   DAY_CHANGED_MESSAGE,
   announceDailyPick,
+  fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
+  fetchDailyHistory,
   isPickRefusal,
   pickZone,
   submitDailyPick,
@@ -121,6 +128,144 @@ describe('fetchDailyDay', () => {
     await expect(fetchDailyDay()).rejects.toMatchObject({
       code: 'offline',
       message: "You are offline. Today's question needs a connection to load.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchCoupleStreak', () => {
+  it('calls get_couple_streak with no arguments and bounds the request', async () => {
+    rpc.mockResolvedValue({ data: { status: 'unlinked' }, error: null });
+
+    await fetchCoupleStreak();
+
+    expect(rpc).toHaveBeenCalledWith('get_couple_streak');
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('returns an ok answer with its streak', async () => {
+    const streak = coupleStreak({ held: 12, run: 3, today_state: 'blue', missed: 1 });
+    rpc.mockResolvedValue({ data: { status: 'ok', streak }, error: null });
+
+    await expect(fetchCoupleStreak()).resolves.toEqual({ status: 'ok', streak });
+  });
+
+  it('returns an unlinked answer', async () => {
+    rpc.mockResolvedValue({ data: { status: 'unlinked' }, error: null });
+
+    await expect(fetchCoupleStreak()).resolves.toEqual({ status: 'unlinked' });
+  });
+
+  it('throws on a PostgREST error instead of answering unlinked', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom', code: 'XX000', details: '', hint: '' } });
+
+    await expect(fetchCoupleStreak()).rejects.toBeInstanceOf(AccountDataError);
+  });
+
+  it.each([
+    ['null', null],
+    ['an unknown status', { status: 'pending' }],
+    ['an ok answer with no streak', { status: 'ok' }],
+    ['a negative count', { status: 'ok', streak: { ...coupleStreak(), held: -1 } }],
+    ['a fractional count', { status: 'ok', streak: { ...coupleStreak(), run: 1.5 } }],
+    ['an unknown today_state', { status: 'ok', streak: { ...coupleStreak(), today_state: 'red' } }],
+    ['a six-day week', { status: 'ok', streak: { ...coupleStreak(), week: coupleStreak().week.slice(1) } }],
+    [
+      'a week day that is not a date',
+      {
+        status: 'ok',
+        streak: { ...coupleStreak(), week: coupleStreak().week.map((d) => ({ ...d, day: 'today' })) },
+      },
+    ],
+    [
+      'a week day that is not a real date',
+      {
+        status: 'ok',
+        streak: {
+          ...coupleStreak(),
+          week: coupleStreak().week.map((d) => ({ ...d, day: '2030-13-45' })),
+        },
+      },
+    ],
+    [
+      'a week state that is unknown',
+      {
+        status: 'ok',
+        streak: { ...coupleStreak(), week: coupleStreak().week.map((d) => ({ ...d, state: 'x' })) },
+      },
+    ],
+  ])('throws invalid-response on %s, never unlinked', async (_label, data) => {
+    rpc.mockResolvedValue({ data, error: null });
+
+    await expect(fetchCoupleStreak()).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('refuses offline before any request', async () => {
+    setOnline(false);
+
+    await expect(fetchCoupleStreak()).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. The streak needs a connection to load.',
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchDailyHistory', () => {
+  it('calls get_daily_history with no arguments by default and bounds the request', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await fetchDailyHistory();
+
+    expect(rpc).toHaveBeenCalledWith('get_daily_history');
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('sends before only when given', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await fetchDailyHistory('2030-01-06');
+
+    expect(rpc).toHaveBeenCalledWith('get_daily_history', { before: '2030-01-06' });
+  });
+
+  it('returns the parsed snapshots in the order sent', async () => {
+    const newest = dailySnapshot({ day_id: 'day-2', day: '2026-11-05' });
+    const older = dailySnapshot({ day_id: 'day-1', day: '2026-11-04' });
+    rpc.mockResolvedValue({ data: [newest, older], error: null });
+
+    await expect(fetchDailyHistory()).resolves.toEqual([newest, older]);
+  });
+
+  it('returns an empty array as nothing to show', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+
+    await expect(fetchDailyHistory()).resolves.toEqual([]);
+  });
+
+  it('throws on a PostgREST error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom', code: 'XX000', details: '', hint: '' } });
+
+    await expect(fetchDailyHistory()).rejects.toBeInstanceOf(AccountDataError);
+  });
+
+  it.each([
+    ['null', null],
+    ['an object', { status: 'unlinked' }],
+    ['an entry that is not a snapshot', [{ day: '2026-11-05' }]],
+    ['an entry with an unknown state', [{ ...dailySnapshot(), state: 'x' }]],
+  ])('throws invalid-response on %s', async (_label, data) => {
+    rpc.mockResolvedValue({ data, error: null });
+
+    await expect(fetchDailyHistory()).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('refuses offline before any request', async () => {
+    setOnline(false);
+
+    await expect(fetchDailyHistory()).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. Past questions needs a connection to load.',
     });
     expect(rpc).not.toHaveBeenCalled();
   });

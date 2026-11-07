@@ -9,6 +9,8 @@ import 'fake-indexeddb/auto';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import {
   deleteAccountCopies,
+  deleteLocalCopy,
+  onLocalCopyWritten,
   readLocalCopy,
   refreshLocalCopies,
   refreshLocalCopy,
@@ -100,6 +102,46 @@ describe('localCopy', () => {
 
       await expect(deleteAccountCopies(A)).resolves.toBeUndefined();
       expect(await readLocalCopy(B, 'partner')).toBe('B-PARTNER');
+    });
+  });
+
+  describe('deleteLocalCopy', () => {
+    it("deletes one account's one kind and nothing else", async () => {
+      await writeLocalCopy(A, 'partner', 'A-PARTNER');
+      await writeLocalCopy(A, 'photos', 'A-PHOTOS');
+      await writeLocalCopy(B, 'partner', 'B-PARTNER');
+
+      await deleteLocalCopy(A, 'partner');
+
+      expect(await readLocalCopy(A, 'partner')).toBeNull();
+      expect(await readLocalCopy(A, 'photos')).toBe('A-PHOTOS');
+      expect(await readLocalCopy(B, 'partner')).toBe('B-PARTNER');
+    });
+
+    it('deleting a kind that is not saved is a no-op', async () => {
+      await writeLocalCopy(B, 'partner', 'B-PARTNER');
+
+      await expect(deleteLocalCopy(A, 'partner')).resolves.toBeUndefined();
+      expect(await readLocalCopy(B, 'partner')).toBe('B-PARTNER');
+    });
+
+    it('does not call the write listeners', async () => {
+      await writeLocalCopy(A, 'partner', 'A-PARTNER');
+      const listener = vi.fn();
+      const stop = onLocalCopyWritten(listener);
+
+      await deleteLocalCopy(A, 'partner');
+      stop();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('throws when the storage fails', async () => {
+      vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(() => {
+        throw new Error('DELETE-FAILED');
+      });
+
+      await expect(deleteLocalCopy(A, 'partner')).rejects.toThrow('DELETE-FAILED');
     });
   });
 

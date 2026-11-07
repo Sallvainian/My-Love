@@ -31,6 +31,7 @@ function renderNavigation(
   overrides: {
     currentView?: ViewType;
     settingsFromHome?: boolean;
+    hasOwnBar?: boolean;
     badgeCounts?: Partial<Record<ViewType, number>>;
   } = {}
 ) {
@@ -40,6 +41,7 @@ function renderNavigation(
       currentView={overrides.currentView ?? 'home'}
       onViewChange={onViewChange}
       settingsFromHome={overrides.settingsFromHome}
+      hasOwnBar={overrides.hasOwnBar}
       badgeCounts={overrides.badgeCounts}
     />
   );
@@ -150,6 +152,21 @@ describe('AppNavigation', () => {
 
       expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
+    });
+
+    it('hides the header for a page with its own bar, and keeps Partner lit', () => {
+      isNativePlatform.mockReturnValue(true);
+      renderNavigation({ currentView: 'partner', hasOwnBar: true });
+
+      expect(screen.queryByTestId('app-header')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('nav-partner')).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('shows the header when the page has no bar of its own', () => {
+      renderNavigation({ currentView: 'partner' });
+
+      expect(screen.getByTestId('app-header')).toBeInTheDocument();
     });
 
     it('leaves the dock and its five destinations as they are', () => {

@@ -58,9 +58,6 @@ export const CUSTOM_MESSAGE_SAVE = '**/rest/v1/custom_messages*';
  * reads are {@link UPCOMING_EVENTS_READ} and {@link PAST_EVENTS_READ}. */
 export const EVENTS_WRITE = '**/rest/v1/events*';
 
-/** The interactions history (`interactionService`). */
-export const INTERACTIONS_READ = '**/rest/v1/interactions?*';
-
 /** The couple's settings row (`coupleSettingsService`). */
 export const COUPLE_SETTINGS_READ = '**/rest/v1/couple_settings*';
 
@@ -108,12 +105,6 @@ export function ownMoodHistoryRead(userId: string): string {
   return `**/rest/v1/moods?*user_id=eq.${userId}*limit=500*`;
 }
 
-/** The partner's mood list on the Partner screen (`fetchPartnerMoods`, 30
- * rows). */
-export function partnerMoodListRead(partnerId: string): string {
-  return `**/rest/v1/moods?*user_id=eq.${partnerId}*limit=30*`;
-}
-
 /**
  * The `timeout` for the standalone `interceptNetworkCall` on a page in a second
  * browser context, which the fixture cannot reach (it is bound to `page` and
@@ -123,6 +114,12 @@ export const SECOND_CONTEXT_READ_TIMEOUT = 15_000;
 
 /** Today's day (`dailyQuestionApi.fetchDailyDay`): the `get_daily_day` RPC. Observe it with `method: 'POST'`. */
 export const DAILY_DAY_READ = '**/rest/v1/rpc/get_daily_day';
+
+/** The couple's streak on the Partner screen (`dailyQuestionApi.fetchCoupleStreak`): the `get_couple_streak` RPC. Observe it with `method: 'POST'`. */
+export const COUPLE_STREAK_READ = '**/rest/v1/rpc/get_couple_streak';
+
+/** The couple's past questions on the Partner screen (`dailyQuestionApi.fetchDailyHistory`): the `get_daily_history` RPC. Observe it with `method: 'POST'`. */
+export const DAILY_HISTORY_READ = '**/rest/v1/rpc/get_daily_history';
 
 /** A pick's send (`dailyQuestionApi.submitDailyPick`): the `submit_daily_pick` RPC. Observe it with `method: 'POST'`. */
 export const DAILY_PICK_SEND = '**/rest/v1/rpc/submit_daily_pick';

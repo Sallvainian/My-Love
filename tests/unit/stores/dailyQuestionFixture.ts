@@ -2,7 +2,7 @@
  * Daily Question snapshots for unit tests: the AD-16 shape `get_daily_day` and
  * `submit_daily_pick` answer, with the pair's question fixed.
  */
-import type { DailyDaySnapshot } from '../../../src/api/validation/dailyQuestionSchemas';
+import type { CoupleStreak, DailyDaySnapshot } from '../../../src/api/validation/dailyQuestionSchemas';
 
 export const DAY_ID = '00000000-0000-4000-8000-0000000000d1';
 
@@ -54,6 +54,27 @@ export function writerSnapshot(
   return {
     ...waitingSnapshot(myChoice),
     write: { mine: true, done: false },
+    ...overrides,
+  };
+}
+
+/** The seven dates ending 2030-03-07, oldest first, all `open` unless `states` overrides the newest ones. */
+function streakWeek(states: CoupleStreak['week'][number]['state'][] = []): CoupleStreak['week'] {
+  const padded = [...Array<'open'>(7 - states.length).fill('open'), ...states];
+  return padded.map((state, index) => ({ day: `2030-03-0${index + 1}`, state }));
+}
+
+/** The streak `get_couple_streak` answers; override any field. Defaults to one done day, orange. */
+export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStreak {
+  return {
+    held: 1,
+    run: 1,
+    today_state: 'orange',
+    milestones: 0,
+    same: 1,
+    done: 1,
+    missed: 0,
+    week: streakWeek(['done']),
     ...overrides,
   };
 }

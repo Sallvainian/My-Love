@@ -47,3 +47,42 @@ export const DailyDayAnswerSchema = z.discriminatedUnion('status', [
 ]);
 
 export type DailyDayAnswer = z.infer<typeof DailyDayAnswerSchema>;
+
+/** One date of the streak's week strip: `done` (both picked), `missed` (closed, not done) or `open`. */
+export const CoupleStreakWeekDaySchema = z.object({
+  day: z.iso.date(),
+  state: z.enum(['done', 'missed', 'open']),
+});
+
+const CountSchema = z.number().int().nonnegative();
+
+/**
+ * The couple's streak as `get_couple_streak` answers it: the server counts it
+ * (AD-7), the client only shows it. `today_state` is orange (the viewer's date
+ * is done), blue (a date was missed after the newest done one) or grey.
+ */
+export const CoupleStreakSchema = z.object({
+  held: CountSchema,
+  run: CountSchema,
+  today_state: z.enum(['grey', 'orange', 'blue']),
+  milestones: CountSchema,
+  same: CountSchema,
+  done: CountSchema,
+  missed: CountSchema,
+  week: z.array(CoupleStreakWeekDaySchema).length(7),
+});
+
+export type CoupleStreak = z.infer<typeof CoupleStreakSchema>;
+
+export const CoupleStreakAnswerSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('ok'), streak: CoupleStreakSchema }),
+  z.object({ status: z.literal('unlinked') }),
+]);
+
+export type CoupleStreakAnswer = z.infer<typeof CoupleStreakAnswerSchema>;
+
+/**
+ * `get_daily_history`: the pair's done days as day snapshots, newest first, at
+ * most 30 per page. An unlinked caller gets `[]`, not a status.
+ */
+export const DailyHistorySchema = z.array(DailyDaySnapshotSchema);

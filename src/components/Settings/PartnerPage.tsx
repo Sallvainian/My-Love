@@ -18,7 +18,7 @@
 
 import { Users } from 'lucide-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { PartnerLoadError } from '../PartnerMoodView/PartnerLoadError';
+import { PartnerLoadError } from '../PartnerView/PartnerLoadError';
 import { formatInstantDate } from './settingsFields';
 import { ReadOnlyRow, SettingsGroup, SettingsRow } from './stack/SettingsRows';
 

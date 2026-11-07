@@ -108,12 +108,10 @@ export class InteractionService {
    * A thin wrapper over `resolvePartnerIdForDelivery()`. No `src/` caller
    * remains: the store's subscribe path reads `resolvePartnerLookup()` below,
    * which keeps a failed read apart from an unlink. This stays because it is a
-   * method rather than a direct import, so the browser harness in
-   * `tests/support/harnesses/interaction-record-ownership.tsx` can supply a
-   * partner identity the same way it already supplies the subscription — that
-   * page runs without a Supabase session, where the real lookup can only answer
-   * `null`. The harness patches `resolvePartnerLookup()` alongside this method,
-   * since the send path goes through that one.
+   * method rather than a direct import. The browser harness that used it
+   * (`tests/support/harnesses/interaction-record-ownership.tsx`) was deleted
+   * with the old Partner page's E2E specs; the method stays for epic 10, which
+   * reworks the interactions.
    *
    * @returns Partner user ID, or null when the account has no linked partner
    */

@@ -21,6 +21,8 @@
  * - `deleteAccountCopies(userId)` — delete every kind saved for one account.
  *   Called on sign-out with the OUTGOING account; touches no other store
  *   (queued `moods` rows stay for their owner). Throws.
+ * - `deleteLocalCopy(userId, kind)` — delete one account's one kind and nothing
+ *   else. Calls no write listener. Throws.
  *
  * Refresh (who re-reads the server, and when):
  * - `registerLocalCopy(kind, refresh)` — register the kind's refresher. One per
@@ -36,12 +38,15 @@
  * - FILL SOURCES. A copy is written only from a server response, a Realtime
  *   event, or the user's own write (confirmed or queued). Never from a default,
  *   a guess, or another account's state.
- *   The one exemption is a device-state kind, `daily-write-declined`
- *   (`services/dailyWriteDeclined.ts`): it is written only by this device's
- *   "No thanks" and never refreshed from the server (architecture AD-13).
+ *   The exemption is the device-state kinds: `daily-write-declined`
+ *   (`services/dailyWriteDeclined.ts`) is written only by this device's
+ *   "No thanks", and `daily-celebrated` (`services/dailyCelebrated.ts`) only by
+ *   the streak's +1 claim on Daily; neither is ever refreshed from the server
+ *   (architecture AD-13).
  * - A FAILED SERVER READ changes nothing: the copy and the screen stay as they
  *   were. Only a successful read overwrites a copy — including "the server says
- *   there is nothing", which is saved as such.
+ *   there is nothing", which is saved as such (`daily-streak` records "unlinked"
+ *   by deleting its copy instead, `services/dailyStreakCopy.ts`).
  * - IDENTITY. A refresher captures `{ userId, authSessionVersion }` before its
  *   first await and re-checks both before every store write and before writing
  *   the copy, so a result raised for one account is never shown or saved under
@@ -137,6 +142,16 @@ export async function deleteAccountCopies(userId: string): Promise<void> {
   // Awaited together: a rejected delete aborts the transaction, and a
   // separately awaited `tx.done` would then reject with no handler attached.
   await Promise.all([...keys.map((key) => tx.store.delete(key)), tx.done]);
+}
+
+/**
+ * Delete `userId`'s saved copy of `kind`, and nothing else: other kinds, other
+ * accounts and every other store are untouched. No write listener is called.
+ * Throws on failure.
+ */
+export async function deleteLocalCopy(userId: string, kind: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(STORE_NAMES.LOCAL_COPIES, [userId, kind]);
 }
 
 /**

@@ -4193,7 +4193,8 @@ location: src/services/dailyDaysCopy.ts:71 (`readSavedDailyDay`), :103 (`mergeDa
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
 reason: `readSavedDailyDay` picks today's entry by date and rank across all `day_id`s, and `mergeDailyDay` never drops another `day_id` with the same `day`. After a reset or a relink this device never saw as `unlinked`, an old `both` entry is shown first. Online the server's answer replaces it, because `mergeAnswer` merges only within one `day_id`, so it flashes; offline it stays.
-status: open
+resolution: `mergeSnapshots` in `dailyDaysCopy.ts` drops every other `day_id` for a date the server has just answered, and each saved entry now records the partner it was read with (`partner_id`, the newest tag wins; a legacy entry reads as `null`), so `readSavedDailyDay` and the new `readSavedDailyHistory` show only the current partner's entries. The cap and `prune` went with it. Unit: `dailyDaysCopy.test.ts` (date drop, tag, filter, legacy entry, no cap), `dailyQuestionSlice.partner.test.ts` and `dailyHistorySlice.test.ts`. E2E: the relink test in `tests/e2e/partner/partner-past-questions-offline.spec.ts`, throwaway accounts only: after an admin relink A shows none of the old pairing's questions offline, and the copy still holds them. It fails with the partner filter removed.
+status: done 2026-11-07
 
 ### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only on their next open.
 origin: epic 6 retrospective (Diff-scope review, R4), 2026-11-06
@@ -4250,4 +4251,112 @@ location: tests/live/daily-question-live.spec.ts (the writer's `openDaily(pageA,
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: low
 reason: After both bots picked (both `submit_daily_pick` calls 200), Claude Bot's page, the day's writer with the write sheet open, was reloaded and never sent `get_daily_day` in the 180 s test timeout; its failure screenshot still shows the waiting state under the sheet. The hosted edge logs also show no `daily_pick` broadcast to Claude Bot's channel after Claude Partner's pick, where the passing run at 04:23 UTC the same day sent one. Every server answer was 200, and Claude Partner's page showed the reveal. The page videos were cut short, so where the writer's page stopped is unknown. Reproduce with the live spec run repeatedly against the hosted site before changing code.
+status: open
+
+### DW-500: A linked Partner page shows only the partner's name, with no card, loading block or error, when the slice holds an `unlinked` streak answer (or null with nothing loading) while a partner is shown.
+origin: spec-deferred df427a169e35
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: PartnerView.tsx falls through to null when `coupleStreak` is not `ok`, not loading and has no error. Reachable only when the server says unlinked while a saved or stale partner is still shown (a server-side unlink with no client action, or the partner read failing after one); there is no unlink feature. Rare; the fix adds a branch. Reported by blind-hunter, edge-case-hunter, verification-gap and intent-alignment.
+status: open
+
+### DW-501: The Connect screen's typed email, shown search answer and error line are lost whenever `loadPartner` runs while the account is unlinked.
+origin: spec-deferred 22a75e44ce54
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: That state now lives in PartnerConnect, which unmounts while `isLoadingPartner` is true, and partnerSlice.loadPartner raises the flag on every call when `partner` is null (partnerSlice.ts:165). In PartnerMoodView the state sat in the parent and survived. It needs a partner reload during typing (a reconnect refresh, or Retry). Rare; the fix keeps PartnerConnect mounted but hidden across loads, which adds branches.
+status: open
+
+### DW-502: The streak error card offers no Retry, so an online transient failure with nothing shown stays until Realtime re-joins or the page is reopened.
+origin: spec-deferred 22cfebd7aa4f
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: PartnerView.tsx renders `partner-streak-error` with no action; only SUBSCRIBED, partner_linked, daily_pick, a partner change or a reconnect re-read. Rare (a failed online read with no streak yet); the fix adds a control. Story 3 owns the streak's failure and offline wording.
+status: open
+
+### DW-503: The interactions local-copy refresher still reads interactions on every signed-in start although no routed screen shows them, and the deleted interaction E2E specs leave that code without browser
+origin: spec-deferred c9adea711391
+location: src/stores/slices/interactionsSlice.ts:235
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: interactionsSlice.ts:235 `registerLocalCopy(INTERACTIONS_COPY_KIND, ...)` still runs; tests/e2e/partner/interaction-record-ownership.spec.ts and tests/e2e/offline/interactions-offline-copy.spec.ts were deleted with the Poke/Kiss/Fart tiles (the API-level tests/api/interaction-record-ownership.spec.ts stays). The intent keeps the code for epic 10, so removing the refresher is out of this story.
+status: open
+
+### DW-504: After a relink to a new partner within one session, the previous couple's streak can show under the new partner's name until the new read lands, or for good if it fails.
+origin: spec-deferred 6244cfdb5f44
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: The slice answer is not keyed by partner; PartnerView shows any `ok` answer once a partner is present. Needs an unlink (no client action exists) and a new link in the same session. Rare; the fix adds a partner key to the stored answer.
+resolution: `dailyQuestionSlice` clears the streak, its error and loading flag (and the history) when the shown partner changes from one non-null id to another in a session (`clearPairData`, from `api.subscribe`; a first link and a reload of the same partner clear nothing, and an identity change forgets the last id), and bumps `streakSeq` so a read in flight for the old pair writes nothing, to the field or the copy. The `daily-streak` copy now records the partner it was read with (`partner_id`, as `daily-days` does): `saveStreakAnswer(userId, answer, partnerId)` tags it and `readSavedStreak(userId, partnerId)` shows it only for the current partner, an untagged copy reading as partner `null`, so a failed read for the new partner no longer falls back to the old pair's streak. Unit: `coupleStreakSlice.test.ts` (relink, in-flight and failed reads, tag, untagged copy, first link, identity change), `dailyStreakCopy.test.ts`. E2E: `partner-past-questions-offline.spec.ts`, a throwaway A relinked from B to C shows C's name and no A-B streak card or question after a reload with the reads aborted.
+status: done 2026-11-07
+
+### DW-505: When `subscribePartnerEvents` rejects, usePartnerStreakListener logs and holds nothing, with no retry, so the Partner page gets no live re-reads until it is reopened.
+origin: spec-deferred 7a52e464bc0a
+location: src/hooks/usePartnerStreakListener.ts
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: usePartnerStreakListener.ts `.catch` only logs, the same pattern as useDailyPickListener. A registry failure is rare; the page still reads on open, on a partner change and on reconnect. The fix adds retry logic.
+status: open
+
+### DW-506: The week strip's "Today" sits on the server's date for the viewer's stored zone, which can be a day off from the device while travelling until a Daily fetch records the new zone.
+origin: spec-deferred 0339fde9918d
+location: src/components/PartnerView/StreakCard.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: get_couple_streak dates the viewer by user_time_zones (story 7.1's recorded residual risk); StreakCard labels the last week entry Today, as the server answers it. Pre-existing server behaviour, and the epic bars the client from working out a day's state.
+status: open
+
+### DW-507: The offline-pick E2E cannot tell the drain's own streak re-read from the refresher's or the Realtime re-join's.
+origin: spec-deferred 484f89571f2f
+location: tests/e2e/daily/daily-streak.spec.ts (the "after a pick queued offline" test)
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
+severity: low
+reason: On reconnect App.tsx:562-566 runs drainQueuedPicks() and refreshLocalCopies() together, and the daily-streak refresher (dailyQuestionSlice.ts registerLocalCopy) sends get_couple_streak without waiting for the pick; useDailyPickListener's SUBSCRIBED on re-join reads it again. So `rereadStreak` in the test may be the refresher's read, and the final orange-at-2 assertion would still pass if the `void get().loadCoupleStreak()` in drainOnce were removed. The drain's call is proven only by the unit test "a pick queued offline and drained later re-reads the streak only after the drain" (tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts). Isolating it in E2E needs the refresher and the Realtime re-join suppressed, more than a direct correction; the surface outcome (the chip updates after reconnect without a reload) is shown.
+status: open
+
+### DW-508: The waiting sentence reads "when Your partner answers too." with a capital Y mid-sentence when the partner's name is missing.
+origin: spec-deferred 254a73a92d5c
+location: src/components/DailyQuestion/DailyQuestion.tsx:393
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
+severity: low
+reason: DailyQuestion.tsx:316 falls back to 'Your partner' when `state.partner?.displayName` is empty (users.display_name is nullable, and the partner copy can be unfilled or its read failed), and line 393 puts that value mid-sentence. The fallback predates this change and already reads "Waiting on Your partner" in DayCard. Rare (a linked partner normally has a name and the copy fills on sign-in) and the fix needs a separate lowercase value for mid-sentence use, so it is filed rather than patched.
+resolution: `DailyQuestion` keeps `partnerName` ('Your partner' fallback) for the sentence starts and adds `partnerNameInline` ('your partner' fallback) for the mid-sentence uses: "Waiting on your partner", "The streak lights up when your partner answers too.", and the values passed to `StreakUp` ("You and your partner both answered.", "See your partner's pick") and `Milestone` ("You and your partner have answered together on N days."). Unit: `DailyQuestion.test.tsx` and `DailyQuestion.celebration.test.tsx` with a blank partner name.
+status: done 2026-11-07
+
+### DW-509: A failed IndexedDB read of daily-celebrated is taken as "nothing stored", so the claim re-seeds over a good stored value.
+origin: spec-deferred 2354bd4b96ec
+location: src/services/dailyCelebrated.ts (claimCelebration)
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
+severity: low
+reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it.
+status: open
+
+### DW-510: After an in-session unlink and relink to a different partner, the Partner page shows the previous pair's past questions under the new partner's name until the new history read lands, or indefinitely
+origin: spec-deferred 744eb5a8fd58
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-lists-past-questions-marked-same-or-differe-plan.md`
+severity: low
+reason: dailyQuestionSlice.dailyHistory is cleared only by signedOutState(); partner_linked does not touch it (usePartnerStreakListener.ts), and PartnerView renders it as soon as `partner` is set. Rare: the app has no unlink action (src/components/Settings/PartnerPage.tsx l.13-14), so the unlink is server-side and the relink must happen in the same session. Fix: reset or key the history on the partner id when it changes; story 9 (saved days record the partner they were read with) is the natural home.
+resolution: The same reset as DW-504: a new partner id clears `dailyHistory`, its error, loading flags and end flag, and bumps `historySeq` and a pair generation, so first-page and load-more reads in flight for the old pair write nothing to the field or the `daily-days` copy, and a list filled from the copy is dropped. Unit: `dailyHistorySlice.test.ts` (relink, in-flight and failed reads). E2E: the same relink spec as DW-504.
+status: done 2026-11-07
+
+### DW-511: After an in-session relink to a different partner whose first history page is full, the history merge keeps the previous pair's older rows below it and shows them under the new partner's name.
+origin: spec-deferred 0672eff09fcf
+location: src/stores/slices/dailyQuestionSlice.ts
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-see-all-opens-every-past-question-with-the-running-count-plan.md`
+severity: low
+reason: loadDailyHistory's full-page branch keeps loaded rows older than the new page's oldest day (dailyQuestionSlice.ts), and nothing resets dailyHistory on a partner change, only signedOutState(). Needs an in-session relink (the app has no unlink action) to a pair that already has 30+ done days; a new pair's first page is short and replaces everything. Fix: reset or key the history on the partner id; extends story 7's deferred relink finding, whose natural home is story 9.
+resolution: The relink now clears `dailyHistory` before the new partner's first page lands, so the full-page merge has no previous pair's rows to keep (and `historyFromCopy` is reset). Unit: `dailyHistorySlice.test.ts` (a new partner's full first page replaces a list filled for the old pair).
+status: done 2026-11-07
+
+### DW-512: `daily-question-partner-linked.spec.ts` once failed in a full E2E run because a `get_daily_day` read was still in flight 15 s after A's channel joined.
+origin: spec-deferred refactor-sweep-7-10
+location: tests/e2e/daily/daily-question-partner-linked.spec.ts:95-101 (the `recurseUntil` that expects `inFlight` 0 before B accepts)
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-refactor-sweep-plan.md`
+severity: low
+reason: In story 7.10's full chromium run (302 passed, this 1 failed) the check read `inFlight` 1 at its 15 s `POLL` timeout; the same spec then passed three runs in a row alone, and in the implementing agent's earlier full run. The account is a throwaway that stays unlinked until B accepts, and 7.10 changes nothing on that path (no partner change, no `get_daily_day` call). One `get_daily_day` read took more than 15 s under the suite's parallel load; DW-495 (each Daily read takes the pair's advisory lock and writes `user_time_zones`) is a likely cause, UNVERIFIED. The reruns replaced `test-results/`, so the failed run's trace is gone. A second full chromium run after the review patches passed all 303, this spec included. Reproduce by repeating the full chromium run, then read the slow request's server timing before changing the wait.
 status: open

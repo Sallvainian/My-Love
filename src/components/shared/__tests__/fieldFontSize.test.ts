@@ -26,7 +26,7 @@ describe('text field font size', () => {
 
   it.each([
     'src/components/love-notes/MessageInput.tsx',
-    'src/components/PartnerMoodView/PartnerMoodView.tsx',
+    'src/components/PartnerView/PartnerConnect.tsx',
     'src/components/MoodTracker/MoodTracker.tsx',
     'src/components/PhotoUpload/PhotoUpload.tsx',
   ])('%s styles no field smaller than 16px', (file) => {

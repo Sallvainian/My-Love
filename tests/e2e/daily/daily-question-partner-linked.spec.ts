@@ -14,7 +14,8 @@
  * must not link or unlink pool partners (AGENTS.md). Each is deleted at
  * teardown through `cleanup`; the FKs cascade the request, the link and the
  * couple's day. Listeners and request trackers are attached before the
- * navigation they observe.
+ * navigation they observe. The same accept also brings the streak chip (held
+ * 0, grey) onto A's Daily.
  */
 import type { Page } from '@playwright/test';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -140,5 +141,11 @@ test.describe('Daily: the invitation to link gives way when the request is accep
     await expect(page.getByTestId('daily-question')).toHaveText(assigned);
     await expect(page.getByTestId('daily-invite')).toHaveCount(0);
     await expect(page).toHaveURL(/\/daily$/);
+
+    // The streak read comes with the same event: the chip shows a new couple's
+    // zero, grey, without leaving Daily.
+    await expect(page.getByTestId('daily-streak-chip')).toBeVisible();
+    await expect(page.getByTestId('daily-streak-chip')).toHaveAttribute('data-state', 'grey');
+    await expect(page.getByTestId('daily-streak-held')).toHaveText('0');
   });
 });
