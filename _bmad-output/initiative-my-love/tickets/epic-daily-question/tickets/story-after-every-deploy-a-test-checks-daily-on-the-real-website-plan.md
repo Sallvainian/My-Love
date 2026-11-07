@@ -44,8 +44,8 @@ deferred:
 
 **Always:**
 - The RPC: `security definer`, `set search_path = ''`, no arguments; null `auth.uid()` → `'Authentication required'`; caller's `auth.users.email` (lowercased) not equal to lowercased `test_email` or `partner_email` value in `public.claude_bot_config` → SQLSTATE `42501`; no partner → deletes nothing, returns 0; else takes the pair's advisory lock (same key as `assign_couple_day`: `'couple_days:' || user_a || ':' || user_b`) and deletes `couple_days` where `user_a = least(uid, partner) and user_b = greatest(uid, partner)`, returning the deleted count (int). EXECUTE revoked from public and anon, granted to authenticated. It returns no config value and no choice.
-- The spec reads both passwords from `CLAUDE_BOT_PASSWORD` and `PUSH_FIXTURE_PASSWORD` and fails at once, naming the variable, when either is unset or empty. It uses only the publishable/anon key and the two bots' own sessions; it asserts each signed-in session's email is the expected bot email before any write.
-- Bot emails: `claude-bot@test.example.com` (signs in with `CLAUDE_BOT_PASSWORD`) and `claude-bot-partner@test.example.com` (`PUSH_FIXTURE_PASSWORD`), the values `claude_bot_config` holds.
+- The spec reads both passwords from `CLAUDE_BOT_PASSWORD` and `CLAUDE_BOT_PARTNER_PASSWORD` and fails at once, naming the variable, when either is unset or empty. It uses only the publishable/anon key and the two bots' own sessions; it asserts each signed-in session's email is the expected bot email before any write.
+- Bot emails: `claude-bot@test.example.com` (signs in with `CLAUDE_BOT_PASSWORD`) and `claude-bot-partner@test.example.com` (`CLAUDE_BOT_PARTNER_PASSWORD`), the values `claude_bot_config` holds.
 - Live mode (`LIVE_BASE_URL` set): never signs up, links or unlinks; a missing or unlinked bot fails with a message saying so. Local mode: the Supabase URL must be a localhost / 127.0.0.1 host or the spec throws before any request.
 - Both browser contexts and both API clients use time zone `UTC` (offset 0), so all four agree on one date.
 - Match surrounding style by hand; import E2E helpers by deep path; GitHub secrets the job needs are listed in this plan's Implementation Notes, never set.
@@ -94,7 +94,7 @@ deferred:
 - [ ] `playwright.live.config.ts` -- `import baseConfig from './playwright.config'`; `testDir: './tests/live'`, `workers: 1`, `fullyParallel: false`, `retries: 0`, timeout 180 s, no `globalSetup`; `use.baseURL` = `LIVE_BASE_URL` or `http://localhost:5173`, `timezoneId: 'UTC'`, trace/screenshot/video `'retain-on-failure'`; `webServer` = `baseConfig.webServer` only when `LIVE_BASE_URL` is unset; list + html reporter to `playwright-report-live`.
 - [ ] `tests/live/daily-question-live.spec.ts` -- one `[P0]` test from `@playwright/test` (no pooled fixtures): resolve target (live: `LIVE_SUPABASE_URL`, `LIVE_SUPABASE_PUBLISHABLE_KEY`, both required; local: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` with the localhost guard); sign each bot in with supabase-js (`persistSession: false`); local only: sign up a missing bot with `display_name` 'Claude Bot' / 'Claude Partner', link if unlinked; assert pair linked to each other; each bot calls `reset_bot_daily_days`; two browser contexts log in through the UI at `/`, open `/daily`, same `daily-question` text; bot A picks This (200), waiting screen; as bot B via API: `get_daily_day('UTC', 0, now)` and `get_daily_day_by_id(day_id)` → state `partner`, `my_choice`/`partner_choice`/`same` null, no value `'this'`/`'that'` anywhere (deep walk); B's page reload shows "has picked" and no reveal; B picks That; both pages after reload show the reveal with `Different picks`. Close contexts and sign the API clients out in `finally`. File header says what it checks and that it touches only the bot pair.
 - [ ] `knip.json` -- add `playwright.live.config.ts` and `tests/live/*.spec.ts` to `entry`.
-- [ ] `.github/workflows/deploy.yml` -- job `live-daily-check` (`needs: health-check`, no environment): checkout, setup-node from `.node-version` with npm cache, `npm ci`, `npx playwright install --with-deps chromium`, run `npx playwright test -c playwright.live.config.ts` with `LIVE_BASE_URL: ${{ vars.SITE_URL }}`, `LIVE_SUPABASE_URL`/`LIVE_SUPABASE_PUBLISHABLE_KEY` from the two existing `VITE_*` secrets, `CLAUDE_BOT_PASSWORD`, `PUSH_FIXTURE_PASSWORD` secrets; upload `playwright-report-live` and `test-results` on failure. Comment explains why it exists and that it never uses the secret key.
+- [ ] `.github/workflows/deploy.yml` -- job `live-daily-check` (`needs: health-check`, no environment): checkout, setup-node from `.node-version` with npm cache, `npm ci`, `npx playwright install --with-deps chromium`, run `npx playwright test -c playwright.live.config.ts` with `LIVE_BASE_URL: ${{ vars.SITE_URL }}`, `LIVE_SUPABASE_URL`/`LIVE_SUPABASE_PUBLISHABLE_KEY` from the two existing `VITE_*` secrets, `CLAUDE_BOT_PASSWORD`, `CLAUDE_BOT_PARTNER_PASSWORD` secrets; upload `playwright-report-live` and `test-results` on failure. Comment explains why it exists and that it never uses the secret key.
 
 **Acceptance Criteria:**
 - Given a fresh local stack with every migration, when `supabase test db` runs, then 44, 40 and 18 pass, showing a non-bot refused and a bot unable to delete another couple's rows.
@@ -105,7 +105,7 @@ deferred:
 
 - **GitHub secrets the `live-daily-check` job needs** (repository secrets, not the `production` environment, since the job runs npm code):
   - `CLAUDE_BOT_PASSWORD` (new): the `claude-bot@test.example.com` password, the value of the fnox entry of the same name.
-  - `PUSH_FIXTURE_PASSWORD` (new): the `claude-bot-partner@test.example.com` password, the value of the fnox entry of the same name.
+  - `CLAUDE_BOT_PARTNER_PASSWORD` (new): the `claude-bot-partner@test.example.com` password, the value of the fnox entry of the same name.
   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` (already set; the build uses them), passed as `LIVE_SUPABASE_URL` / `LIVE_SUPABASE_PUBLISHABLE_KEY`; `vars.SITE_URL` (already set) as `LIVE_BASE_URL`.
 - Files: the migration, `44_reset_bot_daily_days.sql` (19 assertions, one more than the matrix: a profile row carrying a bot email does not pass the check), the 18/40 edits, regenerated types (4 lines), `playwright.live.config.ts`, `tests/live/daily-question-live.spec.ts`, `knip.json`, `deploy.yml`, and `.gitignore` (`**/playwright-report-live/`, so a local run leaves no untracked report).
 - Deviations: Knip picks up `playwright.live.config.ts` through its Playwright plugin and called the plan's entry redundant, so only `tests/live/*.spec.ts` was added. `deploy.yml` uses `--config=` rather than `-c`, which Knip read as an unlisted binary.
@@ -114,6 +114,8 @@ deferred:
 - A local run logs "Could not announce the pick" when the stack runs without Realtime (the isolated one did); the test does not depend on the broadcast.
 
 ## Plan Change Log
+
+- 2026-11-06 (PO, at epic closure): every `PUSH_FIXTURE_PASSWORD` in this plan now reads `CLAUDE_BOT_PARTNER_PASSWORD`. After the build, `66e69812` gave the partner bot its own password at the owner's request, because the push fixtures share `PUSH_FIXTURE_PASSWORD`. The spec, `deploy.yml` and `provision-push-fixtures.mjs` on main use the new name.
 
 ## Review Triage Log
 
@@ -174,7 +176,7 @@ A separate config, not a project in `playwright.config.ts`: that config's `globa
 **Commands:**
 - `supabase migration up` then `npm run db:types` -- expected: types change only by `reset_bot_daily_days`; a second run leaves the file unchanged.
 - `mise exec -- supabase test db` -- expected: every file passes.
-- `CLAUDE_BOT_PASSWORD=… PUSH_FIXTURE_PASSWORD=… npx playwright test -c playwright.live.config.ts` twice, after deleting any local bot accounts -- expected: passes both times.
+- `CLAUDE_BOT_PASSWORD=… CLAUDE_BOT_PARTNER_PASSWORD=… npx playwright test -c playwright.live.config.ts` twice, after deleting any local bot accounts -- expected: passes both times.
 - `npm run typecheck`, `npm run lint`, `npx knip`, `npm run test:unit` -- expected: exit 0.
 - `npx playwright test tests/e2e/daily --project=chromium` -- expected: the Daily specs still pass.
 
@@ -194,7 +196,7 @@ Status: built
 - `.github/workflows/deploy.yml` -- `live-daily-check` job (15-minute limit, uploads only .png and .webm on failure); the live config in `paths-ignore`.
 - `knip.json`, `.gitignore` -- the spec as a Knip entry; the live report folder ignored.
 
-**GitHub secrets the job needs** (repository secrets; the owner sets them after the epic merges): `CLAUDE_BOT_PASSWORD` and `PUSH_FIXTURE_PASSWORD` (new, the fnox values of the same names); `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` and `vars.SITE_URL` already exist.
+**GitHub secrets the job needs** (repository secrets; the owner sets them after the epic merges): `CLAUDE_BOT_PASSWORD` and `CLAUDE_BOT_PARTNER_PASSWORD` (new, the fnox values of the same names); `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` and `vars.SITE_URL` already exist.
 
 **Review findings (follow-up pass, thorough: blind, edge-case, verification-gap, intent):** 32 findings. Patched 5 entries (high 0, medium 4: failure screenshots and videos never captured, no job timeout, and two missing caller-check tests; low 1: B's page response unchecked), plus a wrong type import found while patching. Deferred 2 (medium): no no-reload Realtime check on the live site; local Playwright runs reach the default stack through the mise shims. Rejected: 7 low (midnight crossing, twice; spec changes never run before a deploy, twice; written-question cascade untested, twice, plus the null-email branch; shared `test-results` folder; stuck local rerun after a half-made link request), 3 low that would edit this plan (assertion count; task list against triage, twice), 1 low carried (browser sessions not signed out), 8 false (the loud failure without secrets, hosted config, leak-check breadth, twice, the stricter RPC, "fails the deploy", "passes twice", extra supporting changes); each reason is in the 2026-11-07 triage row.
 
