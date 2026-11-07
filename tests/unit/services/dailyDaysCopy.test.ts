@@ -311,10 +311,10 @@ describe('readSavedDailyDay partner filter', () => {
     expect(await readSavedDailyDay(A, '2026-11-05', 'B')).toEqual(dailySnapshot());
   });
 
-  it('reads an entry without partner_id as null: shown for null/undefined, hidden for a partner', async () => {
+  it('reads an entry without partner_id as untagged: shown for null/undefined and for a partner', async () => {
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { [dailySnapshot().day_id]: dailySnapshot() });
 
-    expect(await readSavedDailyDay(A, '2026-11-05', 'C')).toBeNull();
+    expect(await readSavedDailyDay(A, '2026-11-05', 'C')).toEqual(dailySnapshot());
     expect(await readSavedDailyDay(A, '2026-11-05', null)).toEqual(dailySnapshot());
     expect(await readSavedDailyDay(A, '2026-11-05', undefined)).toEqual(dailySnapshot());
   });

@@ -98,14 +98,14 @@ describe('the saved days copy and the partner', () => {
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 
-  it('hides a legacy entry (no partner_id) while a partner is known', async () => {
+  it('shows a legacy entry (no partner_id) offline while a partner is known', async () => {
     withPartner(PARTNER_C);
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { [DAY_ID]: waitingSnapshot('this') });
     fetchDailyDay.mockRejectedValue(new AccountDataError('offline', 'You are offline.'));
 
     await state().loadDailyDay();
 
-    expect(state().dailyDay).toBeNull();
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 
   it('shows a legacy entry while no partner is known (the saved partner copy is empty)', async () => {

@@ -97,7 +97,10 @@ function forPartner(days: Record<string, SavedDay>, partnerId: string | null): D
 /**
  * The saved snapshot whose `day` is `day` (`YYYY-MM-DD`) and that was read with
  * `partnerId`, or `null` when there is none or the read failed. Two entries for
- * one `day` give the higher-ranked.
+ * one `day` give the higher-ranked. An entry with no tag (saved before entries
+ * recorded their partner) is shown too, so the day saved before the update
+ * still shows offline; the server's next answer for that date re-tags it and
+ * drops any other `day_id` for the date.
  */
 export async function readSavedDailyDay(
   userId: string,
@@ -106,7 +109,11 @@ export async function readSavedDailyDay(
 ): Promise<DailyDaySnapshot | null> {
   const days = parseSavedDays(await readLocalCopy<unknown>(userId, DAILY_DAYS_COPY_KIND));
   let best: DailyDaySnapshot | null = null;
-  for (const snapshot of forPartner(days, partnerId ?? null)) {
+  const wanted = partnerId ?? null;
+  const entries = Object.values(days)
+    .filter((entry) => entry.partnerId === wanted || entry.partnerId === null)
+    .map((entry) => entry.snapshot);
+  for (const snapshot of entries) {
     if (snapshot.day !== day) continue;
     if (!best || dailyStateRank(snapshot.state) > dailyStateRank(best.state)) best = snapshot;
   }
