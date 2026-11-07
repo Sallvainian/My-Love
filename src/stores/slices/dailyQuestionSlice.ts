@@ -71,7 +71,9 @@
  * The streak's +1 (R4) is claimed through `claimStreakCelebration(streak)`: the
  * Daily view calls it for each `ok` streak it shows, and the device-state
  * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
- * whether that held total is new to this device. It holds no state here, so
+ * whether that held total is new to this device and, in the same claim, whether
+ * the milestone count is new too (the milestone screen after the +1; the claim
+ * stores the higher count). It holds no state here, so
  * sign-out needs nothing in `signedOutState()` (the kind goes with
  * `deleteAccountCopies`). It never throws.
  */
@@ -185,8 +187,10 @@ export interface DailyQuestionSlice {
   declineWrittenQuestion: (dayId: string) => Promise<void>;
   /**
    * Ask whether `streak`'s held total is new to this device (`claimCelebration`)
-   * and, when it is, record it as celebrated. Resolves `{ play: true, previous }`
-   * once per new held total, else `{ play: false }`. Never throws: a failure is
+   * and, when it is, record it as celebrated. Resolves
+   * `{ play: true, previous, milestone }` once per new held total (`milestone`:
+   * the streak's milestone count is new to this device too), else
+   * `{ play: false }`. Never throws: a failure is
    * logged and answers `{ play: false }`, as does no signed-in user or a session
    * that changed meanwhile.
    */

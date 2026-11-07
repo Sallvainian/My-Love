@@ -44,6 +44,12 @@
  * walk through Home unmounts at once claims nothing; the overlay belongs to the
  * session that raised it. The write sheet waits while the overlay
  * shows. Only Daily claims: the Partner page shows the count without playing it.
+ *
+ * The milestone (R5): when the same claim also says `milestone` (the streak's
+ * milestone count is above the one this device last showed, stored by that
+ * claim), the +1's button opens the full-screen `Milestone` screen instead of
+ * closing; its Continue and Close both close it, revealing the card. The write
+ * sheet waits behind both stages. A milestone never shows without the +1.
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
@@ -65,6 +71,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 import { StreakWeek } from '../shared/StreakWeek';
+import { Milestone } from './Milestone';
 import { StreakUp } from './StreakUp';
 import { WriteQuestionSheet } from './WriteQuestionSheet';
 
@@ -345,11 +352,21 @@ export function DailyQuestion() {
   const [celebration, setCelebration] = useState<{
     session: string;
     streak: CoupleStreak;
+    /** Which screen is up: the +1, then (when `milestone`) the milestone. */
+    stage: 'up' | 'milestone';
+    milestone: boolean;
   } | null>(null);
   // The held total of the last claim this mount has had answered, play or not.
   const [claimedHeld, setClaimedHeld] = useState<number | null>(null);
   const celebrationShown = celebration !== null && celebration.session === sessionKey;
   const closeCelebration = useCallback(() => setCelebration(null), []);
+  const continueFromStreakUp = useCallback(
+    () =>
+      setCelebration((current) =>
+        current && current.milestone ? { ...current, stage: 'milestone' } : null
+      ),
+    []
+  );
 
   // The session whose read this mount has had answered (see the effect below).
   const [readFor, setReadFor] = useState<string | null>(null);
@@ -408,7 +425,14 @@ export function DailyQuestion() {
       if (!mounted.current) return;
       // One batch: the answer is observable (`data-streak-claimed`) in the same
       // commit that shows the overlay, or the absence of one.
-      if (claim.play) setCelebration({ session: sessionKey, streak: shownStreak });
+      if (claim.play) {
+        setCelebration({
+          session: sessionKey,
+          streak: shownStreak,
+          stage: 'up',
+          milestone: claim.milestone,
+        });
+      }
       setClaimedHeld(shownStreak.held);
     });
   }, [shownStreak, sessionKey, claimStreakCelebration]);
@@ -508,12 +532,22 @@ export function DailyQuestion() {
         )}
       </div>
 
-      {celebrationShown && (
+      {celebrationShown && celebration.stage === 'up' && (
         <StreakUp
           streak={celebration.streak}
           partnerName={partnerName}
-          showReveal={dailyDay?.status === 'ok' && dailyDay.snapshot.state === 'both'}
-          onContinue={closeCelebration}
+          showReveal={
+            !celebration.milestone && dailyDay?.status === 'ok' && dailyDay.snapshot.state === 'both'
+          }
+          onContinue={continueFromStreakUp}
+        />
+      )}
+
+      {celebrationShown && celebration.stage === 'milestone' && (
+        <Milestone
+          streak={celebration.streak}
+          partnerName={partnerName}
+          onClose={closeCelebration}
         />
       )}
 

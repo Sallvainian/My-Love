@@ -13,6 +13,10 @@
  * left unstyled. It is pinned by exact count, not skipped, so a change to it
  * (a new gradient, or one removed) fails here and the pin is updated on
  * purpose.
+ *
+ * One file is allowed hex colours, and only hex: `FlamingHeart.tsx`, an
+ * illustration whose colours are the same in both themes and so no kit token
+ * (story 7.6). Pinned by line count too.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -67,6 +71,10 @@ const ADMIN_PANEL_PIN: Record<string, Record<string, number>> = {
   'src/components/AdminPanel/MessageRow.tsx': { 'palette shade': 9 },
 };
 
+/** The illustration's hex lines (`FlamingHeart.tsx`): the three gradients' stops, the heart's edge and its highlights. */
+const ILLUSTRATION_FILE = 'src/components/DailyQuestion/FlamingHeart.tsx';
+const ILLUSTRATION_HEX_LINES = 5;
+
 interface Hit {
   file: string;
   line: number;
@@ -101,6 +109,7 @@ function describeHits(hits: Hit[]): string {
 }
 
 const isAdminPanel = (hit: Hit) => hit.file.startsWith('src/components/AdminPanel/');
+const isIllustrationHex = (hit: Hit) => hit.file === ILLUSTRATION_FILE && hit.rule === 'hex colour';
 
 describe('style kit sweep', () => {
   const files = componentSources();
@@ -114,7 +123,7 @@ describe('style kit sweep', () => {
   });
 
   it('finds no off-kit colour, gradient or font in src/components outside AdminPanel', () => {
-    const offending = hits.filter((hit) => !isAdminPanel(hit));
+    const offending = hits.filter((hit) => !isAdminPanel(hit) && !isIllustrationHex(hit));
     expect(offending, `off-kit styling found:\n${describeHits(offending)}`).toEqual([]);
   });
 
@@ -129,6 +138,15 @@ describe('style kit sweep', () => {
       'AdminPanel off-kit hits changed; if deliberate, update ADMIN_PANEL_PIN. Current hits:\n' +
         describeHits(hits.filter(isAdminPanel))
     ).toEqual(ADMIN_PANEL_PIN);
+  });
+
+  it('pins the illustration file to its hex lines and nothing else off-kit', () => {
+    const own = hits.filter((hit) => hit.file === ILLUSTRATION_FILE);
+    expect(
+      own.filter((hit) => hit.rule !== 'hex colour'),
+      describeHits(own)
+    ).toEqual([]);
+    expect(own.filter(isIllustrationHex)).toHaveLength(ILLUSTRATION_HEX_LINES);
   });
 
   it('keeps Dancing Script out of the global stylesheet and the HTML shell', () => {

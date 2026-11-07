@@ -96,15 +96,73 @@ describe('claimCelebration', () => {
     expect(await readCelebrated(A)).toEqual({ held: 4, milestones: 0 });
   });
 
-  it('up: stores the new held, keeps the stored milestones and plays from the stored value', async () => {
-    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 4, milestones: 1 });
+  it('up, no new milestone: stores the new held, keeps the stored milestones and plays from the stored value', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 25, milestones: 1 });
 
-    await expect(claimCelebration(A, streak(5, 3), current)).resolves.toEqual({
+    await expect(claimCelebration(A, streak(26, 1), current)).resolves.toEqual({
       play: true,
-      previous: { held: 4, milestones: 1 },
+      previous: { held: 25, milestones: 1 },
+      milestone: false,
     });
 
-    expect(await readCelebrated(A)).toEqual({ held: 5, milestones: 1 });
+    expect(await readCelebrated(A)).toEqual({ held: 26, milestones: 1 });
+  });
+
+  it('first milestone: stores held and milestones and answers milestone', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 24, milestones: 0 });
+
+    await expect(claimCelebration(A, streak(25, 1), current)).resolves.toEqual({
+      play: true,
+      previous: { held: 24, milestones: 0 },
+      milestone: true,
+    });
+
+    expect(await readCelebrated(A)).toEqual({ held: 25, milestones: 1 });
+  });
+
+  it('caught up past one milestone: one milestone answer with the streak held', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 24, milestones: 0 });
+
+    await expect(claimCelebration(A, streak(27, 1), current)).resolves.toMatchObject({
+      play: true,
+      milestone: true,
+    });
+
+    expect(await readCelebrated(A)).toEqual({ held: 27, milestones: 1 });
+  });
+
+  it('two milestones at once: one answer, the higher count stored', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 40, milestones: 1 });
+
+    await expect(claimCelebration(A, streak(75, 3), current)).resolves.toEqual({
+      play: true,
+      previous: { held: 40, milestones: 1 },
+      milestone: true,
+    });
+
+    expect(await readCelebrated(A)).toEqual({ held: 75, milestones: 3 });
+  });
+
+  it('stored milestones ahead of the streak: they stay, and no milestone', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 30, milestones: 2 });
+
+    await expect(claimCelebration(A, streak(31, 1), current)).resolves.toEqual({
+      play: true,
+      previous: { held: 30, milestones: 2 },
+      milestone: false,
+    });
+
+    expect(await readCelebrated(A)).toEqual({ held: 31, milestones: 2 });
+  });
+
+  it('a milestone count above the stored one without a new held plays nothing', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 25, milestones: 0 });
+    const write = vi.spyOn(localCopy, 'writeLocalCopy');
+
+    await expect(claimCelebration(A, streak(25, 1), current)).resolves.toEqual({ play: false });
+
+    expect(write).not.toHaveBeenCalled();
+    expect(await readCelebrated(A)).toEqual({ held: 25, milestones: 0 });
   });
 
   it('lower: no write, no play', async () => {

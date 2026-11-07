@@ -57,6 +57,7 @@ describe('claimStreakCelebration', () => {
     await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual({
       play: true,
       previous: { held: 3, milestones: 0 },
+      milestone: false,
     });
     await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual({
       play: false,

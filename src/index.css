@@ -30,6 +30,13 @@
   --animate-settings-push: settings-push 280ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-settings-pop: settings-pop 280ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-settings-fade: settings-fade 250ms ease-out;
+  /* The flaming heart on the milestone screen (FlamingHeart.tsx): the outer
+     flame, the inner flame and the heart's beat, looping. The flames need
+     `[transform-box:fill-box]` and a bottom-centre origin, the heart a
+     50% 60% origin, set on the elements. */
+  --animate-flame-outer: fh-outer 1.4s ease-in-out infinite;
+  --animate-flame-inner: fh-inner 1s ease-in-out infinite;
+  --animate-heart-beat-flame: fh-beat 1.6s ease-in-out infinite;
   @keyframes settings-push {
     from {
       transform: translateX(100%);
@@ -52,6 +59,51 @@
     }
     to {
       opacity: 1;
+    }
+  }
+  @keyframes fh-outer {
+    0%,
+    100% {
+      transform: scale(1, 1) skewX(0deg);
+    }
+    25% {
+      transform: scale(1.03, 1.07) skewX(-2deg);
+    }
+    50% {
+      transform: scale(0.98, 0.96) skewX(1.5deg);
+    }
+    75% {
+      transform: scale(1.02, 1.05) skewX(2deg);
+    }
+  }
+  @keyframes fh-inner {
+    0%,
+    100% {
+      transform: scale(1, 1) skewX(0deg);
+    }
+    30% {
+      transform: scale(0.97, 1.1) skewX(3deg);
+    }
+    60% {
+      transform: scale(1.03, 0.93) skewX(-2deg);
+    }
+  }
+  @keyframes fh-beat {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    12% {
+      transform: scale(1.07);
+    }
+    24% {
+      transform: scale(1);
+    }
+    36% {
+      transform: scale(1.04);
+    }
+    48% {
+      transform: scale(1);
     }
   }
 }
