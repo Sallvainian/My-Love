@@ -21,7 +21,6 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
 import {
   clearPairDays,
-  ensureTestCoachQuestions,
   readPairDayIds,
   readPairDayWriter,
   readPairWrittenQuestions,
@@ -108,7 +107,6 @@ const writerTest = test.extend<{ setup: PairSetup }>({
     expect(partnerAuthToken).not.toBe('');
 
     const pair = await resolveWorkerPairIds(supabaseAdmin);
-    await ensureTestCoachQuestions(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));
 

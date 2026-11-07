@@ -29,7 +29,6 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
 import {
   clearPairDays,
-  ensureTestCoachQuestions,
   readPairDayIds,
   readPairQuestionTexts,
   setPairDaysCreatedAt,
@@ -120,7 +119,6 @@ test.describe('Daily question: an offline pick is sent when the connection retur
     expect(partnerAuthToken).not.toBe('');
 
     const pair = await resolveWorkerPairIds(supabaseAdmin);
-    await ensureTestCoachQuestions(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));
 
@@ -251,7 +249,6 @@ test.describe(
       cleanup,
     }) => {
       const pair = await resolveWorkerPairIds(supabaseAdmin);
-      await ensureTestCoachQuestions(supabaseAdmin);
       await clearPairDays(supabaseAdmin, pair);
       cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));
 

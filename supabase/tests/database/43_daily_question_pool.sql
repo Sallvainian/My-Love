@@ -2,8 +2,8 @@
 -- pgTAP: the coach's pool of at least 500 questions (20261106000500)
 --
 -- Story 6.4 of architecture-daily-question (epic R5). Pinned here, over the
--- rows whose id starts with `da11e000-` (the seed; E2E's own coach rows and
--- any other stack data are not counted):
+-- rows whose id starts with `da11e000-` (the seed; the three coach rows E2E
+-- inserted before story 6.10 and any other stack data are not counted):
 --   * the pool holds at least 500 questions, all coach rows (user_a null);
 --   * the option rules: trimmed, 1-40 characters, differ ignoring case, printable
 --     ASCII only, no trailing `?`;
@@ -58,8 +58,8 @@ grant select on t_ids to authenticated, anon, service_role;
 update public.users set partner_id = (select b_id from t_ids) where id = (select a_id from t_ids);
 update public.users set partner_id = (select a_id from t_ids) where id = (select b_id from t_ids);
 
--- A coach row outside the seed prefix, standing in for the rows E2E inserts on
--- a local stack: the seed tests must not count it.
+-- A coach row outside the seed prefix, standing in for the rows E2E inserted on
+-- local stacks before story 6.10: the seed tests must not count it.
 insert into public.daily_questions (id, this_text, that_text) values
   ('00000000-0000-4000-8000-00000000d0f0', 'Stand-in one', 'Stand-in two');
 

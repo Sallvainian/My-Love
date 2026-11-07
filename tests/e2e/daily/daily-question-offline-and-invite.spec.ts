@@ -23,7 +23,7 @@
 import type { Page } from '@playwright/test';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
-import { clearPairDays, ensureTestCoachQuestions } from '../../support/factories/daily-question';
+import { clearPairDays } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
@@ -98,7 +98,6 @@ test.describe('Daily: saved day offline and the invitation to link', () => {
     cleanup,
   }) => {
     const pair = await resolveWorkerPairIds(supabaseAdmin);
-    await ensureTestCoachQuestions(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));
     await dismissWelcomeSplash(page);
@@ -141,7 +140,6 @@ test.describe('Daily: saved day offline and the invitation to link', () => {
     cleanup,
   }) => {
     const pair = await resolveWorkerPairIds(supabaseAdmin);
-    await ensureTestCoachQuestions(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));
     await dismissWelcomeSplash(page);

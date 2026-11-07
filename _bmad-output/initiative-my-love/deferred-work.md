@@ -4049,7 +4049,8 @@ location: AGENTS.md:26
 source_spec: `tickets/epic-daily-question/tickets/story-both-partners-pick-today-s-question-and-see-the-reveal-plan.md`
 severity: low
 reason: `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15 after this change; AGENTS.md line 26 still reads "composes 14 slices". The fix edits an agent-context file, so it is deferred rather than patched.
-status: open
+resolution: AGENTS.md now reads "composes 15 slices"; `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15. Fixed in the epic 6 refactor sweep (story 6.10).
+status: done 2026-11-06
 
 ### DW-463: origin/main and this epic each hold a migration at version 20261105010000, so once both reach main the hosted deploy skips one of them.
 origin: spec-deferred f2b78a48ca13
@@ -4066,7 +4067,8 @@ location: tests/e2e/partner/partner-connect.spec.ts ("a poke reaches each linked
 source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
 severity: medium (unverified)
 reason: During story 6.6 the implementing agent's first combined run of `tests/e2e/daily/`, `partner-connect.spec.ts`, `realtime-recovery-after-renewal.spec.ts` and `login.spec.ts` (chromium, local stack) failed this test once: no `notification-badge` appeared. It passed in two reruns, and in the parent session's two full runs of the same set. The poke path (`interactionService`'s `postgres_changes` subscription) is not touched by that story, and the test was not run on the baseline, so whether it is a load-dependent flake or something else is unverified. To settle it, run `partner-connect.spec.ts` with `--repeat-each=10` next to the recovery spec on the baseline and on this branch. If it does fail, check whether the poke is inserted before the `postgres_changes` confirmation (the AGENTS.md pitfall), the way the recovery spec guards with POKES_ARMED_LOG.
-status: open
+resolution: Not reproduced. In story 6.10, `npx playwright test tests/e2e/partner/partner-connect.spec.ts tests/e2e/partner/realtime-recovery-after-renewal.spec.ts --project=chromium --repeat-each=10` on the local stack passed 60 of 60, so "a poke reaches each linked partner live" passed 10 times beside the recovery spec. With no failure on the branch, the baseline comparison was not run. If it fails again, start from the `postgres_changes` confirmation check named above. DW-465 is the same finding.
+status: done 2026-11-06
 
 ### DW-465: The partner-connect poke test failed once while the realtime-recovery spec ran beside it (ledger DW-464).
 origin: spec-deferred 1e1c7fb40342
@@ -4074,7 +4076,8 @@ location: tests/e2e/partner/partner-connect.spec.ts
 source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
 severity: medium
 reason: The implementing agent's first combined Playwright run failed "a poke reaches each linked partner live" once (no notification-badge); two reruns and the parent's two full runs passed. The poke path (interactionService postgres_changes) is untouched by this change and the baseline was not run, so it is unverified. Settle it with partner-connect.spec.ts --repeat-each=10 beside the recovery spec on the baseline and on this branch. (declared severity: medium (unverified))
-status: open
+resolution: Same finding as DW-464, closed with it: not reproduced in 10 repeats beside the recovery spec (story 6.10).
+status: done 2026-11-06
 
 ### DW-466: 24 existing test-file violations of TEA's write-time hook rules.
 origin: installing TEA's write-time enforcement hook (`.claude/hooks/tea-enforce.cjs`, TEA 4.0.0), 2026-11-06
@@ -4098,4 +4101,53 @@ location: AGENTS.md:66,100
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
 reason: AGENTS.md "Maintained by hand" opens with a data-model paragraph ("Check which data model a feature uses…") that spells out how every feature behaves offline but says nothing of Daily. Daily's saved days are the `daily-days` local copy. Picks made offline go into the per-account `pick-queue` store (`services/pickQueue.ts`), and `dailyQuestionSlice.drainQueuedPicks` sends them under `PICK_QUEUE_LOCK` on start, on `online` and on a backoff after a failed pass. A queued pick never enters the copy, so only a server snapshot produces a reveal. The Known-pitfalls rule "New per-account offline data is a new kind in services/localCopy.ts, not a new IndexedDB store" now has a second queue-store exception (beside `note-queue`) that it does not state. This change only added `pickQueue` and `pick-queue` to two lists. The fix edits an agent-context file, so the review deferred it.
+resolution: AGENTS.md's data-model paragraph now describes Daily: the `daily-days` copy written only through `mergeDailyDay`, the `pick-queue` store drained by `dailyQuestionSlice.drainQueuedPicks` under `PICK_QUEUE_LOCK` on start, on `online` and on a backoff, a queued pick never entering the copy, the online-only written question, and the device-only `daily-write-declined` kind. The localCopy rule now names `note-queue` and `pick-queue` as its two queue-store exceptions. Fixed in story 6.10.
+status: done 2026-11-06
+
+### DW-482: A pick the server refuses shows a technical message, such as "[DailyQuestionApi.submitDailyPick] Database error: …".
+origin: story 6.10 refactor sweep, from the residual risks of stories 6.2 and 6.7, 2026-11-06
+location: src/api/dailyQuestionApi.ts (`submitDailyPick`, `toAccountDataError`); src/api/errorHandlers.ts (`handleSupabaseError`); src/components/DailyQuestion/DailyQuestion.tsx:172
+source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
+severity: low
+reason: `submitDailyPick` maps only `DQ001` to a sentence of its own. Every other refusal (`DQ002`, a `picked_at` outside the five-minute window, which a phone clock more than five minutes off the server's meets; `P0002`; `22023`) goes through `toAccountDataError`, whose message is `handleSupabaseError`'s `[<context>] Database error: <server message>`. A queued pick stores that message as its `failure`, and Daily shows it after "Your pick could not be sent."; an online send shows the same text. A fix maps each refusal code to a plain sentence, as `WRITE_REFUSAL_MESSAGES` does for written questions. It changes what users read, so the wording is the owner's.
+status: open
+
+### DW-483: A refused queued pick for a day no longer on screen is shown nowhere, and refused rows are never removed from the device.
+origin: story 6.10 refactor sweep, from story 6.7's residual risks, 2026-11-06
+location: src/stores/slices/dailyQuestionSlice.ts (`drainQueuedPicks`, `showQueuedPicks`); src/services/pickQueue.ts
+source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
+severity: low
+reason: `drainQueuedPicks` marks a refused row `failed` and keeps it. Daily shows a failure only for the day on screen, so a pick refused for yesterday is never seen, and nothing deletes a failed row: it stays in `pick-queue` until a later pick for the same account and day replaces it, which cannot happen once that day is past. The queue survives sign-out by design, so the rows add up over time on a device that keeps meeting refusals.
+status: open
+
+### DW-484: An online pick whose request fails in transit shows a send error instead of being queued, even when the server committed it.
+origin: story 6.10 refactor sweep, from the residual risks of stories 6.7 and 6.12, 2026-11-06
+location: src/stores/slices/dailyQuestionSlice.ts (`submitDailyPick`, the online branch)
+source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
+severity: low
+reason: Send my pick queues only when `isOnline()` is false before the request. When the connection drops during the request, or the server commits the pick but answers after the 30 s `requestTimeout`, the action throws and Daily shows a send error; the pick is not queued. In the committed case the screen keeps offering the pick until the next read (a reload, the next open, or a partner's `daily_pick`), and a second Send returns the stored pick. Queuing on a transport failure would close both, since the RPC is idempotent.
+status: open
+
+### DW-485: A queued pick waits for the next `online` event or start when another tab held the queue lock and closed before its pass finished.
+origin: story 6.10 refactor sweep, from story 6.7's residual risks, 2026-11-06
+location: src/stores/slices/dailyQuestionSlice.ts (`drainQueuedPicks`, the `other-tab` branch)
+source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
+severity: low
+reason: When another tab holds `PICK_QUEUE_LOCK`, this tab waits for the lock, re-reads the day and leaves the retry to that tab ("Its own retry covers a transient stop there"). If that tab stopped on a transient failure and then closed, its retry timer is gone, and this tab sets none, so the row is sent only on the next `online` event or app start.
+status: open
+
+### DW-486: A `daily_pick` broadcast that lands while the channel re-joins and re-reads the partner is dropped, so the partner's pick shows only on the next open.
+origin: story 6.10 refactor sweep, from story 6.6's review (rejected as low, kept as a residual risk), 2026-11-06
+location: src/api/moodSyncService.ts:537 (`refreshChannelIdentity`, run on a re-join of the `subscribePartnerEvents` channel)
+source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
+severity: low
+reason: On a re-join the registry nulls the partner snapshot while it re-reads `users`, and an event that arrives in that round trip is dropped after the `SUBSCRIBED` re-read has already run. Only re-joins are affected, and `new_mood` shares the window. The review declined the fix because it needs a new registry callback; the next Daily open re-reads.
+status: open
+
+### DW-487: A failed IndexedDB read during a Daily copy merge rewrites the copy with only the new day.
+origin: story 6.10 refactor sweep, from story 6.5's review (rejected as low, kept as a residual risk), 2026-11-06
+location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/localCopy.ts:92-100 (`readLocalCopy`)
+source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-day-offline-and-invites-an-unlinked-ac-plan.md`
+severity: low
+reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined.
 status: open

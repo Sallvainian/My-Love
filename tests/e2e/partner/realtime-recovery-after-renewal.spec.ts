@@ -60,7 +60,7 @@ import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
 import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
-import { clearPairDays, ensureTestCoachQuestions } from '../../support/factories/daily-question';
+import { clearPairDays } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { DAILY_DAY_BY_ID_READ, DAILY_DAY_READ, DAILY_PICK_SEND } from '../../support/helpers/reads';
@@ -283,7 +283,6 @@ test.describe('Realtime recovery after the token renews', () => {
 
       // A day left behind would fix the question and the picks the next run
       // starts from; the pick this test sends is gone with its day.
-      await ensureTestCoachQuestions(supabaseAdmin);
       await clearPairDays(supabaseAdmin, pairIds);
       cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pairIds));
 
