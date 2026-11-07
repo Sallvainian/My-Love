@@ -265,7 +265,7 @@ test.describe('Settings navigation rules', () => {
     await expect(page).toHaveURL(/\/settings\/profile\/name$/);
     await navigateTo(page, 'partner');
     await expect(page).toHaveURL(/\/partner$/);
-    await expect(page.getByTestId('partner-mood-view')).toBeVisible();
+    await expect(page.getByTestId('partner-view')).toBeVisible();
 
     // WHEN: back is pressed once
     await page.goBack();

@@ -16,7 +16,7 @@ import { parseEventDate } from './services/eventsService';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from './stores/useAppStore';
-// PokeKissInterface moved to PartnerMoodView
+// The Partner view is PartnerView (PartnerView/); PartnerMoodView and PokeKissInterface are no longer routed (epic 10).
 import type { Session } from '@supabase/supabase-js';
 import { getSession, onAuthStateChange } from './api/auth/sessionService';
 import {
@@ -57,10 +57,8 @@ const PhotoGallery = lazy(() =>
 const MoodTracker = lazy(() =>
   import('./components/MoodTracker/MoodTracker').then((m) => ({ default: m.MoodTracker }))
 );
-const PartnerMoodView = lazy(() =>
-  import('./components/PartnerMoodView/PartnerMoodView').then((m) => ({
-    default: m.PartnerMoodView,
-  }))
+const PartnerView = lazy(() =>
+  import('./components/PartnerView/PartnerView').then((m) => ({ default: m.PartnerView }))
 );
 const DailyQuestion = lazy(() =>
   import('./components/DailyQuestion').then((m) => ({ default: m.DailyQuestion }))
@@ -916,7 +914,7 @@ function App() {
         {/* Story 1.5: Sync Completion Toast - Shows feedback after reconnection sync (AC-1.5.4) */}
         <SyncToast syncResult={syncResult} onDismiss={() => setSyncResult(null)} />
 
-        {/* Story 6.5: Poke/Kiss Interaction Interface - Moved to PartnerMoodView */}
+        {/* Poke/Kiss Interaction Interface: not routed since the Partner page became PartnerView (kept for epic 10) */}
 
         <main
           id="main-content"
@@ -1023,7 +1021,7 @@ function App() {
 
                 {currentView === 'mood' && <MoodTracker />}
 
-                {currentView === 'partner' && <PartnerMoodView />}
+                {currentView === 'partner' && <PartnerView />}
 
                 {currentView === 'daily' && <DailyQuestion />}
 

@@ -51,6 +51,16 @@
  * the device-state `daily-write-declined` kind (`services/dailyWriteDeclined.ts`)
  * and in `dailyWriteDeclined`, which `loadDailyDay` fills from the kind. The
  * view decides when to ask from the snapshot, this field and the device date.
+ *
+ * The couple's streak (Partner page) lives here too: `coupleStreak` holds the
+ * last `get_couple_streak` answer (`{ status: 'ok', streak }`, `{ status:
+ * 'unlinked' }`, or `null` before any), `coupleStreakLoading` a read in flight
+ * and `coupleStreakError` the message of the last failed read.
+ * `loadCoupleStreak` never throws; a failure keeps the answer shown and sets
+ * the error, and only a successful answer writes the field and clears it. It is
+ * online-only with no saved copy. Only the newest started read writes (a
+ * sequence counter), and a read that outlives the session writes nothing.
+ * `signedOutState()` clears all three fields.
  */
 
 import { isOnline } from '../../api/errorHandlers';
@@ -76,10 +86,12 @@ import { formatDateISO } from '../../utils/dateUtils';
 
 import {
   DAY_CHANGED_MESSAGE,
+  type CoupleStreakAnswer,
   type DailyChoice,
   type DailyDayAnswer,
   type DailyDaySnapshot,
   announceDailyPick,
+  fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
   isPickRefusal,
@@ -106,7 +118,15 @@ export interface DailyQuestionSlice {
   dailyQueuedPicks: QueuedDailyPick[];
   /** The `day_id`s whose write prompt this account declined on this device. */
   dailyWriteDeclined: string[];
+  /** The last server answer for the couple's streak, or `null` before any. */
+  coupleStreak: CoupleStreakAnswer | null;
+  /** A `loadCoupleStreak` request is in flight. */
+  coupleStreakLoading: boolean;
+  /** The message of the last failed streak read; cleared by the next answer. */
+  coupleStreakError: string | null;
 
+  /** Read the couple's streak from the server. Never throws; a failure keeps what is shown. */
+  loadCoupleStreak: () => Promise<void>;
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
   loadDailyDay: () => Promise<void>;
   /**
@@ -207,6 +227,9 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       set({ dailyDay: mergeAnswer(shown, merged), dailyDayError: null });
     }
   };
+
+  // The newest started `loadCoupleStreak`: an older read that lands later writes nothing.
+  let streakSeq = 0;
 
   // The tab's running drain, and whether a call arrived while it ran.
   let drainInFlight: Promise<void> | null = null;
@@ -322,6 +345,37 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     dailyDayError: null,
     dailyQueuedPicks: [],
     dailyWriteDeclined: [],
+    coupleStreak: null,
+    coupleStreakLoading: false,
+    coupleStreakError: null,
+
+    loadCoupleStreak: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const mine = ++streakSeq;
+      const isCurrent = () =>
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        streakSeq === mine;
+
+      set({ coupleStreakLoading: true });
+      try {
+        const answer = await fetchCoupleStreak();
+        if (!isCurrent()) return;
+        set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
+      } catch (error) {
+        if (!isCurrent()) return;
+        // An offline refusal is expected, not a fault: the error is still set.
+        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+          console.error("[DailyQuestion] Failed to load the couple's streak:", error);
+        }
+        set({
+          coupleStreakLoading: false,
+          coupleStreakError:
+            error instanceof Error ? error.message : "Could not load your couple's streak.",
+        });
+      }
+    },
 
     loadDailyDay: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();

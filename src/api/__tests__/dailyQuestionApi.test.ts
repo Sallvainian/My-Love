@@ -6,7 +6,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setOnline } from '../../../tests/unit/stores/navigatorFixtures';
-import { DAY_ID, dailySnapshot, waitingSnapshot } from '../../../tests/unit/stores/dailyQuestionFixture';
+import {
+  DAY_ID,
+  coupleStreak,
+  dailySnapshot,
+  waitingSnapshot,
+} from '../../../tests/unit/stores/dailyQuestionFixture';
 
 const rpc = vi.fn();
 const abortSignal = vi.fn();
@@ -33,6 +38,7 @@ import { AccountDataError } from '../../services/accountDataError';
 import {
   DAY_CHANGED_MESSAGE,
   announceDailyPick,
+  fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
   isPickRefusal,
@@ -121,6 +127,84 @@ describe('fetchDailyDay', () => {
     await expect(fetchDailyDay()).rejects.toMatchObject({
       code: 'offline',
       message: "You are offline. Today's question needs a connection to load.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchCoupleStreak', () => {
+  it('calls get_couple_streak with no arguments and bounds the request', async () => {
+    rpc.mockResolvedValue({ data: { status: 'unlinked' }, error: null });
+
+    await fetchCoupleStreak();
+
+    expect(rpc).toHaveBeenCalledWith('get_couple_streak');
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('returns an ok answer with its streak', async () => {
+    const streak = coupleStreak({ held: 12, run: 3, today_state: 'blue', missed: 1 });
+    rpc.mockResolvedValue({ data: { status: 'ok', streak }, error: null });
+
+    await expect(fetchCoupleStreak()).resolves.toEqual({ status: 'ok', streak });
+  });
+
+  it('returns an unlinked answer', async () => {
+    rpc.mockResolvedValue({ data: { status: 'unlinked' }, error: null });
+
+    await expect(fetchCoupleStreak()).resolves.toEqual({ status: 'unlinked' });
+  });
+
+  it('throws on a PostgREST error instead of answering unlinked', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom', code: 'XX000', details: '', hint: '' } });
+
+    await expect(fetchCoupleStreak()).rejects.toBeInstanceOf(AccountDataError);
+  });
+
+  it.each([
+    ['null', null],
+    ['an unknown status', { status: 'pending' }],
+    ['an ok answer with no streak', { status: 'ok' }],
+    ['a negative count', { status: 'ok', streak: { ...coupleStreak(), held: -1 } }],
+    ['a fractional count', { status: 'ok', streak: { ...coupleStreak(), run: 1.5 } }],
+    ['an unknown today_state', { status: 'ok', streak: { ...coupleStreak(), today_state: 'red' } }],
+    ['a six-day week', { status: 'ok', streak: { ...coupleStreak(), week: coupleStreak().week.slice(1) } }],
+    [
+      'a week day that is not a date',
+      {
+        status: 'ok',
+        streak: { ...coupleStreak(), week: coupleStreak().week.map((d) => ({ ...d, day: 'today' })) },
+      },
+    ],
+    [
+      'a week day that is not a real date',
+      {
+        status: 'ok',
+        streak: {
+          ...coupleStreak(),
+          week: coupleStreak().week.map((d) => ({ ...d, day: '2030-13-45' })),
+        },
+      },
+    ],
+    [
+      'a week state that is unknown',
+      {
+        status: 'ok',
+        streak: { ...coupleStreak(), week: coupleStreak().week.map((d) => ({ ...d, state: 'x' })) },
+      },
+    ],
+  ])('throws invalid-response on %s, never unlinked', async (_label, data) => {
+    rpc.mockResolvedValue({ data, error: null });
+
+    await expect(fetchCoupleStreak()).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('refuses offline before any request', async () => {
+    setOnline(false);
+
+    await expect(fetchCoupleStreak()).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. The streak needs a connection to load.',
     });
     expect(rpc).not.toHaveBeenCalled();
   });

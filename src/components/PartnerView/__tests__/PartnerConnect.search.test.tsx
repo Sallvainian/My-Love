@@ -1,5 +1,5 @@
 /**
- * PartnerMoodView's Connect screen: the exact-email partner search.
+ * PartnerConnect's Connect screen: the exact-email partner search.
  *
  * The search runs on submit, never per keystroke, and each answer the store
  * holds renders its own state: found (the account and a Send Request button),
@@ -11,14 +11,9 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PartnerSearchResult } from '../../../api/partnerService';
 
-vi.mock('../../../api/supabaseClient', () => ({ supabase: {} }));
-vi.mock('../../../api/moodSyncService', () => ({
-  moodSyncService: { subscribePartnerEvents: vi.fn(async () => () => {}) },
-}));
-vi.mock('../../PokeKissInterface', () => ({ PokeKissInterface: () => null }));
 vi.mock('../../../stores/useAppStore', () => ({ useAppStore: () => state }));
 
-import { PartnerMoodView } from '../PartnerMoodView';
+import { PartnerConnect } from '../PartnerConnect';
 
 const TARGET_ID = '00000000-0000-4000-8000-00000000f00d';
 const EMAIL = 'jessie@example.test';
@@ -28,18 +23,10 @@ const TAKEN = 'That account is already connected with a partner.';
 
 function makeState(overrides: Record<string, unknown> = {}) {
   return {
-    partnerMoods: [],
-    fetchPartnerMoods: vi.fn(async () => {}),
-    syncStatus: { isOnline: true },
-    partner: null,
-    isLoadingPartner: false,
-    partnerLoadError: false,
     sentRequests: [],
     receivedRequests: [],
     searchResult: null as PartnerSearchResult | null,
     isSearching: false,
-    loadPartner: vi.fn(),
-    loadPendingRequests: vi.fn(),
     searchUsers: vi.fn(async () => {}),
     clearSearch: vi.fn(),
     sendPartnerRequest: vi.fn(async () => {}),
@@ -59,14 +46,14 @@ async function search(email: string) {
   return user;
 }
 
-describe('PartnerMoodView partner search', () => {
+describe('PartnerConnect partner search', () => {
   beforeEach(() => {
     cleanup();
     state = makeState();
   });
 
   it("asks for the partner's email in an email field", () => {
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
 
     const input = screen.getByLabelText("Your partner's email");
     expect(input).toHaveAttribute('type', 'email');
@@ -74,7 +61,7 @@ describe('PartnerMoodView partner search', () => {
   });
 
   it('does not search while the address is being typed', async () => {
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     const user = userEvent.setup();
 
     await user.type(screen.getByLabelText("Your partner's email"), EMAIL);
@@ -83,7 +70,7 @@ describe('PartnerMoodView partner search', () => {
   });
 
   it('keeps Find disabled until the box holds an email-shaped address', async () => {
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     const user = userEvent.setup();
     const find = screen.getByRole('button', { name: 'Find' });
 
@@ -95,7 +82,7 @@ describe('PartnerMoodView partner search', () => {
   });
 
   it('searches the trimmed address on Find, and on Enter', async () => {
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     const user = await search(`  ${EMAIL} `);
     expect(state.searchUsers).toHaveBeenLastCalledWith(EMAIL);
 
@@ -110,7 +97,7 @@ describe('PartnerMoodView partner search', () => {
         user: { id: TARGET_ID, email: EMAIL, displayName: 'Jessie' },
       },
     });
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     const user = await search(EMAIL);
 
     const results = screen.getByTestId('partner-search-results');
@@ -126,7 +113,7 @@ describe('PartnerMoodView partner search', () => {
     state = makeState({
       searchResult: { status: 'found', user: { id: TARGET_ID, email: EMAIL, displayName: null } },
     });
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await search(EMAIL);
 
     const results = screen.getByTestId('partner-search-results');
@@ -135,7 +122,7 @@ describe('PartnerMoodView partner search', () => {
 
   it('taken: says the account is already connected, with no button and no details', async () => {
     state = makeState({ searchResult: { status: 'taken' } });
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await search(EMAIL);
 
     expect(screen.getByTestId('partner-search-taken')).toHaveTextContent(TAKEN);
@@ -146,7 +133,7 @@ describe('PartnerMoodView partner search', () => {
 
   it('missing: says no account uses that email', async () => {
     state = makeState({ searchResult: { status: 'missing' } });
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await search(EMAIL);
 
     expect(screen.getByTestId('partner-search-empty')).toHaveTextContent(MISSING);
@@ -156,7 +143,7 @@ describe('PartnerMoodView partner search', () => {
 
   it('error: says the search failed, not that there is no account', async () => {
     state = makeState({ searchResult: { status: 'error', reason: 'fetch failed' } });
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await search(EMAIL);
 
     expect(screen.getByTestId('partner-search-error')).toHaveTextContent("Couldn't search");
@@ -165,12 +152,12 @@ describe('PartnerMoodView partner search', () => {
 
   it('shows no answer while a search is in flight', async () => {
     state = makeState({ searchResult: { status: 'missing' } });
-    const { rerender } = render(<PartnerMoodView />);
+    const { rerender } = render(<PartnerConnect />);
     await search(EMAIL);
     expect(screen.getByTestId('partner-search-empty')).toBeInTheDocument();
 
     state = { ...state, isSearching: true };
-    rerender(<PartnerMoodView />);
+    rerender(<PartnerConnect />);
 
     expect(screen.getByText('Searching...')).toBeInTheDocument();
     expect(screen.queryByTestId('partner-search-empty')).not.toBeInTheDocument();
@@ -178,7 +165,7 @@ describe('PartnerMoodView partner search', () => {
 
   it('drops the answer as soon as the address is edited', async () => {
     state = makeState({ searchResult: { status: 'missing' } });
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     const user = await search(EMAIL);
     expect(screen.getByTestId('partner-search-empty')).toBeInTheDocument();
 

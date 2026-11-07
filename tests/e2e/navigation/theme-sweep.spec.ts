@@ -11,12 +11,15 @@
  * "Light surface" is measured: a background at alpha >= .5 with relative
  * luminance > .4. Every kit dark surface is below .02, the kit `fill` pink
  * (#db2777) is about .2, and black scrims are 0, so all pass; white, the kit's
- * light `page`/`card2` values and pale pinks fail. Colours are resolved through
+ * light `page`/`card2` values and pale pinks fail. The Partner screen is swept
+ * in whichever streak state the pool pair happens to be in (its card is not
+ * forced to orange, grey or blue here); the card's colour states are checked in
+ * `partner/partner-streak.spec.ts`, scoped to the card. Colours are resolved through
  * a canvas, so oklch/oklab/color-mix computed values are read as the sRGB the
  * screen shows. Media elements are skipped, as are elements hidden by opacity
- * or visibility, and indicator dots no larger than 12x12px: the kit `good`
- * status dot (#4ade80, L about .55) is an 8px "Connected" light, not a
- * surface. A size floor rather than a colour allowlist, so a full-size panel
+ * or visibility, and indicator dots no larger than 12x12px: a small status
+ * light in a bright kit colour (the kit `good` green, #4ade80, L about .55) is
+ * not a surface. A size floor rather than a colour allowlist, so a full-size panel
  * in a light kit colour (`bg-ink`, `bg-good`) still fails.
  *
  * Photos may be the empty state on the test account; either state is a valid
@@ -32,12 +35,13 @@ import type { TypedSupabaseClient } from '../../support/factories';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo, type NavDestination } from '../../support/helpers/navigation';
 import {
+  COUPLE_STREAK_READ,
   DAILY_DAY_READ,
   LOVE_NOTES_READ,
   PHOTOS_LIST_READ,
   UPCOMING_EVENTS_READ,
-  partnerMoodListRead,
 } from '../../support/helpers/reads';
+import { findLightSurfaces } from '../../support/helpers/light-surfaces';
 import { homeEventsSettled, openSettingsFromHome } from '../../support/helpers/settings-screen';
 
 type Scheme = 'light' | 'dark';
@@ -115,17 +119,12 @@ const SIGNED_IN_SCREENS: Screen[] = [
   },
   {
     view: 'partner',
-    read: { url: partnerMoodListRead, armBefore: 'dock' },
+    // The streak is an RPC, hence the POST; the page's mount always sends it
+    // after the dock click.
+    read: { url: COUPLE_STREAK_READ, method: 'POST', armBefore: 'dock' },
     ready: async (page) => {
-      await expect(page.getByTestId('partner-mood-view')).toBeVisible();
-      // A mood card (both the latest and the older ones carry the testid) or,
-      // with no moods, the empty state.
-      await expect(
-        page
-          .getByTestId('partner-mood-card')
-          .or(page.getByTestId('partner-mood-empty-state'))
-          .first()
-      ).toBeVisible();
+      await expect(page.getByTestId('partner-view')).toBeVisible();
+      await expect(page.getByTestId('partner-streak-card')).toBeVisible();
     },
   },
   {
@@ -138,70 +137,6 @@ const SIGNED_IN_SCREENS: Screen[] = [
     },
   },
 ];
-
-interface LightSurface {
-  element: string;
-  background: string;
-  luminance: number;
-}
-
-/** Every in-viewport visible element whose background is an opaque light colour. */
-function findLightSurfaces(page: Page): Promise<LightSurface[]> {
-  return page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('2d canvas unavailable');
-
-    const toRgba = (colour: string): [number, number, number, number] => {
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-      ctx.fillStyle = colour;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-      return [r, g, b, a / 255];
-    };
-
-    const luminance = (r: number, g: number, b: number) => {
-      const [lr, lg, lb] = [r, g, b].map((channel) => {
-        const c = channel / 255;
-        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-      });
-      return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
-    };
-
-    const describe = (el: Element) => {
-      const testId = el.getAttribute('data-testid');
-      const className = typeof el.className === 'string' ? el.className.trim() : '';
-      return (
-        el.tagName.toLowerCase() +
-        (testId ? `[data-testid="${testId}"]` : '') +
-        (className ? ` class="${className}"` : '')
-      );
-    };
-
-    const skipped = new Set(['IMG', 'VIDEO', 'CANVAS', 'PICTURE']);
-    const MAX_DOT = 12;
-    const found: { element: string; background: string; luminance: number }[] = [];
-    for (const el of Array.from(document.querySelectorAll('body *'))) {
-      if (skipped.has(el.tagName)) continue;
-      if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) continue;
-      if (rect.width <= MAX_DOT && rect.height <= MAX_DOT) continue;
-
-      const background = getComputedStyle(el).backgroundColor;
-      const [r, g, b, a] = toRgba(background);
-      if (a < 0.5) continue;
-      const lum = luminance(r, g, b);
-      if (lum > 0.4) {
-        found.push({ element: describe(el), background, luminance: Number(lum.toFixed(3)) });
-      }
-    }
-    return found;
-  });
-}
 
 /** Every element, visible or not, whose computed font names Dancing Script. */
 function findDancingScript(page: Page): Promise<string[]> {

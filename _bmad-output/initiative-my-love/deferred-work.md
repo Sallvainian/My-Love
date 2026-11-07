@@ -4251,3 +4251,59 @@ source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-tes
 severity: low
 reason: After both bots picked (both `submit_daily_pick` calls 200), Claude Bot's page, the day's writer with the write sheet open, was reloaded and never sent `get_daily_day` in the 180 s test timeout; its failure screenshot still shows the waiting state under the sheet. The hosted edge logs also show no `daily_pick` broadcast to Claude Bot's channel after Claude Partner's pick, where the passing run at 04:23 UTC the same day sent one. Every server answer was 200, and Claude Partner's page showed the reveal. The page videos were cut short, so where the writer's page stopped is unknown. Reproduce with the live spec run repeatedly against the hosted site before changing code.
 status: open
+
+### DW-500: A linked Partner page shows only the partner's name, with no card, loading block or error, when the slice holds an `unlinked` streak answer (or null with nothing loading) while a partner is shown.
+origin: spec-deferred df427a169e35
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: PartnerView.tsx falls through to null when `coupleStreak` is not `ok`, not loading and has no error. Reachable only when the server says unlinked while a saved or stale partner is still shown (a server-side unlink with no client action, or the partner read failing after one); there is no unlink feature. Rare; the fix adds a branch. Reported by blind-hunter, edge-case-hunter, verification-gap and intent-alignment.
+status: open
+
+### DW-501: The Connect screen's typed email, shown search answer and error line are lost whenever `loadPartner` runs while the account is unlinked.
+origin: spec-deferred 22a75e44ce54
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: That state now lives in PartnerConnect, which unmounts while `isLoadingPartner` is true, and partnerSlice.loadPartner raises the flag on every call when `partner` is null (partnerSlice.ts:165). In PartnerMoodView the state sat in the parent and survived. It needs a partner reload during typing (a reconnect refresh, or Retry). Rare; the fix keeps PartnerConnect mounted but hidden across loads, which adds branches.
+status: open
+
+### DW-502: The streak error card offers no Retry, so an online transient failure with nothing shown stays until Realtime re-joins or the page is reopened.
+origin: spec-deferred 22cfebd7aa4f
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: PartnerView.tsx renders `partner-streak-error` with no action; only SUBSCRIBED, partner_linked, daily_pick, a partner change or a reconnect re-read. Rare (a failed online read with no streak yet); the fix adds a control. Story 3 owns the streak's failure and offline wording.
+status: open
+
+### DW-503: The interactions local-copy refresher still reads interactions on every signed-in start although no routed screen shows them, and the deleted interaction E2E specs leave that code without browser
+origin: spec-deferred c9adea711391
+location: src/stores/slices/interactionsSlice.ts:235
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: interactionsSlice.ts:235 `registerLocalCopy(INTERACTIONS_COPY_KIND, ...)` still runs; tests/e2e/partner/interaction-record-ownership.spec.ts and tests/e2e/offline/interactions-offline-copy.spec.ts were deleted with the Poke/Kiss/Fart tiles (the API-level tests/api/interaction-record-ownership.spec.ts stays). The intent keeps the code for epic 10, so removing the refresher is out of this story.
+status: open
+
+### DW-504: After a relink to a new partner within one session, the previous couple's streak can show under the new partner's name until the new read lands, or for good if it fails.
+origin: spec-deferred 6244cfdb5f44
+location: src/components/PartnerView/PartnerView.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: The slice answer is not keyed by partner; PartnerView shows any `ok` answer once a partner is present. Needs an unlink (no client action exists) and a new link in the same session. Rare; the fix adds a partner key to the stored answer.
+status: open
+
+### DW-505: When `subscribePartnerEvents` rejects, usePartnerStreakListener logs and holds nothing, with no retry, so the Partner page gets no live re-reads until it is reopened.
+origin: spec-deferred 7a52e464bc0a
+location: src/hooks/usePartnerStreakListener.ts
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: usePartnerStreakListener.ts `.catch` only logs, the same pattern as useDailyPickListener. A registry failure is rare; the page still reads on open, on a partner change and on reconnect. The fix adds retry logic.
+status: open
+
+### DW-506: The week strip's "Today" sits on the server's date for the viewer's stored zone, which can be a day off from the device while travelling until a Daily fetch records the new zone.
+origin: spec-deferred 0339fde9918d
+location: src/components/PartnerView/StreakCard.tsx
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: get_couple_streak dates the viewer by user_time_zones (story 7.1's recorded residual risk); StreakCard labels the last week entry Today, as the server answers it. Pre-existing server behaviour, and the epic bars the client from working out a day's state.
+status: open

@@ -258,6 +258,10 @@ export function signedOutState() {
     // The days this device's account declined to write for; the kind itself is
     // deleted with the account's other copies.
     dailyWriteDeclined: [],
+    // The couple's streak the outgoing account was shown, and its read state.
+    coupleStreak: null,
+    coupleStreakLoading: false,
+    coupleStreakError: null,
 
     // navigationSlice — not account state, but a page pushed in the outgoing
     // session is not one the next sign-in just opened: left set, that page

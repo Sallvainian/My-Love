@@ -42,9 +42,9 @@ test.describe('Partner profile offline', () => {
     const partnerName = ((partnerRecord.responseJson as { display_name: string | null }[] | null)
       ?.[0]?.display_name ?? '').trim();
     expect(partnerName).not.toBe('');
-    const heading = page.getByTestId('partner-mood-view').getByRole('heading', { level: 1 });
+    const heading = page.getByTestId('partner-view').getByRole('heading', { level: 1 });
     await expect(heading).toHaveText(partnerName);
-    await expect(page.getByTestId('partner-mood-refresh-button')).toBeVisible();
+    await expect(page.getByTestId('partner-streak-card')).toBeVisible();
     await recurseUntil(() => partnerCopySaved(page), (v) => { expect(v).toBe(true); });
 
     try {

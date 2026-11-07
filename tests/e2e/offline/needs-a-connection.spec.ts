@@ -14,7 +14,7 @@
  *
  * Background reads still go out on some screens after the tap is armed — seen
  * in runs: other mount-time reads on Photos and Love Notes, and
- * PartnerMoodView's pending-request read on Partner. Tests on those screens
+ * PartnerView's pending-request read on Partner. Tests on those screens
  * narrow the count to writes (every method but GET, less the read-only RPCs in
  * `READ_RPCS`), and say so. The pending-request read is a POST to
  * `rpc/get_my_pending_partner_requests`, and it can go out after the device is
@@ -49,7 +49,6 @@ import { navigateTo } from '../../support/helpers/navigation';
 import {
   CUSTOM_MESSAGE_SAVE,
   CUSTOM_MESSAGES_READ,
-  INTERACTIONS_READ,
   LOVE_NOTES_READ,
   PHOTOS_LIST_READ,
   OWN_PROFILE_READ,
@@ -58,7 +57,6 @@ import {
 import { recurseUntil } from '../../support/helpers/recurse';
 import { deleteRowById } from '../../support/helpers/teardown';
 import type { TypedSupabaseClient } from '../../support/factories';
-import { createInteractionInsert } from '../../support/factories/interaction-record-ownership';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
@@ -394,69 +392,6 @@ test.describe('Partner requests offline', () => {
       await page.context().setOffline(false);
     }
   });
-});
-
-// ---------------------------------------------------------------------------
-// Poke / kiss badge
-// ---------------------------------------------------------------------------
-
-test.describe('Poke and kiss badge offline', () => {
-  for (const [type, subject] of [
-    ['poke', 'A poke'],
-    ['kiss', 'A kiss'],
-  ] as const) {
-    test(`[P1] a ${type} plays but is not marked seen, and the badge stays`, async ({
-      page,
-      supabaseAdmin,
-      interceptNetworkCall,
-      cleanup,
-    }) => {
-      const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-
-      const { data, error } = await supabaseAdmin
-        .from('interactions')
-        .insert(createInteractionInsert({ type, from_user_id: partnerId, to_user_id: userId }))
-        .select('id')
-        .single();
-      expect(error).toBeNull();
-      const interactionId = data!.id;
-      cleanup.defer('delete the seeded interaction', () =>
-        deleteRowById(supabaseAdmin, 'interactions', interactionId)
-      );
-
-      const historyRead = interceptNetworkCall({ method: 'GET', url: INTERACTIONS_READ });
-      await page.goto('/partner');
-      const history = await historyRead;
-      expect(history.status).toBe(200);
-      expect(history.responseJson).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: interactionId, viewed: false })])
-      );
-      const badge = page.getByTestId('notification-badge');
-      await expect(badge).toBeVisible();
-
-      await goOffline(page, true);
-      // Writes only: the Partner screen's pending-request read can still go out.
-      const watch = watchSupabaseRequests(page, { writesOnly: true });
-      await badge.click();
-      // The animation still plays offline; ending it asks to mark it seen.
-      const animation = page.getByTestId(`${type}-animation`);
-      await expect(animation).toBeVisible();
-      await animation.click();
-
-      await expect(page.getByTestId('toast-notification')).toHaveText(
-        offline(`${subject} needs a connection to be marked as seen.`)
-      );
-      watch.stop();
-      expect(watch.requests).toEqual([]);
-      await expect(badge).toBeVisible();
-      const row = await supabaseAdmin
-        .from('interactions')
-        .select('viewed')
-        .eq('id', interactionId)
-        .single();
-      expect(row.data?.viewed).toBe(false);
-    });
-  }
 });
 
 // ---------------------------------------------------------------------------

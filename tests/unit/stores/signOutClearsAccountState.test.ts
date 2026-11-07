@@ -13,9 +13,9 @@
  * partnerSlice was invisible to the very assertion written to catch it.
  *
  * Clearing a SUBSET is worse than clearing nothing, because absence is itself a
- * render condition: clearing `partner` alone flips PartnerMoodView into its
- * `!partner` branch, which paints `sentRequests`, `receivedRequests` and
- * `searchResult`.
+ * render condition: clearing `partner` alone flips PartnerView into its
+ * `!partner` branch (PartnerConnect), which paints `sentRequests`,
+ * `receivedRequests` and `searchResult`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -51,7 +51,7 @@ import { moodService } from '../../../src/services/moodService';
 import { moodSyncFingerprint } from '../../../src/services/moodSyncPayload';
 import { moodSyncService } from '../../../src/api/moodSyncService';
 import type { MoodEntry } from '../../../src/types';
-import { dailySnapshot } from './dailyQuestionFixture';
+import { coupleStreak, dailySnapshot } from './dailyQuestionFixture';
 import { makeMoodEntry } from './moodSliceFixture';
 import { serializedStore } from './loaderIdentityGuardsFixture';
 import { STORAGE_KEY } from '../helpers/persistedBlob';
@@ -111,6 +111,9 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyDayError: null,
   dailyQueuedPicks: [],
   dailyWriteDeclined: [],
+  coupleStreak: null,
+  coupleStreakLoading: false,
+  coupleStreakError: null,
 };
 
 /** Identifiers that must not survive a sign-out */
@@ -126,6 +129,7 @@ const SECRETS = {
   customMessage: 'MY-OWN-CUSTOM-MESSAGE-TEXT',
   dailyQuestionThis: 'THE-DAILY-QUESTION-THIS-TEXT',
   dailyQuestionThat: 'THE-DAILY-QUESTION-THAT-TEXT',
+  coupleStreakError: 'THE-COUPLE-STREAK-READ-FAILURE',
   userId: 'USER-A-ID',
 };
 
@@ -262,6 +266,10 @@ function seedSignedInSession(): void {
     ],
     // The days whose write prompt this account declined on this device.
     dailyWriteDeclined: ['DAY-DECLINED'],
+    // The couple's streak the account was shown, a read in flight and a failed read.
+    coupleStreak: { status: 'ok', streak: coupleStreak({ held: 31, run: 4, milestones: 1 }) },
+    coupleStreakLoading: true,
+    coupleStreakError: SECRETS.coupleStreakError,
 
     // Anniversaries live INSIDE `settings`, which partialize persists and
     // sign-out must otherwise preserve (theme, notifications are device
@@ -397,8 +405,9 @@ describe('clearAuth on sign-out', () => {
 
     const state = useAppStore.getState();
     expect(state.partner).toBeNull();
-    // Clearing `partner` alone is what makes these reachable — PartnerMoodView
-    // renders its search-and-request UI precisely when `partner` is null.
+    // Clearing `partner` alone is what makes these reachable — PartnerView
+    // (via PartnerConnect) renders its search-and-request UI precisely when
+    // `partner` is null.
     expect(state.sentRequests).toEqual([]);
     expect(state.receivedRequests).toEqual([]);
     expect(state.searchResult).toBeNull();

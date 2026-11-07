@@ -82,6 +82,15 @@
   --color-line-strong: var(--kit-line-strong);
   --color-glass: var(--kit-glass);
   --color-field: var(--kit-field);
+  --color-fire: var(--kit-fire);
+  --color-fire-tint: var(--kit-fire-tint);
+  --color-fire-ink: var(--kit-fire-ink);
+  --color-fire-soft: var(--kit-fire-soft);
+  --color-cold: var(--kit-cold);
+  --color-cold-tint: var(--kit-cold-tint);
+  --color-cold-ink: var(--kit-cold-ink);
+  --color-ash-tint: var(--kit-ash-tint);
+  --color-ash-ink: var(--kit-ash-ink);
   --shadow-card: var(--kit-shadow-card);
   --shadow-float: var(--kit-shadow-float);
   --font-lora: 'Lora', serif;
@@ -117,6 +126,17 @@
     --kit-line-strong: #987d90;
     --kit-glass: rgba(255, 255, 255, 0.8);
     --kit-field: #fbf7f9;
+    /* The couple's streak card: orange when today is done, blue when a day
+       was missed, grey otherwise. */
+    --kit-fire: #f97316;
+    --kit-fire-tint: #fff1e6;
+    --kit-fire-ink: #c2410c;
+    --kit-fire-soft: #9a3412;
+    --kit-cold: #3b82f6;
+    --kit-cold-tint: #e3eeff;
+    --kit-cold-ink: #1d4ed8;
+    --kit-ash-tint: #eceef2;
+    --kit-ash-ink: #5b6270;
     --kit-shadow-card: 0 1px 2px rgba(157, 23, 77, 0.05), 0 8px 24px rgba(157, 23, 77, 0.06);
     --kit-shadow-float: 0 10px 30px rgba(157, 23, 77, 0.16);
   }
@@ -140,6 +160,15 @@
       --kit-line-strong: #686e78;
       --kit-glass: rgba(17, 21, 30, 0.78);
       --kit-field: #0f131b;
+      --kit-fire: #f97316;
+      --kit-fire-tint: rgba(249, 115, 22, 0.14);
+      --kit-fire-ink: #fdba74;
+      --kit-fire-soft: #fdba74;
+      --kit-cold: #3b82f6;
+      --kit-cold-tint: rgba(59, 130, 246, 0.16);
+      --kit-cold-ink: #93c5fd;
+      --kit-ash-tint: #1c2230;
+      --kit-ash-ink: #9aa3b2;
       --kit-shadow-card: 0 0 #0000;
       --kit-shadow-float: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
