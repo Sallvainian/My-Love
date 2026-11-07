@@ -24,6 +24,8 @@ const state = {
   showPartnerPage: vi.fn(),
   loadMoreDailyHistory: vi.fn(async () => {}),
   dailyHistoryEnd: false,
+  dailyHistoryLoading: false,
+  dailyHistoryError: null as string | null,
   syncStatus: { isOnline: true },
 };
 
@@ -87,6 +89,8 @@ describe('PastQuestionsPage', () => {
     state.showPartnerPage = vi.fn();
     state.loadMoreDailyHistory = vi.fn(async () => {});
     state.dailyHistoryEnd = false;
+    state.dailyHistoryLoading = false;
+    state.dailyHistoryError = null;
     state.syncStatus = { isOnline: true };
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     window.history.replaceState(null, '', '/partner/history');
@@ -201,6 +205,50 @@ describe('PastQuestionsPage', () => {
       renderPage();
 
       expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    });
+  });
+
+  describe('loading and errors', () => {
+    it('shows the loading block while the first read runs with no rows', () => {
+      state.dailyHistoryLoading = true;
+      renderPage({ history: [] });
+
+      expect(screen.getByTestId('partner-history-loading')).toBeVisible();
+      expect(screen.getByTestId('partner-history-loading')).toHaveTextContent(
+        'Loading your past questions...'
+      );
+      expect(screen.queryByTestId('partner-history-error')).not.toBeInTheDocument();
+    });
+
+    it('shows the error above an empty list once the first read failed', () => {
+      state.dailyHistoryError = 'You are offline. Past questions needs a connection to load.';
+      renderPage({ history: [] });
+
+      expect(screen.getByTestId('partner-history-error')).toBeVisible();
+      expect(screen.getByTestId('partner-history-error')).toHaveTextContent(
+        'You are offline. Past questions needs a connection to load.'
+      );
+      expect(screen.queryByTestId('partner-history-row')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('partner-history-loading')).not.toBeInTheDocument();
+    });
+
+    it('keeps the rows and shows the error under them when a later page failed', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      renderPage();
+
+      expect(screen.getAllByTestId('partner-history-row')).toHaveLength(1);
+      const error = screen.getByTestId('partner-history-error');
+      expect(error).toHaveTextContent('Could not load your past questions.');
+      const card = screen.getByTestId('partner-history-row').parentElement!;
+      expect(card.nextElementSibling).toBe(error);
+      expect(error.nextElementSibling).toBe(screen.getByTestId('partner-history-sentinel'));
+    });
+
+    it('shows no loading block or error when the read succeeded', () => {
+      renderPage();
+
+      expect(screen.queryByTestId('partner-history-loading')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('partner-history-error')).not.toBeInTheDocument();
     });
   });
 

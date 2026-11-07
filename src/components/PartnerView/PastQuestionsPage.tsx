@@ -20,7 +20,7 @@
  * @component
  */
 
-import { Check, ChevronLeft } from 'lucide-react';
+import { Check, ChevronLeft, Heart } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { CoupleStreak, DailyDaySnapshot } from '../../api/dailyQuestionApi';
 import { parseEventDate } from '../../services/eventsService';
@@ -61,6 +61,8 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
   const showPartnerPage = useAppStore((state) => state.showPartnerPage);
   const loadMoreDailyHistory = useAppStore((state) => state.loadMoreDailyHistory);
   const dailyHistoryEnd = useAppStore((state) => state.dailyHistoryEnd);
+  const dailyHistoryLoading = useAppStore((state) => state.dailyHistoryLoading);
+  const dailyHistoryError = useAppStore((state) => state.dailyHistoryError);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +138,16 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
           )}
         </div>
 
+        {days.length === 0 && dailyHistoryLoading && (
+          <div
+            className="flex flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-5 py-10 text-center shadow-card"
+            data-testid="partner-history-loading"
+          >
+            <Heart className="h-8 w-8 animate-pulse fill-current text-accent" aria-hidden="true" />
+            <p className="text-sm text-muted">Loading your past questions...</p>
+          </div>
+        )}
+
         {days.length > 0 && (
           <div className="rounded-[20px] border border-line bg-card px-3.5 shadow-card">
             {days.map((day) => {
@@ -194,6 +206,16 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* A failed read: above an empty list, or under the rows when a "more" failed. */}
+        {dailyHistoryError && !(days.length === 0 && dailyHistoryLoading) && (
+          <div
+            className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
+            data-testid="partner-history-error"
+          >
+            {dailyHistoryError}
           </div>
         )}
 
