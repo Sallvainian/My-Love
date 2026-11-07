@@ -38,47 +38,6 @@ export async function clearPairDays(
   }
 }
 
-/**
- * Three coach questions with fixed ids, so a local stack always has a pool to
- * draw from. Coach rows have no pair (`daily_questions_coach_or_written`), so
- * every worker's pair can draw them, and `couple_days.question_id` is NO ACTION:
- * a row a day still asks cannot be deleted. These rows are therefore upserted
- * with `ignoreDuplicates` and never deleted, and a spec asserts that the page
- * agrees with the question the admin client reads from the pair's
- * `couple_days` row, never a specific text.
- */
-export const TEST_COACH_QUESTIONS = [
-  {
-    id: '00000000-0000-4000-8000-00000000d001',
-    this_text: 'Beach day',
-    that_text: 'Mountain day',
-  },
-  {
-    id: '00000000-0000-4000-8000-00000000d002',
-    this_text: 'Coffee',
-    that_text: 'Tea',
-  },
-  {
-    id: '00000000-0000-4000-8000-00000000d003',
-    this_text: 'Sunrise',
-    that_text: 'Sunset',
-  },
-] as const;
-
-/** Make sure the test coach rows exist. Idempotent; safe under parallel workers. */
-export async function ensureTestCoachQuestions(supabaseAdmin: TypedSupabaseClient): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('daily_questions')
-    .upsert(
-      TEST_COACH_QUESTIONS.map((row) => ({ ...row })),
-      { onConflict: 'id', ignoreDuplicates: true }
-    );
-
-  if (error) {
-    throw new Error(`ensureTestCoachQuestions: failed to upsert the coach rows: ${error.message}`);
-  }
-}
-
 /** The question of this worker pair's `couple_days` rows (at most one per date), as `This or That?`. */
 export async function readPairQuestionTexts(
   supabaseAdmin: TypedSupabaseClient,

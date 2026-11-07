@@ -20,7 +20,6 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
 import {
   clearPairDays,
-  ensureTestCoachQuestions,
   readPairQuestionTexts,
 } from '../../support/factories/daily-question';
 import { closeContext } from '../../support/fixtures/cleanup';
@@ -45,7 +44,6 @@ test.describe('Daily question: pick and reveal', () => {
     expect(partnerAuthToken).not.toBe('');
 
     const pair = await resolveWorkerPairIds(supabaseAdmin);
-    await ensureTestCoachQuestions(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));
 
