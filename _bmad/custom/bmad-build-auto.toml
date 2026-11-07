@@ -12,3 +12,10 @@ Launch a subagent with no prior conversation context, on the Sonnet model at hig
 >
 > When done, report what you changed, how you verified it, and anything left incomplete or risky.
 """
+
+# Review-triage rules the owner adopted from the epic 6 retrospective
+# (2026-11-07, action items 7 and 9).
+persistent_facts = [
+  "Triage, rare but real: a finding verified as a real `low` defect that step 04 would reject only because users or developers are unlikely to meet it routes to `defer` instead, with that reason in its evidence, so bmad-loop files it in the deferred-work ledger now rather than at the epic's refactor sweep. `false` findings and lows whose fix is a direct correction are handled as step 04 says. (Epic 6: six such rejections reached the ledger only at story 6.10.)",
+  "Triage, plan corrections: step 04 rejects any finding whose fix is to edit this build's plan. One exception: a finding that the plan's own record states a fact wrong (a count, name, path or command) is fixed by appending one dated line to a `## Corrections` section at the end of the plan (create the section if it is missing), saying what was wrong and what is right. Earlier text in the plan is never rewritten, and nothing else in the plan is edited. (Epic 6: story 6.11's plan kept a wrong assertion count and a superseded secret name.)",
+]
