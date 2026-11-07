@@ -1,7 +1,9 @@
 /**
  * useDailyPickListener — one subscriber on the shared partner channel while
  * the account is signed in and online. A `daily_pick` re-reads the named day;
- * every SUBSCRIBED re-reads today's, because a broadcast is never replayed.
+ * a `partner_linked` re-reads today's, so the invitation to link gives way to
+ * the day; every SUBSCRIBED re-reads today's, because a broadcast is never
+ * replayed.
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -42,15 +44,16 @@ describe('useDailyPickListener', () => {
     });
   });
 
-  it('holds one subscriber, with a handler for daily_pick and for the status', async () => {
+  it('holds one subscriber, with a handler for daily_pick, partner_linked and the status', async () => {
     renderHook(() => useDailyPickListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
 
     const handlers = subscribe.mock.calls[0][0];
     expect(handlers.daily_pick).toBeTypeOf('function');
+    expect(handlers.partner_linked).toBeTypeOf('function');
     expect(handlers.onStatus).toBeTypeOf('function');
     expect(handlers.new_mood).toBeUndefined();
-    expect(handlers.partner_linked).toBeUndefined();
+    expect(handlers.dates_changed).toBeUndefined();
   });
 
   it('re-reads the named day when a daily_pick arrives', async () => {
@@ -64,7 +67,17 @@ describe('useDailyPickListener', () => {
     expect(state.loadDailyDay).not.toHaveBeenCalled();
   });
 
-  it('re-reads today on every SUBSCRIBED, and on nothing else', async () => {
+  it('re-reads today when a partner_linked arrives (DW-490)', async () => {
+    renderHook(() => useDailyPickListener());
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    act(() => subscribe.mock.calls[0][0].partner_linked!({ event: 'partner_linked' }));
+
+    expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
+    expect(state.refreshDailyDay).not.toHaveBeenCalled();
+  });
+
+  it('re-reads today on every SUBSCRIBED, and on no other status', async () => {
     renderHook(() => useDailyPickListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
     const onStatus = subscribe.mock.calls[0][0].onStatus!;
@@ -95,6 +108,7 @@ describe('useDailyPickListener', () => {
 
     unmount();
     act(() => handlers.daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
+    act(() => handlers.partner_linked!({ event: 'partner_linked' }));
     act(() => handlers.onStatus!('SUBSCRIBED'));
 
     expect(state.refreshDailyDay).not.toHaveBeenCalled();

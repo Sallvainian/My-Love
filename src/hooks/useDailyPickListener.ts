@@ -1,6 +1,7 @@
 /**
- * useDailyPickListener — show the partner's pick on an open Daily without a
- * reload (architecture AD-11).
+ * useDailyPickListener — show the partner's pick, and today's day once a
+ * partner request is accepted, on an open Daily without a reload (architecture
+ * AD-11).
  *
  * `DailyQuestion` mounts this. While the account is signed in and online it
  * holds one subscriber on the shared partner channel (the refcounted registry
@@ -8,6 +9,10 @@
  *
  *   - `daily_pick { day_id }` re-reads that one day (`refreshDailyDay`). The
  *     event carries no choice and is trusted for nothing else.
+ *   - `partner_linked` re-reads today's day (`loadDailyDay`): the device that
+ *     accepted this account's partner request sends it, and the topic is the
+ *     account's own, so it arrives while Daily shows the invitation to link.
+ *     Without it the invitation stays until Daily is opened again (DW-490).
  *   - Every `SUBSCRIBED` — the join, each Realtime re-join, and the replay a
  *     subscriber gets when it attaches to an already-open channel — re-reads
  *     today's day (`loadDailyDay`), because a broadcast is ephemeral and never
@@ -43,6 +48,9 @@ export function useDailyPickListener(): void {
       .subscribePartnerEvents({
         daily_pick: ({ day_id }) => {
           if (active) void refreshDailyDay(day_id);
+        },
+        partner_linked: () => {
+          if (active) void loadDailyDay();
         },
         onStatus: (status) => {
           if (active && status === 'SUBSCRIBED') void loadDailyDay();

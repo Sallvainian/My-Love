@@ -40,6 +40,7 @@ import {
 import type { TypedSupabaseClient } from '../../support/factories';
 import { clockAnchor } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
+import { acceptFromPartnerTab, seedRequest } from '../../support/helpers/partner-requests';
 import {
   LOVE_NOTE_SEND,
   LOVE_NOTES_READ,
@@ -52,7 +53,6 @@ import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
 const REQUEST_SEND = '**/rest/v1/partner_requests*';
 const PENDING_REQUESTS = '**/rest/v1/rpc/get_my_pending_partner_requests';
-const REQUEST_ACCEPT = '**/rest/v1/rpc/accept_partner_request';
 const INTERACTION_SEND = '**/rest/v1/interactions?*';
 
 const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
@@ -60,23 +60,6 @@ const INTERACTIONS_SUBSCRIBED_LOG = /\[InteractionService\] Realtime subscriptio
 
 const MISSING = "No account uses that email — check it's the one they sign in with.";
 const TAKEN = 'That account is already connected with a partner.';
-
-/** A pending request from `from` to `to`, sent as `from` itself; returns its id. */
-async function seedRequest(from: Throwaway, to: Throwaway): Promise<string> {
-  const { error: sendError } = await from.client
-    .from('partner_requests')
-    .insert({ from_user_id: from.userId, to_user_id: to.userId, status: 'pending' });
-  if (sendError) throw new Error(`Failed to send the seed request: ${sendError.message}`);
-
-  const { data: request, error: readError } = await to.client
-    .from('partner_requests')
-    .select('id')
-    .eq('from_user_id', from.userId)
-    .eq('to_user_id', to.userId)
-    .single();
-  if (readError || !request) throw new Error(`Seed request not visible: ${readError?.message}`);
-  return request.id;
-}
 
 /** Link two throwaway accounts the way the app does: a request, then accept. */
 async function linkThroughRequest(from: Throwaway, to: Throwaway): Promise<void> {
@@ -285,22 +268,6 @@ async function waitOnNotesUnlinked(page: Page) {
   await openAndJoin(page, 'notes', NOTES_SUBSCRIBED_LOG);
   await expect(page.getByTestId('notes-error-banner')).toHaveText('Partner not configured');
   return threadReads;
-}
-
-/** B accepts `requestId` from its Partner tab, and the accept RPC succeeds. */
-async function acceptFromPartnerTab(bPage: Page, requestId: string): Promise<void> {
-  const accept = bPage.getByTestId(`accept-request-${requestId}`);
-  await expect(accept).toBeVisible();
-  const accepted = observeOn({
-    page: bPage,
-    method: 'POST',
-    url: REQUEST_ACCEPT,
-    timeout: SECOND_CONTEXT_READ_TIMEOUT,
-  });
-  await accept.click();
-  const acceptResponse = await accepted;
-  expect(acceptResponse.status).toBeGreaterThanOrEqual(200);
-  expect(acceptResponse.status).toBeLessThan(300);
 }
 
 /** The store's partner id, read from the running app (observation only). */
