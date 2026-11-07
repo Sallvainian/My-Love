@@ -27,6 +27,7 @@ const state = {
   dailyHistoryLoading: false,
   dailyHistoryError: null as string | null,
   dailyHistoryErrorOffline: false,
+  dailyHistoryLoadingMore: false,
   syncStatus: { isOnline: true },
 };
 
@@ -93,6 +94,7 @@ describe('PastQuestionsPage', () => {
     state.dailyHistoryLoading = false;
     state.dailyHistoryError = null;
     state.dailyHistoryErrorOffline = false;
+    state.dailyHistoryLoadingMore = false;
     state.syncStatus = { isOnline: true };
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     window.history.replaceState(null, '', '/partner/history');
@@ -275,6 +277,50 @@ describe('PastQuestionsPage', () => {
       expect(screen.getByTestId('partner-history-error')).toHaveTextContent(
         'You are offline. Past questions needs a connection to load.'
       );
+    });
+
+    it('offers Retry under the rows after a failed load-more online, which asks for the page again', async () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      renderPage();
+      expect(state.loadMoreDailyHistory).not.toHaveBeenCalled();
+
+      const retry = within(screen.getByTestId('partner-history-error')).getByTestId(
+        'partner-history-retry'
+      );
+      expect(retry).toBeEnabled();
+      await userEvent.setup().click(retry);
+
+      expect(state.loadMoreDailyHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables Retry while a load-more is in flight', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryLoadingMore = true;
+      renderPage();
+
+      expect(screen.getByTestId('partner-history-retry')).toBeDisabled();
+    });
+
+    it('offers no Retry under the rows at the end of the list, where there is no more to ask for', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      state.dailyHistoryEnd = true;
+      renderPage();
+
+      expect(screen.getByTestId('partner-history-error')).toBeVisible();
+      expect(screen.queryByTestId('partner-history-retry')).not.toBeInTheDocument();
+    });
+
+    it('offers no Retry above an empty list or while offline', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      renderPage({ history: [] });
+      expect(screen.getByTestId('partner-history-error')).toBeVisible();
+      expect(screen.queryByTestId('partner-history-retry')).not.toBeInTheDocument();
+
+      cleanup();
+      state.syncStatus = { isOnline: false };
+      renderPage();
+      expect(screen.getByTestId('partner-history-error')).toBeVisible();
+      expect(screen.queryByTestId('partner-history-retry')).not.toBeInTheDocument();
     });
 
     it('shows no loading block or error when the read succeeded', () => {

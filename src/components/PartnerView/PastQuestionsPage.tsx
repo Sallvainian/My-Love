@@ -27,6 +27,7 @@ import { parseEventDate } from '../../services/eventsService';
 import { replaceWithPartnerTop } from '../../stores/slices/navigationSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { NetworkStatusIndicator } from '../shared';
+import { SECONDARY_BUTTON } from '../shared/kitClasses';
 
 type ShownDay = DailyDaySnapshot & {
   my_choice: NonNullable<DailyDaySnapshot['my_choice']>;
@@ -62,6 +63,7 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
   const loadMoreDailyHistory = useAppStore((state) => state.loadMoreDailyHistory);
   const dailyHistoryEnd = useAppStore((state) => state.dailyHistoryEnd);
   const dailyHistoryLoading = useAppStore((state) => state.dailyHistoryLoading);
+  const dailyHistoryLoadingMore = useAppStore((state) => state.dailyHistoryLoadingMore);
   const dailyHistoryError = useAppStore((state) => state.dailyHistoryError);
   const dailyHistoryErrorOffline = useAppStore((state) => state.dailyHistoryErrorOffline);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
@@ -214,10 +216,24 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
             offline refusal; those rows stay valid and the banner says why. */}
         {dailyHistoryError && (days.length === 0 ? !dailyHistoryLoading : !dailyHistoryErrorOffline) && (
           <div
-            className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
+            className="flex flex-col gap-3 rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
             data-testid="partner-history-error"
           >
-            {dailyHistoryError}
+            <span>{dailyHistoryError}</span>
+            {/* The sentinel stays in view after a failed "more", so the observer
+                never asks again: the person does. At the end there is no more to
+                ask for (a list filled from the copy is at its end too). */}
+            {days.length > 0 && isOnline && !dailyHistoryEnd && (
+              <button
+                type="button"
+                className={SECONDARY_BUTTON}
+                disabled={dailyHistoryLoadingMore}
+                onClick={() => void loadMoreDailyHistory()}
+                data-testid="partner-history-retry"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
