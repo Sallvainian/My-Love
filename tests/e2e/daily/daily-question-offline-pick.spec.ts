@@ -14,8 +14,8 @@
  * 2. The worker alone queues a pick offline; the admin client then moves the
  *    day's `created_at` 10 minutes ahead, so the queued `picked_at` falls before
  *    the five-minute window. Back online the server refuses with `DQ002`, the
- *    page shows the failure with the options and Send my pick again, and the row
- *    is `failed`. There is no page clock and no faked response.
+ *    page shows the clock sentence alone with the options and Send my pick
+ *    again, and the row is `failed` with that sentence. There is no page clock and no faked response.
  *
  * Dev mode has no service worker, so a reload cannot happen while the context
  * is offline; neither test reloads. Listeners and request trackers are attached
@@ -280,7 +280,9 @@ test.describe(
       expect(refused.status).toBe(400);
       expect(refused.responseJson).toMatchObject({ code: 'DQ002' });
       await expect(page.getByTestId('daily-pick-failed')).toBeVisible();
-      await expect(page.getByTestId('daily-pick-failed')).toContainText('Your pick could not be sent.');
+      await expect(page.getByTestId('daily-pick-failed')).toHaveText(
+        "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again."
+      );
       await expect(page.getByTestId('daily-pick-queued')).toHaveCount(0);
       await expect(page.getByTestId('daily-option-this')).toBeVisible();
       await expect(page.getByTestId('daily-option-that')).toBeVisible();

@@ -317,17 +317,40 @@ describe('submitDailyPick', () => {
     });
   });
 
-  it('leaves a DQ002 (outside the five-minute window) a transport error', async () => {
-    rpc.mockResolvedValue({
-      data: null,
-      error: { message: 'Pick time outside the allowed window', code: 'DQ002', details: '', hint: '' },
-    });
+  it.each([
+    [
+      'DQ002',
+      'Pick time outside the allowed window',
+      "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.",
+    ],
+    [
+      'P0002',
+      'Day not found',
+      "This question isn't available any more. Open Daily again to see today's question.",
+    ],
+    ['22023', 'Invalid choice', "This pick couldn't be sent. Please pick again."],
+  ])('maps a %s refusal to a refused error with its own sentence', async (code, serverMessage, shown) => {
+    const error = { message: serverMessage, code, details: '', hint: '' };
+    rpc.mockResolvedValue({ data: null, error });
 
-    const failure = await submitDailyPick(DAY_ID, 'this').catch((error: unknown) => error);
+    const failure = await submitDailyPick(DAY_ID, 'this').catch((caught: unknown) => caught);
 
     expect(failure).toBeInstanceOf(AccountDataError);
-    expect(failure).toMatchObject({ code: 'transport' });
+    expect(failure).toMatchObject({ code: 'refused', message: shown });
     expect((failure as AccountDataError).message).not.toBe(DAY_CHANGED_MESSAGE);
+    expect((failure as AccountDataError).cause).toBe(error);
+    expect(console.error).toHaveBeenCalledWith('[Supabase] DailyQuestionApi.submitDailyPick:', {
+      code,
+      message: serverMessage,
+      details: '',
+      hint: '',
+    });
+  });
+
+  it('leaves any other RPC error a transport error', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'boom', code: 'XX000', details: '', hint: '' } });
+
+    await expect(submitDailyPick(DAY_ID, 'this')).rejects.toMatchObject({ code: 'transport' });
   });
 
   it('refuses offline before any request', async () => {
