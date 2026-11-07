@@ -54,7 +54,6 @@
 import type { Page } from '@playwright/test';
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { test, expect } from '../../support/merged-fixtures';
-import { navigateTo } from '../../support/helpers/navigation';
 import {
   PERSISTED_ALLOWLIST,
   eventCardTestId,
@@ -167,12 +166,9 @@ test.describe('stale persisted events never rehydrate', () => {
     await coupleEvents.clear();
 
     const staleEvent = stalePersistedEvent();
-    // Dated today on purpose: `MoodTracker`'s seeding block only reads
-    // `getMoodForDate(formatDateISO(new Date()))`
-    // (`src/components/MoodTracker/MoodTracker.tsx:165-181`), so a mood dated
-    // any other day never reaches the branch that would disclose it. The page
-    // clock is pinned to the mood's instant, so "today" is the mood's day even
-    // if the run crosses real midnight.
+    // The seeded mood is dated at the clock anchor, which the page clock below
+    // is installed at. The store check further down filters by note alone, so
+    // it does not depend on that date.
     const anchor = clockAnchor();
     const staleMood = stalePersistedMood(anchor);
 
@@ -184,22 +180,18 @@ test.describe('stale persisted events never rehydrate', () => {
     await expect(page.getByTestId('time-together')).toBeVisible();
     await expect(page.getByRole('main')).not.toContainText(staleEvent.label, { ignoreCase: true });
 
-    await navigateTo(page, 'mood');
-    await expect(page.getByTestId('mood-tracker')).toBeVisible();
-
-    // The note never reaches the textarea — and the textarea is never even
-    // expanded. `showNoteField` initializes `false` (`MoodTracker.tsx:100`)
-    // and is raised only by the rehydrated-mood branch, so its absence is the
-    // signal that the branch did not fire.
+    // The stale mood never reaches the store's `moods` list. Story 6.9 took the
+    // mood screen out of every route, so its note field can no longer show the
+    // leak; the store is the level this check reads. The DOM half of the old
+    // check (the note field and "Selected: Sad" on the mood screen) is gone with
+    // the screen's route; epic 10 deletes the screen itself.
     await expect(page.getByRole('main')).not.toContainText(staleMood.note, { ignoreCase: true });
-    await expect(page.getByTestId('mood-note-input')).toHaveCount(0);
-
-    // The mood SELECTION is the other half of the same leak: the branch calls
-    // `setSelectedMoods(existingMood.moods)`, and a non-empty selection renders
-    // "Selected: <label>" — 'Sad' for the seeded 'sad' (`MoodTracker.tsx:49`).
-    await expect(
-      page.getByTestId('mood-selected-summary').filter({ hasText: 'Selected: Sad' })
-    ).toHaveCount(0);
+    const leaked = await page.evaluate(
+      (note) =>
+        (window.__APP_STORE__?.getState().moods ?? []).filter((mood) => mood.note === note).length,
+      staleMood.note
+    );
+    expect(leaked).toBe(0);
   });
 
   test('[P1] one load clears both stale keys from the stored blob, not just from state', async ({

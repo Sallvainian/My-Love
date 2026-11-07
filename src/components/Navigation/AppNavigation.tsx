@@ -51,11 +51,11 @@
  */
 import {
   Camera,
+  Flame,
   Heart,
   House,
   MessageCircle,
   Settings as SettingsIcon,
-  FaceSlightlySmiling,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -71,9 +71,8 @@ interface Destination {
   label: string;
   Icon: LucideIcon;
   /**
-   * Fill the icon while active. No destination sets it now: House,
-   * FaceSlightlySmiling, MessageCircle, Camera and Users lose their inner
-   * strokes to the fill.
+   * Fill the icon while active. No destination sets it now: House, Flame,
+   * MessageCircle, Camera and Users lose their inner strokes to the fill.
    */
   fillWhenActive?: boolean;
 }
@@ -84,7 +83,7 @@ interface Destination {
  */
 const DESTINATIONS: readonly Destination[] = [
   { view: 'home', label: 'Home', Icon: House },
-  { view: 'mood', label: 'Mood', Icon: FaceSlightlySmiling },
+  { view: 'daily', label: 'Daily', Icon: Flame },
   { view: 'notes', label: 'Love Notes', Icon: MessageCircle },
   { view: 'photos', label: 'Photos', Icon: Camera },
   { view: 'partner', label: 'Partner', Icon: Users },
@@ -153,9 +152,10 @@ export function AppNavigation({
             )}
 
             {/* The app name rather than the active destination, and a span rather
-                than a heading: Mood, Notes, Partner and Settings each render
-                their own level-1 heading naming themselves, so a chrome heading
-                would duplicate that title on screen and make a level-1-heading
+                than a heading: Notes, Partner and Settings each render their own
+                level-1 heading naming themselves (Daily's level-1 heading is
+                its question), so a chrome heading would add a second one on
+                screen and make a level-1-heading
                 query ambiguous -- which is exactly what broke
                 notes/love-notes.spec.ts:27 when this was an h1. */}
             <span

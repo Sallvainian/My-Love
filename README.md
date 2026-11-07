@@ -81,7 +81,7 @@ npm run test:e2e               # All Playwright projects (E2E, integration, API)
 npm run test:e2e:ui            # Playwright UI mode
 npm run test:p0                # Priority 0 only
 npm run test:p1                # Priority 0+1
-npx playwright test tests/e2e/mood/mood-tracker.spec.ts  # Single file
+npx playwright test tests/e2e/navigation/dock.spec.ts  # Single file
 
 # Integration
 npm run test:integration

@@ -140,8 +140,8 @@ test.describe('A failed Dates list events load recovers on reconnect (DE.5-COMP-
       // Leave Settings through a view that never calls loadEvents. Returning to
       // Home would start another events load, which would muddy which read the
       // reconnect assertion below is observing.
-      await navigateTo(page, 'mood');
-      await expect(page.getByTestId('mood-tracker')).toBeVisible();
+      await navigateTo(page, 'daily');
+      await expect(page.getByTestId('daily-question-view')).toBeVisible();
 
       await log.step('Seed a row the client cannot know about yet');
       const anchor = new Date();

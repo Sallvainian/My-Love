@@ -20,12 +20,14 @@ import { createPhotoInsert } from '../../support/factories/photos';
 /** The phone-width viewport the layout checks below run at, as the kit specs do. */
 const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
 
-const DOCK_DESTINATIONS = ['home', 'mood', 'notes', 'photos', 'partner'] as const;
+const DOCK_DESTINATIONS = ['home', 'daily', 'notes', 'photos', 'partner'] as const;
+/** The dock's accessible names, in DOM order. */
+const DOCK_LABELS = ['Home', 'Daily', 'Love Notes', 'Photos', 'Partner'] as const;
 const ALL_DESTINATIONS = [...DOCK_DESTINATIONS, 'settings'] as const;
 
 const PATHS: Record<(typeof ALL_DESTINATIONS)[number], RegExp> = {
   home: /\/$/,
-  mood: /\/mood$/,
+  daily: /\/daily$/,
   notes: /\/notes$/,
   photos: /\/photos$/,
   partner: /\/partner$/,
@@ -38,7 +40,7 @@ const PATHS: Record<(typeof ALL_DESTINATIONS)[number], RegExp> = {
  */
 const VIEW_WITNESS: Record<(typeof DOCK_DESTINATIONS)[number], (page: Page) => Locator> = {
   home: (page) => page.getByTestId('message-text'),
-  mood: (page) => page.getByTestId('mood-tracker'),
+  daily: (page) => page.getByTestId('daily-question-view'),
   notes: (page) => page.getByTestId('love-notes-view'),
   photos: (page) =>
     page.getByTestId('photo-gallery').or(page.getByTestId('photo-gallery-empty-state')),
@@ -57,6 +59,12 @@ test.describe('Bottom Dock', () => {
     await expect(dock).toBeVisible();
     for (const view of DOCK_DESTINATIONS) {
       await expect(dock.getByTestId(`nav-${view}`)).toBeVisible();
+    }
+    // The buttons read Home, Daily, Love Notes, Photos, Partner, in that order.
+    const dockButtons = dock.locator('button[data-testid^="nav-"]');
+    await expect(dockButtons).toHaveCount(DOCK_LABELS.length);
+    for (const [index, label] of DOCK_LABELS.entries()) {
+      await expect(dockButtons.nth(index)).toHaveAttribute('aria-label', label);
     }
 
     // Settings is the gear in the top bar, not a dock item.
@@ -120,10 +128,10 @@ test.describe('Bottom Dock', () => {
   test('[P1] should open each view at its top, not at the scroll the last one left', async ({
     page,
   }) => {
-    // Short enough that Mood and Partner both scroll at phone width.
+    // Short enough that Daily and Partner both scroll at phone width.
     await page.setViewportSize({ width: PHONE_VIEWPORT.width, height: 600 });
-    await page.goto('/mood');
-    await expect(VIEW_WITNESS.mood(page)).toBeVisible();
+    await page.goto('/daily');
+    await expect(VIEW_WITNESS.daily(page)).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 400));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
@@ -217,7 +225,7 @@ test.describe('Bottom Dock', () => {
       page,
     }) => {
       // Start elsewhere, so the tap is a real navigation.
-      await page.goto(view === 'home' ? '/mood' : '/');
+      await page.goto(view === 'home' ? '/daily' : '/');
       await expect(page.getByTestId('nav-dock')).toBeVisible();
 
       // WHEN: Its dock button is tapped
@@ -240,8 +248,8 @@ test.describe('Bottom Dock', () => {
 
   test('[P0] should go back to Home, not the previous view, from Settings', async ({ page }) => {
     await page.goto('/');
-    await navigateTo(page, 'mood');
-    await page.waitForURL('**/mood');
+    await navigateTo(page, 'daily');
+    await page.waitForURL('**/daily');
 
     await navigateTo(page, 'settings');
     await page.waitForURL('**/settings');

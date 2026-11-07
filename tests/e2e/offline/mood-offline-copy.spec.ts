@@ -1,13 +1,13 @@
 /**
- * E2E: mood history from the server, partner moods from the local copy
- * (spec-unified-data-storage story 6).
+ * E2E: partner moods from the local copy (spec-unified-data-storage story 6).
  *
- * 1. Own moods: the `moods` IndexedDB store is filled from the server on start,
- *    so a device with an empty store (a fresh device) shows earlier moods in the
- *    calendar without a month change.
- * 2. Partner moods: once loaded online they are saved as the `partner-moods`
- *    local copy, and the Partner screen lists them offline after a reload —
- *    no "No moods yet" and no "will load when you reconnect" notice.
+ * Once loaded online, partner moods are saved as the `partner-moods` local
+ * copy, and the Partner screen lists them offline after a reload -- no "No
+ * moods yet" and no "will load when you reconnect" notice.
+ *
+ * The own-mood-history half (earlier server moods in the calendar on a device
+ * with an empty store) went with the mood screen's route in story 6.9; epic 10
+ * deletes the code.
  *
  * Dev mode has no service worker, so a reload cannot happen while the context
  * is offline. The reload runs online with the moods REST endpoint aborted, so
@@ -23,10 +23,9 @@ import { test, expect } from '../../support/merged-fixtures';
 import { dismissWelcomeSplash } from '../../support/helpers/welcome-splash';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
-import { clockAnchorAvoidingFirstOfMonth, resolveOwnPair } from '../../support/helpers/events';
-import { readStore, signedInUserId } from '../../support/helpers/indexed-db';
+import { resolveOwnPair } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
-import { ownMoodHistoryRead, partnerMoodListRead } from '../../support/helpers/reads';
+import { partnerMoodListRead } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { deleteRowById } from '../../support/helpers/teardown';
 
@@ -34,61 +33,6 @@ import { deleteRowById } from '../../support/helpers/teardown';
 test.use({ trace: 'off', video: 'off' });
 
 const MOODS_REST = '**/rest/v1/moods*';
-
-/** Local `YYYY-MM-DD`, the key the calendar and the `moods` store use. */
-function localISO(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/**
- * An earlier moment inside the anchor's month, so the calendar shows it without
- * a month change: the day before at noon. The anchor comes from
- * `clockAnchorAvoidingFirstOfMonth`, so the day before is always in the same
- * month. The caller installs `anchor` as the page clock, so the page's "this
- * month" is the anchor's. Browser and runner share the machine's timezone (no
- * `timezoneId` is set).
- */
-function dayBeforeAtNoon(anchor: Date): Date {
-  return new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 1, 12, 0, 0);
-}
-
-/** Every row in the page's `moods` store for the signed-in user. */
-async function ownMoodRows(page: Page): Promise<{ date: string; synced: boolean; supabaseId?: string }[]> {
-  const userId = await signedInUserId(page);
-  if (!userId) return [];
-  // A failed read counts as no rows, as it always did.
-  const rows = await readStore<
-    { userId: string; date: string; synced: boolean; supabaseId?: string }[]
-  >(page, 'moods', { op: 'getAll' }).catch(() => null);
-  return (rows ?? [])
-    .filter((row) => row.userId === userId)
-    .map(({ date, synced, supabaseId }) => ({ date, synced, supabaseId }));
-}
-
-/** Empty the page's `moods` store, as on a device that never held these rows. */
-async function clearMoodsStore(page: Page): Promise<void> {
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        const open = indexedDB.open('my-love-db');
-        open.onerror = () => reject(open.error);
-        open.onsuccess = () => {
-          const db = open.result;
-          const tx = db.transaction('moods', 'readwrite');
-          tx.objectStore('moods').clear();
-          tx.oncomplete = () => {
-            db.close();
-            resolve();
-          };
-          tx.onerror = () => {
-            db.close();
-            reject(tx.error);
-          };
-        };
-      })
-  );
-}
 
 /** Notes in the signed-in account's saved `partner-moods` copy, or `null`. */
 async function savedPartnerNotes(page: Page): Promise<string[] | null> {
@@ -100,89 +44,7 @@ test.beforeEach(async ({ page }) => {
   await dismissWelcomeSplash(page);
 });
 
-test.describe('Mood history and partner moods offline', () => {
-  test('[P1] a device with an empty moods store shows earlier server moods in the calendar', async ({
-    page,
-    supabaseAdmin,
-    interceptNetworkCall,
-    cleanup,
-  }) => {
-    const { userId } = await resolveOwnPair(supabaseAdmin);
-    const anchor = clockAnchorAvoidingFirstOfMonth();
-    const loggedAt = dayBeforeAtNoon(anchor);
-    const dateKey = localISO(loggedAt);
-    const note = `backfill-e2e-${randomUUID()}`;
-
-    const { data: seeded, error: seedError } = await supabaseAdmin
-      .from('moods')
-      .insert({
-        user_id: userId,
-        mood_type: 'grateful',
-        mood_types: ['grateful'],
-        note,
-        created_at: loggedAt.toISOString(),
-      })
-      .select('id')
-      .single();
-    expect(seedError).toBeNull();
-    const moodId = seeded!.id;
-    cleanup.defer('delete the seeded mood', () => deleteRowById(supabaseAdmin, 'moods', moodId));
-
-    // GIVEN: signed in, then the moods store is emptied — a fresh device.
-    // The clock survives the reload below, so both loads share one month.
-    await page.clock.install({ time: anchor });
-    const startBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
-    await page.goto('/');
-    const started = await startBackfill;
-    expect(started.status).toBe(200);
-    expect(started.responseJson).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: moodId })])
-    );
-    await recurseUntil(
-      () => page.evaluate(() => window.__APP_STORE__?.getState().userId ?? null),
-      (v) => {
-        expect(v).toBe(userId);
-      }
-    );
-    // This load's own start backfill must land first, or it could merge after
-    // the clear below.
-    await recurseUntil(
-      async () => (await ownMoodRows(page)).some((row) => row.date === dateKey),
-      (v) => {
-        expect(v).toBe(true);
-      }
-    );
-    await clearMoodsStore(page);
-    expect(await ownMoodRows(page)).toEqual([]);
-
-    // WHEN: the app starts again.
-    const reloadBackfill = interceptNetworkCall({ method: 'GET', url: ownMoodHistoryRead(userId) });
-    await page.reload();
-    const reloaded = await reloadBackfill;
-    expect(reloaded.status).toBe(200);
-    expect(reloaded.responseJson).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: moodId })])
-    );
-    await navigateTo(page, 'mood');
-    await page.getByTestId('mood-tab-history').click();
-    await expect(page.getByTestId('mood-calendar')).toBeVisible();
-    // The anchor's month, which the installed clock makes "this month".
-    const monthOnScreen =
-      `${anchor.toLocaleString('en-US', { month: 'long' })} ${anchor.getFullYear()}`;
-    await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
-
-    // THEN: the server mood fills the store and shows on the calendar, in the
-    // month on screen, without navigating.
-    await expect(page.getByTestId(`calendar-day-${dateKey}`)).toHaveAttribute('data-has-mood', 'true');
-    await expect(page.getByTestId('calendar-month-header')).toHaveText(monthOnScreen);
-    await recurseUntil(
-      async () => (await ownMoodRows(page)).find((row) => row.date === dateKey)?.synced ?? null,
-      (v) => {
-        expect(v).toBe(true);
-      }
-    );
-  });
-
+test.describe('Partner moods offline', () => {
   test('[P1] partner moods loaded online are listed offline after a reload', async ({
     page,
     supabaseAdmin,

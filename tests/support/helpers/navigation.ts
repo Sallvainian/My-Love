@@ -1,7 +1,7 @@
 /**
  * Navigation Helpers
  *
- * Every destination is one tap away now: Home, Mood, Love Notes, Photos and
+ * Every destination is one tap away now: Home, Daily, Love Notes, Photos and
  * Partner sit in the bottom dock and Settings is the gear in the app header, all
  * carrying `nav-${view}`. The helper survives the tray's removal because its
  * call sites are spread across many specs; routing them through here means the
@@ -9,10 +9,10 @@
  */
 import type { Page } from '@playwright/test';
 
-/** Every navigation destination, matching ViewType in navigationSlice.ts. */
+/** The dock's destinations and Settings: a subset of ViewType in navigationSlice.ts. */
 export type NavDestination =
   | 'home'
-  | 'mood'
+  | 'daily'
   | 'notes'
   | 'partner'
   | 'photos'

@@ -39,8 +39,8 @@ test.describe('Dock walk', () => {
     await dismissWelcomeSplash(app);
     await app.reload();
     expect(await app.evaluate(() => history.length)).toBe(1);
-    await navigateTo(app, 'mood');
-    await expect(app).toHaveURL(/\/mood$/);
+    await navigateTo(app, 'daily');
+    await expect(app).toHaveURL(/\/daily$/);
 
     // GIVEN: The entry claims 50 entries below it, far more than the history holds
     await app.evaluate(() => history.replaceState({ ...history.state, depth: 50 }, ''));
