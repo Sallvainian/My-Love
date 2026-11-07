@@ -4146,10 +4146,10 @@ status: open
 
 ### DW-487: A failed IndexedDB read during a Daily copy merge rewrites the copy with only the new day.
 origin: story 6.10 refactor sweep, from story 6.5's review (rejected as low, kept as a residual risk), 2026-11-06
-location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/localCopy.ts:92-100 (`readLocalCopy`)
+location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/dailyWriteDeclined.ts (`addDeclinedWriteDay`); src/services/localCopy.ts:92-100 (`readLocalCopy`)
 source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-day-offline-and-invites-an-unlinked-ac-plan.md`
 severity: low
-reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined.
+reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined. The same weakness is in `addDeclinedWriteDay` (`src/services/dailyWriteDeclined.ts:41-53`, story 6.8): `readDeclinedWriteDays` answers `[]` on a failed read (`:27-31`) and the add then writes a list holding only the new day, so earlier "No thanks" days are lost and the write prompt comes back for them (epic 6 retrospective, A2, 2026-11-06).
 status: open
 
 ### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
@@ -4166,4 +4166,60 @@ location: playwright.config.ts:40
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: medium
 reason: Reproduced on 2026-11-07 in story 6.11's follow-up review. `npx` is a mise shim that puts the pinned `supabase` first on PATH, so `supabase status -o env` in playwright.config.ts succeeds against the default project and force-sets VITE_SUPABASE_URL to it, overriding the caller's value (a stub `supabase` placed first on PATH did not help). Separately, `npx vite --mode test` through the shim receives fnox's hosted VITE_* values, which vite.config.ts's local-supabase-in-test-mode plugin deletes, so the app falls back to .env.test, which is the default stack, while the spec's own API clients use the caller's stack. Running node and npx from the node install directory (not the shims) kept both on the isolated stack. The plan's earlier note blamed a different `supabase` that fails; the observed cause is the pinned one succeeding. The live spec's localhost guard cannot tell one local stack from another.
+status: open
+
+### DW-490: An open Daily keeps showing the invitation to link after the partner accepts, until Daily is left and reopened.
+origin: epic 6 retrospective (Diff-scope review, R1), 2026-11-06
+location: src/hooks/useDailyPickListener.ts:43-49 (`subscribePartnerEvents` handlers); src/hooks/usePartnerLinkListener.ts:80-100
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: `useDailyPickListener` registers only `daily_pick` and `onStatus` on the partner-event registry; `partner_linked` reaches only `usePartnerLinkListener`, which reloads the partner and pending requests but not the day. So an account whose request is accepted while Daily is open keeps seeing "Link with your partner" until it leaves Daily and comes back, or until the new partner's first pick reaches it through `showIfOnScreen`'s empty-screen rule (`dailyQuestionSlice.ts:202`), a path no test covers from an `unlinked` screen. A fix re-reads the day on `partner_linked`; the retrospective leaves open whether that waits for epic 7's Partner page rebuild.
+status: open
+
+### DW-491: The write sheet opens after a failed or offline read, though it is meant to wait for the server's answer.
+origin: epic 6 retrospective (Diff-scope review, R2), 2026-11-06
+location: src/components/DailyQuestion/DailyQuestion.tsx:262-269 (`readFor`)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: `readFor` is set after any `loadDailyDay()`, and `loadDailyDay()` never throws, so the sheet's wait, meant to keep a saved day whose turn was written on another device from opening it (comment at `:262-266`), passes offline or after a failed read too. Offline, Send is refused before any request and No thanks still works, so the cost is a sheet that should not have opened. A fix sets `readFor` only when the read answered from the server.
+status: open
+
+### DW-492: Daily's saved copy can show an old pairing's day for today after a relink or `reset_bot_daily_days`.
+origin: epic 6 retrospective (Diff-scope review, R3), 2026-11-06
+location: src/services/dailyDaysCopy.ts:71 (`readSavedDailyDay`), :103 (`mergeDailyDay`); src/stores/slices/dailyQuestionSlice.ts:163 (`mergeAnswer`)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: `readSavedDailyDay` picks today's entry by date and rank across all `day_id`s, and `mergeDailyDay` never drops another `day_id` with the same `day`. After a reset or a relink this device never saw as `unlinked`, an old `both` entry is shown first. Online the server's answer replaces it, because `mergeAnswer` merges only within one `day_id`, so it flashes; offline it stays.
+status: open
+
+### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only on their next open.
+origin: epic 6 retrospective (Diff-scope review, R4), 2026-11-06
+location: src/stores/slices/dailyQuestionSlice.ts:289-294 (`drainQueuedPicks`, the confirmed branch)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: After a queued pick is confirmed and removed, `if (!isCurrent()) return 'stale'` runs before `announceDailyPick`, though the comment above says the pick is committed "whatever the session did meanwhile". A same-account re-login during the send bumps `authSessionVersion` and skips the broadcast. A fix announces before the session check, since the announcement carries only the `day_id`.
+status: open
+
+### DW-494: "{partner} gets it tomorrow" on the write sheet is false when partners are on different clocks and one is already past midnight.
+origin: epic 6 retrospective (Diff-scope review, R5), 2026-11-06
+location: src/components/DailyQuestion/WriteQuestionSheet.tsx:123; the written-question target-date rule (story 6.3, `submit_written_question`)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: A written question goes to the first date after the source day with no `couple_days` row (6.3 Auto Run Result). A partner whose clock is already past midnight has created that row with a pool question, so the written one lands two days later while the sheet says tomorrow. Same-zone writers are refused once their own date ends (DQ006), so only partners in different time zones meet it. The choice between naming the target date on the sheet and always targeting the source day + 1 is the owner's (retrospective, Open questions).
+status: open
+
+### DW-495: Opening Daily reads the day up to four times, and each read takes the pair's advisory lock and writes `user_time_zones`.
+origin: epic 6 retrospective (Diff-scope review, R6), 2026-11-06
+location: src/components/DailyQuestion/DailyQuestion.tsx:267-269 (mount read); src/hooks/useDailyPickListener.ts:46-48 (`SUBSCRIBED` re-read); src/stores/slices/dailyQuestionSlice.ts (`loadDailyDay`)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: Observed on the live site on 2026-11-07: one sign-in, then `/mood` to `/daily`, made 4 `get_daily_day` calls. 6.6's Design Notes accept two reads per open and 6.12 rejected a request-token guard twice as "overlapping loads"; filed so the cost is visible. Each call takes the pair's advisory lock and writes the caller's `user_time_zones` row.
+status: open
+
+### DW-496: The day-changed notice can stay above a day that needs no pick.
+origin: epic 6 retrospective (Diff-scope review, R8), 2026-11-06
+location: src/components/DailyQuestion/DailyQuestion.tsx:236-240, :293 (`clearDayChanged` passed as `onSendStart`)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: The notice is cleared only by the next Send (`onSendStart={clearDayChanged}`). When the re-read day is already picked, no Send is rendered, so the notice stays until Daily is reopened.
 status: open
