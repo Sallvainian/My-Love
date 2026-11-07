@@ -30,6 +30,11 @@ export const DailyDaySnapshotSchema = z.object({
   write: z.object({
     mine: z.boolean(),
     done: z.boolean(),
+    /**
+     * The `YYYY-MM-DD` date a question written from this day goes to (DW-494).
+     * Missing from a snapshot saved before the server sent it: read as tomorrow.
+     */
+    target_day: z.string().optional(),
   }),
 });
 

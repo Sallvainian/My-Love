@@ -38,6 +38,8 @@
 --     fifth), which B calls before their own pick: B is no claude_bot_config
 --     account, so it answers 42501. The bot cases live in
 --     44_reset_bot_daily_days.sql.
+--   * DW-494 (20261107000000) added write.target_day to the snapshot; its
+--     cases live in 42_daily_question_written_questions.sql.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -355,8 +357,8 @@ select is(
 );
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(current_setting('tests.a_res')::jsonb #> '{snapshot,write}') k),
-  array['done', 'mine'],
-  'DAILY-039: write carries exactly mine and done'
+  array['done', 'mine', 'target_day'],
+  'DAILY-039: write carries exactly mine, done and target_day'
 );
 select is(
   current_setting('tests.a_res')::jsonb #>> '{snapshot,write,done}',

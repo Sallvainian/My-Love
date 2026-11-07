@@ -19,6 +19,11 @@
 --     rows on one target are asked one after the other, the earlier source
 --     first; a date before the target never takes it, a later date with a
 --     skipped target still does.
+--   * the snapshot's write.target_day (20261107000000) is the date a question
+--     written now would be stored for: the day + 1 while that date has no
+--     row, the next free date once a partner who is ahead opened it, and
+--     after the write the stored row's target_day, even once later dates
+--     open. The other write checks strip it.
 --   * the pool: a written row already asked joins the next cycle's draws; no
 --     draw takes another couple's written row.
 --   * every refusal writes nothing: P0002 for an outsider, an unlinked caller,
@@ -39,7 +44,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(63);
+select plan(67);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -287,12 +292,12 @@ select ok(
   'WRITE-013: and the row belongs to the ordered pair'
 );
 select is(
-  current_setting('tests.w1')::jsonb ->> 'day' || '/' || (current_setting('tests.w1')::jsonb -> 'write')::text,
+  current_setting('tests.w1')::jsonb ->> 'day' || '/' || ((current_setting('tests.w1')::jsonb -> 'write') - 'target_day')::text,
   '2030-04-10/{"done": true, "mine": true}',
   'WRITE-014: the snapshot is the source day''s, with write { mine, done } true'
 );
 select is(
-  public.daily_day_snapshot(pg_temp.day_id((select a_id from t_ids), date '2030-04-10'), current_setting('tests.n')::uuid, now()) -> 'write',
+  (public.daily_day_snapshot(pg_temp.day_id((select a_id from t_ids), date '2030-04-10'), current_setting('tests.n')::uuid, now()) -> 'write') - 'target_day',
   '{"done": true, "mine": false}'::jsonb,
   'WRITE-015: the other partner sees done true and mine false'
 );
@@ -339,9 +344,29 @@ select is(
 -- A partner who is ahead (e = 2030-05-10)
 -- ============================================
 select pg_temp.mk((select a_id from t_ids), date '2030-05-10');
+select is(
+  public.daily_day_snapshot(pg_temp.day_id((select a_id from t_ids), date '2030-05-10'),
+    pg_temp.writer((select a_id from t_ids), date '2030-05-10'), now()) #>> '{write,target_day}',
+  '2030-05-11',
+  'WRITE-064: with the next date not open, the snapshot''s write.target_day is the day + 1'
+);
 select pg_temp.mk((select a_id from t_ids), date '2030-05-11');
+select is(
+  public.daily_day_snapshot(pg_temp.day_id((select a_id from t_ids), date '2030-05-10'),
+    pg_temp.writer((select a_id from t_ids), date '2030-05-10'), now()) #>> '{write,target_day}',
+  '2030-05-12',
+  'WRITE-065: once a partner who is ahead opened it, write.target_day is the next free date'
+);
 select pg_temp.pk(pg_temp.writer((select a_id from t_ids), date '2030-05-10'), date '2030-05-10');
-select pg_temp.wq(pg_temp.writer((select a_id from t_ids), date '2030-05-10'), date '2030-05-10', 'Hills', 'Plains');
+select set_config('tests.e1',
+  pg_temp.wq(pg_temp.writer((select a_id from t_ids), date '2030-05-10'), date '2030-05-10', 'Hills', 'Plains')::text,
+  false);
+select is(
+  (current_setting('tests.e1')::jsonb #>> '{write,target_day}')::date,
+  (select q.target_day from public.daily_questions q
+   where q.source_day_id = pg_temp.day_id((select a_id from t_ids), date '2030-05-10')),
+  'WRITE-066: and the write''s snapshot names the date the row was stored for'
+);
 
 select is(
   (select q.target_day from public.daily_questions q
@@ -354,6 +379,12 @@ select is(
   pg_temp.question((select a_id from t_ids), date '2030-05-12'),
   '{"this": "Hills", "that": "Plains"}'::jsonb,
   'WRITE-023: and that date asks it'
+);
+select is(
+  public.daily_day_snapshot(pg_temp.day_id((select a_id from t_ids), date '2030-05-10'),
+    pg_temp.writer((select a_id from t_ids), date '2030-05-10'), now()) #>> '{write,target_day}',
+  '2030-05-12',
+  'WRITE-067: with the target date open too, write.target_day stays the stored target'
 );
 select ok(
   pg_temp.from_pool((select a_id from t_ids), date '2030-05-11'),
@@ -501,8 +532,8 @@ select is(
   'WRITE-043: neither wrote a question'
 );
 select is(
-  pg_temp.wq(current_setting('tests.iw')::uuid, date '2030-09-10', 'Rock', 'Roll', timestamptz '2030-09-10 14:59:00+00')
-    -> 'write',
+  (pg_temp.wq(current_setting('tests.iw')::uuid, date '2030-09-10', 'Rock', 'Roll', timestamptz '2030-09-10 14:59:00+00')
+    -> 'write') - 'target_day',
   '{"done": true, "mine": true}'::jsonb,
   'WRITE-044: 14:59 UTC is still the 10th in Tokyo and is accepted'
 );
@@ -645,7 +676,7 @@ select set_config('tests.c_sub',
 reset role;
 
 select is(
-  current_setting('tests.c_sub')::jsonb -> 'write',
+  (current_setting('tests.c_sub')::jsonb -> 'write') - 'target_day',
   '{"done": true, "mine": true}'::jsonb,
   'WRITE-058: the writer''s submit answers with write.done true'
 );

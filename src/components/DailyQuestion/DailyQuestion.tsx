@@ -342,6 +342,8 @@ export function DailyQuestion() {
         <WriteQuestionSheet
           key={writeSnapshot.day_id}
           dayId={writeSnapshot.day_id}
+          day={writeSnapshot.day}
+          targetDay={writeSnapshot.write.target_day}
           partnerName={partnerName}
           onClose={closeWriteSheet}
         />
