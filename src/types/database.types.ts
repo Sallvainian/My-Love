@@ -1101,6 +1101,10 @@ export type Database = {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
+      reset_bot_daily_days: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       submit_daily_pick: {
         Args: {
           choice: string

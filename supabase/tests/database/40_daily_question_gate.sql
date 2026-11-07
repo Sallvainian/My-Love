@@ -34,6 +34,10 @@
 --     fourth), which B calls before and after their own pick; a partnered
 --     outsider, an unlinked user, a day id no row has and a re-linked B on the
 --     old pair's day get P0002 from it, and a NULL auth.uid() is refused.
+--   * Story 6.11 (20261106020000) added the client RPC reset_bot_daily_days (the
+--     fifth), which B calls before their own pick: B is no claude_bot_config
+--     account, so it answers 42501. The bot cases live in
+--     44_reset_bot_daily_days.sql.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -43,7 +47,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(111);
+select plan(112);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -182,16 +186,18 @@ select ok(
   has_function_privilege('authenticated', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
   and has_function_privilege('authenticated', 'public.submit_written_question(uuid, text, text)', 'EXECUTE')
-  and has_function_privilege('authenticated', 'public.get_daily_day_by_id(uuid)', 'EXECUTE'),
-  'DAILY-014: the four client RPCs are executable by authenticated'
+  and has_function_privilege('authenticated', 'public.get_daily_day_by_id(uuid)', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.reset_bot_daily_days()', 'EXECUTE'),
+  'DAILY-014: the five client RPCs are executable by authenticated'
 );
 
 select ok(
   not has_function_privilege('anon', 'public.get_daily_day(text, integer, timestamptz)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.submit_daily_pick(uuid, text, timestamptz, text, integer)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.submit_written_question(uuid, text, text)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.get_daily_day_by_id(uuid)', 'EXECUTE'),
-  'DAILY-015: the four client RPCs are not executable by anon'
+  and not has_function_privilege('anon', 'public.get_daily_day_by_id(uuid)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.reset_bot_daily_days()', 'EXECUTE'),
+  'DAILY-015: the five client RPCs are not executable by anon'
 );
 
 -- ============================================
@@ -401,6 +407,10 @@ select throws_ok(
 select throws_ok(
   format($$select public.submit_written_question(%L, 'Beach', 'Mountains')$$, current_setting('tests.day')),
   'DQ005', null, 'DAILY-101: B cannot submit a written question before their own pick'
+);
+select throws_ok(
+  $$select public.reset_bot_daily_days()$$,
+  '42501', null, 'DAILY-112: B is no bot, so B cannot reset the pair''s days'
 );
 reset role;
 
