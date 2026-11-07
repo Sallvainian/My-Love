@@ -4307,3 +4307,19 @@ source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-pag
 severity: low
 reason: get_couple_streak dates the viewer by user_time_zones (story 7.1's recorded residual risk); StreakCard labels the last week entry Today, as the server answers it. Pre-existing server behaviour, and the epic bars the client from working out a day's state.
 status: open
+
+### DW-507: The offline-pick E2E cannot tell the drain's own streak re-read from the refresher's or the Realtime re-join's.
+origin: spec-deferred 484f89571f2f
+location: tests/e2e/daily/daily-streak.spec.ts (the "after a pick queued offline" test)
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
+severity: low
+reason: On reconnect App.tsx:562-566 runs drainQueuedPicks() and refreshLocalCopies() together, and the daily-streak refresher (dailyQuestionSlice.ts registerLocalCopy) sends get_couple_streak without waiting for the pick; useDailyPickListener's SUBSCRIBED on re-join reads it again. So `rereadStreak` in the test may be the refresher's read, and the final orange-at-2 assertion would still pass if the `void get().loadCoupleStreak()` in drainOnce were removed. The drain's call is proven only by the unit test "a pick queued offline and drained later re-reads the streak only after the drain" (tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts). Isolating it in E2E needs the refresher and the Realtime re-join suppressed, more than a direct correction; the surface outcome (the chip updates after reconnect without a reload) is shown.
+status: open
+
+### DW-508: The waiting sentence reads "when Your partner answers too." with a capital Y mid-sentence when the partner's name is missing.
+origin: spec-deferred 254a73a92d5c
+location: src/components/DailyQuestion/DailyQuestion.tsx:393
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
+severity: low
+reason: DailyQuestion.tsx:316 falls back to 'Your partner' when `state.partner?.displayName` is empty (users.display_name is nullable, and the partner copy can be unfilled or its read failed), and line 393 puts that value mid-sentence. The fallback predates this change and already reads "Waiting on Your partner" in DayCard. Rare (a linked partner normally has a name and the copy fills on sign-in) and the fix needs a separate lowercase value for mid-sentence use, so it is filed rather than patched.
+status: open

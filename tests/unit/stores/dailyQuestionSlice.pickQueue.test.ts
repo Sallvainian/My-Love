@@ -57,6 +57,9 @@ function state() {
   return useAppStore.getState();
 }
 
+const realLoadCoupleStreak = useAppStore.getState().loadCoupleStreak;
+const loadCoupleStreak = vi.fn(async () => {});
+
 const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as const, snapshot });
 
 function queued(overrides: Partial<QueuedPick> = {}): QueuedPick {
@@ -126,6 +129,8 @@ beforeEach(async () => {
   submitDailyPickRequest.mockReset();
   announceDailyPick.mockReset();
   announceDailyPick.mockResolvedValue(undefined);
+  // The streak read has its own tests; here only whether a pick asks for it.
+  useAppStore.setState({ loadCoupleStreak });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
@@ -138,6 +143,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  useAppStore.setState({ loadCoupleStreak: realLoadCoupleStreak });
   // Sign-out cancels any drain retry a test left scheduled, so no timer fires
   // after this file ends (AGENTS: fire-and-forget work must not outlive the file).
   state().clearAuth();
@@ -169,6 +175,8 @@ describe('submitDailyPick offline', () => {
     expect(state().dailyQueuedPicks).toEqual([
       { day_id: DAY_ID, choice: 'this', picked_at: SAME_DAY.toISOString(), failed: false, failure: null },
     ]);
+    // A queued pick changes nothing the server counts yet.
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
   });
 
   it('leaves dailyDay and the copy as the server last answered, even with the partner picked', async () => {
@@ -276,6 +284,7 @@ describe('drainQueuedPicks', () => {
 
     expect(await listQueuedPicks(A)).toEqual([]);
     expect(state().dailyQueuedPicks).toEqual([]);
+    expect(loadCoupleStreak).toHaveBeenCalledTimes(1);
     expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
     expect(await copy()).toEqual({ [DAY_ID]: revealSnapshot('this', 'that') });
     expect(state().dailyDay).toEqual(ok(revealSnapshot('this', 'that')));
@@ -345,8 +354,41 @@ describe('drainQueuedPicks', () => {
       expect(state().dailyQueuedPicks).toEqual([
         expect.objectContaining({ day_id: DAY_ID, failed: true, failure: 'THE-REFUSAL' }),
       ]);
+      // Only the second row was confirmed.
+      expect(loadCoupleStreak).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('a refused row alone does not re-read the streak', async () => {
+    await enqueuePick(queued());
+    submitDailyPickRequest.mockRejectedValue(refusal('DQ002'));
+
+    await state().drainQueuedPicks();
+
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
+  });
+
+  it('a transient failure does not re-read the streak', async () => {
+    await enqueuePick(queued());
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'Network error'));
+
+    await state().drainQueuedPicks();
+
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
+  });
+
+  it('a pick queued offline and drained later re-reads the streak only after the drain', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    setOnline(false);
+    await state().submitDailyPick('this');
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
+
+    setOnline(true);
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+    await state().drainQueuedPicks();
+
+    expect(loadCoupleStreak).toHaveBeenCalledTimes(1);
+  });
 
   it('day-changed from the server is a refusal too', async () => {
     await enqueuePick(queued());

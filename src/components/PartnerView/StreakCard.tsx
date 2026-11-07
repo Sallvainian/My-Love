@@ -5,16 +5,15 @@
  * the run since the last missed day, the last seven dates, and how far the next
  * milestone (every 25 days) is. The card is orange when the viewer's date is
  * done (`today_state` orange), blue when a date was missed since (blue) and
- * grey otherwise. Plain `Flame` for grey and orange, `Snowflake` for blue; in
- * the week strip a done date is a check on fire, a missed one a snowflake on
- * cold and an open one a dashed ring.
+ * grey otherwise. Plain `Flame` for grey and orange, `Snowflake` for blue. The
+ * week strip is the shared `StreakWeek`, also used by Daily.
  *
  * @component
  */
 
-import { Check, Flame, Snowflake } from 'lucide-react';
-import { parseEventDate } from '../../services/eventsService';
+import { Flame, Snowflake } from 'lucide-react';
 import type { CoupleStreak } from '../../api/dailyQuestionApi';
+import { StreakWeek } from '../shared/StreakWeek';
 
 /** Days between milestones (`milestones` is `floor(held / 25)`). */
 const MILESTONE_DAYS = 25;
@@ -48,37 +47,10 @@ const TONE: Record<TodayState, { card: string; tile: string; ink: string; soft: 
   },
 };
 
-/** The narrow weekday letter of a `YYYY-MM-DD` date, read as local (never UTC). */
-function weekdayLetter(day: string): string {
-  const date = parseEventDate(day);
-  return date ? date.toLocaleDateString('en-US', { weekday: 'narrow' }) : '';
-}
-
-function WeekDot({ state }: { state: CoupleStreak['week'][number]['state'] }) {
-  if (state === 'done') {
-    return (
-      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-fire text-black">
-        <Check className="h-4 w-4" strokeWidth={3} aria-hidden="true" />
-      </span>
-    );
-  }
-  if (state === 'missed') {
-    return (
-      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-cold text-black">
-        <Snowflake className="h-4 w-4" aria-hidden="true" />
-      </span>
-    );
-  }
-  return (
-    <span className="h-[26px] w-[26px] rounded-full border-2 border-dashed border-line-strong" />
-  );
-}
-
 export function StreakCard({ streak }: { streak: CoupleStreak }) {
   const tone = TONE[streak.today_state];
   const Icon = streak.today_state === 'blue' ? Snowflake : Flame;
   const nextMilestone = (streak.milestones + 1) * MILESTONE_DAYS;
-  const lastIndex = streak.week.length - 1;
 
   return (
     <section
@@ -115,26 +87,7 @@ export function StreakCard({ streak }: { streak: CoupleStreak }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1" data-testid="partner-streak-week">
-        {streak.week.map((entry, index) => {
-          const isToday = index === lastIndex;
-          return (
-            <div
-              key={entry.day}
-              className="flex flex-col items-center gap-1"
-              data-testid="partner-streak-day"
-              data-state={entry.state}
-            >
-              <span className={isToday ? 'rounded-full outline-2 outline-offset-2 outline-ink' : ''}>
-                <WeekDot state={entry.state} />
-              </span>
-              <span className={`text-[11px] font-semibold ${tone.soft}`}>
-                {isToday ? 'Today' : weekdayLetter(entry.day)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <StreakWeek week={streak.week} testIdPrefix="partner-streak" labelClass={tone.soft} />
 
       <p className={`text-xs font-semibold ${tone.soft}`} data-testid="partner-streak-next">
         Next milestone: {nextMilestone} days · {nextMilestone - streak.held} to go

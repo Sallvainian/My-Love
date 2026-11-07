@@ -22,20 +22,34 @@
  * out of date). A tap on its scrim or Escape hides it until the next mount of
  * this view; only a successful send (`write.done`) or "No thanks" ends it for
  * the day.
+ *
+ * The couple's streak shows above the card from the slice's `coupleStreak`
+ * (`get_couple_streak`; nothing is counted here, only the sentence chosen): a
+ * header with the snapshot's date and, when the streak is `ok`, a chip (held,
+ * with `Flame`, or `Snowflake` when blue; "{run} in a row" under it), the week
+ * strip shared with the Partner card, and, while `today_state` is blue, a cold
+ * banner that says how many dates were missed. Once only the own pick is in
+ * (`me`), a sentence says the streak lights up when the partner answers. A
+ * streak that is null, unlinked or failed to load shows none of these and
+ * reports no error here; the view re-reads it on each mount.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Flame, Snowflake } from 'lucide-react';
 import {
+  type CoupleStreak,
   DAY_CHANGED_MESSAGE,
   type DailyChoice,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
 import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError } from '../../services/accountDataError';
+import { parseEventDate } from '../../services/eventsService';
 import type { QueuedDailyPick } from '../../stores/slices/dailyQuestionSlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
+import { StreakWeek } from '../shared/StreakWeek';
 import { WriteQuestionSheet } from './WriteQuestionSheet';
 
 const OPTION =
@@ -45,6 +59,74 @@ const OPTION_ON = `${OPTION} bg-fill text-white`;
 
 function pickedTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+/** The chip's classes by `today_state`: grey and orange hold a flame, blue a snowflake. */
+const CHIP_TONE: Record<CoupleStreak['today_state'], string> = {
+  grey: 'bg-ash-tint text-ash-ink',
+  orange: 'bg-fire-tint text-fire-ink',
+  blue: 'bg-cold-tint text-cold-ink',
+};
+
+/** "Thursday, November 5" for a `YYYY-MM-DD` date, read as local (never UTC). */
+function longDate(day: string): string {
+  const date = parseEventDate(day);
+  return date
+    ? date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    : '';
+}
+
+function StreakHeader({
+  day,
+  streak,
+}: {
+  day: string;
+  /** The streak when `get_couple_streak` answered `ok`, else null. */
+  streak: CoupleStreak | null;
+}) {
+  const Icon = streak?.today_state === 'blue' ? Snowflake : Flame;
+  return (
+    <div className="flex items-start justify-between gap-3 px-1" data-testid="daily-header">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="text-sm font-semibold text-accent">Today&apos;s question</p>
+        <p className="text-[13px] leading-[1.4] text-muted" data-testid="daily-date">
+          {longDate(day)}
+        </p>
+      </div>
+      {streak && (
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold ${CHIP_TONE[streak.today_state]}`}
+            data-testid="daily-streak-chip"
+            data-state={streak.today_state}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            <span data-testid="daily-streak-held">{streak.held}</span>
+          </span>
+          <p className="text-xs font-semibold text-muted" data-testid="daily-streak-run">
+            {streak.run} in a row
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColdBanner({ streak }: { streak: CoupleStreak }) {
+  const missed =
+    streak.missed === 1 ? 'Yesterday was' : `The last ${streak.missed} days were`;
+  return (
+    <div
+      className="flex flex-col gap-1 rounded-[20px] bg-cold-tint p-4 text-cold-ink"
+      data-testid="daily-streak-cold"
+    >
+      <p className="text-[15px] font-bold">Your streak went cold</p>
+      <p className="text-[13px] leading-[1.4]">
+        {missed} missed, so it&apos;s frozen at {streak.held}. You keep the {streak.held}. Both
+        answer today to light it back up.
+      </p>
+    </div>
+  );
 }
 
 function PickCard({
@@ -224,6 +306,8 @@ export function DailyQuestion() {
   const loading = useAppStore((state) => state.dailyDayLoading);
   const loadError = useAppStore((state) => state.dailyDayError);
   const loadDailyDay = useAppStore((state) => state.loadDailyDay);
+  const loadCoupleStreak = useAppStore((state) => state.loadCoupleStreak);
+  const coupleStreak = useAppStore((state) => state.coupleStreak);
   const queuedPicks = useAppStore((state) => state.dailyQueuedPicks);
   const userId = useAppStore((state) => state.userId);
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
@@ -266,7 +350,12 @@ export function DailyQuestion() {
   // later background load must not take the sheet away mid-typing.
   useEffect(() => {
     void loadDailyDay().then(() => setReadFor(sessionKey));
-  }, [loadDailyDay, sessionKey]);
+    void loadCoupleStreak();
+  }, [loadDailyDay, loadCoupleStreak, sessionKey]);
+
+  // Only a successful, linked answer shows anything; a null, unlinked or failed
+  // read leaves the header without a chip, with no strip and no banner.
+  const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
 
   // The partner's pick shows without a reload (AD-11).
   useDailyPickListener();
@@ -285,14 +374,35 @@ export function DailyQuestion() {
         )}
 
         {dailyDay?.status === 'ok' && (
-          <DayCard
-            key={dailyDay.snapshot.day_id}
-            snapshot={dailyDay.snapshot}
-            queued={queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null}
-            partnerName={partnerName}
-            onSendStart={clearDayChanged}
-            onDayChanged={raiseDayChanged}
-          />
+          <>
+            <StreakHeader day={dailyDay.snapshot.day} streak={streak} />
+
+            {streak?.today_state === 'blue' && <ColdBanner streak={streak} />}
+
+            {streak && (
+              <div className={`${CARD} p-4`}>
+                <StreakWeek week={streak.week} testIdPrefix="daily-streak" labelClass="text-muted" />
+              </div>
+            )}
+
+            {dailyDay.snapshot.state === 'me' && (
+              <p
+                className="px-1 text-[15px] leading-[1.4] font-semibold text-ink"
+                data-testid="daily-streak-waiting"
+              >
+                Your half is in. The streak lights up when {partnerName} answers too.
+              </p>
+            )}
+
+            <DayCard
+              key={dailyDay.snapshot.day_id}
+              snapshot={dailyDay.snapshot}
+              queued={queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null}
+              partnerName={partnerName}
+              onSendStart={clearDayChanged}
+              onDayChanged={raiseDayChanged}
+            />
+          </>
         )}
 
         {dailyDay?.status === 'unlinked' && (

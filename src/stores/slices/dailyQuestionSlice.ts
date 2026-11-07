@@ -64,6 +64,9 @@
  * deletes it (`unlinked`); a failed read leaves it. Only the newest started
  * read writes (a sequence counter), and a read that outlives the session writes
  * nothing, to the field or to the copy. `signedOutState()` clears all three fields.
+ * Daily shows the streak too, so `submitDailyPick` and the queue drain re-read
+ * it (`void loadCoupleStreak()`) after each pick the server confirmed, once the
+ * session is still current; a queued pick and a refused row do not.
  */
 
 import { isOnline } from '../../api/errorHandlers';
@@ -324,6 +327,8 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
             console.error('[DailyQuestion] Could not announce the pick:', error);
           });
+          // A late pick can finish a past date: the streak corrects itself.
+          void get().loadCoupleStreak();
           const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
           if (!isCurrent()) return 'stale';
           showIfOnScreen(snapshot, merged);
@@ -534,6 +539,8 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
         console.error('[DailyQuestion] Could not announce the pick:', error);
       });
+      // The pick may finish the day: re-read the streak, without waiting.
+      void get().loadCoupleStreak();
       // A confirmed own write is a fill source for the copy.
       const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
       if (!isCurrent()) return;
