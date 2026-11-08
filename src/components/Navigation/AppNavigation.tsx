@@ -106,6 +106,11 @@ export interface AppNavigationProps {
    */
   settingsFromHome?: boolean;
   /**
+   * The open page draws its own bar in place of the app header (Settings, and
+   * the Partner view's Past questions page), so the header is left out.
+   */
+  hasOwnBar?: boolean;
+  /**
    * Unseen counts per dock destination. Missing, zero or negative entries
    * render no badge, and `settings` is ignored in both forms: neither the gear
    * nor the column's Settings button carries a badge.
@@ -121,6 +126,7 @@ export function AppNavigation({
   currentView,
   onViewChange,
   settingsFromHome = false,
+  hasOwnBar = false,
   badgeCounts,
 }: AppNavigationProps) {
   const isSettings = currentView === 'settings';
@@ -139,7 +145,7 @@ export function AppNavigation({
 
   return (
     <>
-      {!isSettings && (
+      {!isSettings && !hasOwnBar && (
         <header className={`safe-top sticky top-0 z-40 ${GLASS}`} data-testid="app-header">
           <div className="flex h-16 items-center gap-2 px-3">
             {/* The native shell's Notifications bell; on the website, an empty

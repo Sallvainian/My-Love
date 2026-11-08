@@ -102,6 +102,13 @@ export const DAILY_DAYS_LOCK = 'my-love:daily-days';
  */
 export const DAILY_WRITE_DECLINED_LOCK = 'my-love:daily-write-declined';
 
+/**
+ * Held by one `daily-celebrated` claim at a time
+ * (`dailyCelebrated.claimCelebration`), across tabs, so two claims of the same
+ * new held total yield exactly one play.
+ */
+export const DAILY_CELEBRATED_LOCK = 'my-love:daily-celebrated';
+
 /** Tail of each name's in-memory queue, for contexts without `navigator.locks`. */
 const waitingChains = new Map<string, Promise<unknown>>();
 

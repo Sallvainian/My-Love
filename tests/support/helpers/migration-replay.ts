@@ -60,7 +60,8 @@ class PsqlError extends Error {
   }
 }
 
-function runPsql(stdin: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
+/** Pipe `stdin` to psql in the local database container; callers read the exit code. */
+export function runPsql(stdin: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       'docker',

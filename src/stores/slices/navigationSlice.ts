@@ -4,6 +4,11 @@
  * Manages all navigation-related state and actions including:
  * - View switching (home/photos/mood/partner/notes/settings)
  * - The open Settings subpage (`settingsPath`), mirrored in the URL under `/settings/`
+ * - The open Partner page (`partnerPath`): `''` is the Partner view, `'history'`
+ *   its Past questions page at `/partner/history`. Not a view of its own: the
+ *   view stays `partner`, so the dock keeps Partner lit. `setView` resets it
+ *   like `settingsPath`; `openPartnerPage` pushes one entry, `showPartnerPage`
+ *   restores one without touching history
  * - Whether that page was opened from Home (`settingsFromHome`), a date card or
  *   Home's Add button: the entry carries `from: 'home'` in `history.state`, which
  *   survives a reload, and the flag mirrors it so the dock keeps Home lit
@@ -57,6 +62,42 @@ export function settingsRoute(path: string): string {
 export function settingsPathFromRoute(routePath: string): string {
   if (!isSettingsRoute(routePath)) return '';
   return routePath.slice(SETTINGS_ROUTE.length).replace(/^\/+|\/+$/g, '');
+}
+
+/** The route the Partner view lives at; its Past questions page sits under `/partner/`. */
+const PARTNER_ROUTE = '/partner';
+
+/** The Partner page `/partner/history` names. */
+const PARTNER_HISTORY_PATH = 'history';
+
+/** Whether a route (base path already stripped) is the Partner view or its history page. */
+export function isPartnerRoute(routePath: string): boolean {
+  return routePath === PARTNER_ROUTE || routePath === `${PARTNER_ROUTE}/${PARTNER_HISTORY_PATH}`;
+}
+
+/** The Partner page a route names: `'history'` for `/partner/history`, else `''`. */
+export function partnerPathFromRoute(routePath: string): string {
+  return routePath === `${PARTNER_ROUTE}/${PARTNER_HISTORY_PATH}` ? PARTNER_HISTORY_PATH : '';
+}
+
+/**
+ * Rewrites the current entry to the Partner view's top page, keeping whether
+ * the app created it and its height above the first entry (as Settings' redirect
+ * does). The caller then calls `showPartnerPage('')`.
+ */
+export function replaceWithPartnerTop(): void {
+  const inApp = window.history.state?.inApp === true;
+  const depth = historyDepth();
+  window.history.replaceState(
+    {
+      view: 'partner',
+      partnerPath: '',
+      ...(inApp ? { inApp } : {}),
+      ...(depth > 0 ? { depth } : {}),
+    },
+    '',
+    withBasePath(PARTNER_ROUTE)
+  );
 }
 
 /**
@@ -134,6 +175,8 @@ export interface NavigationSlice {
    * restore landed on, which shows the parent.
    */
   settingsPushedPath: string | null;
+  /** The open Partner page, relative to `/partner` (`''` is the Partner view, `'history'` its Past questions page). */
+  partnerPath: string;
 
   // Actions
   setView: (view: ViewType, skipHistory?: boolean) => void;
@@ -148,6 +191,10 @@ export interface NavigationSlice {
    * redirects), taking `settingsFromHome` from the current entry.
    */
   showSettingsPage: (path: string) => void;
+  /** Push a Partner page: one history entry, marked as created by the app. */
+  openPartnerPage: (path: string) => void;
+  /** Show a Partner page without touching history (popstate, reload, redirects). */
+  showPartnerPage: (path: string) => void;
   navigateHome: () => void;
   navigatePhotos: () => void;
   navigateMood: () => void;
@@ -161,15 +208,17 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
   settingsPath: '',
   settingsFromHome: false,
   settingsPushedPath: null,
+  partnerPath: '',
 
   // Actions
   setView: (view: ViewType, skipHistory = false) => {
     // A view the person picks opens Settings at its top page; a history
-    // restore (skipHistory) leaves the page to `showSettingsPage`.
+    // restore (skipHistory) leaves the page to `showSettingsPage` (and the
+    // Partner page to `showPartnerPage`).
     set(
       skipHistory
         ? { currentView: view }
-        : { currentView: view, settingsPath: '', settingsFromHome: false }
+        : { currentView: view, settingsPath: '', settingsFromHome: false, partnerPath: '' }
     );
 
     // Update browser URL if not skipping history (prevents loops during popstate)
@@ -265,6 +314,21 @@ export const createNavigationSlice: AppStateCreator<NavigationSlice> = (set, get
       settingsFromHome: window.history.state?.from === 'home',
       settingsPushedPath: null,
     });
+  },
+
+  openPartnerPage: (path: string) => {
+    set({ currentView: 'partner', partnerPath: path });
+    const fullPath = withBasePath(path ? `${PARTNER_ROUTE}/${path}` : PARTNER_ROUTE);
+    window.history.pushState(
+      { view: 'partner', partnerPath: path, inApp: true, depth: historyDepth() + 1 },
+      '',
+      fullPath
+    );
+    logger.info(`[AppStore] Partner page opened: '${path}', URL: ${fullPath}`);
+  },
+
+  showPartnerPage: (path: string) => {
+    set({ partnerPath: path });
   },
 
   // Convenience actions

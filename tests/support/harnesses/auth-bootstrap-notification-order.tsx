@@ -10,6 +10,7 @@ import { anniversariesService } from '../../../src/services/anniversariesService
 import { eventsService, type CoupleEvent, type EventsPage } from '../../../src/services/eventsService';
 import { hasNativeReminders } from '../../../src/services/dateReminders';
 import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
+import { DAILY_STREAK_COPY_KIND } from '../../../src/services/dailyStreakCopy';
 import { registerLocalCopy } from '../../../src/services/localCopy';
 import {
   REMINDERS_OFF_COPY_KIND,
@@ -232,6 +233,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
     const unregisterRemindersOffNoop = registerLocalCopy(REMINDERS_OFF_COPY_KIND, async () => {});
     const unregisterPushPreferencesNoop = registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, async () => {});
     const unregisterDailyDaysNoop = registerLocalCopy(DAILY_DAYS_COPY_KIND, async () => {});
+    const unregisterDailyStreakNoop = registerLocalCopy(DAILY_STREAK_COPY_KIND, async () => {});
     restoreCoupleSettingsRefresher = () => {
       unregisterNoop();
       unregisterProfileNoop();
@@ -243,6 +245,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       unregisterRemindersOffNoop();
       unregisterPushPreferencesNoop();
       unregisterDailyDaysNoop();
+      unregisterDailyStreakNoop();
       registerLocalCopy(COUPLE_SETTINGS_COPY_KIND, () => useAppStore.getState().loadCoupleSettings());
       registerLocalCopy(PARTNER_COPY_KIND, () => useAppStore.getState().loadPartner());
       registerLocalCopy(PROFILE_COPY_KIND, () => useAppStore.getState().loadOwnProfile());
@@ -251,6 +254,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
         hasNativeReminders() ? useAppStore.getState().loadPushPreferences() : Promise.resolve()
       );
       registerLocalCopy(DAILY_DAYS_COPY_KIND, () => useAppStore.getState().loadDailyDay());
+      registerLocalCopy(DAILY_STREAK_COPY_KIND, () => useAppStore.getState().loadCoupleStreak());
       registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
       registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {
         if (!useAppStore.getState().userId) return;

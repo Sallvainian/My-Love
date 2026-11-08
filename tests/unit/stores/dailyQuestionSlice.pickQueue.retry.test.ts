@@ -48,6 +48,8 @@ function state() {
   return useAppStore.getState();
 }
 
+const realLoadCoupleStreak = useAppStore.getState().loadCoupleStreak;
+
 const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as const, snapshot });
 
 function queued(overrides: Partial<QueuedPick> = {}): QueuedPick {
@@ -88,6 +90,8 @@ beforeEach(async () => {
   submitDailyPickRequest.mockReset();
   announceDailyPick.mockReset();
   announceDailyPick.mockResolvedValue(undefined);
+  // A confirmed pick re-reads the streak; its own tests cover that read.
+  useAppStore.setState({ loadCoupleStreak: vi.fn(async () => {}) });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -99,6 +103,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  useAppStore.setState({ loadCoupleStreak: realLoadCoupleStreak });
   // Sign-out cancels any drain retry a test left scheduled, so no timer fires
   // after this file ends (AGENTS: fire-and-forget work must not outlive the file).
   state().clearAuth();

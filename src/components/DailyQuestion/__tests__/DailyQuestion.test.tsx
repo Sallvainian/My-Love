@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  coupleStreak,
   dailySnapshot,
   DAY_ID,
   revealSnapshot,
@@ -16,6 +17,7 @@ import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
 
 const fetchDailyDay = vi.fn();
 const submitDailyPickRequest = vi.fn();
+const fetchCoupleStreak = vi.fn();
 
 vi.mock('../../../api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -33,6 +35,7 @@ vi.mock('../../../hooks/useDailyPickListener', () => ({
 vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  fetchCoupleStreak: (...args: unknown[]) => fetchCoupleStreak(...args),
   announceDailyPick: vi.fn(async () => {}),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
@@ -68,6 +71,8 @@ beforeEach(async () => {
   vi.clearAllMocks();
   fetchDailyDay.mockReset();
   submitDailyPickRequest.mockReset();
+  fetchCoupleStreak.mockReset();
+  fetchCoupleStreak.mockResolvedValue({ status: 'unlinked' });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
@@ -83,6 +88,7 @@ beforeEach(async () => {
   queueDb.close();
   await deleteAccountCopies('USER-A-ID');
   await deleteAccountCopies('USER-C-ID');
+  useAppStore.setState({ coupleStreak: null, coupleStreakError: null });
 });
 
 afterEach(() => {
@@ -121,6 +127,29 @@ describe('DailyQuestion', () => {
 
   it('falls back to "Your partner" when no name is known', async () => {
     setPartner(null);
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-partner-status')).toHaveTextContent(
+      "Your partner hasn't picked yet"
+    );
+  });
+
+  it('a nameless linked partner: "Your partner" starts a sentence, "your partner" sits within one', async () => {
+    setPartner('  ');
+    fetchDailyDay.mockResolvedValue(ok(waitingSnapshot('this')));
+
+    render(<DailyQuestion />);
+
+    expect(await screen.findByTestId('daily-waiting')).toHaveTextContent('Waiting on your partner');
+    expect(screen.getByTestId('daily-streak-waiting')).toHaveTextContent(
+      'Your half is in. The streak lights up when your partner answers too.'
+    );
+  });
+
+  it('a nameless linked partner, no picks yet: the status sentence starts with "Your partner"', async () => {
+    setPartner('');
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
 
     render(<DailyQuestion />);
@@ -601,6 +630,175 @@ describe('DailyQuestion', () => {
     expect(await screen.findByTestId('daily-question')).toHaveTextContent('Tea or Coffee?');
     expect(fetchDailyDay).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('daily-loading')).toBeNull();
+  });
+
+  describe('the streak', () => {
+    const okStreak = (overrides: Parameters<typeof coupleStreak>[0] = {}) => ({
+      status: 'ok' as const,
+      streak: coupleStreak(overrides),
+    });
+
+    it('reads the streak on mount', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+      render(<DailyQuestion />);
+      await screen.findByTestId('daily-question');
+
+      await waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
+    });
+
+    it('header: "Today\'s question" as plain text and the snapshot\'s date, the question stays the h1', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ day: '2026-11-05' })));
+
+      render(<DailyQuestion />);
+
+      const header = await screen.findByTestId('daily-header');
+      expect(header).toHaveTextContent("Today's question");
+      expect(screen.getByTestId('daily-date')).toHaveTextContent('Thursday, November 5');
+      expect(screen.getByRole('heading', { level: 1 })).toBe(screen.getByTestId('daily-question'));
+      expect(screen.queryByRole('heading', { name: "Today's question" })).toBeNull();
+    });
+
+    it('grey: a grey chip with the held total, the run line and the strip, no banner', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(okStreak({ held: 2, run: 2, today_state: 'grey' }));
+
+      render(<DailyQuestion />);
+
+      const chip = await screen.findByTestId('daily-streak-chip');
+      expect(chip).toHaveAttribute('data-state', 'grey');
+      expect(chip).toHaveClass('bg-ash-tint', 'text-ash-ink');
+      expect(screen.getByTestId('daily-streak-held')).toHaveTextContent('2');
+      expect(screen.getByTestId('daily-streak-run')).toHaveTextContent('2 in a row');
+      expect(chip.querySelector('svg.lucide-flame')).not.toBeNull();
+      expect(chip.querySelector('svg.lucide-snowflake')).toBeNull();
+      expect(screen.getByTestId('daily-streak-week')).toBeInTheDocument();
+      expect(screen.getAllByTestId('daily-streak-day')).toHaveLength(7);
+      expect(screen.queryByTestId('daily-streak-cold')).toBeNull();
+    });
+
+    it('orange: an orange chip with a flame, no banner', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(okStreak({ today_state: 'orange' }));
+
+      render(<DailyQuestion />);
+
+      const chip = await screen.findByTestId('daily-streak-chip');
+      expect(chip).toHaveAttribute('data-state', 'orange');
+      expect(chip).toHaveClass('bg-fire-tint', 'text-fire-ink');
+      expect(chip.querySelector('svg.lucide-flame')).not.toBeNull();
+      expect(screen.queryByTestId('daily-streak-cold')).toBeNull();
+    });
+
+    it('blue with one missed date: a blue chip with a snowflake and the "Yesterday was" banner', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(
+        okStreak({ held: 12, run: 0, today_state: 'blue', missed: 1 })
+      );
+
+      render(<DailyQuestion />);
+
+      const chip = await screen.findByTestId('daily-streak-chip');
+      expect(chip).toHaveAttribute('data-state', 'blue');
+      expect(chip).toHaveClass('bg-cold-tint', 'text-cold-ink');
+      expect(chip.querySelector('svg.lucide-snowflake')).not.toBeNull();
+      expect(chip.querySelector('svg.lucide-flame')).toBeNull();
+      const banner = screen.getByTestId('daily-streak-cold');
+      expect(banner).toHaveTextContent('Your streak went cold');
+      expect(banner).toHaveTextContent(
+        "Yesterday was missed, so it's frozen at 12. You keep the 12. Both answer today to light it back up."
+      );
+    });
+
+    it('blue with several missed dates: "The last 3 days were missed"', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(
+        okStreak({ held: 5, today_state: 'blue', missed: 3 })
+      );
+
+      render(<DailyQuestion />);
+
+      expect(await screen.findByTestId('daily-streak-cold')).toHaveTextContent(
+        "The last 3 days were missed, so it's frozen at 5. You keep the 5."
+      );
+    });
+
+    it('the strip shows each date in the state the server gave', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(okStreak({ today_state: 'orange' }));
+
+      render(<DailyQuestion />);
+
+      const days = await screen.findAllByTestId('daily-streak-day');
+      expect(days.map((day) => day.getAttribute('data-state'))).toEqual([
+        'open', 'open', 'open', 'open', 'open', 'open', 'done',
+      ]);
+      expect(days[6]).toHaveTextContent('Today');
+    });
+
+    it.each([
+      ['not read yet', null],
+      ['unlinked', { status: 'unlinked' as const }],
+    ])('no streak (%s): the header without a chip, no strip, no banner', async (_label, answer) => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      if (answer) fetchCoupleStreak.mockResolvedValue(answer);
+      else fetchCoupleStreak.mockReturnValue(new Promise(() => {}));
+
+      render(<DailyQuestion />);
+
+      await screen.findByTestId('daily-header');
+      await waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalled());
+      expect(screen.queryByTestId('daily-streak-chip')).toBeNull();
+      expect(screen.queryByTestId('daily-streak-week')).toBeNull();
+      expect(screen.queryByTestId('daily-streak-cold')).toBeNull();
+    });
+
+    it('a failed streak read shows no chip and no error on Daily', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockRejectedValue(new AccountDataError('transport', 'STREAK-DOWN'));
+
+      render(<DailyQuestion />);
+
+      await screen.findByTestId('daily-header');
+      await waitFor(() => expect(useAppStore.getState().coupleStreakError).not.toBeNull());
+      expect(screen.queryByTestId('daily-streak-chip')).toBeNull();
+      expect(screen.queryByText('STREAK-DOWN')).toBeNull();
+      expect(screen.queryByTestId('daily-error')).toBeNull();
+    });
+
+    it('the unlinked invitation has no header, chip or strip', async () => {
+      fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
+
+      render(<DailyQuestion />);
+
+      await screen.findByTestId('daily-invite');
+      expect(screen.queryByTestId('daily-header')).toBeNull();
+      expect(screen.queryByTestId('daily-streak-chip')).toBeNull();
+    });
+
+    it('waiting: the own pick is in, so the sentence names the partner', async () => {
+      fetchDailyDay.mockResolvedValue(ok(waitingSnapshot('this')));
+
+      render(<DailyQuestion />);
+
+      expect(await screen.findByTestId('daily-streak-waiting')).toHaveTextContent(
+        'Your half is in. The streak lights up when Jessie answers too.'
+      );
+      expect(screen.getByTestId('daily-waiting')).toHaveTextContent('Waiting on Jessie');
+    });
+
+    it.each([
+      ['none', dailySnapshot()],
+      ['partner', dailySnapshot({ state: 'partner' })],
+      ['both', revealSnapshot('this', 'that')],
+    ])('no waiting sentence while the state is %s', async (_label, snapshot) => {
+      fetchDailyDay.mockResolvedValue(ok(snapshot));
+
+      render(<DailyQuestion />);
+
+      await screen.findByTestId('daily-question');
+      expect(screen.queryByTestId('daily-streak-waiting')).toBeNull();
+    });
   });
 
   describe('the day changed notice', () => {

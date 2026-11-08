@@ -97,7 +97,7 @@ describe('submitWrittenQuestion', () => {
     await state().submitWrittenQuestion('a', 'b');
 
     const saved = await readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
-    expect(saved?.[DAY_ID]).toEqual(done());
+    expect(saved?.[DAY_ID]).toEqual({ ...done(), partner_id: null });
   });
 
   it('does not let the answer undo a higher state', async () => {
@@ -199,7 +199,7 @@ describe('a read that started before the Send', () => {
 
     expect(state().dailyDay).toEqual(ok(done()));
     const saved = await readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
-    expect(saved?.[DAY_ID]).toEqual(done());
+    expect(saved?.[DAY_ID]).toEqual({ ...done(), partner_id: null });
   });
 
   it('does not reopen the turn when an online load answers late', async () => {

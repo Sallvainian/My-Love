@@ -19,8 +19,6 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 // Custom project fixtures (extend as needed)
 import { test as customFixtures } from './fixtures';
 import { test as authFixture } from './fixtures/auth';
-import { test as interactionRealtimeFixture } from './fixtures/interaction-realtime-control';
-import { test as interactionOwnershipFixture } from './fixtures/interaction-record-ownership';
 import { test as authBootstrapFixture } from './fixtures/auth-bootstrap-notification-order';
 import { test as eventsRefreshFixture } from './fixtures/events-refresh-control';
 import { CLEANUP_TIMEOUT_MS, provideCleanup, type Cleanup } from './fixtures/cleanup';
@@ -51,8 +49,6 @@ type MergedTest = ReturnType<
       typeof networkMonitorFixture,
       typeof customFixtures,
       typeof authFixture,
-      typeof interactionRealtimeFixture,
-      typeof interactionOwnershipFixture,
       typeof authBootstrapFixture,
       typeof eventsRefreshFixture,
     ]
@@ -72,8 +68,6 @@ const merged: MergedTest = mergeTests(
   networkMonitorFixture,
   customFixtures,
   authFixture,
-  interactionRealtimeFixture,
-  interactionOwnershipFixture,
   authBootstrapFixture,
   eventsRefreshFixture
 );

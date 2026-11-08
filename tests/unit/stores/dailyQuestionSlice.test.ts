@@ -48,6 +48,9 @@ function state() {
   return useAppStore.getState();
 }
 
+const realLoadCoupleStreak = useAppStore.getState().loadCoupleStreak;
+const loadCoupleStreak = vi.fn(async () => {});
+
 const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as const, snapshot });
 
 beforeEach(async () => {
@@ -57,6 +60,8 @@ beforeEach(async () => {
   submitDailyPickRequest.mockReset();
   announceDailyPick.mockReset();
   announceDailyPick.mockResolvedValue(undefined);
+  // The streak read has its own tests; here only whether a pick asks for it.
+  useAppStore.setState({ loadCoupleStreak });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
@@ -68,6 +73,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  useAppStore.setState({ loadCoupleStreak: realLoadCoupleStreak });
   vi.useRealTimers();
   setOnline(true);
   vi.restoreAllMocks();
@@ -281,7 +287,9 @@ describe('loadDailyDay', () => {
 });
 
 describe('the saved days copy', () => {
-  const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({ [snapshot.day_id]: snapshot });
+  const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({
+    [snapshot.day_id]: { ...snapshot, partner_id: null },
+  });
   const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
 
   it('shows the saved day for the device date before the fetch settles', async () => {
@@ -467,7 +475,9 @@ describe('the saved days copy', () => {
 
 describe('refreshDailyDay', () => {
   const saved = (...snapshots: Array<ReturnType<typeof dailySnapshot>>) =>
-    Object.fromEntries(snapshots.map((snapshot) => [snapshot.day_id, snapshot]));
+    Object.fromEntries(
+      snapshots.map((snapshot) => [snapshot.day_id, { ...snapshot, partner_id: null }])
+    );
   const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
   const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
 
@@ -677,6 +687,34 @@ describe('submitDailyPick', () => {
 
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
     announcement.settle(undefined);
+  });
+
+  it('re-reads the couple streak once after a confirmed pick', async () => {
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    expect(loadCoupleStreak).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-read the streak when the pick fails', async () => {
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'transport' });
+
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
+  });
+
+  it('does not re-read the streak when the session changed before the answer', async () => {
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
   });
 
   it('announces nothing when the pick is refused', async () => {

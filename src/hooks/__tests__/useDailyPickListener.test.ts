@@ -3,7 +3,7 @@
  * the account is signed in and online. A `daily_pick` re-reads the named day;
  * a `partner_linked` re-reads today's, so the invitation to link gives way to
  * the day; every SUBSCRIBED re-reads today's, because a broadcast is never
- * replayed.
+ * replayed. Each of the three also re-reads the couple's streak.
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -18,6 +18,7 @@ const state = {
   syncStatus: { isOnline: true },
   loadDailyDay: vi.fn(async () => {}),
   refreshDailyDay: vi.fn(async (_dayId: string) => {}),
+  loadCoupleStreak: vi.fn(async () => {}),
 };
 
 vi.mock('../../stores/useAppStore', () => ({
@@ -64,6 +65,7 @@ describe('useDailyPickListener', () => {
 
     expect(state.refreshDailyDay).toHaveBeenCalledTimes(1);
     expect(state.refreshDailyDay).toHaveBeenCalledWith(DAY_ID);
+    expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
     expect(state.loadDailyDay).not.toHaveBeenCalled();
   });
 
@@ -74,6 +76,7 @@ describe('useDailyPickListener', () => {
     act(() => subscribe.mock.calls[0][0].partner_linked!({ event: 'partner_linked' }));
 
     expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
+    expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
     expect(state.refreshDailyDay).not.toHaveBeenCalled();
   });
 
@@ -85,9 +88,11 @@ describe('useDailyPickListener', () => {
     act(() => onStatus('SUBSCRIBED'));
     act(() => onStatus('SUBSCRIBED'));
     expect(state.loadDailyDay).toHaveBeenCalledTimes(2);
+    expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
 
     for (const status of ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED']) act(() => onStatus(status));
     expect(state.loadDailyDay).toHaveBeenCalledTimes(2);
+    expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
     expect(state.refreshDailyDay).not.toHaveBeenCalled();
   });
 
@@ -113,6 +118,7 @@ describe('useDailyPickListener', () => {
 
     expect(state.refreshDailyDay).not.toHaveBeenCalled();
     expect(state.loadDailyDay).not.toHaveBeenCalled();
+    expect(state.loadCoupleStreak).not.toHaveBeenCalled();
   });
 
   it('releases a subscription that resolves after unmount', async () => {

@@ -18,6 +18,7 @@ import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
 const fetchDailyDay = vi.fn();
 const submitDailyPickRequest = vi.fn();
 const submitWrittenQuestionRequest = vi.fn();
+const fetchCoupleStreak = vi.fn();
 
 vi.mock('../../../api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -34,6 +35,7 @@ vi.mock('../../../hooks/useDailyPickListener', () => ({
 vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  fetchCoupleStreak: (...args: unknown[]) => fetchCoupleStreak(...args),
   announceDailyPick: vi.fn(async () => {}),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
   submitWrittenQuestion: (...args: unknown[]) => submitWrittenQuestionRequest(...args),
@@ -66,6 +68,8 @@ beforeEach(async () => {
   fetchDailyDay.mockReset();
   submitDailyPickRequest.mockReset();
   submitWrittenQuestionRequest.mockReset();
+  fetchCoupleStreak.mockReset();
+  fetchCoupleStreak.mockResolvedValue({ status: 'unlinked' });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).

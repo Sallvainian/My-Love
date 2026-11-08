@@ -22,6 +22,18 @@
  * judges the options (R4); a refusal it raises for good (`DQ003` to `DQ006`) is
  * `AccountDataError('refused', reason)`, shown as is.
  *
+ * `fetchCoupleStreak` reads the couple's streak (`get_couple_streak`, which
+ * takes no argument: the server derives the pair and the instant) and answers
+ * `{ status: 'ok', streak }` or `{ status: 'unlinked' }`. Online-only and
+ * throwing, as above; a failure or an answer that does not parse is never
+ * mapped to `unlinked`.
+ *
+ * `fetchDailyHistory` reads the pair's past questions (`get_daily_history`): an
+ * array of day snapshots of the days both partners picked, newest first, at
+ * most 30, all before `before` when given (the next page is the call with the
+ * oldest day in hand). `[]` means nothing to show, unlinked included. Online-only
+ * and throwing, as above.
+ *
  * `announceDailyPick` tells the partner's open Daily that a day changed: a
  * `daily_pick { day_id }` broadcast on their `mood-updates:<uid>` topic, never
  * a choice. It throws when the broadcast fails; the caller decides.
@@ -44,16 +56,22 @@ import {
   type DailyChoice,
   type DailyDayAnswer,
   DailyDayAnswerSchema,
+  type CoupleStreak,
+  type CoupleStreakAnswer,
+  CoupleStreakAnswerSchema,
   type DailyDaySnapshot,
   DailyDaySnapshotSchema,
+  DailyHistorySchema,
 } from './validation/dailyQuestionSchemas';
 
-export type { DailyChoice, DailyDayAnswer, DailyDaySnapshot };
+export type { CoupleStreak, CoupleStreakAnswer, DailyChoice, DailyDayAnswer, DailyDaySnapshot };
 
 const FETCH_CONTEXT = 'DailyQuestionApi.fetchDailyDay';
 const SUBMIT_CONTEXT = 'DailyQuestionApi.submitDailyPick';
 const WRITE_CONTEXT = 'DailyQuestionApi.submitWrittenQuestion';
 const FETCH_BY_ID_CONTEXT = 'DailyQuestionApi.fetchDailyDayById';
+const STREAK_CONTEXT = 'DailyQuestionApi.fetchCoupleStreak';
+const HISTORY_CONTEXT = 'DailyQuestionApi.fetchDailyHistory';
 
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
 const PICK_DATE_MISMATCH = 'DQ001';
@@ -146,6 +164,50 @@ export async function fetchDailyDay(): Promise<DailyDayAnswer> {
     return parsed.data;
   } catch (error) {
     throw toAccountDataError(FETCH_CONTEXT, error);
+  }
+}
+
+/** The couple's streak, or `unlinked`. Throws on any failure; a failure is never `unlinked`. */
+export async function fetchCoupleStreak(): Promise<CoupleStreakAnswer> {
+  refuseOffline('The streak', 'load');
+  try {
+    const { data, error } = await supabase.rpc('get_couple_streak').abortSignal(requestTimeout());
+    if (error) throw error;
+    const parsed = CoupleStreakAnswerSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AccountDataError('invalid-response', 'The streak answer was not understood.', {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  } catch (error) {
+    throw toAccountDataError(STREAK_CONTEXT, error);
+  }
+}
+
+/** How many days `get_daily_history` answers at most; a shorter page is the last one. */
+export const DAILY_HISTORY_PAGE_SIZE = 30;
+
+/**
+ * The days of the caller's pair that both partners picked, newest first, at most
+ * {@link DAILY_HISTORY_PAGE_SIZE}, before `before` (a `YYYY-MM-DD` date) when given. Throws on any failure.
+ */
+export async function fetchDailyHistory(before?: string): Promise<DailyDaySnapshot[]> {
+  refuseOffline('Past questions', 'load');
+  try {
+    const call =
+      before === undefined ? supabase.rpc('get_daily_history') : supabase.rpc('get_daily_history', { before });
+    const { data, error } = await call.abortSignal(requestTimeout());
+    if (error) throw error;
+    const parsed = DailyHistorySchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AccountDataError('invalid-response', 'The past questions answer was not understood.', {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  } catch (error) {
+    throw toAccountDataError(HISTORY_CONTEXT, error);
   }
 }
 

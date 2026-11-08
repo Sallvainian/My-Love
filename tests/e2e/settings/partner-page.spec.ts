@@ -6,7 +6,8 @@
  * linked without a partner request, so their real Linked since is unknown and
  * its row is hidden; a spec that wants the date fulfils the request read. An
  * account the server says is unlinked reads `Not linked`, and its page shows
- * the lead line and `Go to Partner`, which opens the Partner view.
+ * the lead line and `Go to Partner`, which opens the Partner view. A partner
+ * read that fails with nothing saved shows the load-error card, never the lead.
  *
  * Bottom-dock form on a phone viewport, as `settings-stack.spec.ts` runs.
  */
@@ -116,5 +117,26 @@ test.describe('Settings > Partner', () => {
     // THEN: the Partner view opens
     await expect.poll(() => new URL(page.url()).pathname).toBe('/partner');
     await expect(page.getByRole('heading', { level: 1, name: 'Connect with Your Partner' })).toBeVisible();
+  });
+
+  test('[P1] should show the load error, not the lead line, when the partner read fails with nothing saved', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    // GIVEN: a fresh context (no saved partner copy) whose partner read is
+    // aborted before the app starts. An abort, never a 4xx/5xx status, which
+    // the network-error monitor would flag.
+    // playwright-utils deviation: the route must be installed before the next navigation and fail every match; interceptNetworkCall registers its route inside a test.step the caller cannot await, so nothing guarantees it is in place first.
+    await page.route('**/rest/v1/users?select=partner*', (route) => route.abort());
+    await openSettingsFromHome(page, interceptNetworkCall);
+
+    // WHEN: Settings > Partner opens
+    await page.getByTestId('settings-partner-row').click();
+
+    // THEN: the load-error card, with neither the not-linked lead nor the partner card
+    await expect(page).toHaveURL(/\/settings\/partner$/);
+    await expect(page.getByTestId('partner-load-error')).toBeVisible();
+    await expect(page.getByTestId('settings-partner-lead')).toHaveCount(0);
+    await expect(page.getByTestId('settings-partner-card')).toHaveCount(0);
   });
 });

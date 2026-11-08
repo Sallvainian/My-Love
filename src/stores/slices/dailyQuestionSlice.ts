@@ -8,6 +8,9 @@
  * days are the `daily-days` local copy (`services/dailyDaysCopy.ts`), which
  * `loadDailyDay` shows first for the device's date and every successful answer
  * (a read or a confirmed pick) is merged into. The view re-reads on each mount.
+ * Each merge tags the saved day with the partner it was read with, and the
+ * readers show only the current partner's days (the partner from the store or
+ * the saved partner copy; `lookupPartnerId()` tags a merge when neither is known).
  *
  * Only a successful answer writes `dailyDay` and the copy: a failed load keeps
  * what is shown and sets `dailyDayError`, and never turns into `unlinked`. A
@@ -51,19 +54,90 @@
  * the device-state `daily-write-declined` kind (`services/dailyWriteDeclined.ts`)
  * and in `dailyWriteDeclined`, which `loadDailyDay` fills from the kind. The
  * view decides when to ask from the snapshot, this field and the device date.
+ *
+ * The couple's streak (Partner page) lives here too: `coupleStreak` holds the
+ * last `get_couple_streak` answer (`{ status: 'ok', streak }`, `{ status:
+ * 'unlinked' }`, or `null` before any), `coupleStreakLoading` a read in flight
+ * and `coupleStreakError` the message of the last failed read.
+ * `loadCoupleStreak` never throws; a failure keeps the answer shown and sets
+ * the error, and only a successful answer writes the field and clears it. The
+ * last `ok` streak is the `daily-streak` local copy (`services/dailyStreakCopy.ts`):
+ * `loadCoupleStreak` shows it first, but only over `null` (an answer in memory
+ * is at least as new), and a successful answer then replaces it (`ok`) or
+ * deletes it (`unlinked`); a failed read leaves it. The copy is tagged with the
+ * partner it was read with and shown only for the current partner
+ * (`shownPartnerId`), as the saved days are. Only the newest started read writes
+ * (a sequence counter), and a read that outlives the session writes nothing, to
+ * the field or to the copy. `signedOutState()` clears all three fields.
+ * Daily shows the streak too, so `submitDailyPick` and the queue drain re-read
+ * it (`void loadCoupleStreak()`) after each pick the server confirmed, once the
+ * session is still current; a queued pick and a refused row do not.
+ *
+ * When the shown partner changes from one id to another in a session (an unlink
+ * and a new link, or a refreshed partner read that answers a new id), the slice
+ * clears the streak, the past questions and their errors, loading flags and end
+ * flag, and the reads in flight for the old pair write nothing, to the fields
+ * or to the copy (the sequence counters and a generation are bumped). A streak
+ * that was shown or being read is then read again for the new partner, since
+ * Daily's read effect does not re-run on a partner change. Only a non-null id
+ * that differs from the last non-null one seen in the session counts: a first
+ * link and a reload of the same partner clear nothing, and an identity change
+ * (`userId`/`authSessionVersion`) forgets the last id.
+ *
+ * The couple's past questions (Partner page) live here as well: `dailyHistory`
+ * holds `get_daily_history`'s pages read so far (the pair's done days as
+ * snapshots, newest first, 30 a page; `null` before any answer, `[]` for none
+ * or unlinked), `dailyHistoryLoading` a read of the first page in flight and
+ * `dailyHistoryError` the message of the last failed read. `loadDailyHistory`
+ * reads the first page and merges it: a full page replaces only the newest
+ * rows (loaded rows older than its oldest day stay, `dailyHistoryEnd` as it
+ * was, or false when none stay), a short page is the whole list (it replaces all and sets
+ * `dailyHistoryEnd`). `loadMoreDailyHistory` reads the page before the oldest
+ * row, appends the rows not yet present and sets `dailyHistoryEnd` when the page
+ * is short; it does nothing unless signed in with rows, not at the end and not
+ * already loading more (`dailyHistoryLoadingMore`), and writes nothing when the
+ * session changed or the list's oldest day is no longer the one it asked
+ * before, or when the pair changed. Both never throw: a failure keeps the rows
+ * shown and sets the error (an offline refusal is not logged). Only the newest
+ * started first-page read writes (its own sequence counter), nothing if the
+ * session or the pair changed. Every
+ * page read is merged into the `daily-days` copy (the same map as Daily's days,
+ * no cap), and a failed first read with nothing shown fills the list from that
+ * copy (the current partner's `both` days, newest first, `dailyHistoryEnd`
+ * set); the next successful first page replaces such a list rather than
+ * merging with it, and a failed read never writes the copy.
+ * `signedOutState()` clears all five fields.
+ *
+ * The streak's +1 (R4) is claimed through `claimStreakCelebration(streak)`: the
+ * Daily view calls it for each `ok` streak it shows, and the device-state
+ * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
+ * whether that held total is new to this device and, in the same claim, whether
+ * the milestone count is new too (the milestone screen after the +1; the claim
+ * stores the higher count). It holds no state here, so
+ * sign-out needs nothing in `signedOutState()` (the kind goes with
+ * `deleteAccountCopies`). It never throws.
  */
 
 import { isOnline } from '../../api/errorHandlers';
+import { lookupPartnerId } from '../../api/supabaseClient';
 import { AccountDataError } from '../../services/accountDataError';
 import {
   DAILY_DAYS_COPY_KIND,
   dailyStateRank,
   keepWriteDone,
   mergeDailyDay,
+  mergeDailyDays,
   readSavedDailyDay,
+  readSavedDailyHistory,
 } from '../../services/dailyDaysCopy';
+import { type CelebrationClaim, claimCelebration } from '../../services/dailyCelebrated';
 import type { StoredQueuedPick } from '../../services/dbSchema';
 import { addDeclinedWriteDay, readDeclinedWriteDays } from '../../services/dailyWriteDeclined';
+import {
+  DAILY_STREAK_COPY_KIND,
+  readSavedStreak,
+  saveStreakAnswer,
+} from '../../services/dailyStreakCopy';
 import { registerLocalCopy } from '../../services/localCopy';
 import {
   enqueuePick,
@@ -76,18 +150,24 @@ import { formatDateISO } from '../../utils/dateUtils';
 
 import {
   DAY_CHANGED_MESSAGE,
+  type CoupleStreak,
+  type CoupleStreakAnswer,
   type DailyChoice,
   type DailyDayAnswer,
   type DailyDaySnapshot,
   announceDailyPick,
+  fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
+  DAILY_HISTORY_PAGE_SIZE,
+  fetchDailyHistory,
   isPickRefusal,
   pickZone,
   submitDailyPick as submitDailyPickRequest,
   submitWrittenQuestion as submitWrittenQuestionRequest,
 } from '../../api/dailyQuestionApi';
 import type { AppStateCreator } from '../types';
+import { readSavedPartner } from './partnerSlice';
 
 /** One of the account's queued picks, as the view needs it. */
 export type QueuedDailyPick = Pick<
@@ -106,7 +186,33 @@ export interface DailyQuestionSlice {
   dailyQueuedPicks: QueuedDailyPick[];
   /** The `day_id`s whose write prompt this account declined on this device. */
   dailyWriteDeclined: string[];
+  /** The last server answer for the couple's streak, or `null` before any. */
+  coupleStreak: CoupleStreakAnswer | null;
+  /** A `loadCoupleStreak` request is in flight. */
+  coupleStreakLoading: boolean;
+  /** The message of the last failed streak read; cleared by the next answer. */
+  coupleStreakError: string | null;
+  /** The first page of the pair's past questions, newest first, or `null` before any answer. */
+  dailyHistory: DailyDaySnapshot[] | null;
+  /** A `loadDailyHistory` request is in flight. */
+  dailyHistoryLoading: boolean;
+  /** The message of the last failed history read; cleared by the next answer. */
+  dailyHistoryError: string | null;
+  /** That failed read was an offline refusal, not a server or network fault. */
+  dailyHistoryErrorOffline: boolean;
+  /** That failed read was a `loadMoreDailyHistory`, not the first page. */
+  dailyHistoryErrorMore: boolean;
+  /** The oldest page of past questions has been read (a page shorter than a full one). */
+  dailyHistoryEnd: boolean;
+  /** A `loadMoreDailyHistory` request is in flight. */
+  dailyHistoryLoadingMore: boolean;
 
+  /** Read the first page of past questions and merge it into the field. Never throws; a failure keeps what is shown. */
+  loadDailyHistory: () => Promise<void>;
+  /** Read the page of past questions before the oldest row shown and append it. Never throws; a failure keeps what is shown. */
+  loadMoreDailyHistory: () => Promise<void>;
+  /** Read the couple's streak from the server. Never throws; a failure keeps what is shown. */
+  loadCoupleStreak: () => Promise<void>;
   /** Read today's day from the server. Never throws; a failure keeps what is shown. */
   loadDailyDay: () => Promise<void>;
   /**
@@ -143,6 +249,16 @@ export interface DailyQuestionSlice {
    * as it was.
    */
   declineWrittenQuestion: (dayId: string) => Promise<void>;
+  /**
+   * Ask whether `streak`'s held total is new to this device (`claimCelebration`)
+   * and, when it is, record it as celebrated. Resolves
+   * `{ play: true, previous, milestone }` once per new held total (`milestone`:
+   * the streak's milestone count is new to this device too), else
+   * `{ play: false }`. Never throws: a failure is
+   * logged and answers `{ play: false }`, as does no signed-in user or a session
+   * that changed meanwhile.
+   */
+  claimStreakCelebration: (streak: CoupleStreak) => Promise<CelebrationClaim>;
 }
 
 /** What one drain pass ended on (see `drainOnce`). */
@@ -178,6 +294,7 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
 export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (set, get, api) => {
   // A signed-in start and the window `online` event refresh the saved days.
   registerLocalCopy(DAILY_DAYS_COPY_KIND, () => get().loadDailyDay());
+  registerLocalCopy(DAILY_STREAK_COPY_KIND, () => get().loadCoupleStreak());
 
   /** Re-read the account's queued picks into `dailyQueuedPicks`, while `isCurrent()`. */
   const showQueuedPicks = async (userId: string, isCurrent: () => boolean): Promise<void> => {
@@ -205,6 +322,46 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     const fillsEmptyScreen = shown?.status !== 'ok' && snapshot.day === formatDateISO(new Date());
     if (isShownDay || fillsEmptyScreen) {
       set({ dailyDay: mergeAnswer(shown, merged), dailyDayError: null });
+    }
+  };
+
+  // The newest started `loadCoupleStreak`: an older read that lands later writes nothing.
+  let streakSeq = 0;
+  // The newest started `loadDailyHistory`, the same way.
+  let historySeq = 0;
+  // The shown history was filled from the copy after a failed first read: the
+  // next successful first page replaces it instead of merging with it.
+  let historyFromCopy = false;
+  // Bumped when the shown partner changes: a history read started under an
+  // older generation belongs to the old pair and writes nothing.
+  let pairGeneration = 0;
+  // The last non-null partner id seen in this identity, and the identity it was
+  // seen in (`userId:authSessionVersion`).
+  let lastPartnerId: string | null = null;
+  let seenIdentity = '';
+
+  /** The partner the saved days are shown for: the store's, else the saved partner copy's; `null` when none. */
+  const shownPartnerId = async (userId: string): Promise<string | null> => {
+    if (get().partnerKnown) return get().partner?.id ?? null;
+    const saved = await readSavedPartner(userId);
+    return saved?.status === 'linked' ? saved.partner.id : null;
+  };
+
+  /**
+   * The partner a merge tags its entries with: the linked id from the store or
+   * the saved partner copy when one is known, else `lookupPartnerId()`, where
+   * anything but a `linked` answer (or a throw) gives `null`.
+   */
+  const mergePartnerId = async (userId: string): Promise<string | null> => {
+    const known = get().partner?.id;
+    if (known) return known;
+    const saved = await readSavedPartner(userId);
+    if (saved?.status === 'linked') return saved.partner.id;
+    try {
+      const lookup = await lookupPartnerId();
+      return lookup?.status === 'linked' ? lookup.partnerId : null;
+    } catch {
+      return null;
     }
   };
 
@@ -240,6 +397,30 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     }, delay);
   };
 
+  /** The old pair's streak and past questions are gone; their reads in flight write nothing. */
+  const clearPairData = (): void => {
+    // Daily's read effect does not re-run on a partner change, so a streak that
+    // was shown or being read is read again for the new partner.
+    const streakWanted = get().coupleStreak !== null || get().coupleStreakLoading;
+    streakSeq += 1;
+    historySeq += 1;
+    pairGeneration += 1;
+    historyFromCopy = false;
+    set({
+      coupleStreak: null,
+      coupleStreakLoading: false,
+      coupleStreakError: null,
+      dailyHistory: null,
+      dailyHistoryLoading: false,
+      dailyHistoryError: null,
+      dailyHistoryErrorOffline: false,
+      dailyHistoryErrorMore: false,
+      dailyHistoryEnd: false,
+      dailyHistoryLoadingMore: false,
+    });
+    if (streakWanted && get().userId) void get().loadCoupleStreak();
+  };
+
   // Sign-out and an account switch change the identity in one set(); the
   // pending retry belongs to the old one.
   api.subscribe((state) => {
@@ -249,6 +430,19 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     ) {
       cancelDrainRetry();
     }
+
+    // A new partner id after another one (never a first link or the same
+    // partner again) ends the old pair's streak and past questions.
+    const identity = `${state.userId}:${state.authSessionVersion}`;
+    if (identity !== seenIdentity) {
+      seenIdentity = identity;
+      lastPartnerId = null;
+    }
+    const partnerId = state.partner?.id ?? null;
+    if (!partnerId) return;
+    const changed = lastPartnerId !== null && partnerId !== lastPartnerId;
+    lastPartnerId = partnerId;
+    if (changed) clearPairData();
   });
 
   /**
@@ -292,7 +486,16 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
             console.error('[DailyQuestion] Could not announce the pick:', error);
           });
-          const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+          // A late pick can finish a past date: the streak corrects itself.
+          void get().loadCoupleStreak();
+          const partnerId = await mergePartnerId(requestedBy);
+          if (!isCurrent()) return 'stale';
+          const merged = await mergeDailyDay(
+            requestedBy,
+            { status: 'ok', snapshot },
+            partnerId,
+            isCurrent
+          );
           if (!isCurrent()) return 'stale';
           showIfOnScreen(snapshot, merged);
         }
@@ -322,6 +525,195 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
     dailyDayError: null,
     dailyQueuedPicks: [],
     dailyWriteDeclined: [],
+    coupleStreak: null,
+    coupleStreakLoading: false,
+    coupleStreakError: null,
+    dailyHistory: null,
+    dailyHistoryLoading: false,
+    dailyHistoryError: null,
+    dailyHistoryErrorOffline: false,
+    dailyHistoryErrorMore: false,
+    dailyHistoryEnd: false,
+    dailyHistoryLoadingMore: false,
+
+    loadDailyHistory: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const mine = ++historySeq;
+      const generation = pairGeneration;
+      const inSession = () =>
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairGeneration === generation;
+      const isCurrent = () => inSession() && historySeq === mine;
+
+      set({ dailyHistoryLoading: true });
+      try {
+        const days = await fetchDailyHistory();
+        if (!isCurrent()) return;
+        // A list filled from the copy is stale: this page is the first thing loaded.
+        const loaded = historyFromCopy ? [] : (get().dailyHistory ?? []);
+        historyFromCopy = false;
+        const oldest = days[days.length - 1];
+        if (days.length >= DAILY_HISTORY_PAGE_SIZE && oldest) {
+          // A full first page: rows paged in below it stay, `dailyHistoryEnd` as it
+          // was; with none kept (an earlier empty read set it) there is more to page.
+          const kept = loaded.filter((row) => row.day < oldest.day);
+          set({
+            dailyHistory: [...days, ...kept],
+            ...(kept.length === 0 ? { dailyHistoryEnd: false } : {}),
+            dailyHistoryLoading: false,
+            dailyHistoryError: null,
+            dailyHistoryErrorOffline: false,
+            dailyHistoryErrorMore: false,
+          });
+        } else {
+          // A short page is the whole list.
+          set({
+            dailyHistory: days,
+            dailyHistoryEnd: true,
+            dailyHistoryLoading: false,
+            dailyHistoryError: null,
+            dailyHistoryErrorOffline: false,
+            dailyHistoryErrorMore: false,
+          });
+        }
+        // Save the page for offline; the session decides, not a newer read.
+        if (days.length === 0) return;
+        const partnerId = await mergePartnerId(requestedBy);
+        if (!inSession()) return;
+        await mergeDailyDays(requestedBy, days, partnerId, inSession);
+      } catch (error) {
+        if (!isCurrent()) return;
+        // An offline refusal is expected, not a fault: the error is still set.
+        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+          console.error('[DailyQuestion] Failed to load the past questions:', error);
+        }
+        set({
+          dailyHistoryLoading: false,
+          dailyHistoryError:
+            error instanceof Error ? error.message : 'Could not load your past questions.',
+          dailyHistoryErrorOffline: error instanceof AccountDataError && error.code === 'offline',
+          dailyHistoryErrorMore: false,
+        });
+        // Nothing shown: fill the list from the copy (never written on a failure).
+        if (get().dailyHistory === null) {
+          const partnerId = await shownPartnerId(requestedBy);
+          if (!isCurrent()) return;
+          const saved = await readSavedDailyHistory(requestedBy, partnerId);
+          if (!isCurrent() || get().dailyHistory !== null) return;
+          if (saved.length > 0) {
+            set({ dailyHistory: saved, dailyHistoryEnd: true });
+            historyFromCopy = true;
+          }
+        }
+      }
+    },
+
+    loadMoreDailyHistory: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      const loaded = get().dailyHistory;
+      const asked = loaded?.[loaded.length - 1]?.day;
+      if (!requestedBy || asked === undefined) return;
+      if (get().dailyHistoryEnd || get().dailyHistoryLoadingMore) return;
+      const generation = pairGeneration;
+      const inSession = () =>
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairGeneration === generation;
+
+      set({ dailyHistoryLoadingMore: true });
+      try {
+        const days = await fetchDailyHistory(asked);
+        if (!inSession()) return;
+        const rows = get().dailyHistory ?? [];
+        // A first-page re-read can have replaced the tail while this ran.
+        if (rows[rows.length - 1]?.day !== asked) {
+          set({ dailyHistoryLoadingMore: false });
+          return;
+        }
+        const present = new Set(rows.map((row) => row.day_id));
+        set({
+          dailyHistory: [...rows, ...days.filter((row) => !present.has(row.day_id))],
+          dailyHistoryEnd: days.length < DAILY_HISTORY_PAGE_SIZE,
+          dailyHistoryLoadingMore: false,
+          // An older page answers only a failed "more": a failed first page
+          // stays failed (and its Retry stays) until the first page is read.
+          ...(get().dailyHistoryErrorMore
+            ? { dailyHistoryError: null, dailyHistoryErrorOffline: false, dailyHistoryErrorMore: false }
+            : {}),
+        });
+        if (days.length === 0) return;
+        const partnerId = await mergePartnerId(requestedBy);
+        if (!inSession()) return;
+        await mergeDailyDays(requestedBy, days, partnerId, inSession);
+      } catch (error) {
+        if (!inSession()) return;
+        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+          console.error('[DailyQuestion] Failed to load more past questions:', error);
+        }
+        // A failed first page still pending outranks this: it keeps the error
+        // (and its Retry) until a first-page read answers.
+        if (get().dailyHistoryError !== null && !get().dailyHistoryErrorMore) {
+          set({ dailyHistoryLoadingMore: false });
+          return;
+        }
+        set({
+          dailyHistoryLoadingMore: false,
+          dailyHistoryError:
+            error instanceof Error ? error.message : 'Could not load your past questions.',
+          dailyHistoryErrorOffline: error instanceof AccountDataError && error.code === 'offline',
+          dailyHistoryErrorMore: true,
+        });
+      }
+    },
+
+    loadCoupleStreak: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return;
+      const mine = ++streakSeq;
+      const isCurrent = () =>
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        streakSeq === mine;
+
+      set({ coupleStreakLoading: true });
+
+      // 1. The saved streak, at once, over nothing only.
+      const savedFor = await shownPartnerId(requestedBy);
+      if (!isCurrent()) return;
+      const saved = await readSavedStreak(requestedBy, savedFor);
+      if (!isCurrent()) return;
+      if (saved && get().coupleStreak === null) {
+        set({ coupleStreak: { status: 'ok', streak: saved } });
+      }
+
+      try {
+        // 2. The server's answer, shown and then saved.
+        const answer = await fetchCoupleStreak();
+        if (!isCurrent()) return;
+        set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
+        try {
+          // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
+          const partnerId = answer.status === 'ok' ? await mergePartnerId(requestedBy) : null;
+          if (!isCurrent()) return;
+          await saveStreakAnswer(requestedBy, answer, partnerId);
+        } catch (error) {
+          console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
+        }
+      } catch (error) {
+        if (!isCurrent()) return;
+        // An offline refusal is expected, not a fault: the error is still set.
+        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+          console.error("[DailyQuestion] Failed to load the couple's streak:", error);
+        }
+        set({
+          coupleStreakLoading: false,
+          coupleStreakError:
+            error instanceof Error ? error.message : "Could not load your couple's streak.",
+        });
+      }
+    },
 
     loadDailyDay: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
@@ -336,7 +728,9 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       // same day_id.
       const today = formatDateISO(new Date());
       const [saved, declined] = await Promise.all([
-        readSavedDailyDay(requestedBy, today),
+        shownPartnerId(requestedBy).then((partnerId) =>
+          readSavedDailyDay(requestedBy, today, partnerId)
+        ),
         readDeclinedWriteDays(requestedBy),
         showQueuedPicks(requestedBy, isCurrent),
       ]);
@@ -356,7 +750,10 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         // 2. The server's answer, merged into the copy and then shown.
         const answer = await fetchDailyDay();
         if (!isCurrent()) return;
-        const merged = await mergeDailyDay(requestedBy, answer, isCurrent);
+        // Only an `ok` answer is tagged; `unlinked` writes `{}` and needs no partner.
+        const partnerId = answer.status === 'ok' ? await mergePartnerId(requestedBy) : null;
+        if (!isCurrent()) return;
+        const merged = await mergeDailyDay(requestedBy, answer, partnerId, isCurrent);
         if (!isCurrent()) return;
         set({
           dailyDay: mergeAnswer(get().dailyDay, merged),
@@ -393,7 +790,14 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       try {
         const snapshot = await fetchDailyDayById(dayId);
         if (!isCurrent()) return;
-        const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+        const partnerId = await mergePartnerId(requestedBy);
+        if (!isCurrent()) return;
+        const merged = await mergeDailyDay(
+          requestedBy,
+          { status: 'ok', snapshot },
+          partnerId,
+          isCurrent
+        );
         if (!isCurrent()) return;
         showIfOnScreen(snapshot, merged);
       } catch (error) {
@@ -457,8 +861,17 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
       void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
         console.error('[DailyQuestion] Could not announce the pick:', error);
       });
+      // The pick may finish the day: re-read the streak, without waiting.
+      void get().loadCoupleStreak();
       // A confirmed own write is a fill source for the copy.
-      const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+      const partnerId = await mergePartnerId(requestedBy);
+      if (!isCurrent()) return;
+      const merged = await mergeDailyDay(
+        requestedBy,
+        { status: 'ok', snapshot },
+        partnerId,
+        isCurrent
+      );
       if (!isCurrent()) return;
       set({
         dailyDay: mergeAnswer(get().dailyDay, merged),
@@ -512,7 +925,14 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
         thatText
       );
       if (!isCurrent()) return;
-      const merged = await mergeDailyDay(requestedBy, { status: 'ok', snapshot }, isCurrent);
+      const partnerId = await mergePartnerId(requestedBy);
+      if (!isCurrent()) return;
+      const merged = await mergeDailyDay(
+        requestedBy,
+        { status: 'ok', snapshot },
+        partnerId,
+        isCurrent
+      );
       if (!isCurrent()) return;
       set({
         dailyDay: mergeAnswer(get().dailyDay, merged),
@@ -536,6 +956,23 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
           "[DailyQuestion] Could not save that tomorrow's question was declined:",
           error
         );
+      }
+    },
+
+    claimStreakCelebration: async (streak) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return { play: false };
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      try {
+        const claim = await claimCelebration(requestedBy, streak, isCurrent);
+        return isCurrent() ? claim : { play: false };
+      } catch (error) {
+        if (isCurrent()) {
+          console.error('[DailyQuestion] Could not record the streak celebration:', error);
+        }
+        return { play: false };
       }
     },
   };

@@ -27,19 +27,15 @@ vi.mock('@/api/supabaseClient', () => ({
   },
   sessionMismatch: async () => null,
 }));
-vi.mock('@/api/moodSyncService', () => ({ moodSyncService: {} }));
-vi.mock('@/components/PokeKissInterface', () => ({ PokeKissInterface: () => null }));
 vi.mock('@/stores/useAppStore', () => ({ useAppStore: () => state }));
 
 import { partnerService } from '@/api/partnerService';
-import { PartnerMoodView } from '@/components/PartnerMoodView/PartnerMoodView';
+import { PartnerConnect } from '@/components/PartnerView/PartnerConnect';
 
 const state = {
-  partnerMoods: [], partner: null, isLoadingPartner: false,
-  syncStatus: { isOnline: true }, sentRequests: [], isSearching: false,
+  sentRequests: [], isSearching: false,
   searchResult: { status: 'found', user: { id: 'target', email: 'target@example.com', displayName: 'Target' } },
   receivedRequests: [{ id: 'request', other_display_name: 'Sender', other_email: null, created_at: '2026-09-01' }],
-  fetchPartnerMoods: vi.fn(), loadPartner: vi.fn(), loadPendingRequests: vi.fn(),
   searchUsers: vi.fn(), clearSearch: vi.fn(),
   sendPartnerRequest: (id: string) => partnerService.sendPartnerRequest(id),
   acceptPartnerRequest: (id: string) => partnerService.acceptPartnerRequest(id),
@@ -115,7 +111,7 @@ describe('partner request CHECK presentation', () => {
   it.each(actions)('%s shows a plain backend CHECK error in the rendered caller', async (_method, button) => {
     backend.error = { ...raw };
     const user = userEvent.setup();
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await clickAction(user, button);
     await expectConnectionError(friendly);
     expect(screen.queryByText(/raw constraint/)).toBeNull();
@@ -124,7 +120,7 @@ describe('partner request CHECK presentation', () => {
   it.each(actions)('%s retains plain non-CHECK caller fallback', async (_method, button, verb) => {
     backend.error = { ...raw, code: NOT_NULL_VIOLATION, message: 'original database message' };
     const user = userEvent.setup();
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await clickAction(user, button);
     await expectConnectionError(`Failed to ${verb} partner request`);
     expect((backend.error as { message: string }).message).toBe('original database message');
@@ -133,7 +129,7 @@ describe('partner request CHECK presentation', () => {
   it.each(actions)('%s retains Error instance presentation for non-CHECK errors', async (_method, button) => {
     backend.error = new Error('original error');
     const user = userEvent.setup();
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await clickAction(user, button);
     await expectConnectionError('original error');
   });
@@ -163,7 +159,7 @@ describe('partner requests offline (ticket 11)', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
       const user = userEvent.setup();
-      render(<PartnerMoodView />);
+      render(<PartnerConnect />);
 
       await clickAction(user, button);
 
@@ -212,7 +208,7 @@ describe('accepting a request when one of the pair already has a partner', () =>
     vi.spyOn(console, 'error').mockImplementation(() => {});
     backend.error = { ...refusal };
     const user = userEvent.setup();
-    render(<PartnerMoodView />);
+    render(<PartnerConnect />);
     await user.click(screen.getByRole('button', { name: 'Accept' }));
     await vi.waitFor(() => expect(screen.getByTestId('partner-connection-error')).toHaveTextContent(explained));
   });

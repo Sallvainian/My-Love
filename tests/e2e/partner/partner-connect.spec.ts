@@ -14,15 +14,15 @@
  * search test C and D are linked to each other through the real
  * request/accept RPCs so that D's address is a "taken" answer. Each is deleted
  * at teardown through `cleanup`; the FKs cascade the requests, the links, the
- * notes and the pokes.
+ * notes.
  *
  * One behaviour per test: the search answers; the request reaching B and B's
- * accept linking both sides; love notes arriving live; pokes arriving live; a
- * poke sent while B is on another screen showing when B opens Partner.
- * Nothing is reloaded after a link. In the accept and love-note tests A waits
- * on Love Notes while B accepts, the one screen that joined its channel and
- * loaded its thread with no partner; each note and poke arrives on the other
- * screen over Realtime, with no re-read on the receiving page.
+ * accept linking both sides; love notes arriving live. Nothing is reloaded
+ * after a link. In the accept and love-note tests A waits on Love Notes while B
+ * accepts, the one screen that joined its channel and loaded its thread with no
+ * partner; each note arrives on the other screen over Realtime, with no re-read
+ * on the receiving page. The unlinked Partner page shows only the Connect UI,
+ * never the streak card.
  */
 import { randomUUID } from 'node:crypto';
 import type { Browser, BrowserContext, Page, Request, TestInfo } from '@playwright/test';
@@ -33,10 +33,6 @@ import {
 import type { AppState } from '../../../src/stores/types';
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
-import {
-  parsePhoenixFrame,
-  type PhoenixFrame,
-} from '../../support/fixtures/interaction-realtime-control';
 import type { TypedSupabaseClient } from '../../support/factories';
 import { clockAnchor } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -53,10 +49,8 @@ import { dismissWelcomeSplash, WELCOME_SPLASH_KEY } from '../../support/helpers/
 const PARTNER_SEARCH = '**/rest/v1/rpc/find_partner_by_email';
 const REQUEST_SEND = '**/rest/v1/partner_requests*';
 const PENDING_REQUESTS = '**/rest/v1/rpc/get_my_pending_partner_requests';
-const INTERACTION_SEND = '**/rest/v1/interactions?*';
 
 const NOTES_SUBSCRIBED_LOG = /\[useRealtimeMessages\].*SUBSCRIBED/;
-const INTERACTIONS_SUBSCRIBED_LOG = /\[InteractionService\] Realtime subscription status: SUBSCRIBED/;
 
 const MISSING = "No account uses that email — check it's the one they sign in with.";
 const TAKEN = 'That account is already connected with a partner.';
@@ -146,8 +140,8 @@ async function signInToPartnerTab(page: Page, account: Throwaway): Promise<void>
 
 /**
  * Every GET a page starts to a table, and how many have settled. Delivery is
- * only proved live if no read of the thread (or the interaction history) is in
- * flight at the send and none starts until the item is on screen.
+ * only proved live if no read of the thread is in flight at the send and none
+ * starts until the item is on screen.
  */
 function trackReads(page: Page, table: string) {
   const counts = { started: 0, settled: 0 };
@@ -166,78 +160,8 @@ function trackReads(page: Page, table: string) {
   return counts;
 }
 
-type Reads = ReturnType<typeof trackReads>;
-
-/** A `system` frame confirming a postgres_changes subscription. */
-function confirmsPostgresChanges(frame: PhoenixFrame): boolean {
-  const payload = frame[4];
-  return (
-    frame[3] === 'system' &&
-    typeof payload === 'object' &&
-    payload !== null &&
-    'extension' in payload &&
-    payload.extension === 'postgres_changes' &&
-    'status' in payload &&
-    payload.status === 'ok'
-  );
-}
-
-/**
- * Whether the page's current join of `topic` is live and its postgres_changes
- * subscription armed, and how many history reads `reads` had counted when it
- * was armed. SUBSCRIBED fires on the join reply, and can fire before the server
- * has armed that subscription; it confirms it later with a `system` frame, and
- * a row inserted before then may not be delivered. A leave, close or error of
- * the current join clears it. Watches every socket the page opens, so call it
- * before sign-in.
- */
-function watchPostgresChanges(page: Page, topic: string, reads: Reads) {
-  const state = { armed: false, readsAtArming: 0 };
-  let joinRef: string | null = null;
-  const frameOn = (payload: string | Buffer): PhoenixFrame | null => {
-    const frame = parsePhoenixFrame(payload);
-    return frame?.[2] === `realtime:${topic}` ? frame : null;
-  };
-  // playwright-utils deviation: reads Realtime's Phoenix frames, which playwright-utils does not expose.
-  page.on('websocket', (socket) => {
-    socket.on('framesent', ({ payload }) => {
-      const frame = frameOn(payload);
-      if (frame?.[3] === 'phx_join') {
-        joinRef = frame[0];
-        state.armed = false;
-      } else if (frame?.[3] === 'phx_leave' && frame[0] === joinRef) {
-        state.armed = false;
-      }
-    });
-    socket.on('framereceived', ({ payload }) => {
-      const frame = frameOn(payload);
-      if (!frame || frame[0] !== joinRef) return;
-      if (frame[3] === 'phx_close' || frame[3] === 'phx_error') {
-        state.armed = false;
-      } else if (confirmsPostgresChanges(frame)) {
-        state.armed = true;
-        state.readsAtArming = reads.started;
-      }
-    });
-  });
-  return state;
-}
-
-/**
- * Armed, and the history read the app starts on the confirmation has answered,
- * with no other read in flight. The app reads the history when the server
- * confirms the subscription, to catch rows that missed live delivery. After
- * this, a poke reaches the screen over Realtime unless another read starts,
- * which pokeAndSeeItArrive refuses.
- */
-function caughtUp(incoming: ReturnType<typeof watchPostgresChanges>, reads: Reads): boolean {
-  return (
-    incoming.armed && reads.started > incoming.readsAtArming && reads.started === reads.settled
-  );
-}
-
 /** Navigate by the dock and wait for the screen's own Realtime join to report SUBSCRIBED. */
-async function openAndJoin(page: Page, view: 'notes' | 'partner', log: RegExp): Promise<void> {
+async function openAndJoin(page: Page, view: 'notes', log: RegExp): Promise<void> {
   const joined = page.waitForEvent('console', {
     predicate: (message) => log.test(message.text()),
     timeout: 30_000,
@@ -327,6 +251,9 @@ test.describe('Connecting with a partner', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: 'Connect with Your Partner' })
     ).toBeVisible();
+    // Unlinked: only the Connect UI, never the streak.
+    await expect(page.getByTestId('partner-view')).toBeVisible();
+    await expect(page.getByTestId('partner-streak-card')).toHaveCount(0);
 
     // A taken account: D already has a partner. The screen says so, offers no
     // request, and shows nothing about D.
@@ -454,6 +381,8 @@ test.describe('Connecting with a partner', () => {
     );
     await expect(bPage.getByRole('heading', { level: 1, name: a.name })).toBeVisible();
     await expect(bPage.getByTestId('partner-search-card')).toHaveCount(0);
+    // The page reads the streak once the partner is known: a new couple's card.
+    await expect(bPage.getByTestId('partner-streak-card')).toBeVisible();
 
     // ---- A, still on Love Notes and never reloaded, learns of the link ----
     // B's accept announces it on A's mood topic; App's listener re-reads the
@@ -505,104 +434,6 @@ test.describe('Connecting with a partner', () => {
     await sendNoteAndSeeItArrive(bPage, page, aThreadReads, `From B ${randomUUID()}`);
     await sendNoteAndSeeItArrive(page, bPage, bThreadReads, `From A ${randomUUID()}`);
   });
-
-  test('[P0] a poke reaches each linked partner live', async ({
-    page,
-    browser,
-    supabaseAdmin,
-    cleanup,
-  }, testInfo) => {
-    const a = await createThrowaway(supabaseAdmin, cleanup, 'a');
-    const b = await createThrowaway(supabaseAdmin, cleanup, 'b');
-    await linkThroughRequest(a, b);
-    const anchor = clockAnchor();
-
-    await pinFirstBrowser(page, anchor);
-    // Both watched from before sign-in. Sign-in starts the interactions
-    // refresher, and a read already in flight when a counter attaches settles
-    // without having started, leaving the in-flight count at -1.
-    const aHistoryReads = trackReads(page, 'interactions');
-    const aIncoming = watchPostgresChanges(
-      page,
-      `incoming-interactions:${a.userId}`,
-      aHistoryReads
-    );
-    await signIn(page, a);
-    const bPage = await openSecondBrowser(browser, testInfo, cleanup, anchor);
-    const bHistoryReads = trackReads(bPage, 'interactions');
-    const bIncoming = watchPostgresChanges(
-      bPage,
-      `incoming-interactions:${b.userId}`,
-      bHistoryReads
-    );
-    await signIn(bPage, b);
-
-    // ---- A poke, each way, live ----
-    await Promise.all([
-      openAndJoin(page, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
-      openAndJoin(bPage, 'partner', INTERACTIONS_SUBSCRIBED_LOG),
-    ]);
-    await recurseUntil(
-      async () => ({
-        a: caughtUp(aIncoming, aHistoryReads),
-        b: caughtUp(bIncoming, bHistoryReads),
-      }),
-      (v) => {
-        expect(v).toEqual({ a: true, b: true });
-      }
-    );
-    await expect(page.getByRole('heading', { level: 1, name: b.name })).toBeVisible();
-
-    await pokeAndSeeItArrive(page, bPage, bHistoryReads);
-    await pokeAndSeeItArrive(bPage, page, aHistoryReads);
-  });
-
-  test('[P1] a poke sent while the partner is on another screen shows when they open Partner', async ({
-    page,
-    browser,
-    supabaseAdmin,
-    cleanup,
-  }, testInfo) => {
-    const a = await createThrowaway(supabaseAdmin, cleanup, 'a');
-    const b = await createThrowaway(supabaseAdmin, cleanup, 'b');
-    await linkThroughRequest(a, b);
-    const anchor = clockAnchor();
-
-    await pinFirstBrowser(page, anchor);
-    await signIn(page, a);
-    const bPage = await openSecondBrowser(browser, testInfo, cleanup, anchor);
-    const bHistoryReads = trackReads(bPage, 'interactions');
-    const bIncoming = watchPostgresChanges(
-      bPage,
-      `incoming-interactions:${b.userId}`,
-      bHistoryReads
-    );
-    await signIn(bPage, b);
-    // B's sign-in read has answered, so it cannot carry the poke below.
-    await recurseUntil(
-      async () => ({ started: bHistoryReads.started, settled: bHistoryReads.settled }),
-      (v) => {
-        expect(v).toEqual({ started: 1, settled: 1 });
-      }
-    );
-
-    // ---- A pokes while B is on Home, where nothing listens for it ----
-    await openAndJoin(page, 'partner', INTERACTIONS_SUBSCRIBED_LOG);
-    const sent = observeOn({
-      page,
-      method: 'POST',
-      url: INTERACTION_SEND,
-      timeout: SECOND_CONTEXT_READ_TIMEOUT,
-    });
-    await page.getByTestId('poke-button').click();
-    expect((await sent).status).toBe(201);
-
-    // ---- B opens Partner: the read on the server's confirmation brings it ----
-    await navigateTo(bPage, 'partner');
-    await expect(bPage.getByTestId('notification-badge')).toHaveText('1');
-    expect(bIncoming.armed).toBe(true);
-    expect(bHistoryReads.started).toBe(bIncoming.readsAtArming + 1);
-  });
 });
 
 /**
@@ -635,35 +466,4 @@ async function sendNoteAndSeeItArrive(
 
   await expect(to.getByTestId('love-note-message').filter({ hasText: text })).toBeVisible();
   expect(toReads.started, 'the note arrived over Realtime, not a thread re-read').toBe(readsBefore);
-}
-
-/**
- * Poke from `from`, and see the unviewed badge on `to` with no history read on
- * `to` in flight at the send or started after it.
- */
-async function pokeAndSeeItArrive(
-  from: Page,
-  to: Page,
-  toReads: { started: number; settled: number }
-): Promise<void> {
-  await recurseUntil(
-    async () => toReads.started - toReads.settled,
-    (v) => {
-      expect(v).toBe(0);
-    },
-    { timeout: 15_000 }
-  );
-  const readsBefore = toReads.started;
-  await expect(to.getByTestId('notification-badge')).toHaveCount(0);
-  const sent = observeOn({
-    page: from,
-    method: 'POST',
-    url: INTERACTION_SEND,
-    timeout: SECOND_CONTEXT_READ_TIMEOUT,
-  });
-  await from.getByTestId('poke-button').click();
-  expect((await sent).status).toBe(201);
-
-  await expect(to.getByTestId('notification-badge')).toHaveText('1');
-  expect(toReads.started, 'the poke arrived over Realtime, not a history re-read').toBe(readsBefore);
 }
