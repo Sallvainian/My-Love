@@ -4147,10 +4147,10 @@ status: open
 
 ### DW-487: A failed IndexedDB read during a Daily copy merge rewrites the copy with only the new day.
 origin: story 6.10 refactor sweep, from story 6.5's review (rejected as low, kept as a residual risk), 2026-11-06
-location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/dailyWriteDeclined.ts (`addDeclinedWriteDay`); src/services/localCopy.ts:92-100 (`readLocalCopy`)
+location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/dailyWriteDeclined.ts (`addDeclinedWriteDay`); src/services/dailyDaysCopy.ts:214-231 (`mergeDailyDays`); src/services/localCopy.ts:97-106 (`readLocalCopy`)
 source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-day-offline-and-invites-an-unlinked-ac-plan.md`
 severity: low
-reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined. The same weakness is in `addDeclinedWriteDay` (`src/services/dailyWriteDeclined.ts:41-53`, story 6.8): `readDeclinedWriteDays` answers `[]` on a failed read (`:27-31`) and the add then writes a list holding only the new day, so earlier "No thanks" days are lost and the write prompt comes back for them (epic 6 retrospective, A2, 2026-11-06).
+reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined. The same weakness is in `addDeclinedWriteDay` (`src/services/dailyWriteDeclined.ts:41-53`, story 6.8): `readDeclinedWriteDays` answers `[]` on a failed read (`:27-31`) and the add then writes a list holding only the new day, so earlier "No thanks" days are lost and the write prompt comes back for them (epic 6 retrospective, A2, 2026-11-06). Story 7.9 added a third, `mergeDailyDays`, and removed the 31-day cap: one failed read while a history page is merged now rewrites the whole copy with that page, so every other saved day is gone until its page is read online again. DW-509 is the same root in `claimCelebration`; one `readLocalCopy` variant that tells "absent" from "failed", used by all four merges, closes both (epic 7 retrospective, G2, 2026-11-07).
 status: open
 
 ### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
@@ -4193,7 +4193,7 @@ location: src/services/dailyDaysCopy.ts:71 (`readSavedDailyDay`), :103 (`mergeDa
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
 reason: `readSavedDailyDay` picks today's entry by date and rank across all `day_id`s, and `mergeDailyDay` never drops another `day_id` with the same `day`. After a reset or a relink this device never saw as `unlinked`, an old `both` entry is shown first. Online the server's answer replaces it, because `mergeAnswer` merges only within one `day_id`, so it flashes; offline it stays.
-resolution: `mergeSnapshots` in `dailyDaysCopy.ts` drops every other `day_id` for a date the server has just answered, and each saved entry now records the partner it was read with (`partner_id`, the newest tag wins; a legacy entry reads as `null`), so `readSavedDailyDay` and the new `readSavedDailyHistory` show only the current partner's entries. The cap and `prune` went with it. Unit: `dailyDaysCopy.test.ts` (date drop, tag, filter, legacy entry, no cap), `dailyQuestionSlice.partner.test.ts` and `dailyHistorySlice.test.ts`. E2E: the relink test in `tests/e2e/partner/partner-past-questions-offline.spec.ts`, throwaway accounts only: after an admin relink A shows none of the old pairing's questions offline, and the copy still holds them. It fails with the partner filter removed.
+resolution: `mergeSnapshots` in `dailyDaysCopy.ts` drops every other `day_id` for a date the server has just answered, whichever partner it was read with, so an old pairing's entry is deleted on every date the new pair also answers and stays saved, hidden, only on the other dates. Each saved entry records the partner it was read with (`partner_id`, the newest tag wins; an entry saved before the tag reads as `null`). `readSavedDailyHistory` gives only the current partner's entries. `readSavedDailyDay` gives the current partner's and, since 26514052, an untagged one too, so a day saved before the tag still shows offline until the server's next answer for its date re-tags it; an entry tagged with another partner stays hidden. The cap and `prune` went with it. Unit: `dailyDaysCopy.test.ts` (date drop, tag, filter, legacy entry, no cap), `dailyQuestionSlice.partner.test.ts` and `dailyHistorySlice.test.ts`. E2E: the relink test in `tests/e2e/partner/partner-past-questions-offline.spec.ts`, throwaway accounts only: after an admin relink A shows none of the old pairing's questions offline, and the copy still holds its three done days, dates the new pair has not answered. It fails with the partner filter removed. Corrected 2026-11-25 (epic 7 retrospective, D8): the earlier text said a legacy entry is hidden and did not say the date drop deletes an old pairing's entry.
 status: done 2026-11-07
 
 ### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only on their next open.
@@ -4332,7 +4332,7 @@ origin: spec-deferred 2354bd4b96ec
 location: src/services/dailyCelebrated.ts (claimCelebration)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
-reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it.
+reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it. Story 6 did not add it. Same root as DW-487: one `readLocalCopy` variant closes both (epic 7 retrospective, G2, 2026-11-07).
 status: open
 
 ### DW-510: After an in-session unlink and relink to a different partner, the Partner page shows the previous pair's past questions under the new partner's name until the new history read lands, or indefinitely
@@ -4359,4 +4359,99 @@ location: tests/e2e/daily/daily-question-partner-linked.spec.ts:95-101 (the `rec
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-refactor-sweep-plan.md`
 severity: low
 reason: In story 7.10's full chromium run (302 passed, this 1 failed) the check read `inFlight` 1 at its 15 s `POLL` timeout; the same spec then passed three runs in a row alone, and in the implementing agent's earlier full run. The account is a throwaway that stays unlinked until B accepts, and 7.10 changes nothing on that path (no partner change, no `get_daily_day` call). One `get_daily_day` read took more than 15 s under the suite's parallel load; DW-495 (each Daily read takes the pair's advisory lock and writes `user_time_zones`) is a likely cause, UNVERIFIED. The reruns replaced `test-results/`, so the failed run's trace is gone. A second full chromium run after the review patches passed all 303, this spec included. Reproduce by repeating the full chromium run, then read the slow request's server timing before changing the wait.
+status: open
+
+### DW-513: After a server-side relink to a different partner, the +1 and milestone stay silent and Daily keeps the old pair's day.
+origin: epic 7 retrospective (D1 and D2), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/services/dailyCelebrated.ts:55-79 (`claimCelebration`); src/stores/slices/dailyQuestionSlice.ts:401-422 (`clearPairData`)
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: The `daily-celebrated` copy holds one `{ held, milestones }` per account and no partner, and `clearPairData` does not touch it, so a new pair's held total, which starts at 0, plays no +1 and shows no milestone until it passes the old pair's. `clearPairData` also keeps `dailyDay`, and Daily's read effect does not re-run on a partner change, so Daily shows the old pair's question and picks under the new partner's name until a remount, a re-join or a `partner_linked` broadcast re-reads the day. The app has no unlink, so this needs a server-side change of `users.partner_id`. No test covers a relink for the celebration. A fix tags the celebration with its partner (or deletes the kind in `clearPairData`) and re-reads the day there.
+status: open
+
+### DW-514: See all shows only its title when there is no past question, and offers no Retry when its first read fails online.
+origin: epic 7 retrospective (D5 and what is left of D4), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/components/PartnerView/PastQuestionsPage.tsx:151-247
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: With `dailyHistory` `[]`, nothing loading and no error, `/partner/history` (reached by a reload or a direct URL) shows the title and "Same pick on 0 of your 0 days" and nothing else. D4, a failed load-more that was never retried, is fixed (a47a4c19, de3f3fb3, 1e85a54f, d16660d8), but its Retry needs rows (`days.length > 0`), so a failed first read with no rows shows the error box alone until a reconnect, a partner change, a live event or reopening the page reads again.
+status: open
+
+### DW-515: The cold banner says "Yesterday was missed" when the missed day can be the day before yesterday.
+origin: epic 7 retrospective (D6), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/components/DailyQuestion/DailyQuestion.tsx:138-140 (`ColdBanner`)
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: The words come from `missed === 1` alone, and `missed` counts closed dates; a date closes only after both partners' midnights (AD-3). For the partner whose midnight comes first, yesterday stays open until the other's midnight, so in those hours the one missed date is the day before. It needs partners in different time zones. The copy is the owner's: name the date from `week`, or use a count such as "1 day was missed".
+status: open
+
+### DW-516: A failed partner lookup saves a day, a history page or the streak with no partner tag.
+origin: epic 7 retrospective (D7), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/stores/slices/dailyQuestionSlice.ts:355-366 (`mergePartnerId`); src/services/dailyDaysCopy.ts:166 (`mergeSnapshots`)
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: `mergePartnerId` answers `null` for unlinked, for an error answer and for a throw, and the merge always writes the new tag, over a good one too; AGENTS.md's Known pitfalls name this null-for-two-states pattern. Reachable only when neither the store nor the saved `partner` copy has a partner (a first sign-in on a device), and only until the next good merge. Since 26514052 an untagged day still shows on Daily; untagged past questions and an untagged streak are hidden offline. A fix keeps a non-null stored tag when the lookup failed, or returns a status.
+status: open
+
+### DW-517: The partner tag is asserted with a known partner on two of Daily's merge callers, and Daily's component fixtures use a partner state the app never reaches.
+origin: epic 7 retrospective (D9 and D10), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts:290,320; dailyQuestionSlice.writeQuestion.test.ts:100,202; dailyQuestionSlice.test.ts:291,479; src/components/DailyQuestion/__tests__/DailyQuestion.test.tsx:62-66; WriteQuestionSheet.test.tsx:81
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: `dailyQuestionSlice.partner.test.ts` checks `loadDailyDay`'s tag with a known partner and `dailyHistorySlice.test.ts` the history pages'; `drainQueuedPicks`, `refreshDailyDay`, `submitDailyPick` and `submitWrittenQuestion` are asserted only with no partner known, where `partner_id: null` is right. A call site that passed `null` would drop the day from offline past questions and no test would fail. Separately, `setPartner` and the write-sheet tests set `partner` without `partnerKnown`, though `partnerSlice.loadPartner` sets both together, so the saved-day reads in those tests run with no known partner.
+status: open
+
+### DW-518: `get_couple_streak` is read from many places at once, and each read walks the pair's whole history.
+origin: epic 7 retrospective (D11), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/components/DailyQuestion/DailyQuestion.tsx:406; src/components/PartnerView/PartnerView.tsx:81-87; src/hooks/useDailyPickListener.ts:57-67; src/hooks/usePartnerStreakListener.ts:54-65; src/stores/slices/dailyQuestionSlice.ts:297,421,490,865
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: Daily's mount, `SUBSCRIBED`, `daily_pick` and `partner_linked` in both listeners, each confirmed pick or drained row, the `daily-streak` refresher (each signed-in start and each reconnect) and `PartnerView`'s partner and `isOnline` effect each send one, and the function runs a `generate_series` over every date since the pair's first day. Performance only; DW-495 is the same over-read for `get_daily_day`.
+status: open
+
+### DW-519: A second celebration claim in one Daily mount can replace the overlay that is playing. PLAUSIBLE, not reproduced.
+origin: epic 7 retrospective (D12), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/components/DailyQuestion/DailyQuestion.tsx:428-445
+source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
+severity: low
+reason: The claim effect claims each `ok` streak shown. If the saved copy is above the stored celebration and the server's answer is higher again, both claims play, and the second `setCelebration` resets `stage` to `'up'`, even during the milestone screen. The effect waits for the mount's own day read, which narrows the window. Reproduce before changing code.
+status: open
+
+### DW-520: A sign-out between the last session check and the IndexedDB put can recreate the outgoing account's saved copy. UNVERIFIED as reachable.
+origin: epic 7 retrospective (P1, story 7.3's residual risk), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/stores/slices/dailyQuestionSlice.ts:696-703 (`saveStreakAnswer`'s caller); src/services/dailyStreakCopy.ts; src/services/dailyDaysCopy.ts:199-201
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-shows-offline-from-its-saved-copy-plan.md`
+severity: low
+reason: `isCurrent()` is checked before `saveStreakAnswer` is called, not inside the write, so a sign-out landing between the check and the put could write the `daily-streak` copy right after `deleteAccountCopies` removed it. `mergeDailyDay`, `mergeDailyDays` and `partnerSlice` have the same window. The row stays keyed by the outgoing account's id.
+status: open
+
+### DW-521: Offline, a short-lived Daily mount can claim the +1 and unmount before playing it. UNVERIFIED.
+origin: epic 7 retrospective (P1, story 7.5's residual risk), 2026-11-07; re-checked on main 8696807a, 2026-11-25
+location: src/components/DailyQuestion/DailyQuestion.tsx:413-445
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
+severity: low
+reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 (and a milestone with it) is lost on the device.
+status: open
+
+### DW-522: Offline, Past questions can show fewer days than the count above them.
+origin: epic 7 closure check, 2026-11-25
+location: src/components/PartnerView/PartnerView.tsx:81-87; src/stores/slices/dailyQuestionSlice.ts:581-609 (`loadDailyHistory`), :613-649 (`loadMoreDailyHistory`)
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-past-questions-show-offline-plan.md`
+severity: low
+reason: The Partner page reads only the newest 30 done days, and older pages reach the `daily-days` copy only when See all is scrolled to them online. A couple past 30 done days that never scrolled sees, offline, 30 rows under "of your N days", and the copy fill sets `dailyHistoryEnd`, so nothing says there are more. Going offline with the page already loaded also hides older days that are saved: the copy fills the list only while it is `null`, and the pager stops after the offline refusal. The epic's 2026-11-07 decision removed the 31-day cap so the rows match the count. `partner-past-questions-offline.spec.ts` covers only a list paged to its end before the reload.
+status: open
+
+### DW-523: A milestone screen is lost for good on a device when its +1 is cut short.
+origin: epic 7 closure check, 2026-11-25
+location: src/services/dailyCelebrated.ts:55-79 (`claimCelebration`); src/components/DailyQuestion/DailyQuestion.tsx:370-376, :428-445
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-every-25-days-the-milestone-screen-shows-its-badge-plan.md`
+severity: medium
+reason: The claim stores the new `held` and `milestones` before anything shows, and the milestone screen opens only from the +1's button, so a reload or leaving Daily during the +1 skips the milestone screen and no later open shows it ("a milestone never shows without the +1"). It contradicts R5, under which reaching a milestone shows its screen once per device, so it is a bug; story 7.6's plan had recorded it as by design. Owner's decision, 2026-11-25: if the +1 is cut short, the milestone screen shows by itself the next time Daily opens. The +1 itself is still not replayed. The file comments in `dailyCelebrated.ts` and `DailyQuestion.tsx` that state the old rule change with the fix; DW-521 is another way the claim is stored with nothing shown.
+status: open
+
+### DW-524: `new-date-forms.spec.ts`'s add-an-anniversary test failed two weekly burn-ins while loading the partner's Dates list.
+origin: epic 7 closure check, from the scheduled Tests runs, 2026-11-25; not this epic's work
+location: tests/e2e/settings/new-date-forms.spec.ts:55 (the second context, lines 138-148)
+severity: low
+reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait.
 status: open
