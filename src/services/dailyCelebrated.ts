@@ -3,12 +3,16 @@
  * celebrated, and the milestones it last showed (architecture AD-13).
  *
  * A device-state kind: it is written only by `claimCelebration` (the +1 on
- * Daily) and has no server source, so it registers no refresher
- * (`registerLocalCopy`) and the `localCopy.ts` FILL SOURCES rule exempts it.
- * Each device celebrates once per new held total, and shows the milestone
- * screen once per new milestone: `milestones` is the highest count shown, so a
- * claim that plays compares the streak's count with it. Sign-out removes it
- * with the account's other kinds (`deleteAccountCopies`).
+ * Daily) and `claimMilestone` (the milestone screen there) and has no server
+ * source, so it registers no refresher (`registerLocalCopy`) and the
+ * `localCopy.ts` FILL SOURCES rule exempts it. Each device celebrates once per
+ * new held total, and shows the milestone screen once per new milestone: `held`
+ * is stored when the +1 is claimed, and `milestones`, the highest count shown,
+ * only when the milestone screen itself is about to show. A +1 cut short
+ * (a reload, leaving Daily) therefore leaves the milestone owed: the held total
+ * is stored and the milestone count is not, and the next open of Daily shows
+ * the milestone screen by itself. Sign-out removes it with the account's other
+ * kinds (`deleteAccountCopies`).
  *
  * @module services/dailyCelebrated
  */
@@ -27,13 +31,18 @@ const CelebratedSchema = z.object({ held: CountSchema, milestones: CountSchema }
 export type Celebrated = z.infer<typeof CelebratedSchema>;
 
 /**
- * What a claim decided: `previous` is the stored value a play rolls up from,
- * and `milestone` says the streak's milestone count is above the stored one, so
- * the milestone screen follows the +1.
+ * What a claim decided. `previous` is the value stored before it (a play rolls
+ * up from it), or `null` when there was none or nothing was claimed. `milestone`
+ * says the streak's milestone count is above the highest one shown: with a play,
+ * the milestone screen follows the +1; without one, the +1 for this held total
+ * was already claimed and its milestone screen is still owed.
  */
 export type CelebrationClaim =
-  | { play: false }
+  | { play: false; previous: Celebrated | null; milestone: boolean }
   | { play: true; previous: Celebrated; milestone: boolean };
+
+/** The answer when nothing was claimed (no session, or a failure). */
+export const NO_CELEBRATION: CelebrationClaim = { play: false, previous: null, milestone: false };
 
 /** The stored value, or `null` when nothing is stored, the read failed or the value is malformed. */
 export async function readCelebrated(userId: string): Promise<Celebrated | null> {
@@ -45,12 +54,14 @@ export async function readCelebrated(userId: string): Promise<Celebrated | null>
 /**
  * Decide whether `streak` is a new held total for this device, under
  * `DAILY_CELEBRATED_LOCK` (waiting, across tabs), so two claims at once yield
- * one play. Nothing stored: seed from the streak, no play. A held above the
- * stored one: store it with the higher of the two milestone counts and play,
- * answering `milestone` when the streak's count is the higher. Otherwise no play
- * and no write (a milestone never shows without the +1). Writes only while
- * `isCurrent()` holds (a sign-out in between must not recreate the outgoing
- * account's kind), and then answers no play. Throws when the write fails.
+ * one play. Nothing stored: seed from the streak, no play and no milestone. A
+ * held above the stored one: store it, leave the stored milestones (the screen
+ * has not shown yet) and play, answering `milestone` when the streak's count is
+ * the higher. Otherwise no play and no write; `milestone` is then true only for
+ * the stored held itself with a higher milestone count, a milestone whose +1 was
+ * cut short (a lower held is an older answer). Writes only while `isCurrent()`
+ * holds (a sign-out in between must not recreate the outgoing account's kind),
+ * and answers `NO_CELEBRATION` when it does not. Throws when the write fails.
  */
 export async function claimCelebration(
   userId: string,
@@ -59,21 +70,52 @@ export async function claimCelebration(
 ): Promise<CelebrationClaim> {
   return withWaitingLock(DAILY_CELEBRATED_LOCK, async () => {
     const stored = await readCelebrated(userId);
-    if (!isCurrent()) return { play: false };
+    if (!isCurrent()) return NO_CELEBRATION;
     if (stored === null) {
       await writeLocalCopy(userId, DAILY_CELEBRATED_KIND, {
         held: streak.held,
         milestones: streak.milestones,
       });
-      return { play: false };
+      return NO_CELEBRATION;
     }
+    const milestone = streak.milestones > stored.milestones;
     if (streak.held > stored.held) {
       await writeLocalCopy(userId, DAILY_CELEBRATED_KIND, {
         held: streak.held,
-        milestones: Math.max(stored.milestones, streak.milestones),
+        milestones: stored.milestones,
       });
-      return { play: true, previous: stored, milestone: streak.milestones > stored.milestones };
+      return { play: true, previous: stored, milestone };
     }
-    return { play: false };
+    return {
+      play: false,
+      previous: stored,
+      milestone: milestone && streak.held === stored.held,
+    };
+  });
+}
+
+/**
+ * Claim the milestone screen for `streak`, under the same lock, just before it
+ * shows: `true`, with the streak's count stored as the highest shown, when that
+ * count is above the stored one; `false`, with nothing written, when it has been
+ * shown already (another tab), nothing is stored, or `isCurrent()` no longer
+ * holds (a sign-out, or the view that would show it is gone). So a milestone
+ * that showed never shows again, even on a reload at once, and one that cannot
+ * show stays owed. Throws when the write fails.
+ */
+export async function claimMilestone(
+  userId: string,
+  streak: Pick<CoupleStreak, 'milestones'>,
+  isCurrent: () => boolean
+): Promise<boolean> {
+  return withWaitingLock(DAILY_CELEBRATED_LOCK, async () => {
+    const stored = await readCelebrated(userId);
+    if (!isCurrent()) return false;
+    if (stored === null || streak.milestones <= stored.milestones) return false;
+    await writeLocalCopy(userId, DAILY_CELEBRATED_KIND, {
+      held: stored.held,
+      milestones: streak.milestones,
+    });
+    return true;
   });
 }

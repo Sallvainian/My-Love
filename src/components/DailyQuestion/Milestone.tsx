@@ -1,7 +1,8 @@
 /**
  * Milestone -- the design's 25-day milestone screen, full screen above the dock
  * and header (z-100, as `StreakUp`). Daily shows it after the +1 when the
- * claim said the streak's milestone count is new to this device.
+ * claim said the streak's milestone count is new to this device, or by itself on
+ * the next open when that +1 was cut short.
  *
  * It shows what the server counted (`streak.held`, `streak.milestones`); the
  * only thing worked out here is which four badges to draw (`milestoneBadges`):
@@ -9,7 +10,7 @@
  * colour when reached and grey when not. The big flaming heart flickers and
  * beats unless Reduce Motion is on; the badges never animate. Continue and
  * Close both do the same thing, `onClose`; the milestone was stored as shown
- * by the claim that raised it.
+ * just before this screen came up (`claimStreakMilestone`).
  *
  * The panel and the buttons keep clear of all four safe-area insets, as
  * `StreakUp`: the iPhone Duo's side column holds the dock.

@@ -41,8 +41,8 @@
  *   The exemption is the device-state kinds: `daily-write-declined`
  *   (`services/dailyWriteDeclined.ts`) is written only by this device's
  *   "No thanks", and `daily-celebrated` (`services/dailyCelebrated.ts`) only by
- *   the streak's +1 claim on Daily; neither is ever refreshed from the server
- *   (architecture AD-13).
+ *   the streak's +1 and milestone claims on Daily; neither is ever refreshed
+ *   from the server (architecture AD-13).
  * - A FAILED SERVER READ changes nothing: the copy and the screen stay as they
  *   were. Only a successful read overwrites a copy — including "the server says
  *   there is nothing", which is saved as such (`daily-streak` records "unlinked"

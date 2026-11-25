@@ -112,10 +112,11 @@
  * Daily view calls it for each `ok` streak it shows, and the device-state
  * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
  * whether that held total is new to this device and, in the same claim, whether
- * the milestone count is new too (the milestone screen after the +1; the claim
- * stores the higher count). It holds no state here, so
- * sign-out needs nothing in `signedOutState()` (the kind goes with
- * `deleteAccountCopies`). It never throws.
+ * its milestone screen has yet to show. That claim stores the held total alone;
+ * `claimStreakMilestone(streak)` stores the milestone count just before its
+ * screen shows (R5), so a +1 cut short leaves the milestone for the next open of
+ * Daily. Both hold no state here, so sign-out needs nothing in
+ * `signedOutState()` (the kind goes with `deleteAccountCopies`). Neither throws.
  */
 
 import { isOnline } from '../../api/errorHandlers';
@@ -130,7 +131,12 @@ import {
   readSavedDailyDay,
   readSavedDailyHistory,
 } from '../../services/dailyDaysCopy';
-import { type CelebrationClaim, claimCelebration } from '../../services/dailyCelebrated';
+import {
+  type CelebrationClaim,
+  claimCelebration,
+  claimMilestone,
+  NO_CELEBRATION,
+} from '../../services/dailyCelebrated';
 import type { StoredQueuedPick } from '../../services/dbSchema';
 import { addDeclinedWriteDay, readDeclinedWriteDays } from '../../services/dailyWriteDeclined';
 import {
@@ -251,14 +257,22 @@ export interface DailyQuestionSlice {
   declineWrittenQuestion: (dayId: string) => Promise<void>;
   /**
    * Ask whether `streak`'s held total is new to this device (`claimCelebration`)
-   * and, when it is, record it as celebrated. Resolves
-   * `{ play: true, previous, milestone }` once per new held total (`milestone`:
-   * the streak's milestone count is new to this device too), else
-   * `{ play: false }`. Never throws: a failure is
-   * logged and answers `{ play: false }`, as does no signed-in user or a session
-   * that changed meanwhile.
+   * and, when it is, record it as celebrated. Resolves `play: true` once per
+   * new held total, with `milestone` when the streak's milestone count is new to
+   * this device too; else `play: false`, with `milestone` when that held total's
+   * +1 was claimed and its milestone screen is still owed. Never throws: a
+   * failure is logged and answers `NO_CELEBRATION`, as does no signed-in user or
+   * a session that changed meanwhile.
    */
   claimStreakCelebration: (streak: CoupleStreak) => Promise<CelebrationClaim>;
+  /**
+   * Claim the milestone screen for `streak` just before showing it
+   * (`claimMilestone`): `true` once per milestone on this device. Nothing is
+   * recorded once `canShow()` is false (the view is gone), so it stays owed.
+   * Never throws: a failure is logged and answers `false`, as does no signed-in
+   * user or a session that changed meanwhile.
+   */
+  claimStreakMilestone: (streak: CoupleStreak, canShow: () => boolean) => Promise<boolean>;
 }
 
 /** What one drain pass ended on (see `drainOnce`). */
@@ -961,18 +975,39 @@ export const createDailyQuestionSlice: AppStateCreator<DailyQuestionSlice> = (se
 
     claimStreakCelebration: async (streak) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      if (!requestedBy) return { play: false };
+      if (!requestedBy) return NO_CELEBRATION;
       const isCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
       try {
         const claim = await claimCelebration(requestedBy, streak, isCurrent);
-        return isCurrent() ? claim : { play: false };
+        return isCurrent() ? claim : NO_CELEBRATION;
       } catch (error) {
         if (isCurrent()) {
           console.error('[DailyQuestion] Could not record the streak celebration:', error);
         }
-        return { play: false };
+        return NO_CELEBRATION;
+      }
+    },
+
+    claimStreakMilestone: async (streak, canShow) => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) return false;
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      try {
+        const claimed = await claimMilestone(
+          requestedBy,
+          streak,
+          () => isCurrent() && canShow()
+        );
+        return claimed && isCurrent();
+      } catch (error) {
+        if (isCurrent()) {
+          console.error('[DailyQuestion] Could not record the milestone as shown:', error);
+        }
+        return false;
       }
     },
   };
