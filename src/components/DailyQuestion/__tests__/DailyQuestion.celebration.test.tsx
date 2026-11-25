@@ -5,7 +5,7 @@
  * stories' matrices.
  */
 import { createElement, forwardRef, type ComponentType, type ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -528,6 +528,24 @@ describe('the streak +1 on Daily', () => {
         return mount;
       }
 
+      const { loadDailyDay, claimStreakCelebration } = useAppStore.getState();
+      afterEach(() => {
+        vi.restoreAllMocks();
+        useAppStore.setState({ loadDailyDay, claimStreakCelebration });
+      });
+
+      /**
+       * The view has handled `answer`, a promise it awaits itself: its own
+       * continuation was queued first, and `act` commits what that set. So a
+       * claim the answer leads to has been made by the time this resolves.
+       */
+      async function viewHandled(answer: Promise<unknown> | undefined) {
+        expect(answer).toBeDefined();
+        await act(async () => {
+          await answer;
+        });
+      }
+
       /** What a reload does to the two answers this view reads: gone until read again. */
       function dropAnswers() {
         useAppStore.setState({ coupleStreak: null, dailyDay: null });
@@ -625,11 +643,16 @@ describe('the streak +1 on Daily', () => {
           })
         );
         const user = userEvent.setup();
+        const claim = vi.spyOn(dailyCelebrated, 'claimCelebration');
+        let dayRead: Promise<void> | undefined;
+        useAppStore.setState({ loadDailyDay: () => (dayRead = loadDailyDay()) });
 
         render(<DailyQuestion />);
-        await waitFor(() => expect(useAppStore.getState().dailyDayLoading).toBe(false));
-        // Real time for a claim made too early to answer.
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await viewHandled(dayRead);
+        expect(useAppStore.getState().dailyDayLoading).toBe(false);
+        // The day's read is in and the streak's is not: a claim made now is too early.
+        expect(useAppStore.getState().coupleStreakLoading).toBe(true);
+        expect(claim).not.toHaveBeenCalled();
         expect(screen.queryByTestId('daily-milestone')).toBeNull();
         answer(okStreak({ held: 26, milestones: 1 }));
 
@@ -640,8 +663,14 @@ describe('the streak +1 on Daily', () => {
       });
 
       it('a re-read while the +1 is up leaves the +1 up', async () => {
+        // Before the mount: a new action on an open view would make it claim again.
+        let claimAnswer: ReturnType<typeof claimStreakCelebration> | undefined;
+        useAppStore.setState({
+          claimStreakCelebration: (streak) => (claimAnswer = claimStreakCelebration(streak)),
+        });
         await plusOneUp();
         const claim = vi.spyOn(dailyCelebrated, 'claimCelebration');
+        const claimMilestone = vi.spyOn(dailyCelebrated, 'claimMilestone');
 
         await useAppStore.getState().loadCoupleStreak();
         // The re-read's own claim answered: the milestone is owed, and stays so.
@@ -653,9 +682,9 @@ describe('the streak +1 on Daily', () => {
             },
           ])
         );
-        claim.mockRestore();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await viewHandled(claimAnswer);
 
+        expect(claimMilestone).not.toHaveBeenCalled();
         expect(await readCelebrated(USER)).toEqual({ held: 25, milestones: 0 });
         expect(screen.getByTestId('daily-streak-up')).toBeInTheDocument();
         expect(screen.queryByTestId('daily-milestone')).toBeNull();
