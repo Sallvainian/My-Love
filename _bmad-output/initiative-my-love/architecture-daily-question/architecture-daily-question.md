@@ -7,9 +7,9 @@ paradigm: 'immutable facts with server-side projections, over the existing Supab
 scope: 'The daily this-or-that question slice of initiative-my-love: epics 6 Daily Question, 7 Streak and Partner Page, 8 Daily Pushes and Nudge, 9 Reply in Love Notes, 10 Remove Moods and Poke/Kiss/Fart'
 status: final
 created: '2026-11-05'
-updated: '2026-11-05'
+updated: '2026-11-25'
 binds: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, C1, C2, C3, C4]
-sources: ['_bmad-output/initiative-my-love/initiative-my-love.md', '_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md', 'AGENTS.md', 'https://claude.ai/artifact/8wnGn8SjpqJwSckSUVBaEh (notifications screen)']
+sources: ['_bmad-output/initiative-my-love/initiative-my-love.md', '_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md', 'AGENTS.md', 'https://claude.ai/artifact/8wnGn8SjpqJwSckSUVBaEh (notifications screen)', '_bmad-output/initiative-my-love/tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md']
 ---
 
 # Architecture Spine: Daily Question
@@ -66,7 +66,7 @@ Arrows point the only way a dependency may run. Views never call the API directl
 
 - **Binds:** epics 6, 7, 8
 - **Prevents:** pushes and day closure each inventing their own idea of a partner's clock
-- **Rule:** `user_time_zones (user_id pk, time_zone, utc_offset_minutes, effective_zone, reported_at)` holds each user's zone. Only `get_daily_day` writes it, and only when its `reported_at` is newer than the stored one; a `reported_at` later than `now() + 5 min` is clamped to `now()`. A pick never writes it. Only the cron job (AD-9), closure (AD-7) and the nudge slot (AD-17) read the stored zone; a fetch dates itself with the zone it sends. Closing day `d` uses each partner's zone from their own pick of `d` when that pick exists, and the stored zone otherwise. A user with no row gets no scheduled push, and their days close on UTC.
+- **Rule:** `user_time_zones (user_id pk, time_zone, utc_offset_minutes, effective_zone, reported_at)` holds each user's zone. Only `get_daily_day` writes it, and only when its `reported_at` is newer than the stored one; a `reported_at` later than `now() + 5 min` is clamped to `now()`. A pick never writes it. Only the cron job (AD-9), the streak (AD-7) and the nudge slot (AD-17) read the stored zone; a fetch dates itself with the zone it sends. Closing day `d` uses each partner's zone from their own pick of `d` when that pick exists, and the stored zone otherwise. A user with no row gets no scheduled push, and their days close on UTC.
 
 ### AD-4: One function assigns the day's question
 
@@ -102,14 +102,15 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Binds:** R5, R6, R7, R9, R11, R17, R20; epics 7, 8
 - **Prevents:** the Partner page, Daily and the push copy counting the streak three different ways
 - **Rule:**
-  - The internal `couple_streak(user_a, user_b, viewer, at)` returns `held` (the streak), `run` (days in a row), `today_state` (`grey | orange | blue`, for the viewer's date), `milestones` (`floor(held / 25)`), `same` and `done`.
+  - The internal `couple_streak(user_a, user_b, viewer, at)` returns `held` (the streak), `run` (days in a row), `today_state` (`grey | orange | blue`, for the viewer's date), `milestones` (`floor(held / 25)`), `same`, `done`, `missed` and `week`. `missed` is the number of missed dates after the newest done date, or of all missed dates when none is done. `week` is seven `{ day, state: 'done' | 'missed' | 'open' }`, oldest first, ending on the viewer's date; a date before the couple's first day is `open`. No client works out a day's state itself.
+  - The viewer's date is `at` in the viewer's stored zone (AD-3), UTC with no row, for a client and for `send-push` alike.
   - Day `d` is done when both picks exist. It is closed once `at` passes the later of the two partners' local midnights ending `d` (AD-3).
   - A missed day is any closed calendar date since the couple's first `couple_days.day` that is not done, including dates with no row.
-  - `run` counts back from the newest day that is done or closed; an open day never breaks it.
-  - `today_state` is orange when today is done, blue when the newest closed day was missed, and grey otherwise.
+  - `run` is the number of done dates after the newest missed date, or of all done dates when none is missed; an open day never breaks it.
+  - `today_state` is orange when today is done, else blue when `missed > 0`, else grey. So blue ends as soon as a done date is newer than every missed one, even before that date has closed on both partners' clocks, and blue never comes with `missed` 0.
   - Nothing is stored, so a late pick corrects the result by itself.
   - Same/Different is decided per day inside AD-16's snapshot, and `couple_streak` sums those same marks.
-  - The client RPC `get_couple_streak()` passes `auth.uid()`; `send-push` passes the recipient. In copy, "streak" means `held` and "in a row" means `run`.
+  - The client RPC `get_couple_streak()` passes `auth.uid()` and answers `{ status: 'ok', streak } | { status: 'unlinked' }`; `send-push` passes the recipient. In copy, "streak" means `held` and "in a row" means `run`.
 
 ### AD-8: Time-dependent SQL takes the instant, internally
 
@@ -172,8 +173,9 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Binds:** R8, R9, R18; epics 6, 7
 - **Prevents:** an unlinked answer and a failed read both blanking Daily, a feature-private cache, and celebration state clobbered by a refresh
 - **Rule:**
-  - Day snapshots are one `localCopy` kind, a map keyed by `day_id`; today is one entry of it, never a second copy. Every write to the map goes through one merge function under a lock, and an entry's `state` never moves back (`none` → `me` or `partner` → `both`), so a slow read cannot undo a reveal. The streak snapshot is a second kind.
-  - `get_daily_day(time_zone, utc_offset_minutes, reported_at)` answers `{ status: 'ok', snapshot } | { status: 'unlinked' }` and throws on failure. Only a successful answer writes a copy. `unlinked` shows the invitation to link (R18).
+  - Day snapshots are one `localCopy` kind, a map keyed by `day_id`; today is one entry of it, never a second copy, and the past-question pages merge into it with no cap. Every write of a snapshot to the map goes through one merge rule under a lock. An entry's `state` never moves back (`none` → `me` or `partner` → `both`), nor its `write.done`, so a slow read cannot undo a reveal or reopen the prompt. A server answer for a date drops every other `day_id` saved for that date, whichever partner it was read with, because a relink or `reset_bot_daily_days` gives the date a new day. The streak snapshot is a second kind.
+  - Both kinds are tagged with the partner they were read with: `partner_id`, on each entry of the map and once on the streak, and `null` when no partner is known. Reading a copy gives only what carries the current partner's tag, so a day or streak tagged with an old partner stays hidden. The one exception is Daily's saved day for the device's date, which also shows an entry tagged `null` or not tagged, so a day saved before tags existed still shows offline. Past questions and the streak hide such data once a partner is known.
+  - `get_daily_day(time_zone, utc_offset_minutes, reported_at)` answers `{ status: 'ok', snapshot } | { status: 'unlinked' }` and throws on failure. Only a successful answer writes a copy. `unlinked` shows the invitation to link (R18) and empties the map; `get_couple_streak`'s `unlinked` deletes the streak copy.
   - Celebration state is its own kind, `daily-celebrated { held, milestones }`, written only by the animation. A first read with none stored seeds it from the current snapshot without playing. The +1 animation (R8) and the milestone screen (R9) play only when the snapshot exceeds it, never because a realtime event arrived.
   - A second device-state kind, `daily-write-declined`, holds the `day_id`s whose write prompt (AD-4) this account declined on this device, written only by "No thanks". The prompt shows while `write.mine` is true, `write.done` is false and the `day_id` is not in it, so another device may ask once more. These are the only two device-state kinds; the `localCopy.ts` header exempts both from the server-fill rule in the same change, and sign-out deletes them with the account's other kinds.
 
