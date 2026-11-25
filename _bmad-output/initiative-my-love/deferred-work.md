@@ -4430,7 +4430,7 @@ origin: epic 7 retrospective (P1, story 7.5's residual risk), 2026-11-07; re-che
 location: src/components/DailyQuestion/DailyQuestion.tsx:413-445
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
-reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 (and a milestone with it) is lost on the device.
+reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 is lost on the device (its milestone, if any, shows on the next open since DW-523).
 status: open
 
 ### DW-522: Offline, Past questions can show fewer days than the count above them.
@@ -4447,7 +4447,8 @@ location: src/services/dailyCelebrated.ts:55-79 (`claimCelebration`); src/compon
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-every-25-days-the-milestone-screen-shows-its-badge-plan.md`
 severity: medium
 reason: The claim stores the new `held` and `milestones` before anything shows, and the milestone screen opens only from the +1's button, so a reload or leaving Daily during the +1 skips the milestone screen and no later open shows it ("a milestone never shows without the +1"). It contradicts R5, under which reaching a milestone shows its screen once per device, so it is a bug; story 7.6's plan had recorded it as by design. Owner's decision, 2026-11-25: if the +1 is cut short, the milestone screen shows by itself the next time Daily opens. The +1 itself is still not replayed. The file comments in `dailyCelebrated.ts` and `DailyQuestion.tsx` that state the old rule change with the fix; DW-521 is another way the claim is stored with nothing shown.
-status: open
+resolution: `claimCelebration` now stores the new `held` alone and leaves the stored `milestones` as the highest count shown; `claimMilestone` stores the count under the same lock just before the screen shows. A +1 cut short leaves the milestone owed (the stored held with a lower milestone count), and the next open of Daily shows it by itself, with no second +1. Only a +1 claimed before the mount's first claim counts as cut short, so Daily open in another tab never shows the milestone early; the claim also waits out a streak read in flight, so an owed milestone never comes up from the saved streak and is then replaced by a newer +1. Unit: `dailyCelebrated.test.ts`, `dailyQuestionSlice.celebration.test.ts`, `DailyQuestion.celebration.test.tsx` ("the +1 cut short"). E2E: `daily-streak-milestone.spec.ts`, a reload during the +1 and leaving Daily during the +1.
+status: done 2026-11-25
 
 ### DW-524: `new-date-forms.spec.ts`'s add-an-anniversary test failed two weekly burn-ins while loading the partner's Dates list.
 origin: epic 7 closure check, from the scheduled Tests runs, 2026-11-25; not this epic's work

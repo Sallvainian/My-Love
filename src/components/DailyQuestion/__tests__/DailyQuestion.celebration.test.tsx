@@ -72,6 +72,7 @@ vi.mock('motion/react', () => {
   };
 });
 
+import * as dailyCelebrated from '../../../services/dailyCelebrated';
 import { DAILY_CELEBRATED_KIND, readCelebrated } from '../../../services/dailyCelebrated';
 import { openMyLoveDB } from '../../../services/dbSchema';
 import { deleteAccountCopies, writeLocalCopy } from '../../../services/localCopy';
@@ -504,6 +505,219 @@ describe('the streak +1 on Daily', () => {
 
       expect(screen.queryByTestId('daily-streak-up')).toBeNull();
       expect(screen.queryByTestId('daily-milestone')).toBeNull();
+    });
+
+    describe('the +1 cut short (DW-523)', () => {
+      /** This mount's claim of `held` has answered. */
+      async function claimAnswered(held: number) {
+        await waitFor(() =>
+          expect(screen.getByTestId('daily-question-view')).toHaveAttribute(
+            'data-streak-claimed',
+            String(held)
+          )
+        );
+      }
+
+      /** The 25th day's +1 is on screen, its button not pressed. */
+      async function plusOneUp() {
+        await celebratedAt(24, 0);
+        fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held: 25, milestones: 1 }));
+        const mount = render(<DailyQuestion />);
+        await screen.findByTestId('daily-streak-up');
+        return mount;
+      }
+
+      /** What a reload does to the two answers this view reads: gone until read again. */
+      function dropAnswers() {
+        useAppStore.setState({ coupleStreak: null, dailyDay: null });
+      }
+
+      it('by a reload: the next open shows the milestone by itself, the +1 is not replayed', async () => {
+        const first = await plusOneUp();
+        first.unmount();
+        dropAnswers();
+        const user = userEvent.setup();
+
+        render(<DailyQuestion />);
+
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('25');
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+        expect(screen.getByTestId('daily-milestone-badge-25')).toHaveAttribute(
+          'data-reached',
+          'true'
+        );
+        expect(await readCelebrated(USER)).toEqual({ held: 25, milestones: 1 });
+
+        await user.click(screen.getByTestId('daily-milestone-continue'));
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        expect(screen.getByTestId('daily-reveal')).toBeInTheDocument();
+      });
+
+      it('by leaving Daily: coming back shows the milestone by itself, the +1 is not replayed', async () => {
+        const first = await plusOneUp();
+        // The store keeps the day and the streak: only the view goes.
+        first.unmount();
+
+        render(<DailyQuestion />);
+
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('25');
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+        expect(await readCelebrated(USER)).toEqual({ held: 25, milestones: 1 });
+      });
+
+      it('the milestone shown by itself never shows again after a reload, closed or not', async () => {
+        const first = await plusOneUp();
+        first.unmount();
+        dropAnswers();
+        const second = render(<DailyQuestion />);
+        await screen.findByTestId('daily-milestone');
+        second.unmount();
+        dropAnswers();
+
+        render(<DailyQuestion />);
+        await claimAnswered(25);
+
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+      });
+
+      it('a milestone reached from the +1 but not closed never shows again after a reload', async () => {
+        const first = await plusOneUp();
+        await userEvent.setup().click(screen.getByTestId('daily-streak-up-continue'));
+        await screen.findByTestId('daily-milestone');
+        first.unmount();
+        dropAnswers();
+
+        render(<DailyQuestion />);
+        await claimAnswered(25);
+
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+      });
+
+      it('a plain +1 cut short shows nothing on the next open', async () => {
+        await celebratedAt(25, 1);
+        fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held: 26, milestones: 1 }));
+        const first = render(<DailyQuestion />);
+        await screen.findByTestId('daily-streak-up');
+        first.unmount();
+        dropAnswers();
+
+        render(<DailyQuestion />);
+        await claimAnswered(26);
+
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+      });
+
+      it('a new day finished before the next open: the +1 of that day, then the owed milestone', async () => {
+        const first = await plusOneUp();
+        first.unmount();
+        // The streak in the store is still yesterday's 25; the server answers 26
+        // after the day's own read. The owed milestone must not flash up from 25
+        // and be replaced by the +1 for 26.
+        let answer: (value: ReturnType<typeof okStreak>) => void = () => {};
+        fetchCoupleStreak.mockReturnValue(
+          new Promise((resolve) => {
+            answer = resolve;
+          })
+        );
+        const user = userEvent.setup();
+
+        render(<DailyQuestion />);
+        await waitFor(() => expect(useAppStore.getState().dailyDayLoading).toBe(false));
+        // Real time for a claim made too early to answer.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        answer(okStreak({ held: 26, milestones: 1 }));
+
+        expect(await screen.findByTestId('daily-streak-up-held')).toHaveTextContent('26');
+        await user.click(screen.getByTestId('daily-streak-up-continue'));
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('26');
+        expect(await readCelebrated(USER)).toEqual({ held: 26, milestones: 1 });
+      });
+
+      it('a re-read while the +1 is up leaves the +1 up', async () => {
+        await plusOneUp();
+        const claim = vi.spyOn(dailyCelebrated, 'claimCelebration');
+
+        await useAppStore.getState().loadCoupleStreak();
+        // The re-read's own claim answered: the milestone is owed, and stays so.
+        await waitFor(() =>
+          expect(claim.mock.settledResults).toEqual([
+            {
+              type: 'fulfilled',
+              value: { play: false, previous: { held: 25, milestones: 0 }, milestone: true },
+            },
+          ])
+        );
+        claim.mockRestore();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(await readCelebrated(USER)).toEqual({ held: 25, milestones: 0 });
+        expect(screen.getByTestId('daily-streak-up')).toBeInTheDocument();
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+      });
+
+      it('another tab claims the +1 while Daily is open here: no milestone until the next open', async () => {
+        await celebratedAt(24, 0);
+        fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held: 24, milestones: 0 }));
+        const open = render(<DailyQuestion />);
+        await claimAnswered(24);
+
+        // The other tab stored held 25 and is playing its +1.
+        await celebratedAt(25, 0);
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held: 25, milestones: 1 }));
+        await useAppStore.getState().loadCoupleStreak();
+        await claimAnswered(25);
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+
+        // Cut short there too: the next open shows it.
+        open.unmount();
+        render(<DailyQuestion />);
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('25');
+      });
+
+      it('shown in another tab meanwhile: the +1 here closes with no second milestone screen', async () => {
+        await plusOneUp();
+        await celebratedAt(25, 1);
+
+        await userEvent.setup().click(screen.getByTestId('daily-streak-up-continue'));
+
+        await waitFor(() => expect(screen.queryByTestId('daily-streak-up')).toBeNull());
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        expect(screen.getByTestId('daily-reveal')).toBeInTheDocument();
+      });
+
+      it('the write sheet waits behind a milestone shown by itself', async () => {
+        const first = await plusOneUp();
+        first.unmount();
+        dropAnswers();
+        fetchDailyDay.mockResolvedValue(
+          ok(writerSnapshot('this', { state: 'both', partner_choice: 'that', same: false }))
+        );
+
+        render(<DailyQuestion />);
+        await screen.findByTestId('daily-milestone');
+        expect(screen.queryByTestId('daily-write-sheet')).toBeNull();
+
+        await userEvent.setup().click(screen.getByTestId('daily-milestone-continue'));
+        expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
+      });
+
+      it('offline: the saved streak shows the owed milestone on the next open', async () => {
+        const first = await plusOneUp();
+        first.unmount();
+        fetchCoupleStreak.mockRejectedValue(new Error('Failed to fetch'));
+
+        render(<DailyQuestion />);
+
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('25');
+      });
     });
 
     it('the write sheet waits through both stages and opens after the milestone closes', async () => {

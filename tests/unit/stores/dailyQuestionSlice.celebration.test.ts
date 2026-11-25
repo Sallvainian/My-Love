@@ -1,7 +1,7 @@
 /**
- * `claimStreakCelebration` on the composed `useAppStore`: the session guard and
- * the never-throws contract around `claimCelebration`. The claim's own rules
- * are in tests/unit/services/dailyCelebrated.test.ts.
+ * `claimStreakCelebration` and `claimStreakMilestone` on the composed
+ * `useAppStore`: the session guard and the never-throws contract around
+ * `claimCelebration` and `claimMilestone`. The claims' own rules are in tests/unit/services/dailyCelebrated.test.ts.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
@@ -15,6 +15,7 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 
 import {
   DAILY_CELEBRATED_KIND,
+  NO_CELEBRATION,
   readCelebrated,
 } from '../../../src/services/dailyCelebrated';
 import * as celebrated from '../../../src/services/dailyCelebrated';
@@ -44,9 +45,7 @@ afterEach(() => {
 
 describe('claimStreakCelebration', () => {
   it('first claim seeds the signed-in account and does not play', async () => {
-    await expect(state().claimStreakCelebration(coupleStreak({ held: 3 }))).resolves.toEqual({
-      play: false,
-    });
+    await expect(state().claimStreakCelebration(coupleStreak({ held: 3 }))).resolves.toEqual(NO_CELEBRATION);
 
     expect(await readCelebrated(A)).toEqual({ held: 3, milestones: 0 });
   });
@@ -61,6 +60,8 @@ describe('claimStreakCelebration', () => {
     });
     await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual({
       play: false,
+      previous: { held: 4, milestones: 0 },
+      milestone: false,
     });
   });
 
@@ -68,9 +69,7 @@ describe('claimStreakCelebration', () => {
     state().clearAuth();
     const claim = vi.spyOn(celebrated, 'claimCelebration');
 
-    await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual({
-      play: false,
-    });
+    await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual(NO_CELEBRATION);
 
     expect(claim).not.toHaveBeenCalled();
   });
@@ -82,7 +81,7 @@ describe('claimStreakCelebration', () => {
     // session as a sign-out does and leave the copy to the claim's own guard.
     useAppStore.setState({ authSessionVersion: state().authSessionVersion + 1 });
 
-    await expect(pending).resolves.toEqual({ play: false });
+    await expect(pending).resolves.toEqual(NO_CELEBRATION);
     expect(await readCelebrated(A)).toEqual({ held: 3, milestones: 0 });
   });
 
@@ -91,7 +90,7 @@ describe('claimStreakCelebration', () => {
     const pending = state().claimStreakCelebration(coupleStreak({ held: 4 }));
     useAppStore.setState({ userId: C });
 
-    await expect(pending).resolves.toEqual({ play: false });
+    await expect(pending).resolves.toEqual(NO_CELEBRATION);
     expect(await readCelebrated(C)).toBeNull();
   });
 
@@ -99,12 +98,63 @@ describe('claimStreakCelebration', () => {
     const failure = new Error('disk full');
     vi.spyOn(celebrated, 'claimCelebration').mockRejectedValue(failure);
 
-    await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual({
-      play: false,
-    });
+    await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual(NO_CELEBRATION);
 
     expect(console.error).toHaveBeenCalledWith(
       '[DailyQuestion] Could not record the streak celebration:',
+      failure
+    );
+  });
+});
+
+describe('claimStreakMilestone', () => {
+  const owed = { held: 25, milestones: 0 };
+  const reached = coupleStreak({ held: 25, milestones: 1 });
+  const canShow = () => true;
+
+  it('answers true once per milestone and stores it as shown', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, owed);
+
+    await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(true);
+    await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(false);
+
+    expect(await readCelebrated(A)).toEqual({ held: 25, milestones: 1 });
+  });
+
+  it('signed out: answers false and touches nothing', async () => {
+    state().clearAuth();
+    const claim = vi.spyOn(celebrated, 'claimMilestone');
+
+    await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(false);
+
+    expect(claim).not.toHaveBeenCalled();
+  });
+
+  it('a view that can no longer show it: answers false, and the milestone stays owed', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, owed);
+
+    await expect(state().claimStreakMilestone(reached, () => false)).resolves.toBe(false);
+
+    expect(await readCelebrated(A)).toEqual(owed);
+  });
+
+  it('a sign-out during the claim: answers false, and the stored value is not overwritten', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, owed);
+    const pending = state().claimStreakMilestone(reached, canShow);
+    useAppStore.setState({ authSessionVersion: state().authSessionVersion + 1 });
+
+    await expect(pending).resolves.toBe(false);
+    expect(await readCelebrated(A)).toEqual(owed);
+  });
+
+  it('a write failure is logged and answers false, never throws', async () => {
+    const failure = new Error('disk full');
+    vi.spyOn(celebrated, 'claimMilestone').mockRejectedValue(failure);
+
+    await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(false);
+
+    expect(console.error).toHaveBeenCalledWith(
+      '[DailyQuestion] Could not record the milestone as shown:',
       failure
     );
   });

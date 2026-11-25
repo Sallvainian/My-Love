@@ -15,6 +15,10 @@
  *    the card; a reload shows neither and the copy holds `{ 25, 1 }`.
  * 2. The first picker, away from Daily when the day finishes, sees the +1 then
  *    the milestone on returning, and closes it with Close.
+ * 3. A reload during the +1 (DW-523): the milestone shows by itself when Daily
+ *    opens again, with no second +1, and a reload after it shows neither.
+ * 4. Leaving Daily during the +1 (back, as the dock is covered): the same on
+ *    coming back.
  *
  * The day's writer is asked to write tomorrow's question after their pick; the
  * sheet waits behind both screens, so the writer says "No thanks" where a step
@@ -258,5 +262,60 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
     await own.getByTestId('daily-milestone-close').click();
     await expect(own.getByTestId('daily-milestone')).toHaveCount(0);
     await expect(own.getByTestId('daily-reveal')).toBeVisible();
+  });
+
+  test('[P0] a reload during the +1: the milestone shows by itself, once', async ({
+    setup: { own, partner, ownIsWriter, ownName },
+  }) => {
+    await pick(own, 'this');
+    await expect(own.getByTestId('daily-waiting')).toBeVisible();
+    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await pick(partner, 'that');
+    await expectStreakUp(partner, { otherName: ownName, button: 'Continue' });
+
+    await log.step('The partner reloads before pressing the button');
+    await partner.reload();
+    await expectMilestone(partner, { otherName: ownName });
+
+    await log.step('A reload of the milestone itself shows neither screen');
+    await openDailySeeded(partner, 25, 1, 'reload');
+    await expectClaimed(partner, 25);
+    await expect(partner.getByTestId('daily-streak-up')).toHaveCount(0);
+    await expect(partner.getByTestId('daily-milestone')).toHaveCount(0);
+    await expect(partner.getByTestId('daily-reveal')).toBeVisible();
+  });
+
+  test('[P0] leaving Daily during the +1: the milestone shows by itself on coming back, once', async ({
+    setup: { own, partner, ownIsWriter, partnerName },
+  }) => {
+    await pick(own, 'this');
+    await expect(own.getByTestId('daily-waiting')).toBeVisible();
+    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+
+    await log.step('The worker leaves Daily; the partner finishes the day; the worker comes back');
+    await navigateTo(own, 'home');
+    await expect(own.getByTestId('daily-question-view')).toHaveCount(0);
+    await pick(partner, 'that');
+    await navigateTo(own, 'daily');
+    await expectStreakUp(own, { otherName: partnerName, button: 'Continue' });
+
+    await log.step('Back leaves Daily with the +1 still up');
+    await own.goBack();
+    await expect(own.getByTestId('daily-question-view')).toHaveCount(0);
+
+    await log.step('Coming back shows the milestone by itself; Continue reveals the card');
+    await navigateTo(own, 'daily');
+    await expectMilestone(own, { otherName: partnerName });
+    await own.getByTestId('daily-milestone-continue').click();
+    await expect(own.getByTestId('daily-milestone')).toHaveCount(0);
+    await expect(own.getByTestId('daily-reveal')).toBeVisible();
+
+    await log.step('Leaving and coming back again shows neither screen');
+    await navigateTo(own, 'home');
+    await expect(own.getByTestId('daily-question-view')).toHaveCount(0);
+    await navigateTo(own, 'daily');
+    await expectClaimed(own, 25);
+    await expect(own.getByTestId('daily-streak-up')).toHaveCount(0);
+    await expect(own.getByTestId('daily-milestone')).toHaveCount(0);
   });
 });

@@ -104,8 +104,9 @@ export const DAILY_WRITE_DECLINED_LOCK = 'my-love:daily-write-declined';
 
 /**
  * Held by one `daily-celebrated` claim at a time
- * (`dailyCelebrated.claimCelebration`), across tabs, so two claims of the same
- * new held total yield exactly one play.
+ * (`dailyCelebrated.claimCelebration`, `claimMilestone`), across tabs, so two
+ * claims of the same new held total yield exactly one play, and two of the same
+ * milestone exactly one screen.
  */
 export const DAILY_CELEBRATED_LOCK = 'my-love:daily-celebrated';
 

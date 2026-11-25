@@ -8,8 +8,8 @@
  * Motion it renders the end state with plain elements (no `m.*` component):
  * the new held, `+1`, today filled, the message. It shows what the server
  * counted (`streak.held`, `streak.run`); nothing is computed here. The caller
- * has already stored the held total as celebrated, so closing the screen is
- * all `onContinue` does.
+ * has already stored the held total as celebrated, so `onContinue` only closes
+ * the screen or opens the milestone.
  *
  * The panel and the button keep clear of all four safe-area insets, as
  * `DIALOG_SCRIM`: the iPhone Duo's side column holds the dock.
