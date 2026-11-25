@@ -308,13 +308,6 @@
       "computedHash": "dd35011359927842a012c7d2cb993bb81e23ac3a67450c9a54d7bb5f396dddd3",
       "commit": "86d4b03248e205f99e6c908a91863953a3182f79"
     },
-    "bmod-founder": {
-      "source": "bmad-code-org/BMAD-METHOD",
-      "ref": "dev",
-      "sourceType": "github",
-      "skillPath": "skills/bmod-founder/SKILL.md",
-      "computedHash": "e79a72b3aa8d8f36715037648acd9370d540c6428fdac0919bb5a8c2ac0f6eac"
-    },
     "bmod-method": {
       "source": "bmad-code-org/BMAD-METHOD",
       "ref": "dev",
