@@ -65,14 +65,6 @@
       "computedHash": "713e3cb0ddb0be66e0ca3b1afee8dc8546eb642fb525b01fc8e36d2e1c87784b",
       "commit": "86d4b03248e205f99e6c908a91863953a3182f79"
     },
-    "bmad-architecture": {
-      "source": "bmad-code-org/BMAD-METHOD",
-      "ref": "dev",
-      "sourceType": "github",
-      "skillPath": "skills/method/bmad-architecture/SKILL.md",
-      "computedHash": "2aa275f6fb9709fda578f84d50b516a44507a5a4bb8d03cb079c6215ca1014c0",
-      "commit": "4b03b7d0f3261eda20e5a39afba53d6034a02fc2"
-    },
     "bmad-brainstorming": {
       "source": "bmad-code-org/BMAD-METHOD",
       "ref": "dev",
@@ -292,14 +284,6 @@
       "skillPath": "skills/toolsmith/bmad-toolsmith/SKILL.md",
       "computedHash": "a8bfb795b4d6772a97a2dc73d89734d3f0bbcbfec0dc6f42b2ff2a349161c1a9",
       "commit": "86d4b03248e205f99e6c908a91863953a3182f79"
-    },
-    "bmad-ux": {
-      "source": "bmad-code-org/BMAD-METHOD",
-      "ref": "dev",
-      "sourceType": "github",
-      "skillPath": "skills/method/bmad-ux/SKILL.md",
-      "computedHash": "affd11a2352b280f37b74fe4285660c13cb8a660255009914f3da4fb25de2b36",
-      "commit": "4b03b7d0f3261eda20e5a39afba53d6034a02fc2"
     },
     "bmad-walkthrough": {
       "source": "bmad-code-org/BMAD-METHOD",
