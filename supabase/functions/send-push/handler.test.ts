@@ -80,8 +80,10 @@ const coupleDay: CoupleDayRow = {
   this_text: 'Tea',
   that_text: 'Coffee',
 };
-/** `sender` picked; the other seat is `recipient`. */
-const dailyPick: DailyPickRow = { id: DAILY_PICK_ID, day_id: COUPLE_DAY_ID, user_id: 'sender' };
+/** `sender` picked first (`daily_partner_picked`); the other seat is `recipient`. */
+const firstPick: DailyPickRow = { id: DAILY_PICK_ID, day_id: COUPLE_DAY_ID, user_id: 'sender', is_second: false };
+/** `sender` picked second (`daily_both_answered`). */
+const secondPick: DailyPickRow = { ...firstPick, is_second: true };
 /** From `sender` to `recipient`. */
 const dailyNudge: DailyNudgeRow = {
   id: DAILY_NUDGE_ID,
@@ -1047,7 +1049,7 @@ const KIND_CASES: { kind: PushKind; body: Record<string, string>; rows: Paramete
   {
     kind: 'daily_partner_picked',
     body: { kind: 'daily_partner_picked', id: DAILY_PICK_ID },
-    rows: { dailyPick },
+    rows: { dailyPick: firstPick },
   },
   { kind: 'daily_nudge', body: { kind: 'daily_nudge', id: DAILY_NUDGE_ID }, rows: { dailyNudge } },
   {
@@ -1058,7 +1060,7 @@ const KIND_CASES: { kind: PushKind; body: Record<string, string>; rows: Paramete
   {
     kind: 'daily_both_answered',
     body: { kind: 'daily_both_answered', id: DAILY_PICK_ID },
-    rows: { dailyPick },
+    rows: { dailyPick: secondPick },
   },
 ];
 
@@ -1330,7 +1332,7 @@ Deno.test('a partner pick tells the pair\'s other member, titled with the picker
   const listed: string[] = [];
   const dateLookups: [string, string][] = [];
   const { status, answer, claimed } = await postDaily(PICK_POST, {
-    dailyPick,
+    dailyPick: firstPick,
     listed,
     dateLookups,
     // users.partner_id is not consulted for a pick: the pair decides.
@@ -1355,7 +1357,7 @@ Deno.test('a partner pick tells the pair\'s other member, titled with the picker
 
 Deno.test('a pick made by the first seat goes to the second', async () => {
   const listed: string[] = [];
-  await postDaily(PICK_POST, { dailyPick: { ...dailyPick, user_id: 'recipient' }, listed });
+  await postDaily(PICK_POST, { dailyPick: { ...firstPick, user_id: 'recipient' }, listed });
   assertEquals(listed, ['sender']);
 });
 
@@ -1364,7 +1366,7 @@ Deno.test('a partner pick for a day that is not the recipient\'s date is dropped
   const countLookups: string[] = [];
   const preferenceLookups: [string, PushPreference][] = [];
   const { status, answer, claimed } = await postDaily(PICK_POST, {
-    dailyPick,
+    dailyPick: firstPick,
     localDate: '2027-01-16',
     listed,
     countLookups,
@@ -1379,11 +1381,40 @@ Deno.test('a partner pick for a day that is not the recipient\'s date is dropped
 });
 
 Deno.test('a pick by someone outside the day\'s pair tells nobody', async () => {
-  for (const post of [PICK_POST, BOTH_POST]) {
-    const { answer, claimed } = await postDaily(post, { dailyPick: { ...dailyPick, user_id: 'stranger' } });
+  for (const [post, pick] of [
+    [PICK_POST, firstPick],
+    [BOTH_POST, secondPick],
+  ] as const) {
+    const { answer, claimed } = await postDaily(post, { dailyPick: { ...pick, user_id: 'stranger' } });
     assertEquals(answer, ZEROS);
     assertEquals(claimed.length, 0);
   }
+});
+
+Deno.test('a pick whose stored order does not match the posted kind is no push', async () => {
+  const cases: [Record<string, string>, DailyPickRow][] = [
+    [PICK_POST, secondPick],
+    [BOTH_POST, firstPick],
+  ];
+  for (const [post, dailyPick] of cases) {
+    const listed: string[] = [];
+    const dateLookups: [string, string][] = [];
+    const { status, answer, claimed } = await postDaily(post, { dailyPick, listed, dateLookups });
+    assertEquals(status, 200, post.kind);
+    assertEquals(answer, ZEROS, post.kind);
+    assertEquals(claimed.length, 0, post.kind);
+    assertEquals(listed, [], post.kind);
+    assertEquals(dateLookups, [], post.kind);
+  }
+});
+
+Deno.test('a mis-posted pick kind claims nothing, so the matching kind posted later still records', async () => {
+  const claimed: PushRequestRow[] = [];
+  const deps = { db: fakeDb({ dailyPick: secondPick, devices: TWO_DEVICES, claimed }), apns: null, now: () => NOW };
+  assertEquals(await (await handleSendPush(request(PICK_POST), deps)).json(), ZEROS);
+  assertEquals(claimed.length, 0);
+  assertEquals(await (await handleSendPush(request(BOTH_POST), deps)).json(), { ...ZEROS, recorded: 2 });
+  assertEquals(claimed.map((c) => c.kind), ['daily_both_answered', 'daily_both_answered']);
 });
 
 Deno.test('both answered titles by the run and tells the first picker', async () => {
@@ -1396,7 +1427,7 @@ Deno.test('both answered titles by the run and tells the first picker', async ()
     const listed: string[] = [];
     const streakLookups: [string, string, string, string][] = [];
     const { answer, claimed } = await postDaily(BOTH_POST, {
-      dailyPick,
+      dailyPick: secondPick,
       streak: { held: 9, run },
       listed,
       streakLookups,
@@ -1418,7 +1449,7 @@ Deno.test('a late both answered still sends, with That day counts. in place of t
   ];
   for (const [run, title, body] of cases) {
     const { answer, claimed } = await postDaily(BOTH_POST, {
-      dailyPick,
+      dailyPick: secondPick,
       streak: { held: 9, run },
       localDate: '2027-01-16',
     });
@@ -1536,16 +1567,16 @@ Deno.test('the evening partner reminder names the partner who has not picked and
 
 Deno.test('a partner with no name falls back to Your partner in every daily title', async () => {
   const cases: [Record<string, string>, Parameters<typeof fakeDb>[0], string][] = [
-    [PICK_POST, { dailyPick }, 'Your partner made their pick'],
+    [PICK_POST, { dailyPick: firstPick }, 'Your partner made their pick'],
     [NUDGE_POST, { dailyNudge }, 'Your partner nudged you'],
     [EVENING_POST, { dailyReminder: eveningPartner, partnerId: 'sender' }, "Your partner hasn't done their daily"],
-    [BOTH_POST, { dailyPick, streak: { held: 3, run: 3 } }, '3 days in a row'],
+    [BOTH_POST, { dailyPick: secondPick, streak: { held: 3, run: 3 } }, '3 days in a row'],
   ];
   for (const [post, options, title] of cases) {
     const { claimed } = await postDaily(post, { ...options, displayName: null });
     assertEquals(claimed[0].payload.aps.alert.title, title);
   }
-  const { claimed } = await postDaily(BOTH_POST, { dailyPick, displayName: null });
+  const { claimed } = await postDaily(BOTH_POST, { dailyPick: secondPick, displayName: null });
   assertEquals(claimed[0].payload.aps.alert.body, "See Your partner's pick.");
 });
 
@@ -1621,8 +1652,8 @@ Deno.test('a daily post whose row is gone is a 404', async () => {
 
 Deno.test('a daily row whose day is gone is a 404', async () => {
   const cases: [Record<string, string>, Parameters<typeof fakeDb>[0]][] = [
-    [PICK_POST, { dailyPick }],
-    [BOTH_POST, { dailyPick }],
+    [PICK_POST, { dailyPick: firstPick }],
+    [BOTH_POST, { dailyPick: secondPick }],
     [NUDGE_POST, { dailyNudge }],
     [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }],
     [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }],
@@ -1636,10 +1667,10 @@ Deno.test('a daily row whose day is gone is a 404', async () => {
 
 Deno.test('a failed read of the day, the date or the streak answers 500 and claims nothing', async () => {
   const cases: [Record<string, string>, Parameters<typeof fakeDb>[0], 'getCoupleDay' | 'getUserLocalDate' | 'getCoupleStreak'][] = [
-    [PICK_POST, { dailyPick }, 'getCoupleDay'],
-    [PICK_POST, { dailyPick }, 'getUserLocalDate'],
-    [BOTH_POST, { dailyPick }, 'getUserLocalDate'],
-    [BOTH_POST, { dailyPick }, 'getCoupleStreak'],
+    [PICK_POST, { dailyPick: firstPick }, 'getCoupleDay'],
+    [PICK_POST, { dailyPick: firstPick }, 'getUserLocalDate'],
+    [BOTH_POST, { dailyPick: secondPick }, 'getUserLocalDate'],
+    [BOTH_POST, { dailyPick: secondPick }, 'getCoupleStreak'],
     [NUDGE_POST, { dailyNudge }, 'getCoupleDay'],
     [NUDGE_POST, { dailyNudge }, 'getCoupleStreak'],
     [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, 'getCoupleDay'],
@@ -1665,7 +1696,7 @@ Deno.test('the sound and the kind reach APNs for a nudge and none for a partner 
   };
   for (const [post, rows] of [
     [NUDGE_POST, { dailyNudge }],
-    [PICK_POST, { dailyPick }],
+    [PICK_POST, { dailyPick: firstPick }],
   ] as const) {
     await handleSendPush(request(post), {
       db: fakeDb({ ...rows, devices: [TWO_DEVICES[0]] }),
@@ -1681,8 +1712,8 @@ Deno.test('the sound and the kind reach APNs for a nudge and none for a partner 
 
 Deno.test('no daily payload carries a choice, and only the nudge and the 8 PM reminders carry a sound', async () => {
   const cases: [Record<string, string>, Parameters<typeof fakeDb>[0], string | undefined][] = [
-    [PICK_POST, { dailyPick }, undefined],
-    [BOTH_POST, { dailyPick }, undefined],
+    [PICK_POST, { dailyPick: firstPick }, undefined],
+    [BOTH_POST, { dailyPick: secondPick }, undefined],
     [NUDGE_POST, { dailyNudge }, 'default'],
     [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, undefined],
     [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }, 'default'],

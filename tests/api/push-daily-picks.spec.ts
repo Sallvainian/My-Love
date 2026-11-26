@@ -24,12 +24,16 @@
  * post of the same `{kind, id}` plus an empty `requestsFor`.
  *
  * Throwaway accounts only: the worker's pool pair's `couple_days` and picks are never
- * touched. Requires `supabase start` with the edge runtime serving `send-push`
- * (`needs-edge-functions` in CI); the `api` project runs one worker, so this file and
+ * touched. A host-local midnight inside the test's timeout would turn the Daily day
+ * between the seed and the last assertion, so the test first calls
+ * `waitClearOfDailyTurns`, which waits past the turn (DW-531); the shared guard also
+ * waits past 20:00, which this spec, sending no nudge, does not need. Requires `supabase
+ * start` with the edge runtime serving `send-push` (`needs-edge-functions` in CI);
+ * the `api` project runs one worker, so this file and
  * the other push specs never run at once.
  */
 import { seedPairDays } from '../support/factories/daily-question';
-import { isoDateDaysFromNow } from '../support/helpers/events';
+import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import {
   awaitRequests,
   createParty as createThrowawayParty,
@@ -49,7 +53,8 @@ test.describe('Daily pick pushes', () => {
   test('[P0] a first pick pushes the partner without the choice, a second pick says both answered, a late first pick and a switched-off kind record nothing, and a retry posts nothing', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     const createParty = (role: string) => createThrowawayParty(supabaseAdmin, cleanup, 'dailypick', 'Pick', role);
     const alice = await createParty('a');
     const bob = await createParty('b');

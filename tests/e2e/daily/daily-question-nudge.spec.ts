@@ -12,10 +12,11 @@
  *     for the pair's day, and disables the button, also after a reload.
  *
  * The slot is read from the row, never guessed from the host clock: the server
- * chose it on the worker's own stored zone. A run that crosses 20:00 or local
- * midnight between the nudge and the reload is the low host-clock flake stories
- * 8.3, 8.6 and 8.7 deferred (DW-535). Nothing here links, unlinks or resets an
- * account; the pair's days (and their nudges) are cleared before the test and
+ * chose it on the worker's own stored zone. A run that would cross 20:00 or local
+ * midnight between the nudge and the reload waits past the turn first
+ * (`waitClearOfDailyTurns`, which extends the timeout by the wait; DW-535).
+ * Nothing here links, unlinks or resets an account; the pair's days (and their
+ * nudges) are cleared before the test and
  * again at teardown.
  */
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
@@ -28,6 +29,7 @@ import {
   readPairDayWriter,
 } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { waitClearOfDailyTurns } from '../../support/helpers/events';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { goOffline } from '../../support/helpers/offline';
@@ -58,10 +60,11 @@ test.describe('Daily question: nudge the partner', () => {
     partnerAuthToken,
     interceptNetworkCall,
     cleanup,
-  }) => {
+  }, testInfo) => {
     // Side effect: writes the partner identity's storage-state file.
     expect(partnerAuthToken).not.toBe('');
 
+    await waitClearOfDailyTurns(testInfo);
     const pair = await resolveWorkerPairIds(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));

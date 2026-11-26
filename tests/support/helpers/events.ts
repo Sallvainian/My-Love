@@ -28,6 +28,7 @@
  * project and the `chromium` project alike. Same call as
  * `tests/support/helpers/rls-security.ts`, which this module's shape follows.
  */
+import type { TestInfo } from '@playwright/test';
 import { getWorkerPairEmails } from '../auth/worker-pool';
 import type { TypedSupabaseClient } from '../factories';
 import { formatDateISO } from '../../../src/utils/dateUtils';
@@ -208,6 +209,52 @@ export function clockAnchor(now: Date = new Date()): Date {
   const anchor = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
   if (anchor > now) anchor.setDate(anchor.getDate() - 1);
   return anchor;
+}
+
+/** How far past a turn the guard sleeps: `useDailyDayRereads` re-reads at 20:00:05. */
+const PAST_TURN_MS = 10_000;
+
+/**
+ * The milliseconds to wait before a test that starts at `now` and may run for
+ * `windowMs` can no longer have a Daily turn inside it, or 0 when none can.
+ *
+ * The turns are host-local wall-clock 00:00 (the Daily day changes) and 20:00
+ * (the nudge slot changes). A turn inside [now - 10 s, now + `windowMs`] makes
+ * the answer "sleep until 10 s past that turn": the lower bound is the same 10 s,
+ * so a start just after a turn waits out the 20:00:05 re-read as well. Built from
+ * calendar components (`new Date(y, m, d, h)`), never parsed from a string, so a
+ * DST day's turn is the wall-clock one; the day before and after are tried so a
+ * window that straddles midnight finds it.
+ *
+ * Why a wait and not a skip: a skip would drop P0 coverage silently on those runs.
+ * Used by `waitClearOfDailyTurns` for the five Daily specs that seed or read a
+ * date and assert it later (DW-527, DW-531, DW-534, DW-535, DW-541).
+ */
+export function msUntilClearOfDailyTurns(now: Date, windowMs: number): number {
+  for (const hour of [0, 20]) {
+    for (const dayOffset of [-1, 0, 1]) {
+      const turn = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour);
+      const until = turn.getTime() - now.getTime();
+      if (until > -PAST_TURN_MS && until <= windowMs) return until + PAST_TURN_MS;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Sleep past a local midnight or 20:00 that falls inside this test's own timeout
+ * window (or just behind it), and extend the timeout by the wait. Call it before
+ * the first seed, clear or read that depends on the date or the nudge slot.
+ *
+ * The window is `testInfo.timeout` because a test that ends in time cannot cross
+ * a turn it started clear of, whatever it does inside. The timeout is extended
+ * first: the wait itself counts against it. A no-op on a clear clock.
+ */
+export async function waitClearOfDailyTurns(testInfo: TestInfo): Promise<void> {
+  const waitMs = msUntilClearOfDailyTurns(new Date(), testInfo.timeout);
+  if (waitMs <= 0) return;
+  if (testInfo.timeout > 0) testInfo.setTimeout(testInfo.timeout + waitMs);
+  await new Promise<void>((done) => setTimeout(done, waitMs));
 }
 
 function landsOnLeapDay(dayOffset: number, anchor: Date): boolean {

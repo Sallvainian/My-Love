@@ -16,10 +16,9 @@
  *     after the write sheet is closed.
  *
  * The slot is the server's, chosen on the sender's stored zone: a run that
- * crosses 20:00 or local midnight between the nudge and the reload is the low
- * host-clock flake stories 8.3, 8.6, 8.7 and 8.8 deferred for their own specs
- * (DW-535 is story 8.8's entry for `daily-question-nudge.spec.ts`); this spec's
- * entry is in story 8.9's plan `deferred` list. Nothing
+ * would cross 20:00 or local midnight between the nudge and the reload waits past
+ * the turn first, in the `setup` fixture (`waitClearOfDailyTurns`, which extends
+ * the timeout by the wait; DW-541). Nothing
  * here links, unlinks or resets an account; the pair's days (and their
  * nudges) are cleared before each test and again at teardown.
  */
@@ -30,6 +29,7 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test as base, expect } from '../../support/merged-fixtures';
 import { clearPairDays, readPairDayWriter } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { waitClearOfDailyTurns } from '../../support/helpers/events';
 import { closeContext } from '../../support/fixtures/cleanup';
 import {
   DAILY_DAY_READ,
@@ -93,11 +93,13 @@ const test = base.extend<{ setup: PairSetup }>({
       partnerAuthToken,
       cleanup,
     },
-    use
+    use,
+    testInfo
   ) => {
     // Side effect: writes the partner identity's storage-state file.
     expect(partnerAuthToken).not.toBe('');
 
+    await waitClearOfDailyTurns(testInfo);
     const pair = await resolveWorkerPairIds(supabaseAdmin);
     await clearPairDays(supabaseAdmin, pair);
     cleanup.defer("clear the pair's daily days", () => clearPairDays(supabaseAdmin, pair));

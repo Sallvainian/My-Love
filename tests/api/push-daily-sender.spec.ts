@@ -33,13 +33,17 @@
  * wiring (`SOURCE_COLUMN` to `daily_pick_id`, the `user_local_date` rpc and the
  * compare with `couple_days.day`).
  *
+ * A host-local midnight or 20:00 inside a test's timeout would turn the Daily day or
+ * the nudge slot between the seed and the last assertion, so each test first calls
+ * `waitClearOfDailyTurns`, which waits past the turn (DW-527).
+ *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI); the `api` project runs one worker, so this
  * file and the other push specs never run at once.
  */
 import type { TypedSupabaseClient } from '../support/factories';
 import { readPairQuestionsByDay, seedPairDays } from '../support/factories/daily-question';
-import { isoDateDaysFromNow } from '../support/helpers/events';
+import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
@@ -98,7 +102,8 @@ test.describe('Daily push sender', () => {
   test('[P0] a morning reminder, an evening partner reminder and a nudge record their copy for the recipient\'s devices only; an off switch records nothing for that kind and person', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     const { alice, bob, aliceDevice, bobPhone, bobTablet, today, asked, dayId } = await setUpPair(
       supabaseAdmin,
       cleanup
@@ -203,7 +208,8 @@ test.describe('Daily push sender', () => {
   test('[P0] the pick kinds record under daily_pick_id for the other partner only, drop a late first pick and word a late second pick', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     const { alice, bob, aliceDevice, bobPhone, bobTablet, today, dayIds } = await setUpPair(supabaseAdmin, cleanup);
     const twoDaysAgo = isoDateDaysFromNow(-2, new Date());
 

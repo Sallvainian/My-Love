@@ -18,13 +18,17 @@
  *      records nothing for Dave (shown by a hand post that answers all zeros plus an
  *      empty `requestsFor`, never by a sleep).
  *
+ * A host-local midnight or 20:00 inside a test's timeout would turn the Daily day or the
+ * nudge slot (so the repeat in the slot would no longer be refused), so each test first
+ * calls `waitClearOfDailyTurns`, which waits past the turn (DW-534).
+ *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI); the `api` project runs one worker, so this file and
  * the other push specs never run at once.
  */
 import type { TypedSupabaseClient } from '../support/factories';
 import { seedPairDays } from '../support/factories/daily-question';
-import { isoDateDaysFromNow } from '../support/helpers/events';
+import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import {
   awaitRequests,
   createParty as createThrowawayParty,
@@ -89,7 +93,8 @@ test.describe('Daily nudge', () => {
   test('[P0] a nudge answers with its slot spent and pushes the partner, and a repeat in the slot and a nudge before one\'s own pick are refused', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     // Alice nudges Bob: both of Bob's devices hear it, with the default sound.
     const { first: alice, second: bob, secondDevices, dayId } = await setUpPair(supabaseAdmin, cleanup, ['a', 'b']);
 
@@ -129,7 +134,8 @@ test.describe('Daily nudge', () => {
   test('[P0] a nudge to a partner whose nudge switch is off lands and records nothing', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     const { first: carol, second: dave, dayId: pairDay } = await setUpPair(supabaseAdmin, cleanup, ['c', 'd']);
     const switchOff = await supabaseAdmin.from('push_preferences').upsert({ user_id: dave.userId, daily_nudge: false });
     expect(switchOff.error).toBeNull();
