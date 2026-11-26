@@ -36,7 +36,14 @@ import { type QueuedPick, enqueuePick, listQueuedPicks } from '../../../src/serv
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { PICK_QUEUE_LOCK } from '../../../src/services/syncLock';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { DAY_ID, dailySnapshot, revealSnapshot, waitingSnapshot } from './dailyQuestionFixture';
+import {
+  DAY_ID,
+  KNOWN_PARTNER_ID,
+  dailySnapshot,
+  knownPartnerState,
+  revealSnapshot,
+  waitingSnapshot,
+} from './dailyQuestionFixture';
 import { deferred } from './loaderIdentityGuardsFixture';
 import { setOnline } from './navigatorFixtures';
 
@@ -290,6 +297,19 @@ describe('drainQueuedPicks', () => {
       [DAY_ID]: { ...revealSnapshot('this', 'that'), partner_id: null },
     });
     expect(state().dailyDay).toEqual(ok(revealSnapshot('this', 'that')));
+  });
+
+  it('tags the merged day with the known partner', async () => {
+    useAppStore.setState(knownPartnerState());
+    await enqueuePick(queued());
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().drainQueuedPicks();
+
+    expect(await copy()).toEqual({
+      [DAY_ID]: { ...waitingSnapshot('this'), partner_id: KNOWN_PARTNER_ID },
+    });
   });
 
   it('logs an announce failure and still shows the confirmed pick', async () => {

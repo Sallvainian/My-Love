@@ -132,9 +132,9 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
         }
         // Save the page for offline; the session decides, not a newer read.
         if (days.length === 0) return;
-        const partnerId = await mergePartnerId(get, requestedBy);
+        const partner = await mergePartnerId(get, requestedBy);
         if (!inSession()) return;
-        await mergeDailyDays(requestedBy, days, partnerId, inSession);
+        await mergeDailyDays(requestedBy, days, partner, inSession);
       } catch (error) {
         if (!isCurrent()) return;
         // An offline refusal is expected, not a fault: the error is still set.
@@ -196,9 +196,9 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
             : {}),
         });
         if (days.length === 0) return;
-        const partnerId = await mergePartnerId(get, requestedBy);
+        const partner = await mergePartnerId(get, requestedBy);
         if (!inSession()) return;
-        await mergeDailyDays(requestedBy, days, partnerId, inSession);
+        await mergeDailyDays(requestedBy, days, partner, inSession);
       } catch (error) {
         if (!inSession()) return;
         if (!(error instanceof AccountDataError && error.code === 'offline')) {

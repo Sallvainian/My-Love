@@ -149,11 +149,24 @@ describe('the saved days copy and the partner', () => {
     expect(await copy()).toEqual(tagged(dailySnapshot(), PARTNER_C));
   });
 
-  it.each([
+  const failedLookups = [
     ['an undefined answer', () => vi.mocked(lookupPartnerId).mockResolvedValue(undefined as never)],
     ['an error answer', () => vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'error', reason: 'x' })],
     ['a throw', () => vi.mocked(lookupPartnerId).mockRejectedValue(new Error('boom'))],
-  ])('tags null on %s from lookupPartnerId', async (_name, arrange) => {
+  ] as const;
+
+  it.each(failedLookups)('keeps the stored tag on %s from lookupPartnerId', async (_name, arrange) => {
+    arrange();
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, tagged(dailySnapshot({ state: 'partner' }), PARTNER_B));
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+
+    expect(await copy()).toEqual(tagged(dailySnapshot({ state: 'partner' }), PARTNER_B));
+    expect(state().dailyDay).toEqual(ok(dailySnapshot({ state: 'partner' })));
+  });
+
+  it.each(failedLookups)('leaves a new entry untagged on %s from lookupPartnerId', async (_name, arrange) => {
     arrange();
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
 
@@ -161,6 +174,16 @@ describe('the saved days copy and the partner', () => {
 
     expect(await copy()).toEqual(tagged(dailySnapshot(), null));
     expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+  });
+
+  it('tags null on an unlinked answer from lookupPartnerId, over a stored tag', async () => {
+    vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'unlinked' });
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, tagged(dailySnapshot(), PARTNER_B));
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+
+    expect(await copy()).toEqual(tagged(dailySnapshot(), null));
   });
 
   it("an answer for the date drops the old pairing's day_id for it", async () => {

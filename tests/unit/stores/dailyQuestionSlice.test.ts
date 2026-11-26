@@ -32,7 +32,14 @@ import { AccountDataError } from '../../../src/services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { dailySnapshot, revealSnapshot, waitingSnapshot, DAY_ID } from './dailyQuestionFixture';
+import {
+  dailySnapshot,
+  revealSnapshot,
+  waitingSnapshot,
+  DAY_ID,
+  KNOWN_PARTNER_ID,
+  knownPartnerState,
+} from './dailyQuestionFixture';
 import { setOnline } from './navigatorFixtures';
 import { deferred } from './loaderIdentityGuardsFixture';
 
@@ -481,6 +488,17 @@ describe('refreshDailyDay', () => {
   const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
   const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
 
+  it('tags the merged day with the known partner', async () => {
+    useAppStore.setState(knownPartnerState());
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(await copy()).toEqual({
+      [DAY_ID]: { ...dailySnapshot({ state: 'partner' }), partner_id: KNOWN_PARTNER_ID },
+    });
+  });
+
   it('asks for the named day', async () => {
     fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
 
@@ -642,6 +660,18 @@ describe('submitDailyPick', () => {
 
     expect(submitDailyPickRequest).toHaveBeenCalledWith(DAY_ID, 'this', SAME_DAY);
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it('tags the saved day with the known partner', async () => {
+    useAppStore.setState(knownPartnerState());
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    const saved = await readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+    expect(saved).toEqual({
+      [DAY_ID]: { ...waitingSnapshot('this'), partner_id: KNOWN_PARTNER_ID },
+    });
   });
 
   it('stores the reveal when the partner had already picked', async () => {

@@ -80,6 +80,8 @@ beforeEach(async () => {
   useAppStore.getState().setAuthUser('USER-A-ID');
   useAppStore.setState({
     partner: { id: 'USER-B-ID', displayName: 'Jessie', email: 'b@example.com' },
+    // `loadPartner` sets both together.
+    partnerKnown: true,
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
   const queueDb = await openMyLoveDB();
   await queueDb.clear('pick-queue');
@@ -276,7 +278,9 @@ describe("the write tomorrow's question sheet", () => {
   });
 
   it('a saved day with the turn open, written elsewhere: the sheet never shows', async () => {
-    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: writerSnapshot() });
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: { ...writerSnapshot(), partner_id: 'USER-B-ID' },
+    });
     let answer: (value: unknown) => void = () => {};
     fetchDailyDay.mockReturnValue(new Promise((resolve) => (answer = resolve)));
 

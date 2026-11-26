@@ -655,6 +655,25 @@ describe('the daily-days copy behind the past questions', () => {
     expect(state().dailyHistory).toEqual(PAGE);
   });
 
+  it.each([
+    ['an undefined answer', () => vi.mocked(lookupPartnerId).mockResolvedValue(undefined as never)],
+    [
+      'an error answer',
+      () => vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'error', reason: 'x' }),
+    ],
+    ['a throw', () => vi.mocked(lookupPartnerId).mockRejectedValue(new Error('boom'))],
+  ])("keeps a saved day's tag on %s from lookupPartnerId", async (_name, arrange) => {
+    arrange();
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { d2: savedDone('d2', '2026-11-05', PARTNER_B) });
+    fetchDailyHistory.mockResolvedValue(PAGE);
+
+    await state().loadDailyHistory();
+
+    const saved = await copyOf();
+    expect(saved?.d2?.partner_id).toBe(PARTNER_B);
+    expect(saved?.d1?.partner_id).toBeNull();
+  });
+
   it('a failed write is logged and the list is still shown', async () => {
     withPartner(PARTNER_C);
     const failure = new Error('disk full');

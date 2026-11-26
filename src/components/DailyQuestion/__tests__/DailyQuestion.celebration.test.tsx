@@ -107,6 +107,8 @@ beforeEach(async () => {
   useAppStore.getState().setAuthUser(USER);
   useAppStore.setState({
     partner: { id: 'USER-B-ID', displayName: 'Jessie', email: 'b@example.com' },
+    // `loadPartner` sets both together.
+    partnerKnown: true,
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
   const queueDb = await openMyLoveDB();
   await queueDb.clear('pick-queue');
@@ -202,6 +204,7 @@ describe('the streak +1 on Daily', () => {
     beforeEach(() => {
       useAppStore.setState({
         partner: { id: 'USER-B-ID', displayName: '', email: 'b@example.com' },
+        partnerKnown: true,
       } as unknown as Parameters<typeof useAppStore.setState>[0]);
     });
 

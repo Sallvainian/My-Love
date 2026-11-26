@@ -62,6 +62,9 @@ const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as co
 function setPartner(displayName: string | null) {
   useAppStore.setState({
     partner: displayName === null ? null : { id: 'USER-B-ID', displayName, email: 'b@example.com' },
+    // `loadPartner` sets `partnerKnown` with a set partner: that state without it is never reached.
+    // A null partner is not confirmed unlinked here, so `partnerKnown` stays false (not yet loaded).
+    partnerKnown: displayName !== null,
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
 }
 
@@ -304,7 +307,9 @@ describe('DailyQuestion', () => {
   });
 
   it('a failed load after a saved day keeps the question and shows no invitation', async () => {
-    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: dailySnapshot() });
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: { ...dailySnapshot(), partner_id: 'USER-B-ID' },
+    });
     fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'The server is down'));
 
     render(<DailyQuestion />);
@@ -315,7 +320,9 @@ describe('DailyQuestion', () => {
   });
 
   it('offline with today saved: the saved question, no error, no invitation, no loading line', async () => {
-    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: dailySnapshot() });
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: { ...dailySnapshot(), partner_id: 'USER-B-ID' },
+    });
     setOnline(false);
     fetchDailyDay.mockRejectedValue(
       new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
@@ -425,7 +432,9 @@ describe('DailyQuestion', () => {
       failure: null,
     });
     fetchDailyDay.mockRejectedValue(new AccountDataError('offline', 'You are offline.'));
-    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: dailySnapshot() });
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: { ...dailySnapshot(), partner_id: 'USER-B-ID' },
+    });
 
     render(<DailyQuestion />);
 

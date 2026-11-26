@@ -20,7 +20,8 @@ import {
   type CoupleStreakAnswer,
   CoupleStreakSchema,
 } from '../api/validation/dailyQuestionSchemas';
-import { deleteLocalCopy, readLocalCopy, writeLocalCopy } from './localCopy';
+import { type PartnerTag, resolvePartnerTag } from './dailyPartnerTag';
+import { deleteLocalCopy, readLocalCopy, readLocalCopyStatus, writeLocalCopy } from './localCopy';
 
 export const DAILY_STREAK_COPY_KIND = 'daily-streak';
 
@@ -42,20 +43,33 @@ export async function readSavedStreak(
 
 /**
  * Save a successful server answer: `ok` writes its streak tagged with the
- * partner it was read with, `unlinked` deletes the copy. Throws when the storage
- * fails.
+ * partner it was read with, `unlinked` deletes the copy. When the partner is
+ * `unknown` (the lookup failed) an `ok` keeps the stored copy's tag, and with
+ * no stored copy it is untagged; a failed read of the stored copy then writes
+ * nothing. Writes only while `isCurrent()` holds, checked right before the
+ * write or delete. Throws when the storage fails.
  */
 export async function saveStreakAnswer(
   userId: string,
   answer: CoupleStreakAnswer,
-  partnerId: string | null
+  partner: PartnerTag,
+  isCurrent: () => boolean
 ): Promise<void> {
-  if (answer.status === 'ok') {
-    await writeLocalCopy(userId, DAILY_STREAK_COPY_KIND, {
-      ...answer.streak,
-      partner_id: partnerId,
-    });
-  } else {
+  if (answer.status !== 'ok') {
+    if (!isCurrent()) return;
     await deleteLocalCopy(userId, DAILY_STREAK_COPY_KIND);
+    return;
   }
+  let stored: string | null = null;
+  if (partner.status === 'unknown') {
+    const read = await readLocalCopyStatus<unknown>(userId, DAILY_STREAK_COPY_KIND);
+    if (read.status === 'failed') return;
+    const tag = (read.status === 'found' ? read.value : null) as { partner_id?: unknown } | null;
+    stored = typeof tag?.partner_id === 'string' ? tag.partner_id : null;
+  }
+  if (!isCurrent()) return;
+  await writeLocalCopy(userId, DAILY_STREAK_COPY_KIND, {
+    ...answer.streak,
+    partner_id: resolvePartnerTag(partner, stored),
+  });
 }

@@ -120,7 +120,7 @@ import {
   submitDailyPick as submitDailyPickRequest,
   submitWrittenQuestion as submitWrittenQuestionRequest,
 } from '../../api/dailyQuestionApi';
-import { mergePartnerId, shownPartnerId } from '../dailyPartnerIds';
+import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
 import type { AppStateCreator } from '../types';
 
 /** One of the account's queued picks, as the view needs it. */
@@ -361,12 +361,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
           });
           // A late pick can finish a past date: the streak corrects itself.
           void get().loadCoupleStreak();
-          const partnerId = await mergePartnerId(get, requestedBy);
+          const partner = await mergePartnerId(get, requestedBy);
           if (!isCurrent()) return 'stale';
           const merged = await mergeDailyDay(
             requestedBy,
             { status: 'ok', snapshot },
-            partnerId,
+            partner,
             isCurrent
           );
           if (!isCurrent()) return 'stale';
@@ -435,9 +435,10 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         const answer = await fetchDailyDay();
         if (!isCurrent()) return;
         // Only an `ok` answer is tagged; `unlinked` writes `{}` and needs no partner.
-        const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
+        const partner =
+          answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : NO_PARTNER_TAG;
         if (!isCurrent()) return;
-        const merged = await mergeDailyDay(requestedBy, answer, partnerId, isCurrent);
+        const merged = await mergeDailyDay(requestedBy, answer, partner, isCurrent);
         if (!isCurrent()) return;
         set({
           dailyDay: mergeAnswer(get().dailyDay, merged),
@@ -474,12 +475,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       try {
         const snapshot = await fetchDailyDayById(dayId);
         if (!isCurrent()) return;
-        const partnerId = await mergePartnerId(get, requestedBy);
+        const partner = await mergePartnerId(get, requestedBy);
         if (!isCurrent()) return;
         const merged = await mergeDailyDay(
           requestedBy,
           { status: 'ok', snapshot },
-          partnerId,
+          partner,
           isCurrent
         );
         if (!isCurrent()) return;
@@ -548,12 +549,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       // The pick may finish the day: re-read the streak, without waiting.
       void get().loadCoupleStreak();
       // A confirmed own write is a fill source for the copy.
-      const partnerId = await mergePartnerId(get, requestedBy);
+      const partner = await mergePartnerId(get, requestedBy);
       if (!isCurrent()) return;
       const merged = await mergeDailyDay(
         requestedBy,
         { status: 'ok', snapshot },
-        partnerId,
+        partner,
         isCurrent
       );
       if (!isCurrent()) return;
@@ -611,12 +612,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         thatText
       );
       if (!isCurrent()) return;
-      const partnerId = await mergePartnerId(get, requestedBy);
+      const partner = await mergePartnerId(get, requestedBy);
       if (!isCurrent()) return;
       const merged = await mergeDailyDay(
         requestedBy,
         { status: 'ok', snapshot },
-        partnerId,
+        partner,
         isCurrent
       );
       if (!isCurrent()) return;
@@ -647,12 +648,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         throw error;
       }
       if (!isCurrent()) return;
-      const partnerId = await mergePartnerId(get, requestedBy);
+      const partner = await mergePartnerId(get, requestedBy);
       if (!isCurrent()) return;
       const merged = await mergeDailyDay(
         requestedBy,
         { status: 'ok', snapshot },
-        partnerId,
+        partner,
         isCurrent
       );
       if (!isCurrent()) return;

@@ -3,6 +3,7 @@
  * `submit_daily_pick` answer, with the pair's question fixed.
  */
 import type { CoupleStreak, DailyDaySnapshot } from '../../../src/api/validation/dailyQuestionSchemas';
+import type { PartnerTag } from '../../../src/services/dailyPartnerTag';
 
 export const DAY_ID = '00000000-0000-4000-8000-0000000000d1';
 
@@ -87,3 +88,15 @@ export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStrea
     ...overrides,
   };
 }
+
+/** The partner the store holds once `loadPartner` has answered: `partner` and `partnerKnown` together. */
+export const KNOWN_PARTNER_ID = 'PARTNER-KNOWN-ID';
+export const knownPartnerState = (id = KNOWN_PARTNER_ID) => ({
+  partner: { id, email: 'partner@example.com', displayName: 'Harper', linkedSince: null, birthday: null },
+  partnerKnown: true,
+});
+
+/** The partner a copy write is tagged with: a linked partner, none, or a failed lookup. */
+export const linked = (partnerId: string): PartnerTag => ({ status: 'linked', partnerId });
+export const UNLINKED: PartnerTag = { status: 'unlinked' };
+export const UNKNOWN_PARTNER: PartnerTag = { status: 'unknown' };
