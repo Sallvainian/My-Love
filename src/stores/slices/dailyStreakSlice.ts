@@ -95,7 +95,7 @@ export interface DailyStreakSlice {
   claimStreakMilestone: (streak: CoupleStreak, canShow: () => boolean) => Promise<boolean>;
 }
 
-export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, get) => {
+export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, get, _api) => {
   registerLocalCopy(DAILY_STREAK_COPY_KIND, () => get().loadCoupleStreak());
 
   // The newest started `loadCoupleStreak`: an older read that lands later writes nothing.

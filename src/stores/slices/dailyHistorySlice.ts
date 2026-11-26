@@ -69,7 +69,7 @@ export interface DailyHistorySlice {
   resetDailyHistoryForNewPair: () => void;
 }
 
-export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set, get) => {
+export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set, get, _api) => {
   // The newest started `loadDailyHistory`: an older read that lands later writes nothing.
   let historySeq = 0;
   // The shown history was filled from the copy after a failed first read: the
