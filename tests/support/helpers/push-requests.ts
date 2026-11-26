@@ -2,7 +2,8 @@
  * Push-request helpers for the push specs
  * (`tests/api/push-love-note-trigger.spec.ts`,
  * `tests/api/push-partner-activity-trigger.spec.ts`,
- * `tests/api/push-daily-sender.spec.ts` and `tests/api/push-daily-reminders.spec.ts`):
+ * `tests/api/push-daily-sender.spec.ts`, `tests/api/push-daily-reminders.spec.ts` and
+ * `tests/api/push-daily-picks.spec.ts`):
  * read what the `send-push` Edge Function recorded in `push_requests`, speak as a
  * user with a real JWT, build and link throwaway pairs with devices, and post to the
  * sender as the triggers do.
@@ -97,6 +98,16 @@ export async function postToSender(supabaseAdmin: TypedSupabaseClient, body: Rec
     headers: { 'Content-Type': 'application/json', 'x-push-secret': settings!.sender_secret },
     body: JSON.stringify(body),
   });
+}
+
+/** The sender's answer when it claims nothing: no device is sent, recorded, skipped, failed or gone. */
+export const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
+
+/** Posts `{kind, id}` to the sender, asserts it answered 200 and returns its JSON counts. */
+export async function postKindToSender(supabaseAdmin: TypedSupabaseClient, kind: string, id: string) {
+  const response = await postToSender(supabaseAdmin, { kind, id });
+  expect(response.status, kind).toBe(200);
+  return response.json();
 }
 
 /** A moods.created_at no other run reuses (the table is unique on user and created_at). */

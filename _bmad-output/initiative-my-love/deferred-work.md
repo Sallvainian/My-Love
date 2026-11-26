@@ -4506,3 +4506,11 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-p
 severity: low
 reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment).
 status: open
+
+### DW-531: tests/api/push-daily-picks.spec.ts fixes today, yesterday and two days ago from the host clock when it seeds the pair, so a run that crosses host-local midnight between the seed and a pick fails
+origin: spec-deferred cf4802363580
+location: tests/api/push-daily-picks.spec.ts seed and submitPick
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-picks-push-the-partner-and-both-answered-plan.md`
+severity: low
+reason: The spec computes `today` with isoDateDaysFromNow(0, now) before seedPairDays, then submits today's pick with picked_at = new Date() for dayIds[today]; after midnight record_daily_pick refuses it with DQ001 (pick date is not the day's date), and user_local_date would also move the recipient's date so the on-date partner-picked push is dropped. The same low flake story 8.3 deferred for push-daily-sender.spec.ts. Real low flake, deferred because a run must straddle local midnight within seconds; the fix is a guard (skip within a few minutes of local midnight) shared by both specs.
+status: open

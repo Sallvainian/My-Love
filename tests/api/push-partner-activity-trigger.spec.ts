@@ -49,6 +49,7 @@ import {
   postToSender,
   requestsFor,
   uniqueMoodTime,
+  zeros,
 } from '../support/helpers/push-requests';
 import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 import { test, expect } from '../support/merged-fixtures';
@@ -420,8 +421,6 @@ test.describe('Partner request push', () => {
     expect(error).toBeNull();
     return data!.id;
   }
-
-  const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
 
   test('[P0] a request records on the asked person\'s devices only, and its acceptance on the asker\'s only; a decline and the auto-declined requests record none', async ({
     supabaseAdmin,

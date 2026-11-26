@@ -18,8 +18,9 @@
  * - the five daily kinds (story 8.3, push-copy.md): `daily_partner_picked` and
  *   `daily_both_answered` post a `daily_picks` id, `daily_nudge` a
  *   `daily_nudges` id, `daily_question` and `daily_reminder` a
- *   `daily_reminders` id. The sender knows them a deploy ahead of the triggers
- *   (stories 5 to 7), so a post for them is accepted now and nothing posts yet.
+ *   `daily_reminders` id. The sender knew them a deploy ahead of the triggers:
+ *   `daily_reminders` posts the reminder kinds since story 8.5 and `daily_picks`
+ *   the two pick kinds since story 8.6; the nudge is posted from story 8.7.
  *
  * Split out of `index.ts` so `deno test` can drive it with a fake database
  * and a fake APNs client.
