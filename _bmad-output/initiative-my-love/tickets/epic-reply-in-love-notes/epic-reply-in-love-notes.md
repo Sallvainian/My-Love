@@ -40,4 +40,5 @@ Partners talk about the day's answers where they already talk. Signal: a reply o
 - Waits on epic 6 because: the reply points at its stored question and sits on its reveal card.
 - Waits on epic 7 because: both change the reveal card.
 - Waits on epic 8 because: both add migrations, regenerate the database types and change epic 6's screens.
+- Decision: 2026-11-26 (owner) backlog story 6 ("A daily question has one nudge, one 8 PM reminder and the both-answered push") is built before this epic starts: it changes epic 8's migrations, the database types and Daily's screens.
 - The architecture spine (companion) settles how a reply points at its day's question; refine against it.
