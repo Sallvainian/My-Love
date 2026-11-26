@@ -4578,6 +4578,7 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-scre
 severity: low
 reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter).
 status: open
+progress: 2026-11-26 epic 8 retrospective (F1e): the partner's midnight is not re-read either, so a page left open across it keeps an enabled Nudge button that DQ009 refuses on every tap. Backlog story 6 removes the waiting card's Nudge button, which covers that case. The stale day across the sender's own midnight remains.
 
 ### DW-539: A nudge request that times out after the server committed it shows "Your nudge could not be sent." although the push went out.
 origin: spec-deferred 31cd9232798f
@@ -4595,6 +4596,7 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-scre
 severity: low
 reason: get_daily_day stores the zone of whichever device read last; Daily's mount read stores this device's zone, so they agree unless another device of the same account in another zone reads in between. Then the timer fires at the wrong hour and the evening slot shows only on a return or reload (review 2026-11-26: edge-case-hunter, intent-alignment).
 status: open
+progress: 2026-11-26 epic 8 retrospective (F1a, F1c). F1a: inside one `get_daily_day` the day is dated with the zone the request sends, while the stored zone is replaced only by a newer `reported_at` (`supabase/migrations/20261105210000_daily_question_own_clocks.sql:116-121, 282-286`). With a second device of the same account in another zone, the day comes from this device, and DQ009 and the scheduled pushes from the other device's zone. F1c: the 20:00:05 re-read (`src/hooks/useDailyDayRereads.ts`) fires once with no retry, so device clock skew past 5 s or a failed read leaves the evening slot unseen until a return or reload. Backlog story 6 removes the nudge slots, which covers F1c and the 20:00 timer this entry names; F1a remains.
 
 ### DW-541: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the pick and the reload.
 origin: spec-deferred 038b11dcab84
@@ -4611,4 +4613,53 @@ location: tests/live/daily-question-live.spec.ts (the `openedA.snapshot.write.mi
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-after-every-deploy-the-live-check-also-sends-a-nudge-plan.md`
 severity: low
 reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC.
+status: open
+progress: 2026-11-26 `ea53dabb` (PR #513 review) runs `waitClearOfDailyTurns` before the reset, and the deploy runner is on UTC, so a deploy run waits past both UTC turns and this crossing cannot happen there. It remains only for a local live run on a host not on UTC. Backlog story 6 rewrites the live check's nudge step.
+
+### DW-543: send-push judges whether a pick's day is the recipient's current date when it sends, not when the pick was made.
+origin: epic 8 retrospective, 2026-11-26
+location: supabase/functions/send-push/handler.ts:436-454 (`resolveSource`), :657-658 (the send-time `now`)
+source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Retrospective F1b. The trigger posts within seconds, and the sender compares the day with `user_local_date(recipient, now())` at send time. A first pick made just before the recipient's midnight and sent after it is dropped as late, and a second pick is worded "That day counts." though it was on the day. Backlog story 6 removes the partner-picked push, which takes the first half; the both-answered wording remains.
+status: open
+
+### DW-544: push-daily-reminders.spec.ts's guard counts a throwaway pair left behind by a killed run. PLAUSIBLE, not reproduced.
+origin: epic 8 retrospective, 2026-11-26
+location: tests/api/push-daily-reminders.spec.ts:106 (the guard before the rpc)
+source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Retrospective F5 R4. The spec's throwaway `dailyrem-*` pair is removed by its cleanup, which a killed run never reaches. The next run's guard counts that pair as an account due in the window and stops before the rpc, so a red P0 api spec reads like a reminder bug. The fix is to exclude the spec's own prefix or delete leftovers before seeding.
+status: open
+
+### DW-545: send-push reads the couple's streak before it checks the recipient's switch.
+origin: epic 8 retrospective, 2026-11-26
+location: supabase/functions/send-push/handler.ts:448, 462, 505 (`getCoupleStreak`) against :669 (`isPushEnabled`)
+source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Retrospective F5 R5. `resolveSource` builds each daily kind with `couple_streak` before the handler reads the switch, so a kind the recipient turned off still costs a streak read and answers 500 when that read fails, though it would have been dropped.
+status: open
+
+### DW-546: Three daily push api specs hand-write the couple-day lookup and the linked-pair recipe that shared helpers already give.
+origin: epic 8 retrospective, 2026-11-26
+location: tests/api/push-daily-nudge.spec.ts:47-82; tests/api/push-daily-sender.spec.ts:63-100; tests/api/push-daily-picks.spec.ts:58-82
+source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Retrospective F6 (duplication map). Each spec queries `couple_days` by sorted `user_a`/`user_b` itself, although `tests/support/factories/daily-question.ts` exports `readPairDayIds` and `orderedPair`; two specs also copy the `setUpPair` recipe and redeclare `type Cleanup`. AGENTS.md, Shared test helpers (DW-313). The 8.5 and 8.6 reviews moved the other helpers into `tests/support/helpers/push-requests.ts` and left these.
+status: open
+
+### DW-547: A refused nudge is logged twice.
+origin: epic 8 retrospective, 2026-11-26
+location: src/api/dailyQuestionApi.ts:300 (`logSupabaseError`); src/components/DailyQuestion/nudgeFailureMessage.ts:16 (`console.error`)
+source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Retrospective F6 (duplication map). `sendDailyNudge` logs a refusal before throwing `AccountDataError('refused')`, and `nudgeFailureMessage` logs the same failure again on its way to the line it shows.
+status: open
+
+### DW-548: Drop the `push_preferences` columns for New question and Partner picked once installed builds have taken story 6's update.
+origin: epic 8 retrospective, 2026-11-26
+location: push_preferences.daily_question, push_preferences.daily_partner_picked; src/services/pushPreferencesService.ts (the column list); supabase/tests/database/36_push_preferences.sql (PUSH-PREF-009); src/types/database.types.ts
+source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Backlog story 6 removes both switches and the pushes they controlled, but keeps the columns (owner, 2026-11-26): installed shells run the old web bundle until they take the live update, and that bundle reads both columns by name, so dropping them in the same deploy would fail its Settings reads. Drop them in a later migration, after the owner's and partner's shells run a bundle from story 6 or later, regenerating the types and updating PUSH-PREF-009 in the same change.
 status: open
