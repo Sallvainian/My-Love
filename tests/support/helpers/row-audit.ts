@@ -39,6 +39,9 @@ export const AUDITED_TABLES = {
   // pair, so any spec that signs in a pool account adds a day. Only a spec that
   // picks adds a pick, and `clearPairDays` removes the picks with their days.
   daily_picks: ['user_id'],
+  // Nudges (story 8.7): `send_daily_nudge` writes one; a spec that nudges as a pool account
+  // adds a row, and the row cascades with the pair's day.
+  daily_nudges: ['from_user', 'to_user'],
 } as const;
 
 export type AuditedTable = keyof typeof AUDITED_TABLES;

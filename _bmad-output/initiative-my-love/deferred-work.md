@@ -4514,3 +4514,27 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-picks-push-the-p
 severity: low
 reason: The spec computes `today` with isoDateDaysFromNow(0, now) before seedPairDays, then submits today's pick with picked_at = new Date() for dayIds[today]; after midnight record_daily_pick refuses it with DQ001 (pick date is not the day's date), and user_local_date would also move the recipient's date so the on-date partner-picked push is dropped. The same low flake story 8.3 deferred for push-daily-sender.spec.ts. Real low flake, deferred because a run must straddle local midnight within seconds; the fix is a guard (skip within a few minutes of local midnight) shared by both specs.
 status: open
+
+### DW-532: A sender whose clock is past midnight while the recipient's is still on the day can nudge about that day in a fresh slot of the sender's new date, which also spends that date's slot before the new
+origin: spec-deferred 900939320814
+location: supabase/migrations/20261126020000_daily_nudge.sql record_daily_nudge and daily_day_snapshot nudge block
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
+severity: low
+reason: record_daily_nudge and the snapshot key the limit on (from_user, sender_local_date, slot) and require only user_local_date(partner, at) = the day (AD-17 as written). With A on UTC and B in New York, at 2030-09-11 02:00 UTC A (picked 09-10, B not) gets slot after_pick for 09-10, unspent, so a third nudge about 09-10 lands and A's 09-11 after_pick slot is spent before 09-11's question. Real low defect, deferred because it needs partners in different zones and a nudge after the sender's midnight, and the fix (also requiring the sender's own date to be the day, or keying on day_id) changes AD-17's rule, which is the architect's or owner's call (review 2026-11-26: blind-hunter, edge-case-hunter, intent-alignment).
+status: open
+
+### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the
+origin: spec-deferred 54bfbe5d4e23
+location: supabase/migrations/20261126020000_daily_nudge.sql:154-155
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
+severity: low
+reason: Under READ COMMITTED each statement in the volatile function takes a fresh snapshot, and get_daily_day may update user_time_zones from the same account's other device in between. Real low defect, deferred because it needs a zone change within the same milliseconds as a nudge; the fix is to read the zone once and derive both values from it (review 2026-11-26: edge-case-hunter).
+status: open
+
+### DW-534: tests/api/push-daily-nudge.spec.ts takes today from the host clock before seeding, so a run that crosses host-local midnight between the seed and the nudge fails spuriously.
+origin: spec-deferred e25547d0886d
+location: tests/api/push-daily-nudge.spec.ts setUpPair
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
+severity: low
+reason: setUpPair seeds today with isoDateDaysFromNow(0, new Date()) and host-zone user_time_zones rows; after midnight user_local_date(recipient, now()) is the next date and send_daily_nudge refuses DQ009. The same low flake stories 8.3 and 8.6 deferred for push-daily-sender.spec.ts and push-daily-picks.spec.ts; the shared fix is a guard near local midnight (review 2026-11-26: intent-alignment).
+status: open

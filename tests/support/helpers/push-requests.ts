@@ -2,8 +2,8 @@
  * Push-request helpers for the push specs
  * (`tests/api/push-love-note-trigger.spec.ts`,
  * `tests/api/push-partner-activity-trigger.spec.ts`,
- * `tests/api/push-daily-sender.spec.ts`, `tests/api/push-daily-reminders.spec.ts` and
- * `tests/api/push-daily-picks.spec.ts`):
+ * `tests/api/push-daily-sender.spec.ts`, `tests/api/push-daily-reminders.spec.ts`,
+ * `tests/api/push-daily-picks.spec.ts` and `tests/api/push-daily-nudge.spec.ts`):
  * read what the `send-push` Edge Function recorded in `push_requests`, speak as a
  * user with a real JWT, build and link throwaway pairs with devices, and post to the
  * sender as the triggers do.

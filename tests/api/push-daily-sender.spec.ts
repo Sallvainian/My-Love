@@ -6,9 +6,12 @@
  * records; a hand post of the same `{kind, id}` is then a replay (`skipped`). The
  * `daily_picks` triggers exist too (story 8.6), so every pick, the seed's included,
  * posts `daily_partner_picked` or `daily_both_answered` itself and the pick case waits
- * for the records, then hand posts the same `{kind, id}` as a replay. Only the nudge
- * trigger is story 8.7, so that case still posts `{kind, id}` by hand as the trigger
- * will, for a `daily_nudges` row. The rows are inserted with the service role.
+ * for the records, then hand posts the same `{kind, id}` as a replay. The `daily_nudges`
+ * trigger exists too (story 8.7), so each nudge row inserted here posts `daily_nudge`
+ * itself: the case waits for the records, and a nudge to a recipient who switched the
+ * kind off still answers `zeros` to a hand post and lists no device. The rows are
+ * inserted with the service role, which bypasses `send_daily_nudge`'s rules; the
+ * client RPC is `push-daily-nudge.spec.ts`.
  *
  * Asserted: the title, body, sound, badge, `partner-activity` thread and `kind`
  * recorded in `push_requests` (CI cannot reach APNs, so the sender records the
@@ -157,8 +160,8 @@ test.describe('Daily push sender', () => {
 
     // ---- a nudge from Alice to Bob: Bob's devices only, the default sound ----
     const nudge = await addNudge(alice, bob, 'after_pick');
-    expect(await postKindToSender(supabaseAdmin, 'daily_nudge', nudge)).toEqual({ ...zeros, recorded: 2 });
-    const nudgeRows = await requestsFor(supabaseAdmin, nudge, 'daily_nudge_id');
+    // The insert's trigger posts it; the sender records both of Bob's devices.
+    const nudgeRows = await awaitRequests(supabaseAdmin, nudge, 'daily_nudge_id', 2);
     expect(nudgeRows.map((r) => r.token).sort()).toEqual([bobPhone, bobTablet].sort());
     for (const row of nudgeRows) {
       expect(row.payload).toEqual(
@@ -166,7 +169,7 @@ test.describe('Daily push sender', () => {
       );
     }
 
-    // A replayed post is skipped for every device.
+    // A hand post of what the trigger already posted is a replay, skipped for every device.
     expect(await postKindToSender(supabaseAdmin, 'daily_nudge', nudge)).toEqual({ ...zeros, skipped: 2 });
     expect(await requestsFor(supabaseAdmin, nudge, 'daily_nudge_id')).toEqual(nudgeRows);
 
@@ -189,12 +192,12 @@ test.describe('Daily push sender', () => {
 
     // ... and so does the nudge he sends to Alice, whose own switch is on.
     const back = await addNudge(bob, alice, 'after_pick');
-    expect(await postKindToSender(supabaseAdmin, 'daily_nudge', back)).toEqual({ ...zeros, recorded: 1 });
-    const backRows = await requestsFor(supabaseAdmin, back, 'daily_nudge_id');
+    const backRows = await awaitRequests(supabaseAdmin, back, 'daily_nudge_id', 1);
     expect(backRows.map((r) => r.token)).toEqual([aliceDevice]);
     expect(backRows[0].payload).toEqual(
       dailyPayload('daily_nudge', `${bob.name} nudged you`, 'Your 3-day streak needs your pick today.', 'default')
     );
+    expect(await postKindToSender(supabaseAdmin, 'daily_nudge', back)).toEqual({ ...zeros, skipped: 1 });
   });
 
   test('[P0] the pick kinds record under daily_pick_id for the other partner only, drop a late first pick and word a late second pick', async ({

@@ -20,7 +20,7 @@
  *   `daily_nudges` id, `daily_question` and `daily_reminder` a
  *   `daily_reminders` id. The sender knew them a deploy ahead of the triggers:
  *   `daily_reminders` posts the reminder kinds since story 8.5 and `daily_picks`
- *   the two pick kinds since story 8.6; the nudge is posted from story 8.7.
+ *   the two pick kinds since story 8.6, and `daily_nudges` the nudge since story 8.7.
  *
  * Split out of `index.ts` so `deno test` can drive it with a fake database
  * and a fake APNs client.

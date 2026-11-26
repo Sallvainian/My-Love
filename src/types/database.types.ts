@@ -1172,6 +1172,10 @@ export type Database = {
         Args: { at: string; day_id: string; viewer: string }
         Returns: Json
       }
+      daily_nudge_slot: {
+        Args: { at: string; sender: string }
+        Returns: string
+      }
       decline_partner_request: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -1216,6 +1220,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      record_daily_nudge: {
+        Args: { at: string; day_id: string; viewer: string }
+        Returns: Json
+      }
       record_daily_pick: {
         Args: {
           at: string
@@ -1256,6 +1264,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      send_daily_nudge: { Args: { day_id: string }; Returns: Json }
       submit_daily_pick: {
         Args: {
           choice: string
