@@ -26,7 +26,7 @@
  *
  * ## Queue rules
  *
- * - SENDER. Only `dailyQuestionSlice.drainQueuedPicks` sends rows, under
+ * - SENDER. Only `dailyDaySlice.drainQueuedPicks` sends rows, under
  *   `withSyncLock(PICK_QUEUE_LOCK)`, oldest first, and only the signed-in
  *   account's pending (not `failed`) rows. A resend after a lost response is
  *   idempotent on the server (one pick per day and user).

@@ -248,8 +248,9 @@ export function signedOutState() {
     pushPreferences: null,
     pushPreferencesLoadFailed: false,
 
-    // dailyQuestionSlice — the couple's question and the picks the gate released
-    // to the outgoing account; the loading flag and error go with them.
+    // dailyDaySlice (with dailyStreakSlice and dailyHistorySlice below) — the
+    // couple's question and the picks the gate released to the outgoing
+    // account; the loading flag and error go with them.
     dailyDay: null,
     dailyDayLoading: false,
     dailyDayError: null,
