@@ -1,7 +1,7 @@
 /**
  * Daily Question — today's this-or-that question for the couple.
  *
- * Reads `dailyDay` from `dailyQuestionSlice`; every projection (state, the
+ * Reads `dailyDay` from `dailyDaySlice`; every projection (state, the
  * partner's choice, Same/Different) comes from the server snapshot, and the
  * view shows the partner's choice only when the snapshot carries it. `unlinked`
  * renders no question and no pick control, only the invitation to link (Go to
@@ -72,7 +72,7 @@ import {
 import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
-import type { QueuedDailyPick } from '../../stores/slices/dailyQuestionSlice';
+import type { QueuedDailyPick } from '../../stores/slices/dailyDaySlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
