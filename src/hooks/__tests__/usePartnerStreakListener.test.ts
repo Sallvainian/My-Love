@@ -28,6 +28,7 @@ vi.mock('../../stores/useAppStore', () => ({
 }));
 
 import { moodSyncService } from '../../api/moodSyncService';
+import { RETRY_CONFIG } from '../../api/realtimeRetry';
 import { usePartnerStreakListener } from '../usePartnerStreakListener';
 
 const subscribe = vi.mocked(moodSyncService.subscribePartnerEvents);
@@ -189,5 +190,44 @@ describe('usePartnerStreakListener', () => {
       )
     );
     consoleSpy.mockRestore();
+  });
+
+  it('retries a subscribe that rejects once, then stays subscribed and re-reads on SUBSCRIBED', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const failure = new Error('no channel');
+      subscribe.mockReset();
+      subscribe.mockRejectedValueOnce(failure).mockResolvedValue(release);
+
+      const hook = renderHook(() => usePartnerStreakListener());
+      await act(async () => {});
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[usePartnerStreakListener] Could not listen for the streak:',
+        failure
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RETRY_CONFIG.baseDelay);
+      });
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(release).not.toHaveBeenCalled();
+
+      act(() => subscribe.mock.calls[1][0].onStatus!('SUBSCRIBED'));
+      expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
+
+      hook.unmount();
+      expect(release).toHaveBeenCalledTimes(1);
+      // Held, so nothing is attempted again.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RETRY_CONFIG.maxDelay);
+      });
+      expect(subscribe).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

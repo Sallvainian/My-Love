@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { moodSyncService } from '../api/moodSyncService';
+import { listenToPartnerEvents } from '../api/listenToPartnerEvents';
 import { useAppStore } from '../stores/useAppStore';
 
 /** A return to the front re-reads the dates only this long after the last such re-read. */
@@ -59,15 +59,14 @@ export function useDatesChangedListener(): void {
     if (!listening) return;
 
     let active = true;
-    let unsubscribe: (() => void) | null = null;
     let joinedOnce = false;
     const reread = () => {
       void loadEvents();
       void loadAnniversariesFromServer();
     };
 
-    moodSyncService
-      .subscribePartnerEvents({
+    const stop = listenToPartnerEvents(
+      {
         onStatus: (status) => {
           if (!active || status !== 'SUBSCRIBED') return;
           // The first join follows the start's own loads; a re-join may have
@@ -78,21 +77,20 @@ export function useDatesChangedListener(): void {
         dates_changed: () => {
           if (active) reread();
         },
-      })
-      .then((release) => {
-        if (!active) {
-          release();
-          return;
-        }
-        unsubscribe = release;
-      })
-      .catch((error: unknown) => {
-        console.error('[useDatesChangedListener] Could not listen for date changes:', error);
-      });
+      },
+      {
+        failureMessage: '[useDatesChangedListener] Could not listen for date changes:',
+        // A subscribe that failed first is no longer covered by the start's
+        // own loads, so the join after a retry re-reads like a re-join.
+        onRetry: () => {
+          joinedOnce = true;
+        },
+      }
+    );
 
     return () => {
       active = false;
-      unsubscribe?.();
+      stop();
     };
   }, [listening, session, loadEvents, loadAnniversariesFromServer]);
 }
