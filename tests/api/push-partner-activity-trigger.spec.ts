@@ -42,13 +42,13 @@ import { randomUUID } from 'node:crypto';
 import type { TypedSupabaseClient } from '../support/factories';
 import { resolveOwnPair } from '../support/helpers/events';
 import {
+  awaitRequests,
   clientFor,
   newToken,
   partnerPayload,
   postToSender,
   requestsFor,
   uniqueMoodTime,
-  type SourceColumn,
 } from '../support/helpers/push-requests';
 import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
 import { test, expect } from '../support/merged-fixtures';
@@ -419,21 +419,6 @@ test.describe('Partner request push', () => {
       .single();
     expect(error).toBeNull();
     return data!.id;
-  }
-
-  async function awaitRequests(
-    supabaseAdmin: TypedSupabaseClient,
-    requestId: string,
-    column: SourceColumn,
-    count: number
-  ) {
-    await expect
-      .poll(async () => (await requestsFor(supabaseAdmin, requestId, column)).length, {
-        message: `the sender records ${count} request(s) in ${column}`,
-        timeout: 20_000,
-      })
-      .toBe(count);
-    return requestsFor(supabaseAdmin, requestId, column);
   }
 
   const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };

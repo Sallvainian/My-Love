@@ -1,9 +1,11 @@
 /**
  * The sender's five daily kinds, over the wire against the local stack
- * (epic-daily-pushes-and-nudge, story 8.3). Nothing posts a daily push yet (the
- * triggers are stories 5 to 7), so each case posts `{kind, id}` to `send-push`
- * as a trigger will: `daily_question` and `daily_reminder` for a
- * `daily_reminders` row, `daily_nudge` for a `daily_nudges` row, and
+ * (epic-daily-pushes-and-nudge, story 8.3). The `daily_reminders` triggers exist
+ * (story 8.5), so inserting a reminder row posts `daily_question` (morning) or
+ * `daily_reminder` (evening) to `send-push` itself and the case waits for the
+ * records; a hand post of the same `{kind, id}` is then a replay (`skipped`). The
+ * nudge and pick triggers are stories 8.6 and 8.7, so those cases still post
+ * `{kind, id}` by hand as a trigger will: `daily_nudge` for a `daily_nudges` row, and
  * `daily_partner_picked` and `daily_both_answered` for a `daily_picks` row. The
  * rows are inserted with the service role.
  *
@@ -31,68 +33,31 @@
  * (`needs-edge-functions` in CI); the `api` project runs one worker, so this
  * file and the other push specs never run at once.
  */
-import { randomUUID } from 'node:crypto';
 import type { TypedSupabaseClient } from '../support/factories';
 import { readPairQuestionsByDay, seedPairDays } from '../support/factories/daily-question';
 import { isoDateDaysFromNow } from '../support/helpers/events';
 import { runPsql } from '../support/helpers/migration-replay';
-import { newToken, postToSender, requestsFor } from '../support/helpers/push-requests';
-import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
+import {
+  awaitRequests,
+  createParty as createThrowawayParty,
+  dailyPayload,
+  link,
+  postToSender,
+  registerDevice,
+  requestsFor,
+  type Party,
+} from '../support/helpers/push-requests';
 import { test, expect } from '../support/merged-fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
+type Cleanup = { defer: (name: string, fn: () => Promise<unknown>) => void };
+
 const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
 
-/** What a daily push records: the `partner-activity` thread, the kind, the badge (0: no love notes) and a sound or none. */
-const dailyPayload = (kind: string, title: string, body: string, sound?: 'default') => ({
-  kind,
-  aps: { alert: { title, body }, 'thread-id': 'partner-activity', badge: 0, ...(sound ? { sound } : {}) },
-});
-
 test.describe('Daily push sender', () => {
-  async function createParty(
-    supabaseAdmin: TypedSupabaseClient,
-    cleanup: { defer: (name: string, fn: () => Promise<unknown>) => void },
-    role: string
-  ) {
-    const account = await createOutsiderClient(supabaseAdmin, `dailypush-${role}`);
-    cleanup.defer(`delete throwaway account ${role}`, () => deleteOutsider(account));
-    const name = `Daily ${role.toUpperCase()} ${randomUUID().slice(0, 6)}`;
-    const { error } = await account.client
-      .from('users')
-      .update({ display_name: name, updated_at: new Date().toISOString() })
-      .eq('id', account.userId);
-    expect(error, `name ${role}`).toBeNull();
-    return { ...account, name };
-  }
-
-  type Party = Awaited<ReturnType<typeof createParty>>;
-
-  async function registerDevice(party: Party, environment: 'sandbox' | 'production') {
-    const token = newToken();
-    const { error } = await party.client.rpc('register_push_device', { p_token: token, p_environment: environment });
-    expect(error).toBeNull();
-    return token;
-  }
-
-  async function link(supabaseAdmin: TypedSupabaseClient, from: Party, to: Party) {
-    const { data, error } = await from.client
-      .from('partner_requests')
-      .insert({ from_user_id: from.userId, to_user_id: to.userId, status: 'pending' })
-      .select('id')
-      .single();
-    expect(error).toBeNull();
-    expect((await to.client.rpc('accept_partner_request', { p_request_id: data!.id })).error).toBeNull();
-    const { data: users } = await supabaseAdmin
-      .from('users')
-      .select('id, partner_id')
-      .in('id', [from.userId, to.userId]);
-    expect(Object.fromEntries(users!.map((u) => [u.id, u.partner_id]))).toEqual({
-      [from.userId]: to.userId,
-      [to.userId]: from.userId,
-    });
-  }
+  const createParty = (supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup, role: string) =>
+    createThrowawayParty(supabaseAdmin, cleanup, 'dailypush', 'Daily', role);
 
   async function post(supabaseAdmin: TypedSupabaseClient, kind: string, id: string) {
     const response = await postToSender(supabaseAdmin, { kind, id });
@@ -104,7 +69,7 @@ test.describe('Daily push sender', () => {
    * A linked pair with devices (Alice one, Bob two) and its days seeded: three past
    * days both picked, yesterday absent, today with Alice's pick only.
    */
-  async function setUpPair(supabaseAdmin: TypedSupabaseClient, cleanup: Parameters<typeof createParty>[1]) {
+  async function setUpPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup) {
     const alice = await createParty(supabaseAdmin, cleanup, 'a');
     const bob = await createParty(supabaseAdmin, cleanup, 'b');
     await link(supabaseAdmin, alice, bob);
@@ -163,8 +128,8 @@ test.describe('Daily push sender', () => {
 
     // ---- 8 AM: Bob gets the question, with no sound ----
     const morning = await addReminder(bob.userId, 'morning');
-    expect(await post(supabaseAdmin, 'daily_question', morning)).toEqual({ ...zeros, recorded: 2 });
-    const morningRows = await requestsFor(supabaseAdmin, morning, 'daily_reminder_id');
+    // The insert's trigger posts it; the sender records both of Bob's devices.
+    const morningRows = await awaitRequests(supabaseAdmin, morning, 'daily_reminder_id', 2);
     expect(morningRows.map((r) => [r.token, r.delivery]).sort()).toEqual(
       [
         [bobPhone, 'recorded'],
@@ -180,12 +145,15 @@ test.describe('Daily push sender', () => {
     // ---- 8 PM, the stored `evening_partner` kind: Alice hears Bob has not, with the default sound ----
     // The variant is the row's kind, which the sender reads and never infers from picks.
     const evening = await addReminder(alice.userId, 'evening_partner');
-    expect(await post(supabaseAdmin, 'daily_reminder', evening)).toEqual({ ...zeros, recorded: 1 });
-    const eveningRows = await requestsFor(supabaseAdmin, evening, 'daily_reminder_id');
+    const eveningRows = await awaitRequests(supabaseAdmin, evening, 'daily_reminder_id', 1);
     expect(eveningRows.map((r) => r.token)).toEqual([aliceDevice]);
     expect(eveningRows[0].payload).toEqual(
       dailyPayload('daily_reminder', `${bob.name} hasn't done their daily`, 'Nudge them before midnight.', 'default')
     );
+
+    // A hand post of what the trigger already posted is a replay for every device.
+    expect(await post(supabaseAdmin, 'daily_question', morning)).toEqual({ ...zeros, skipped: 2 });
+    expect(await post(supabaseAdmin, 'daily_reminder', evening)).toEqual({ ...zeros, skipped: 1 });
 
     // A reminder posted under the other reminder kind is no push and claims nothing.
     expect(await post(supabaseAdmin, 'daily_question', evening)).toEqual(zeros);
@@ -219,8 +187,7 @@ test.describe('Daily push sender', () => {
 
     // His reminder still records (his other switches are on) ...
     const eveningSelf = await addReminder(bob.userId, 'evening_self');
-    expect(await post(supabaseAdmin, 'daily_reminder', eveningSelf)).toEqual({ ...zeros, recorded: 2 });
-    for (const row of await requestsFor(supabaseAdmin, eveningSelf, 'daily_reminder_id')) {
+    for (const row of await awaitRequests(supabaseAdmin, eveningSelf, 'daily_reminder_id', 2)) {
       expect(row.payload).toEqual(
         dailyPayload('daily_reminder', "You haven't done your daily yet", `${asked} It takes two taps.`, 'default')
       );

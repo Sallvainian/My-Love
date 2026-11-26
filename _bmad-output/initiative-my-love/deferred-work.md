@@ -4482,3 +4482,27 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows
 severity: low
 reason: setUpPair takes today = isoDateDaysFromNow(0, new Date()) and seedPairDays writes a user_time_zones row in the host's zone; the pick-kinds case takes twoDaysAgo the same way. user_local_date(recipient, now()) then answers the next day after midnight, so the on-day partner-picked push is dropped as late and the "3-day streak", "Day 4" and "See ...'s pick." assertions miss. Real low flake, deferred because a run must straddle local midnight within seconds (follow-up review 2026-11-25: blind-hunter, edge-case-hunter); the fix is a guard (skip within a few minutes of local midnight) or re-deriving the date from user_local_date before each post.
 status: open
+
+### DW-528: The live daily-reminders cron job (every 5 minutes on real time) can act on api-spec accounts during a host-zone 08:00-08:30 or 20:00-20:30 window, so a tick that lands mid-spec makes
+origin: spec-deferred 2a1496a6b7b2
+location: tests/api/push-daily-sender.spec.ts addReminder; tests/api/push-partner-activity-trigger.spec.ts by-token count; supabase/migrations/20261126000000_daily_reminders_schedule.sql daily-reminders job
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: push-daily-sender.spec.ts setUpPair links a throwaway pair both ways, registers devices and seedPairDays writes a host-zone user_time_zones row, so enqueue_daily_reminders(now()) treats it as due; addReminder then asserts a null insert error (tests/api/push-daily-sender.spec.ts addReminder). push-partner-activity-trigger.spec.ts reads push_requests by token and expects toHaveLength(6) while the pool pair (linked, a stored zone from get_daily_day) holds devices. 35_push_devices.sql's unscoped net.http_request_queue counts are exposed the same way to a committed cron insert. Needs a tick inside a window during the few seconds a spec holds that state (about 0.1-0.2% of runs). Real low flake, deferred because developers are unlikely to meet it (review 2026-11-26: blind-hunter, edge-case-hunter, verification-gap). Fix: pause the job around the api leg or clear a cron-made row for (user, today, slot) before the spec inserts.
+status: open
+
+### DW-529: For partners on clocks four or more hours apart, the 8 PM evening_partner push can tell the earlier partner to nudge about a date the later partner can no longer pick, because the later partner's date
+origin: spec-deferred 916c1600ab8a
+location: supabase/migrations/20261126000000_daily_reminders_schedule.sql enqueue_daily_reminders, evening branch
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: enqueue_daily_reminders checks picks on the couple day for the recipient's own local date; record_daily_pick refuses a pick whose local date is not the day, and AD-17 refuses a nudge unless the day is the recipient's current date, so "Nudge them before midnight." asks for something neither partner can do. The intent and AD-9 state the evening_partner rule literally (only the recipient has picked, no spent evening nudge), so changing it needs an owner or architect decision. Real low defect, deferred because it needs partners far apart and the fix adds a branch (review 2026-11-26: blind-hunter, intent-alignment).
+status: open
+
+### DW-530: tests/api/push-daily-reminders.spec.ts fails its own guard on a host in a half-hour zone (for example +05:30), because the pool accounts then sit at 08:10 and 20:10 at the spec's Kathmandu 08:25 and
+origin: spec-deferred 64204ccf98b3
+location: tests/api/push-daily-reminders.spec.ts otherAccountsDueAt and the two instants
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment).
+status: open

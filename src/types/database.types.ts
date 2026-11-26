@@ -1180,6 +1180,7 @@ export type Database = {
         Args: { time_zone: string; utc_offset_minutes: number }
         Returns: string
       }
+      enqueue_daily_reminders: { Args: { at: string }; Returns: number }
       find_partner_by_email: {
         Args: { p_email: string }
         Returns: {
