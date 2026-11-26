@@ -125,7 +125,7 @@ Epic 8's daily pushes are cut down to three: the partner's nudge, one 8 PM remin
 - design — _bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md, sections Top page rows and Subpages
 - architecture — _bmad-output/initiative-my-love/architecture-daily-question/architecture-daily-question.md, AD-4, AD-9, AD-10, AD-13, AD-16, AD-17, Consistency Conventions
 - retrospective — _bmad-output/initiative-my-love/tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md, Findings (F1, F5: R6 and R7), Action items (3), Acceptance verdict
-- ledger — _bmad-output/initiative-my-love/deferred-work.md, DW-532, DW-536, DW-539, DW-548
+- ledger — _bmad-output/initiative-my-love/deferred-work.md, DW-526, DW-532, DW-533, DW-536, DW-539, DW-548
 
 ## Notes
 
@@ -142,5 +142,7 @@ Epic 8's daily pushes are cut down to three: the partner's nudge, one 8 PM remin
 - Decision: 2026-11-26 (owner) this is a backlog story, built before epic 9 starts (epic 9's Notes record it). Epic 9 waits on epic 8's migrations and types, and this story changes both.
 - Decision: 2026-11-26 (owner) the initiative's R13, R14 and R19 are reworded to this story (`d7963f01`).
 - Covers, without a ledger entry (owner, 2026-11-26): the retrospective's F1c (the single 20:00 re-read), R3 (the sender's other device keeps a stale Nudge button) and the waiting card's copy of the nudge-send handler. All three go with the button and the slots.
+- Covers DW-526 (owner, 2026-11-26): removing the `evening_partner` reminder removes the only reminder that names the sender (`send-push/handler.ts:490`), so a re-pairing between enqueue and send can no longer name the new partner on the old pair's day. Only `evening_self` remains, and it names nobody.
+- Covers DW-533 (owner, 2026-11-26): removing the nudge slots removes `daily_nudge_slot`, the second read of the sender's stored zone in `record_daily_nudge` (`20261126020000_daily_nudge.sql:154-155`). At most one zone read may remain, to fill the sender's local date.
 - Code (kept by the owner): date reminders are `src/services/dateReminders.ts` and `reminderIdsToCancel`.
 - Risk high: it changes the hosted nudge limit, the 8 PM schedule and the post-deploy live check. Check beyond the criteria: after the deploy, the Live Daily Check passes on production, and `daily-reminders` runs on hosted still succeed.

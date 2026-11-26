@@ -4115,34 +4115,35 @@ status: done 2026-11-06
 
 ### DW-483: A refused queued pick for a day no longer on screen is shown nowhere, and refused rows are never removed from the device.
 origin: story 6.10 refactor sweep, from story 6.7's residual risks, 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts (`drainQueuedPicks`, `showQueuedPicks`); src/services/pickQueue.ts
+location: src/stores/slices/dailyDaySlice.ts:349-351 (`drainOnce` marks a refused row `failed`), :228-240 (`showQueuedPicks`); src/services/pickQueue.ts:104-124 (no delete path for a failed row); src/components/DailyQuestion/DailyQuestion.tsx:656 (only the shown day's row)
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: `drainQueuedPicks` marks a refused row `failed` and keeps it. Daily shows a failure only for the day on screen, so a pick refused for yesterday is never seen, and nothing deletes a failed row: it stays in `pick-queue` until a later pick for the same account and day replaces it, which cannot happen once that day is past. The queue survives sign-out by design, so the rows add up over time on a device that keeps meeting refusals.
+reason: `drainQueuedPicks` marks a refused row `failed` and keeps it. Daily shows a failure only for the day on screen, so a pick refused for yesterday is never seen, and nothing deletes a failed row: it stays in `pick-queue` until a later pick for the same account and day replaces it, which cannot happen once that day is past. The queue survives sign-out by design, so the rows add up over time on a device that keeps meeting refusals. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` in story 8.1's split (bf6a8a2d). Since 4583f571 the failure box shows the stored sentence alone.
 status: open
+decision: 2026-11-26 prune-silently — after a successful server answer for today, `loadDailyDay` deletes the signed-in account's `failed` pick-queue rows for other days, never another account's rows; no new copy, since the week strip and the cold banner already show that date as missed.
 
 ### DW-484: An online pick whose request fails in transit shows a send error instead of being queued, even when the server committed it.
 origin: story 6.10 refactor sweep, from the residual risks of stories 6.7 and 6.12, 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts (`submitDailyPick`, the online branch)
+location: src/stores/slices/dailyDaySlice.ts:526-534 (`submitDailyPick`, the online branch, rethrows every online failure); src/components/DailyQuestion/DailyQuestion.tsx:303-310
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: Send my pick queues only when `isOnline()` is false before the request. When the connection drops during the request, or the server commits the pick but answers after the 30 s `requestTimeout`, the action throws and Daily shows a send error; the pick is not queued. In the committed case the screen keeps offering the pick until the next read (a reload, the next open, or a partner's `daily_pick`), and a second Send returns the stored pick. Queuing on a transport failure would close both, since the RPC is idempotent.
+reason: Send my pick queues only when `isOnline()` is false before the request. When the connection drops during the request, or the server commits the pick but answers after the 30 s `requestTimeout`, the action throws and Daily shows a send error; the pick is not queued. In the committed case the screen keeps offering the pick until the next read (a reload, the next open, or a partner's `daily_pick`), and a second Send returns the stored pick. Queuing on a transport failure would close both, since the RPC is idempotent. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` (bf6a8a2d). Besides the reads named above, the app returning to the front and the 20:00:05 re-read (`useDailyDayRereads`, 54d788c9) also re-read, and the error shown is the technical transport text ("[DailyQuestionApi.submitDailyPick] Network error: …", `accountDataError.ts:106-123`). Waits for backlog story 6 (criterion 6, the nudge prompt for an answer sent from the queue): landing first would lose the after-pick nudge offer for a timed-out pick, because a drained pick raises none today. Then a bundle (pick-unknown-send-queued) queues a pick whose request fails with `AccountDataError` code `transport`, with its original `pickedAt` and zone, and starts the drain; `invalid-response` stays an error.
 status: open
 
 ### DW-485: A queued pick waits for the next `online` event or start when another tab held the queue lock and closed before its pass finished.
 origin: story 6.10 refactor sweep, from story 6.7's residual risks, 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts (`drainQueuedPicks`, the `other-tab` branch)
+location: src/stores/slices/dailyDaySlice.ts:377-385 (`drainOnce`, the `other-tab` branch waits and reloads the day), :583-590 (only `transient` and `failed` schedule a retry)
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: When another tab holds `PICK_QUEUE_LOCK`, this tab waits for the lock, re-reads the day and leaves the retry to that tab ("Its own retry covers a transient stop there"). If that tab stopped on a transient failure and then closed, its retry timer is gone, and this tab sets none, so the row is sent only on the next `online` event or app start.
+reason: When another tab holds `PICK_QUEUE_LOCK`, this tab waits for the lock, re-reads the day and leaves the retry to that tab ("Its own retry covers a transient stop there"). If that tab stopped on a transient failure and then closed, its retry timer is gone, and this tab sets none, so the row is sent only on the next `online` event or app start. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` (bf6a8a2d). Besides the next `online` event or app start, a session or `isOnline` change also re-runs the drain: `App.tsx:603-611` (deps `:631`) calls `drainQueuedPicks` on every `onAuthStateChange` notification, `TOKEN_REFRESHED` included, about hourly at the local `jwt_expiry` of 3600 (the hosted value is UNVERIFIED).
 status: open
 
 ### DW-486: A `daily_pick` broadcast that lands while the channel re-joins and re-reads the partner is dropped, so the partner's pick shows only on the next open.
 origin: story 6.10 refactor sweep, from story 6.6's review (rejected as low, kept as a residual risk), 2026-11-06
-location: src/api/moodSyncService.ts:537 (`refreshChannelIdentity`, run on a re-join of the `subscribePartnerEvents` channel)
+location: src/api/moodSyncService.ts:533-557 (`refreshChannelIdentity`, the null write at :539), fanned out before it settles at :777-794
 source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
 severity: low
-reason: On a re-join the registry nulls the partner snapshot while it re-reads `users`, and an event that arrives in that round trip is dropped after the `SUBSCRIBED` re-read has already run. Only re-joins are affected, and `new_mood` shares the window. The review declined the fix because it needs a new registry callback; the next Daily open re-reads.
+reason: On a re-join the registry nulls the partner snapshot while it re-reads `users`, and an event that arrives in that round trip is dropped after the `SUBSCRIBED` re-read has already run. Only re-joins are affected, and `new_mood` shares the window. The review declined the fix because it needs a new registry callback; the next Daily open re-reads. 2026-11-26 triage: `daily_nudge` (story 8.8, 54d788c9) shares the window with `new_mood`. Besides the next Daily open, a return to the app (`useDailyDayRereads.ts:62-65`) and the next re-join re-read. The 6.6 review's "needs a new registry callback" was an automated triage call: holding the broadcasts that arrive while the refresh runs, and dispatching them against the snapshot it wrote, needs none.
 status: open
 
 ### DW-487: A failed IndexedDB read during a Daily copy merge rewrites the copy with only the new day.
@@ -4156,10 +4157,10 @@ status: done 2026-11-25
 
 ### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
 origin: spec-deferred b8c1506b047a
-location: tests/live/daily-question-live.spec.ts:313
+location: tests/live/daily-question-live.spec.ts:458-462 (B's reload before its pick), :478-482 (A's reload after B's pick)
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: medium
-reason: Before this change nothing checked Daily on the live site; this change adds the hidden-pick and reveal checks but each page reads its state after `pageB.reload()` / `pageA.reload()` (tests/live/daily-question-live.spec.ts), so a hosted Realtime or broadcast-authorization break is not caught. tests/e2e/daily/daily-question-live-pick.spec.ts checks the no-reload update locally only. A no-reload step needs the channel-joined wait that spec uses (the `SUBSCRIBED` log), which is more than a trivial addition.
+reason: Before this change nothing checked Daily on the live site; this change adds the hidden-pick and reveal checks but each page reads its state after `pageB.reload()` / `pageA.reload()` (tests/live/daily-question-live.spec.ts), so a hosted Realtime or broadcast-authorization break is not caught. tests/e2e/daily/daily-question-live-pick.spec.ts checks the no-reload update locally only. A no-reload step needs the channel-joined wait that spec uses (the `SUBSCRIBED` log), which is more than a trivial addition. 2026-11-26 triage: the `SUBSCRIBED` log the local spec waits on is `logger.debug`, which prints only in DEV (`src/utils/logger.ts:6-8`), so it never prints on the live site; the live check needs a join signal a production build gives, such as the Realtime join reply on `mood-updates:<uid>` with the listener attached before navigation. `tests/**` does not trigger `deploy.yml` (`deploy.yml:14-15`), so the proof on production is the next deploy that is not test-only. Waits for backlog story 6, whose criterion 14 rewrites the live check's nudge step (:405-435) and removes the waiting card's Nudge button; then it is its own bundle.
 status: open
 
 ### DW-489: Through the mise shims, a local Playwright run aimed at any stack but the default one reaches the default (shared) stack anyway, so a local run of the live spec on an isolated stack signs the bots up
@@ -4182,10 +4183,10 @@ status: done 2026-11-06
 
 ### DW-491: The write sheet opens after a failed or offline read, though it is meant to wait for the server's answer.
 origin: epic 6 retrospective (Diff-scope review, R2), 2026-11-06
-location: src/components/DailyQuestion/DailyQuestion.tsx:262-269 (`readFor`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:553-556 (the mount read that sets `readFor`), :497-506 (`showWriteSheet`); src/stores/slices/dailyDaySlice.ts:145, :402-466 (`loadDailyDay`)
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: `readFor` is set after any `loadDailyDay()`, and `loadDailyDay()` never throws, so the sheet's wait, meant to keep a saved day whose turn was written on another device from opening it (comment at `:262-266`), passes offline or after a failed read too. Offline, Send is refused before any request and No thanks still works, so the cost is a sheet that should not have opened. A fix sets `readFor` only when the read answered from the server.
+reason: `readFor` is set after any `loadDailyDay()`, and `loadDailyDay()` never throws, so the sheet's wait, meant to keep a saved day whose turn was written on another device from opening it (comment at `:262-266`), passes offline or after a failed read too. Offline, Send is refused before any request and No thanks still works, so the cost is a sheet that should not have opened. A fix sets `readFor` only when the read answered from the server. 2026-11-26 triage: the comment is now at `DailyQuestion.tsx:548-552`. `readFor` also gates the nudge offer (:543) and the +1 claim (:574). Online it costs more: after a failed read, a send for a turn written on another device returns the stored question unchanged (`20261106000000_daily_question_written_questions.sql:186-191`), so the sheet closes as sent while the typed text is dropped.
 status: open
 
 ### DW-492: Daily's saved copy can show an old pairing's day for today after a relink or `reset_bot_daily_days`.
@@ -4197,12 +4198,12 @@ reason: `readSavedDailyDay` picks today's entry by date and rank across all `day
 resolution: `mergeSnapshots` in `dailyDaysCopy.ts` drops every other `day_id` for a date the server has just answered, whichever partner it was read with, so an old pairing's entry is deleted on every date the new pair also answers and stays saved, hidden, only on the other dates. Each saved entry records the partner it was read with (`partner_id`, the newest tag wins; an entry saved before the tag reads as `null`). `readSavedDailyHistory` gives only the current partner's entries. `readSavedDailyDay` gives the current partner's and, since 26514052, an untagged one too, so a day saved before the tag still shows offline until the server's next answer for its date re-tags it; an entry tagged with another partner stays hidden. The cap and `prune` went with it. Unit: `dailyDaysCopy.test.ts` (date drop, tag, filter, legacy entry, no cap), `dailyQuestionSlice.partner.test.ts` and `dailyHistorySlice.test.ts`. E2E: the relink test in `tests/e2e/partner/partner-past-questions-offline.spec.ts`, throwaway accounts only: after an admin relink A shows none of the old pairing's questions offline, and the copy still holds its three done days, dates the new pair has not answered. It fails with the partner filter removed. Corrected 2026-11-25 (epic 7 retrospective, D8): the earlier text said a legacy entry is hidden and did not say the date drop deletes an old pairing's entry.
 status: done 2026-11-07
 
-### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only on their next open.
+### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only when their Daily next reads the day (an open, a return to the app or a later re-read).
 origin: epic 6 retrospective (Diff-scope review, R4), 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts:289-294 (`drainQueuedPicks`, the confirmed branch)
+location: src/stores/slices/dailyDaySlice.ts:356-361 (`drainOnce`, the confirmed branch), :541-547 (`submitDailyPick`'s online path, the same skip)
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: After a queued pick is confirmed and removed, `if (!isCurrent()) return 'stale'` runs before `announceDailyPick`, though the comment above says the pick is committed "whatever the session did meanwhile". A same-account re-login during the send bumps `authSessionVersion` and skips the broadcast. A fix announces before the session check, since the announcement carries only the `day_id`.
+reason: After a queued pick is confirmed and removed, `if (!isCurrent()) return 'stale'` runs before `announceDailyPick`, though the comment above says the pick is committed "whatever the session did meanwhile". A same-account re-login during the send bumps `authSessionVersion` and skips the broadcast. A fix announces before the session check, since the announcement carries only the `day_id`. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` (bf6a8a2d), and the online path at :541-547 skips the same way. Announcing before every check is wrong: after an account switch it would send the old pair's `day_id` to the new account's partner, because `announceDailyPick` resolves the partner from the current session (`dailyQuestionApi.ts:266-270`). The fix announces while the same account is signed in (`get().userId === requestedBy`).
 status: open
 
 ### DW-494: "{partner} gets it tomorrow" on the write sheet is false when partners are on different clocks and one is already past midnight.
@@ -4214,20 +4215,20 @@ reason: A written question goes to the first date after the source day with no `
 resolution: The owner chose to name the real day the partner gets the question. Migration `20261107000000_daily_question_write_target_day.sql` replaces `daily_day_snapshot` (same signature, settings and grants, so `database.types.ts` is unchanged) and adds `write.target_day`, the date the day's written question is asked, or would be if written now: the `couple_days` row that asks it once asked; otherwise a walk over the pair's free dates after the day that takes, on each date, the question `assign_couple_day` would ask (the earliest waiting written question by `target_day`, then source day, then id), starting from the stored `target_day` or, with none, the target `record_written_question` would store. So a partner ahead who already opened tomorrow, and a second question waiting on the same target, both move the named day on. `record_written_question` and its stored `target_day` are unchanged; the snapshot copies both functions' rules, so the three must change together. `DailyDaySnapshotSchema` reads `target_day` as optional, so a snapshot saved in `daily-days` before the server sent it parses and reads as tomorrow. `WriteQuestionSheet` keeps today's wording while the date is the shown day + 1 (or missing) and otherwise names its weekday, parsed with `parseEventDate`: "Saturday", "Write Saturday's question?", "{partner} gets it on Saturday. You'll answer it too.", "Send for Saturday". pgTAP WRITE-064 to WRITE-072 (`42_daily_question_written_questions.sql`) pin the day + 1 and the next free date with nothing else waiting, the asked day, and two questions on one target (the second source day's sheet names the date after the target, before and after its write and once asked); DAILY-039 pins `write`'s keys. The refusal sentences (`DQ004` to `DQ006`) and the offline sentence still say "tomorrow's question". DW-498 records that the named day is read once, when the snapshot is.
 status: done 2026-11-06
 
-### DW-495: Opening Daily reads the day up to four times, and each read takes the pair's advisory lock and writes `user_time_zones`.
+### DW-495: Opening Daily reads the day up to four times, and each linked read takes the pair's advisory lock and every read writes `user_time_zones`.
 origin: epic 6 retrospective (Diff-scope review, R6), 2026-11-06
-location: src/components/DailyQuestion/DailyQuestion.tsx:267-269 (mount read); src/hooks/useDailyPickListener.ts:46-48 (`SUBSCRIBED` re-read); src/stores/slices/dailyQuestionSlice.ts (`loadDailyDay`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:553-556 (mount read); src/hooks/useDailyPickListener.ts:79-83 (`SUBSCRIBED` re-read), :74-78 (`partner_linked` re-read); src/hooks/useDailyDayRereads.ts:54-65; src/stores/slices/dailyDaySlice.ts:402-466 (`loadDailyDay`; its refresher at :225)
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: Observed on the live site on 2026-11-07: one sign-in, then `/mood` to `/daily`, made 4 `get_daily_day` calls. 6.6's Design Notes accept two reads per open and 6.12 rejected a request-token guard twice as "overlapping loads"; filed so the cost is visible. Each call takes the pair's advisory lock and writes the caller's `user_time_zones` row.
+reason: Observed on the live site on 2026-11-07: one sign-in, then `/mood` to `/daily`, made 4 `get_daily_day` calls. 6.6's Design Notes accept two reads per open and 6.12 rejected a request-token guard twice as "overlapping loads"; filed so the cost is visible. Each call takes the pair's advisory lock and writes the caller's `user_time_zones` row. 2026-11-26 triage: `loadDailyDay` has no in-flight guard and is called from 10 sites. Only a linked read takes the lock (`assign_couple_day`, `20261106000000_daily_question_written_questions.sql:264`), while every read upserts `user_time_zones` (`20261105210000_daily_question_own_clocks.sql:269-275`). The rejections were automated triage calls, not owner decisions: 6.6's review rejected coalescing (it adds slice state), and 6.12's review rejected a request-token guard for the early-cleared loading flag. The fix keeps one read in flight plus one trailing pass, never a join-only coalesce.
 status: open
 
 ### DW-496: The day-changed notice can stay above a day that needs no pick.
 origin: epic 6 retrospective (Diff-scope review, R8), 2026-11-06
-location: src/components/DailyQuestion/DailyQuestion.tsx:236-240, :293 (`clearDayChanged` passed as `onSendStart`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:443-449 (the notice state and `clearDayChanged`), :297 (`onSendStart` in DayCard's send), :658 (`onSendStart={clearDayChanged}`)
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: The notice is cleared only by the next Send (`onSendStart={clearDayChanged}`). When the re-read day is already picked, no Send is rendered, so the notice stays until Daily is reopened.
+reason: The notice is cleared only by the next Send (`onSendStart={clearDayChanged}`). When the re-read day is already picked, no Send is rendered, so the notice stays until Daily is reopened. 2026-11-26 triage: no Send renders while a queued pick is pending either (:319, :336-349), so the notice stays then too.
 status: open
 
 ### DW-497: The hosted database has never been compared with the migrations as a whole, so objects no migration created can still be there.
@@ -4235,56 +4236,61 @@ origin: owner request during loop run 20261105-224246-5db5 (story 6.11's live ch
 location: the hosted Supabase project; supabase/migrations/
 source_spec: none
 severity: low
-reason: AGENTS.md records that the hosted database carries objects no migration created (tables and a function removed at e5f1ab6d, two photos policies at 8f9d35d4), and each was found only when a migration touched that table. Nothing compares the whole hosted schema with what the migrations build, so a leftover policy, grant or function elsewhere is found only by chance. A one-off, read-only comparison (`supabase db diff --linked`, or the hosted catalog read table by table) would list every difference; each leftover is then dropped by a migration with `drop … if exists` after the owner approves it. The post-deploy live check (story 6.11) covers Daily's gate only, not drift elsewhere.
+reason: AGENTS.md records that the hosted database carries objects no migration created (tables and a function removed at e5f1ab6d, two photos policies at 8f9d35d4), and each was found only when a migration touched that table. Nothing compares the whole hosted schema with what the migrations build, so a leftover policy, grant or function elsewhere is found only by chance. A one-off, read-only comparison (`supabase db diff --linked`, or the hosted catalog read table by table) would list every difference; each leftover is then dropped by a migration with `drop … if exists` after the owner approves it. The post-deploy live check (story 6.11) covers Daily's gate only, not drift elsewhere. 2026-11-26 triage: `supabase db diff --linked` is not a read-only comparison: the pinned CLI 2.122.0's help says it may need `database_write`, and it builds a shadow database in local Docker (what it writes is UNVERIFIED). Read the hosted catalog with `supabase db query --linked` instead, under an access token scoped to `database_read` only, table by table, and run the same queries on the local stack.
 status: open
+decision: 2026-11-26 one-sitting — one sitting outside the loop, never while a loop run uses the shared local stack: read the hosted catalog read-only (tables, policies, grants and functions in `public` and `storage`), compare it with the local stack, the owner approves one list, and one migration drops each hosted-only object with `drop … if exists` (or adds what the live app needs); local tests pass, `deploy.yml` applies it, and this entry closes.
 
 ### DW-498: The write sheet keeps the day it named when the date the question is asked moves while the sheet is open.
 origin: review of the DW-494 fix (fix/daily-pick-refusals-and-write-day), 2026-11-06
-location: supabase/migrations/20261107000000_daily_question_write_target_day.sql (`daily_day_snapshot`, `write.target_day`); src/components/DailyQuestion/WriteQuestionSheet.tsx
+location: supabase/migrations/20261107000000_daily_question_write_target_day.sql (`daily_day_snapshot`, `write.target_day`); supabase/migrations/20261126020000_daily_nudge.sql:225, :318-397 (the current `daily_day_snapshot`, its walk copied unchanged); src/components/DailyQuestion/WriteQuestionSheet.tsx:82; src/components/DailyQuestion/DailyQuestion.tsx:740
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: `write.target_day` is computed when the snapshot is read. When the partner whose clock is ahead opens the next date, or another written question takes that date, while the writer's sheet is open, the date the question is asked moves on but the sheet keeps the day it named until the snapshot is read again; the question is then asked a day later than the sheet said. The snapshot the send returns carries the new date, but the sheet closes on that send.
+reason: `write.target_day` is computed when the snapshot is read. When the partner whose clock is ahead opens the next date, or another written question takes that date, while the writer's sheet is open, the date the question is asked moves on but the sheet keeps the day it named until the snapshot is read again; the question is then asked a day later than the sheet said. The snapshot the send returns carries the new date, but the sheet closes on that send. 2026-11-26 triage: the reminder schedule moves the date too: on each 08:00 and 20:00 tick `enqueue_daily_reminders` calls `assign_couple_day` for the partner's local date (`20261126000000_daily_reminders_schedule.sql:104`, no branch by slot). Backlog story 6 removes the 08:00 one; the 20:00 one stays, though it needs partners about 20 hours apart. This is the epic 8 retrospective's dropped Adversarial 6.
 status: open
+decision: 2026-11-26 line-after-send — after Send, when the answer's `write.target_day` differs from the date the sheet named, Daily shows one line naming the real day ("{partner} gets it on Sunday."); no migration and no extra request. Built after backlog story 6, beside the nudge prompt that follows the sheet (criterion 5).
 
 ### DW-499: The live Daily check once stalled on the writer's reload: the page sent no day read and missed the partner's pick broadcast.
 origin: deploy run 42340556736 (merge of PR #486), Live Daily Check, attempt 1, 2026-11-06; attempt 2 passed unchanged
-location: tests/live/daily-question-live.spec.ts (the writer's `openDaily(pageA, () => pageA.reload())` after B's pick); src/components/DailyQuestion/DailyQuestion.tsx; src/stores/slices/dailyQuestionSlice.ts
+location: tests/live/daily-question-live.spec.ts:478 (the writer's `openDaily(pageA, () => pageA.reload())` after B's pick); src/components/DailyQuestion/DailyQuestion.tsx; src/stores/slices/dailyDaySlice.ts
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: low
-reason: After both bots picked (both `submit_daily_pick` calls 200), Claude Bot's page, the day's writer with the write sheet open, was reloaded and never sent `get_daily_day` in the 180 s test timeout; its failure screenshot still shows the waiting state under the sheet. The hosted edge logs also show no `daily_pick` broadcast to Claude Bot's channel after Claude Partner's pick, where the passing run at 04:23 UTC the same day sent one. Every server answer was 200, and Claude Partner's page showed the reveal. The page videos were cut short, so where the writer's page stopped is unknown. Reproduce with the live spec run repeatedly against the hosted site before changing code.
-status: open
+reason: After both bots picked (both `submit_daily_pick` calls 200), Claude Bot's page, the day's writer with the write sheet open, was reloaded and never sent `get_daily_day` in the 180 s test timeout; its failure screenshot still shows the waiting state under the sheet. The hosted edge logs also show no `daily_pick` broadcast to Claude Bot's channel after Claude Partner's pick, where the passing run at 04:23 UTC the same day sent one. Every server answer was 200, and Claude Partner's page showed the reveal. The page videos were cut short, so where the writer's page stopped is unknown. Reproduce with the live spec run repeatedly against the hosted site before changing code. 2026-11-26 triage: the run was 2026-11-07T04:56Z. The 180 s timeout means a matched request never answered, as the observer had no bound on the response (`observe-network-call.js:8-9`); 535fc097 replaced that observer with one that accepts only the loaded page's own read (`tests/live/daily-question-live.spec.ts:241-269`). In the 15 deploy runs since, 14 passed on attempt 1 and 1 failed with "No response" (45686746193), which 535fc097 fixed.
+status: done 2026-11-26
+resolution: not reproduced in 15 later deploy runs; the observer that could hang on the left page's read was replaced by 535fc097, and the missing broadcast is what DW-488's no-reload step will check. Reopen with a seen-again line if the Live Daily Check stalls again.
+decision: 2026-11-26 close — the owner closed it as not reproduced.
 
 ### DW-500: A linked Partner page shows only the partner's name, with no card, loading block or error, when the slice holds an `unlinked` streak answer (or null with nothing loading) while a partner is shown.
 origin: spec-deferred df427a169e35
-location: src/components/PartnerView/PartnerView.tsx
+location: src/components/PartnerView/PartnerView.tsx:153-173 (the streak ternary ends in `: null` at :173)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: PartnerView.tsx falls through to null when `coupleStreak` is not `ok`, not loading and has no error. Reachable only when the server says unlinked while a saved or stale partner is still shown (a server-side unlink with no client action, or the partner read failing after one); there is no unlink feature. Rare; the fix adds a branch. Reported by blind-hunter, edge-case-hunter, verification-gap and intent-alignment.
+reason: PartnerView.tsx falls through to null when `coupleStreak` is not `ok`, not loading and has no error. Reachable only when the server says unlinked while a saved or stale partner is still shown (a server-side unlink with no client action, or the partner read failing after one); there is no unlink feature. Rare; the fix adds a branch. Reported by blind-hunter, edge-case-hunter, verification-gap and intent-alignment. 2026-11-26 triage: the location gained its lines; the code is unchanged since b154eb31.
 status: open
 
 ### DW-501: The Connect screen's typed email, shown search answer and error line are lost whenever `loadPartner` runs while the account is unlinked.
 origin: spec-deferred 22a75e44ce54
-location: src/components/PartnerView/PartnerView.tsx
+location: src/stores/slices/partnerSlice.ts:165 (`loadPartner` raises `isLoadingPartner` whenever `partner` is null); src/components/PartnerView/PartnerView.tsx:129-143; src/components/PartnerView/PartnerConnect.tsx:37-40
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: That state now lives in PartnerConnect, which unmounts while `isLoadingPartner` is true, and partnerSlice.loadPartner raises the flag on every call when `partner` is null (partnerSlice.ts:165). In PartnerMoodView the state sat in the parent and survived. It needs a partner reload during typing (a reconnect refresh, or Retry). Rare; the fix keeps PartnerConnect mounted but hidden across loads, which adds branches.
+reason: That state now lives in PartnerConnect, which unmounts while `isLoadingPartner` is true, and partnerSlice.loadPartner raises the flag on every call when `partner` is null (partnerSlice.ts:165). In PartnerMoodView the state sat in the parent and survived. It needs a partner reload during typing (a reconnect refresh, or Retry). Rare; the fix keeps PartnerConnect mounted but hidden across loads, which adds branches. 2026-11-26 triage: fix the cause in the slice instead: `loadPartner` raises `isLoadingPartner` only while nothing has answered (`partner` null and `!partnerKnown`), as its own comment says, and PartnerView's `sawLoading` latch also counts `partnerKnown` so the `/partner/history` redirect still fires. Keeping PartnerConnect mounted but hidden, or lifting its state, would keep the flash, and lifting it would need a `signedOutState` entry for a typed third-party address.
 status: open
 
 ### DW-502: The streak error card offers no Retry, so an online transient failure with nothing shown stays until Realtime re-joins or the page is reopened.
 origin: spec-deferred 22cfebd7aa4f
-location: src/components/PartnerView/PartnerView.tsx
+location: src/components/PartnerView/PartnerView.tsx:166-172 (`partner-streak-error`, text only)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: PartnerView.tsx renders `partner-streak-error` with no action; only SUBSCRIBED, partner_linked, daily_pick, a partner change or a reconnect re-read. Rare (a failed online read with no streak yet); the fix adds a control. Story 3 owns the streak's failure and offline wording.
+reason: PartnerView.tsx renders `partner-streak-error` with no action; only SUBSCRIBED, partner_linked, daily_pick, a partner change or a reconnect re-read. Rare (a failed online read with no streak yet); the fix adds a control. Story 3 owns the streak's failure and offline wording. 2026-11-26 triage: the fix reuses the existing online-only "Retry" button (`SECONDARY_BUTTON`, as `PastQuestionsPage.tsx:233-245` and `DailyQuestion.tsx:700-712` do), disabled while `coupleStreakLoading`; no new copy.
 status: open
 
-### DW-503: The interactions local-copy refresher still reads interactions on every signed-in start although no routed screen shows them, and the deleted interaction E2E specs leave that code without browser
+### DW-503: The interactions local-copy refresher still reads interactions on every signed-in start although no routed screen shows them, and the deleted interaction E2E specs leave that code without browser coverage until epic 10 deletes it.
 origin: spec-deferred c9adea711391
 location: src/stores/slices/interactionsSlice.ts:235
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: interactionsSlice.ts:235 `registerLocalCopy(INTERACTIONS_COPY_KIND, ...)` still runs; tests/e2e/partner/interaction-record-ownership.spec.ts and tests/e2e/offline/interactions-offline-copy.spec.ts were deleted with the Poke/Kiss/Fart tiles (the API-level tests/api/interaction-record-ownership.spec.ts stays). The intent keeps the code for epic 10, so removing the refresher is out of this story.
+reason: interactionsSlice.ts:235 `registerLocalCopy(INTERACTIONS_COPY_KIND, ...)` still runs; tests/e2e/partner/interaction-record-ownership.spec.ts and tests/e2e/offline/interactions-offline-copy.spec.ts were deleted with the Poke/Kiss/Fart tiles (the API-level tests/api/interaction-record-ownership.spec.ts stays). The intent keeps the code for epic 10, so removing the refresher is out of this story. 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is restored. The removal is carried only by epic 10's Description ("each device's mood and interaction copies") and Done when ("A device upgraded from the old build keeps no mood or interaction copy"), which name no DW id; the epic 10 story that deletes the refresher names DW-503 in its verify and declares it in its plan's `closes_deferred`. Not loop work before then: story 7.2 left the interaction code to epic 10.
 status: open
+decision: 2026-11-26 epic-10 — the PO adds DW-503 to epic 10's Notes; it closes with the epic 10 story that deletes the interactions refresher.
 
 ### DW-504: After a relink to a new partner within one session, the previous couple's streak can show under the new partner's name until the new read lands, or for good if it fails.
 origin: spec-deferred 6244cfdb5f44
@@ -4295,29 +4301,33 @@ reason: The slice answer is not keyed by partner; PartnerView shows any `ok` ans
 resolution: `dailyQuestionSlice` clears the streak, its error and loading flag (and the history) when the shown partner changes from one non-null id to another in a session (`clearPairData`, from `api.subscribe`; a first link and a reload of the same partner clear nothing, and an identity change forgets the last id), and bumps `streakSeq` so a read in flight for the old pair writes nothing, to the field or the copy. The `daily-streak` copy now records the partner it was read with (`partner_id`, as `daily-days` does): `saveStreakAnswer(userId, answer, partnerId)` tags it and `readSavedStreak(userId, partnerId)` shows it only for the current partner, an untagged copy reading as partner `null`, so a failed read for the new partner no longer falls back to the old pair's streak. Unit: `coupleStreakSlice.test.ts` (relink, in-flight and failed reads, tag, untagged copy, first link, identity change), `dailyStreakCopy.test.ts`. E2E: `partner-past-questions-offline.spec.ts`, a throwaway A relinked from B to C shows C's name and no A-B streak card or question after a reload with the reads aborted.
 status: done 2026-11-07
 
-### DW-505: When `subscribePartnerEvents` rejects, usePartnerStreakListener logs and holds nothing, with no retry, so the Partner page gets no live re-reads until it is reopened.
+### DW-505: When `subscribePartnerEvents` rejects, usePartnerStreakListener logs and holds nothing, with no retry, so the Partner page gets no live re-reads until it is reopened, the device reconnects or the session changes.
 origin: spec-deferred 7a52e464bc0a
-location: src/hooks/usePartnerStreakListener.ts
+location: src/hooks/usePartnerStreakListener.ts:76-78; the same `.catch` at src/hooks/useDailyPickListener.ts:92-94, src/hooks/usePartnerLinkListener.ts:110-112 and src/hooks/useDatesChangedListener.ts:89-91
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: usePartnerStreakListener.ts `.catch` only logs, the same pattern as useDailyPickListener. A registry failure is rare; the page still reads on open, on a partner change and on reconnect. The fix adds retry logic.
+reason: usePartnerStreakListener.ts `.catch` only logs, the same pattern as useDailyPickListener. A registry failure is rare; the page still reads on open, on a partner change and on reconnect. The fix adds retry logic. 2026-11-26 triage: all four routed listeners have the same `.catch`; the realistic rejection is `supabase.realtime.setAuth()` (`moodSyncService.ts:907`). One shared fix retries on a bounded backoff, copying the registry's `RETRY_CONFIG` and `armMoodReopen` (`moodSyncService.ts:135-139`, `:731-761`), and stops on unmount, a session change or going offline; `usePartnerMood` and `PartnerMoodView` are left to epic 10.
 status: open
 
 ### DW-506: The week strip's "Today" sits on the server's date for the viewer's stored zone, which can be a day off from the device while travelling until a Daily fetch records the new zone.
 origin: spec-deferred 0339fde9918d
-location: src/components/PartnerView/StreakCard.tsx
+location: src/components/shared/StreakWeek.tsx:73,97; supabase/migrations/20261107010000_couple_streak.sql:108-114
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: get_couple_streak dates the viewer by user_time_zones (story 7.1's recorded residual risk); StreakCard labels the last week entry Today, as the server answers it. Pre-existing server behaviour, and the epic bars the client from working out a day's state.
-status: open
+reason: get_couple_streak dates the viewer by user_time_zones (story 7.1's recorded residual risk); StreakCard labels the last week entry Today, as the server answers it. Pre-existing server behaviour, and the epic bars the client from working out a day's state. 2026-11-26 triage: the label is in `StreakWeek.tsx:97`, shared by the Partner page and Daily. The daily-days refresher (`dailyDaySlice.ts:225`) records the zone on every start and reconnect, but in parallel with the streak read (`localCopy.ts:198-202`).
+status: done 2026-11-26
+resolution: accepted by design: the newest-reported zone wins (AD-3, AD-7), and travel corrects itself on the next Daily read.
+decision: 2026-11-26 accept-by-design — the owner closed it together with DW-540: the viewer's stored zone is the newest one reported.
 
 ### DW-507: The offline-pick E2E cannot tell the drain's own streak re-read from the refresher's or the Realtime re-join's.
 origin: spec-deferred 484f89571f2f
 location: tests/e2e/daily/daily-streak.spec.ts (the "after a pick queued offline" test)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
 severity: low
-reason: On reconnect App.tsx:562-566 runs drainQueuedPicks() and refreshLocalCopies() together, and the daily-streak refresher (dailyQuestionSlice.ts registerLocalCopy) sends get_couple_streak without waiting for the pick; useDailyPickListener's SUBSCRIBED on re-join reads it again. So `rereadStreak` in the test may be the refresher's read, and the final orange-at-2 assertion would still pass if the `void get().loadCoupleStreak()` in drainOnce were removed. The drain's call is proven only by the unit test "a pick queued offline and drained later re-reads the streak only after the drain" (tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts). Isolating it in E2E needs the refresher and the Realtime re-join suppressed, more than a direct correction; the surface outcome (the chip updates after reconnect without a reload) is shown.
-status: open
+reason: On reconnect App.tsx:562-566 runs drainQueuedPicks() and refreshLocalCopies() together, and the daily-streak refresher (dailyQuestionSlice.ts registerLocalCopy) sends get_couple_streak without waiting for the pick; useDailyPickListener's SUBSCRIBED on re-join reads it again. So `rereadStreak` in the test may be the refresher's read, and the final orange-at-2 assertion would still pass if the `void get().loadCoupleStreak()` in drainOnce were removed. The drain's call is proven only by the unit test "a pick queued offline and drained later re-reads the streak only after the drain" (tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts). Isolating it in E2E needs the refresher and the Realtime re-join suppressed, more than a direct correction; the surface outcome (the chip updates after reconnect without a reload) is shown. 2026-11-26 triage: the reconnect readers are now `App.tsx:575` (`drainQueuedPicks`) and `:578` (`refreshLocalCopies`) in `handleOnline` (:560-579), the daily-streak refresher at `dailyStreakSlice.ts:99`, the drain's re-read at `dailyDaySlice.ts:363` and the re-join read at `useDailyPickListener.ts:79-83`.
+status: done 2026-11-26
+resolution: accepted: the drain's streak re-read and its order are pinned by tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts:382-393, which fails if the call is removed; isolating it in E2E would hard-code reader counts that DW-495 and DW-518 change.
+decision: 2026-11-26 close — accepted as covered by the unit test.
 
 ### DW-508: The waiting sentence reads "when Your partner answers too." with a capital Y mid-sentence when the partner's name is missing.
 origin: spec-deferred 254a73a92d5c
@@ -4360,15 +4370,17 @@ origin: spec-deferred refactor-sweep-7-10
 location: tests/e2e/daily/daily-question-partner-linked.spec.ts:95-101 (the `recurseUntil` that expects `inFlight` 0 before B accepts)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: In story 7.10's full chromium run (302 passed, this 1 failed) the check read `inFlight` 1 at its 15 s `POLL` timeout; the same spec then passed three runs in a row alone, and in the implementing agent's earlier full run. The account is a throwaway that stays unlinked until B accepts, and 7.10 changes nothing on that path (no partner change, no `get_daily_day` call). One `get_daily_day` read took more than 15 s under the suite's parallel load; DW-495 (each Daily read takes the pair's advisory lock and writes `user_time_zones`) is a likely cause, UNVERIFIED. The reruns replaced `test-results/`, so the failed run's trace is gone. A second full chromium run after the review patches passed all 303, this spec included. Reproduce by repeating the full chromium run, then read the slow request's server timing before changing the wait.
-status: open
+reason: In story 7.10's full chromium run (302 passed, this 1 failed) the check read `inFlight` 1 at its 15 s `POLL` timeout; the same spec then passed three runs in a row alone, and in the implementing agent's earlier full run. The account is a throwaway that stays unlinked until B accepts, and 7.10 changes nothing on that path (no partner change, no `get_daily_day` call). One `get_daily_day` read took more than 15 s under the suite's parallel load; DW-495 (each Daily read takes the pair's advisory lock and writes `user_time_zones`) is a likely cause, UNVERIFIED. The reruns replaced `test-results/`, so the failed run's trace is gone. A second full chromium run after the review patches passed all 303, this spec included. Reproduce by repeating the full chromium run, then read the slow request's server timing before changing the wait. 2026-11-26 triage: the named cause is ruled out: A is unlinked, so `get_daily_day` returns before `assign_couple_day` and takes no lock (`20261105210000_daily_question_own_clocks.sql:277-279`).
+status: done 2026-11-26
+resolution: not reproduced: 0 failures in 27 attempts of the spec across the 17 main-push and scheduled Tests runs since 2026-11-07 that ran it, three weekly burn-ins included. Reopen with a seen-again line carrying the slow request's timing from the CI trace.
+decision: 2026-11-26 close — not reproduced.
 
 ### DW-513: After a server-side relink to a different partner, the +1 and milestone stay silent and Daily keeps the old pair's day.
 origin: epic 7 retrospective (D1 and D2), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/services/dailyCelebrated.ts:55-79 (`claimCelebration`); src/stores/slices/dailyQuestionSlice.ts:401-422 (`clearPairData`)
+location: src/services/dailyCelebrated.ts:70-101 (`claimCelebration`); src/stores/slices/dailyDaySlice.ts:295-319 (the pair-change subscriber; its resets at dailyStreakSlice.ts:156-163 and dailyHistorySlice.ts:223)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: The `daily-celebrated` copy holds one `{ held, milestones }` per account and no partner, and `clearPairData` does not touch it, so a new pair's held total, which starts at 0, plays no +1 and shows no milestone until it passes the old pair's. `clearPairData` also keeps `dailyDay`, and Daily's read effect does not re-run on a partner change, so Daily shows the old pair's question and picks under the new partner's name until a remount, a re-join or a `partner_linked` broadcast re-reads the day. The app has no unlink, so this needs a server-side change of `users.partner_id`. No test covers a relink for the celebration. A fix tags the celebration with its partner (or deletes the kind in `clearPairData`) and re-reads the day there.
+reason: The `daily-celebrated` copy holds one `{ held, milestones }` per account and no partner, and `clearPairData` does not touch it, so a new pair's held total, which starts at 0, plays no +1 and shows no milestone until it passes the old pair's. `clearPairData` also keeps `dailyDay`, and Daily's read effect does not re-run on a partner change, so Daily shows the old pair's question and picks under the new partner's name until a remount, a re-join or a `partner_linked` broadcast re-reads the day. The app has no unlink, so this needs a server-side change of `users.partner_id`. No test covers a relink for the celebration. A fix tags the celebration with its partner (or deletes the kind in `clearPairData`) and re-reads the day there. 2026-11-26 triage: story 8.1's split (bf6a8a2d) replaced `clearPairData` with the `dailyDaySlice` pair-change subscriber; read each `clearPairData` above as that subscriber. Tag the celebration with its partner rather than deleting the kind there: the subscriber forgets its last partner on each identity change, so a delete misses a relink made while the app was closed. An untagged value counts as the current pair's and is tagged on its next write, as 26514052 did for days; afterwards AGENTS.md's `daily-celebrated` description needs its one-line edit.
 status: open
 
 ### DW-514: See all shows only its title when there is no past question, and offers no Retry when its first read fails online.
@@ -4378,70 +4390,76 @@ source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-
 severity: low
 reason: With `dailyHistory` `[]`, nothing loading and no error, `/partner/history` (reached by a reload or a direct URL) shows the title and "Same pick on 0 of your 0 days" and nothing else. D4, a failed load-more that was never retried, is fixed (a47a4c19, de3f3fb3, 1e85a54f, d16660d8), but its Retry needs rows (`days.length > 0`), so a failed first read with no rows shows the error box alone until a reconnect, a partner change, a live event or reopening the page reads again.
 status: open
+decision: 2026-11-26 empty-state — See all with no past question shows "No past questions yet" (the app's "No … yet" pattern, as `PhotoGallery.tsx:216`), and a failed first read with no rows gets the existing online-only Retry.
 
 ### DW-515: The cold banner says "Yesterday was missed" when the missed day can be the day before yesterday.
 origin: epic 7 retrospective (D6), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:138-140 (`ColdBanner`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:168-183 (`ColdBanner`; the words at :169-170)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: The words come from `missed === 1` alone, and `missed` counts closed dates; a date closes only after both partners' midnights (AD-3). For the partner whose midnight comes first, yesterday stays open until the other's midnight, so in those hours the one missed date is the day before. It needs partners in different time zones. The copy is the owner's: name the date from `week`, or use a count such as "1 day was missed".
+reason: The words come from `missed === 1` alone, and `missed` counts closed dates; a date closes only after both partners' midnights (AD-3). For the partner whose midnight comes first, yesterday stays open until the other's midnight, so in those hours the one missed date is the day before. It needs partners in different time zones. The copy is the owner's: name the date from `week`, or use a count such as "1 day was missed". 2026-11-26 triage: "The last {n} days were missed" has the same skew while yesterday is still open.
 status: open
+decision: 2026-11-26 name-the-day — the banner keeps "Yesterday was missed" only when the newest missed date in `week` is yesterday, and otherwise names that date's weekday ("Tuesday was missed, so it's frozen at 2."), read with `parseEventDate`; for more than one missed date it keeps "The last {n} days were missed" when yesterday is among them, and otherwise says "{n} days were missed".
 
 ### DW-516: A failed partner lookup saves a day, a history page or the streak with no partner tag.
 origin: epic 7 retrospective (D7), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/stores/slices/dailyQuestionSlice.ts:355-366 (`mergePartnerId`); src/services/dailyDaysCopy.ts:166 (`mergeSnapshots`)
+location: src/stores/dailyPartnerIds.ts:26-40 (`mergePartnerId`); src/services/dailyDaysCopy.ts:173-192 (`mergeSnapshots`, the tag at :188); src/services/dailyStreakCopy.ts:48-61 (`saveStreakAnswer`)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: `mergePartnerId` answers `null` for unlinked, for an error answer and for a throw, and the merge always writes the new tag, over a good one too; AGENTS.md's Known pitfalls name this null-for-two-states pattern. Reachable only when neither the store nor the saved `partner` copy has a partner (a first sign-in on a device), and only until the next good merge. Since 26514052 an untagged day still shows on Daily; untagged past questions and an untagged streak are hidden offline. A fix keeps a non-null stored tag when the lookup failed, or returns a status.
+reason: `mergePartnerId` answers `null` for unlinked, for an error answer and for a throw, and the merge always writes the new tag, over a good one too; AGENTS.md's Known pitfalls name this null-for-two-states pattern. Reachable only when neither the store nor the saved `partner` copy has a partner (a first sign-in on a device), and only until the next good merge. Since 26514052 an untagged day still shows on Daily; untagged past questions and an untagged streak are hidden offline. A fix keeps a non-null stored tag when the lookup failed, or returns a status. 2026-11-26 triage: `mergePartnerId` moved to `src/stores/dailyPartnerIds.ts` (bf6a8a2d). It is also reached when the saved partner copy's read fails (`readSavedPartner`, `partnerSlice.ts:73-80`, reads through `readLocalCopy`). The fix returns a status, as `lookupPartnerId()` does: on an unknown partner the day merge keeps each stored entry's `partner_id` and the streak copy keeps its stored tag.
 status: open
 
 ### DW-517: The partner tag is asserted with a known partner on two of Daily's merge callers, and Daily's component fixtures use a partner state the app never reaches.
 origin: epic 7 retrospective (D9 and D10), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts:290,320; dailyQuestionSlice.writeQuestion.test.ts:100,202; dailyQuestionSlice.test.ts:291,479; src/components/DailyQuestion/__tests__/DailyQuestion.test.tsx:62-66; WriteQuestionSheet.test.tsx:81
+location: tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts:290,320; dailyQuestionSlice.writeQuestion.test.ts:100,202; dailyQuestionSlice.test.ts:291,479; dailyQuestionSlice.nudge.test.ts:88,193; src/components/DailyQuestion/__tests__/DailyQuestion.test.tsx:62-66; WriteQuestionSheet.test.tsx:81-83; DailyQuestion.celebration.test.tsx:108-110,204
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: `dailyQuestionSlice.partner.test.ts` checks `loadDailyDay`'s tag with a known partner and `dailyHistorySlice.test.ts` the history pages'; `drainQueuedPicks`, `refreshDailyDay`, `submitDailyPick` and `submitWrittenQuestion` are asserted only with no partner known, where `partner_id: null` is right. A call site that passed `null` would drop the day from offline past questions and no test would fail. Separately, `setPartner` and the write-sheet tests set `partner` without `partnerKnown`, though `partnerSlice.loadPartner` sets both together, so the saved-day reads in those tests run with no known partner.
+reason: `dailyQuestionSlice.partner.test.ts` checks `loadDailyDay`'s tag with a known partner and `dailyHistorySlice.test.ts` the history pages'; `drainQueuedPicks`, `refreshDailyDay`, `submitDailyPick` and `submitWrittenQuestion` are asserted only with no partner known, where `partner_id: null` is right. A call site that passed `null` would drop the day from offline past questions and no test would fail. Separately, `setPartner` and the write-sheet tests set `partner` without `partnerKnown`, though `partnerSlice.loadPartner` sets both together, so the saved-day reads in those tests run with no known partner. 2026-11-26 triage: `sendDailyNudge` (story 8.8, 54d788c9) joins the callers asserted only with no partner known (`dailyQuestionSlice.nudge.test.ts:88,193`), and `DailyQuestion.celebration.test.tsx` sets `partner` without `partnerKnown` too. `DailyQuestion.nudge.test.tsx` and `DailyQuestion.afterPick.test.tsx` are left to backlog story 6, which rewrites them.
 status: open
 
 ### DW-518: `get_couple_streak` is read from many places at once, and each read walks the pair's whole history.
 origin: epic 7 retrospective (D11), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:406; src/components/PartnerView/PartnerView.tsx:81-87; src/hooks/useDailyPickListener.ts:57-67; src/hooks/usePartnerStreakListener.ts:54-65; src/stores/slices/dailyQuestionSlice.ts:297,421,490,865
+location: src/components/DailyQuestion/DailyQuestion.tsx:555; src/components/PartnerView/PartnerView.tsx:81-87; src/hooks/useDailyPickListener.ts:64-83; src/hooks/usePartnerStreakListener.ts:52-66; src/stores/slices/dailyDaySlice.ts:363,549; src/stores/slices/dailyStreakSlice.ts:99 (refresher), :162 (the pair-change re-read)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: Daily's mount, `SUBSCRIBED`, `daily_pick` and `partner_linked` in both listeners, each confirmed pick or drained row, the `daily-streak` refresher (each signed-in start and each reconnect) and `PartnerView`'s partner and `isOnline` effect each send one, and the function runs a `generate_series` over every date since the pair's first day. Performance only; DW-495 is the same over-read for `get_daily_day`.
+reason: Daily's mount, `SUBSCRIBED`, `daily_pick` and `partner_linked` in both listeners, each confirmed pick or drained row, the `daily-streak` refresher (each signed-in start and each reconnect) and `PartnerView`'s partner and `isOnline` effect each send one, and the function runs a `generate_series` over every date since the pair's first day. Performance only; DW-495 is the same over-read for `get_daily_day`. 2026-11-26 triage: the call sites moved with story 8.1's split (bf6a8a2d). `resetCoupleStreakForNewPair`'s re-read (`dailyStreakSlice.ts:162`) is one more, and `streakSeq` only discards older answers (`dailyStreakSlice.ts:131`), so every call still sends a read.
 status: open
 
 ### DW-519: A second celebration claim in one Daily mount can replace the overlay that is playing. PLAUSIBLE, not reproduced.
 origin: epic 7 retrospective (D12), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:428-445
+location: src/components/DailyQuestion/DailyQuestion.tsx:573-608 (the claim effect; its gate at :573-574, `setCelebration` at :597-603)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: The claim effect claims each `ok` streak shown. If the saved copy is above the stored celebration and the server's answer is higher again, both claims play, and the second `setCelebration` resets `stage` to `'up'`, even during the milestone screen. The effect waits for the mount's own day read, which narrows the window. Reproduce before changing code.
+reason: The claim effect claims each `ok` streak shown. If the saved copy is above the stored celebration and the server's answer is higher again, both claims play, and the second `setCelebration` resets `stage` to `'up'`, even during the milestone screen. The effect waits for the mount's own day read, which narrows the window. Reproduce before changing code. 2026-11-26 triage: since dcb93efe a mount's own saved and server answers make one claim (the `!streakLoading` gate at :573-574); what remains is a re-read answering a higher held total while the +1 or the milestone screen is up (a `daily_pick`, a drained pick, the reconnect refresher). The mechanism is confirmed by reading the code; only the real-app case is unreproduced.
 status: open
+decision: 2026-11-26 never-restart — a newer claim while the +1 or the milestone screen is up updates the shown streak (the newer held total, the milestone kept if either claim had one) and keeps the overlay on its stage; built test-first with the existing component harness.
 
 ### DW-520: A sign-out between the last session check and the IndexedDB put can recreate the outgoing account's saved copy. UNVERIFIED as reachable.
 origin: epic 7 retrospective (P1, story 7.3's residual risk), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/stores/slices/dailyQuestionSlice.ts:696-703 (`saveStreakAnswer`'s caller); src/services/dailyStreakCopy.ts; src/services/dailyDaysCopy.ts:199-201
+location: src/stores/slices/dailyStreakSlice.ts:136-138 (`loadCoupleStreak`: `isCurrent()`, then `saveStreakAnswer`); src/services/dailyDaysCopy.ts:225-227, :253-255; src/services/dailyCelebrated.ts:79-93, :121-126; src/stores/slices/partnerSlice.ts:214-245
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-shows-offline-from-its-saved-copy-plan.md`
 severity: low
-reason: `isCurrent()` is checked before `saveStreakAnswer` is called, not inside the write, so a sign-out landing between the check and the put could write the `daily-streak` copy right after `deleteAccountCopies` removed it. `mergeDailyDay`, `mergeDailyDays` and `partnerSlice` have the same window. The row stays keyed by the outgoing account's id.
-status: open
+reason: `isCurrent()` is checked before `saveStreakAnswer` is called, not inside the write, so a sign-out landing between the check and the put could write the `daily-streak` copy right after `deleteAccountCopies` removed it. `mergeDailyDay`, `mergeDailyDays` and `partnerSlice` have the same window. The row stays keyed by the outgoing account's id. 2026-11-26 triage: the locations moved with story 8.1's split (bf6a8a2d).
+status: done 2026-11-26
+resolution: not reachable: every caller issues the put synchronously after its isCurrent() check, and getDb() is one cached handle (localCopy.ts:81-98, :130-131), so the put's transaction is created before any sign-out delete's; IndexedDB runs readwrite transactions in creation order (noted at partnerSlice.ts:242-243).
+decision: 2026-11-26 close — not reachable.
 
 ### DW-521: Offline, a short-lived Daily mount can claim the +1 and unmount before playing it. UNVERIFIED.
 origin: epic 7 retrospective (P1, story 7.5's residual risk), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:413-445
+location: src/components/DailyQuestion/DailyQuestion.tsx:562-608; src/services/dailyCelebrated.ts:70-101; src/stores/slices/navigationSlice.ts:214-285 (`setView`'s walk through Home)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
-reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 is lost on the device (its milestone, if any, shows on the next open since DW-523).
+reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 is lost on the device (its milestone, if any, shows on the next open since DW-523). 2026-11-26 triage: since dcb93efe the claim also waits out the streak read (offline, one more saved-streak read), and mount 2 then shows an owed milestone at once, without its +1. Reproduce first with an offline variant of `daily-streak-up.spec.ts`'s Partner-to-Daily dock scenario: if it stays green, keep the spec as the guard and close this entry as not reachable; if the +1 is lost, `claimCelebration` re-checks inside its lock, right before the write, that the mount can still show it, as `claimMilestone` does.
 status: open
 
 ### DW-522: Offline, Past questions can show fewer days than the count above them.
 origin: epic 7 closure check, 2026-11-25
-location: src/components/PartnerView/PartnerView.tsx:81-87; src/stores/slices/dailyQuestionSlice.ts:581-609 (`loadDailyHistory`), :613-649 (`loadMoreDailyHistory`)
+location: src/components/PartnerView/PartnerView.tsx:81-87; src/stores/slices/dailyHistorySlice.ts:91-163 (`loadDailyHistory`; the copy fill at :151-161), :165-221 (`loadMoreDailyHistory`); src/components/PartnerView/PastQuestionsPage.tsx:87-91 (the pager stops after the offline refusal)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-past-questions-show-offline-plan.md`
 severity: low
-reason: The Partner page reads only the newest 30 done days, and older pages reach the `daily-days` copy only when See all is scrolled to them online. A couple past 30 done days that never scrolled sees, offline, 30 rows under "of your N days", and the copy fill sets `dailyHistoryEnd`, so nothing says there are more. Going offline with the page already loaded also hides older days that are saved: the copy fills the list only while it is `null`, and the pager stops after the offline refusal. The epic's 2026-11-07 decision removed the 31-day cap so the rows match the count. `partner-past-questions-offline.spec.ts` covers only a list paged to its end before the reload.
+reason: The Partner page reads only the newest 30 done days, and older pages reach the `daily-days` copy only when See all is scrolled to them online. A couple past 30 done days that never scrolled sees, offline, 30 rows under "of your N days", and the copy fill sets `dailyHistoryEnd`, so nothing says there are more. Going offline with the page already loaded also hides older days that are saved: the copy fills the list only while it is `null`, and the pager stops after the offline refusal. The epic's 2026-11-07 decision removed the 31-day cap so the rows match the count. `partner-past-questions-offline.spec.ts` covers only a list paged to its end before the reload. 2026-11-26 triage: the history code moved to `dailyHistorySlice.ts` (bf6a8a2d).
 status: open
+decision: 2026-11-26 background-fill — while online, page every remaining done day into the `daily-days` copy in the background (into the copy only) until the end, or until the saved done days reach `streak.done`; and on an offline refusal with rows shown, append the saved rows older than the oldest shown and set `historyFromCopy` and `dailyHistoryEnd`, so the next online first page replaces the list and paging resumes.
 
 ### DW-523: A milestone screen is lost for good on a device when its +1 is cut short.
 origin: epic 7 closure check, 2026-11-25
@@ -4454,9 +4472,9 @@ status: done 2026-11-25
 
 ### DW-524: `new-date-forms.spec.ts`'s add-an-anniversary test failed two weekly burn-ins while loading the partner's Dates list.
 origin: epic 7 closure check, from the scheduled Tests runs, 2026-11-25; not this epic's work
-location: tests/e2e/settings/new-date-forms.spec.ts:55 (the second context, lines 138-148)
+location: tests/e2e/settings/new-date-forms.spec.ts:137-144 (the partner's anniversaries observer, set up after the UI sign-in at :131-135)
 severity: low
-reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait.
+reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait. 2026-11-26 triage: both stop on the navigation from the signed-in Home page to `/settings/dates`: the observer is set up after the sign-in, which starts the anniversaries refresher (`datesSlice.ts:292-294`), so it plausibly latches onto Home's refresher read, which the navigation cuts off (a null response on 11-15, a response that never settles on 11-08); the same mechanism as DW-280 and 535fc097. The fix moves the live spec's `observeRpcAfterNavigation` (`tests/live/daily-question-live.spec.ts:241-269`) into a shared helper that accepts only the loaded document's request and bounds its response wait.
 status: open
 
 ### DW-525: send-push does not check a pick's is_second against the posted kind, so a mis-posted daily_partner_picked or daily_both_answered sends the wrong copy and, because both kinds share the (daily_pick_id,
@@ -4468,13 +4486,15 @@ reason: getDailyPick (supabase/functions/send-push/index.ts) selects id, day_id,
 status: done 2026-11-26
 resolution: `getDailyPick` now selects `is_second`, and `resolveSource` answers no recipient and no payload when it disagrees with the posted kind (`daily_partner_picked` needs false, `daily_both_answered` true): 200, every count 0, no device listed, nothing claimed, so the matching post later still records. Unit: `handler.test.ts` (both mismatches, and a mis-post followed by the correct post). The sentence in `supabase/migrations/20261125000000_daily_push_sender.sql` (lines 17-20) that says send-push does not check `is_second` (DW-525) predates this fix and is left as written.
 
-### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's
+### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's day.
 origin: spec-deferred 184bc275beae
-location: supabase/functions/send-push/handler.ts resolveSource, daily_question / daily_reminder
+location: supabase/functions/send-push/handler.ts:471-513 (`resolveSource`; `getPartnerId` at :479)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
 severity: low
-reason: resolveSource takes getPartnerId(reminder.user_id) and never compares it with the day's other seat; picks use otherInPair(day, ...). The ticket says the reminder's sender is the recipient's partner; the gap is a partner change within the seconds between the story 5 enqueue and pg_net's post. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter, intent-alignment).
-status: open
+reason: resolveSource takes getPartnerId(reminder.user_id) and never compares it with the day's other seat; picks use otherInPair(day, ...). The ticket says the reminder's sender is the recipient's partner; the gap is a partner change within the seconds between the story 5 enqueue and pg_net's post. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter, intent-alignment). 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is restored. Only `evening_partner` (:490) names the sender, and it reads no day; the morning push (:511) and `evening_self` (:502) ignore the sender.
+status: done 2026-11-26
+resolution: moved to backlog story 6, which removes the evening_partner reminder, the only reminder that names the sender (handler.ts:490), and the 8 AM push; only evening_self remains, and it names nobody. Story 6 lists this entry.
+decision: 2026-11-26 close — moved to backlog story 6.
 
 ### DW-527: tests/api/push-daily-sender.spec.ts fixes "today" and "two days ago" from the host clock when it seeds the pair, while send-push reads the recipient's date from its own now(), so a run that crosses
 origin: spec-deferred 5c56c69dc1e9
@@ -4485,12 +4505,12 @@ reason: setUpPair takes today = isoDateDaysFromNow(0, new Date()) and seedPairDa
 status: done 2026-11-26
 resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in both tests of `push-daily-sender.spec.ts`, before `setUpPair`.
 
-### DW-528: The live daily-reminders cron job (every 5 minutes on real time) can act on api-spec accounts during a host-zone 08:00-08:30 or 20:00-20:30 window, so a tick that lands mid-spec makes
+### DW-528: The live daily-reminders cron job (every 5 minutes on real time) can act on api-spec accounts during a host-zone 08:00-08:30 or 20:00-20:30 window, so a tick that lands mid-spec makes push-daily-sender.spec.ts's hand-inserted reminder hit the (user_id, local_date, slot) key or adds daily records to push-partner-activity-trigger.spec.ts's by-token count of six.
 origin: spec-deferred 2a1496a6b7b2
-location: tests/api/push-daily-sender.spec.ts addReminder; tests/api/push-partner-activity-trigger.spec.ts by-token count; supabase/migrations/20261126000000_daily_reminders_schedule.sql daily-reminders job
+location: tests/api/push-daily-sender.spec.ts:112-120 (`addReminder`; called at :132, :149, :191); tests/api/push-partner-activity-trigger.spec.ts:375-381 (the by-token count of six); supabase/migrations/20261126000000_daily_reminders_schedule.sql:206-210 (the daily-reminders job); supabase/tests/database/35_push_devices.sql:292, 307, 320, 349, 392, 407, 420, 441, 586, 602, 614, 627, 639 (unscoped queue reads)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
 severity: low
-reason: push-daily-sender.spec.ts setUpPair links a throwaway pair both ways, registers devices and seedPairDays writes a host-zone user_time_zones row, so enqueue_daily_reminders(now()) treats it as due; addReminder then asserts a null insert error (tests/api/push-daily-sender.spec.ts addReminder). push-partner-activity-trigger.spec.ts reads push_requests by token and expects toHaveLength(6) while the pool pair (linked, a stored zone from get_daily_day) holds devices. 35_push_devices.sql's unscoped net.http_request_queue counts are exposed the same way to a committed cron insert. Needs a tick inside a window during the few seconds a spec holds that state (about 0.1-0.2% of runs). Real low flake, deferred because developers are unlikely to meet it (review 2026-11-26: blind-hunter, edge-case-hunter, verification-gap). Fix: pause the job around the api leg or clear a cron-made row for (user, today, slot) before the spec inserts.
+reason: push-daily-sender.spec.ts setUpPair links a throwaway pair both ways, registers devices and seedPairDays writes a host-zone user_time_zones row, so enqueue_daily_reminders(now()) treats it as due; addReminder then asserts a null insert error (tests/api/push-daily-sender.spec.ts addReminder). push-partner-activity-trigger.spec.ts reads push_requests by token and expects toHaveLength(6) while the pool pair (linked, a stored zone from get_daily_day) holds devices. 35_push_devices.sql's unscoped net.http_request_queue counts are exposed the same way to a committed cron insert. Needs a tick inside a window during the few seconds a spec holds that state (about 0.1-0.2% of runs). Real low flake, deferred because developers are unlikely to meet it (review 2026-11-26: blind-hunter, edge-case-hunter, verification-gap). Fix: pause the job around the api leg or clear a cron-made row for (user, today, slot) before the spec inserts. 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is completed from the plan. The partner-activity and pgTAP sites are local-stack only: in CI no api spec writes a pool account's zone, and the Database Tests stack has no eligible account; CI also retries twice (`playwright.config.ts:102`). Pausing the job conflicts with DAILY-REM-011, which pins it active (`48_daily_reminders.sql:151-161`), and with the shared stack, where a killed run would leave it paused; scoping 35's reads by id prefix would weaken PUSH-DB-065 to 067. Waits for backlog story 6, which removes the 08:00 window, the morning and `evening_partner` kinds that `addReminder` inserts, and the nudge slots; then a bundle (api-specs-clear-of-reminder-ticks) waits clear of each */5 tick inside the host's 20:00-20:30 window and excludes `daily_reminders` rows from 35's unscoped reads, keeping every "nothing queued" check as strong as before.
 status: open
 
 ### DW-529: For partners on clocks four or more hours apart, the 8 PM evening_partner push can tell the earlier partner to nudge about a date the later partner can no longer pick, because the later partner's date
@@ -4502,12 +4522,12 @@ reason: enqueue_daily_reminders checks picks on the couple day for the recipient
 status: done 2026-11-26
 resolution: won't fix -- decided 2026-11-26 by the owner: keep the evening_partner rule as AD-9 states it. The owner and partner share one clock, so the far-apart case does not arise for them.
 
-### DW-530: tests/api/push-daily-reminders.spec.ts fails its own guard on a host in a half-hour zone (for example +05:30), because the pool accounts then sit at 08:10 and 20:10 at the spec's Kathmandu 08:25 and
+### DW-530: push-daily-reminders.spec.ts's guard stops the spec when any other linked account with a push device stores a zone due at its Kathmandu instants, such as a pair a killed run left behind.
 origin: spec-deferred 64204ccf98b3
-location: tests/api/push-daily-reminders.spec.ts otherAccountsDueAt and the two instants
+location: tests/api/push-daily-reminders.spec.ts:55-68 (`otherAccountsDueAt`), :86-98 (the `dailyrem-` pair), :100-107 (the instants and the two guard calls)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
 severity: low
-reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment).
+reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment). 2026-11-26 triage: the title was cut by the harvest's 200-character clamp (it ended at "Kathmandu 08:25 and") and is rewritten to the confirmed mechanism. The guard counts any account other than the pair that is linked both ways, holds a push device (:62) and stores a zone due at the instant: a throwaway pair or pool device left by a killed run, or a local-stack account with a device in the host's half-hour zone. Pool accounts hold no device while this spec runs, since only the two trigger specs register them and their cleanup deletes them. Absorbs DW-544 (a `dailyrem-` pair left behind by a killed run is counted by the same guard; excluding the prefix alone fails `expect(morning.data).toBe(2)`, because the rpc would also insert the leftover's rows, so the fix is the zone-chosen instant or an age-gated delete of the spec's own stale `dailyrem-` accounts before seeding). Waits for backlog story 6, which rewrites this spec's assertions and its morning instant; then one bundle (reminders-spec-instant-from-zones) picks the pair's zone and instant from the zones the other eligible accounts store, keeping the guard as the final check with a message naming the accounts it counted.
 status: open
 
 ### DW-531: tests/api/push-daily-picks.spec.ts fixes today, yesterday and two days ago from the host clock when it seeds the pair, so a run that crosses host-local midnight between the seed and a pick fails
@@ -4519,23 +4539,27 @@ reason: The spec computes `today` with isoDateDaysFromNow(0, now) before seedPai
 status: done 2026-11-26
 resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in `push-daily-picks.spec.ts`, before the pair is seeded.
 
-### DW-532: A sender whose clock is past midnight while the recipient's is still on the day can nudge about that day in a fresh slot of the sender's new date, which also spends that date's slot before the new
+### DW-532: A sender whose clock is past midnight while the recipient's is still on the day can nudge about that day in a fresh slot of the sender's new date, which also spends that date's slot before the new day's question.
 origin: spec-deferred 900939320814
 location: supabase/migrations/20261126020000_daily_nudge.sql record_daily_nudge and daily_day_snapshot nudge block
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
 severity: low
-reason: record_daily_nudge and the snapshot key the limit on (from_user, sender_local_date, slot) and require only user_local_date(partner, at) = the day (AD-17 as written). With A on UTC and B in New York, at 2030-09-11 02:00 UTC A (picked 09-10, B not) gets slot after_pick for 09-10, unspent, so a third nudge about 09-10 lands and A's 09-11 after_pick slot is spent before 09-11's question. Real low defect, deferred because it needs partners in different zones and a nudge after the sender's midnight, and the fix (also requiring the sender's own date to be the day, or keying on day_id) changes AD-17's rule, which is the architect's or owner's call (review 2026-11-26: blind-hunter, edge-case-hunter, intent-alignment).
-status: open
+reason: record_daily_nudge and the snapshot key the limit on (from_user, sender_local_date, slot) and require only user_local_date(partner, at) = the day (AD-17 as written). With A on UTC and B in New York, at 2030-09-11 02:00 UTC A (picked 09-10, B not) gets slot after_pick for 09-10, unspent, so a third nudge about 09-10 lands and A's 09-11 after_pick slot is spent before 09-11's question. Real low defect, deferred because it needs partners in different zones and a nudge after the sender's midnight, and the fix (also requiring the sender's own date to be the day, or keying on day_id) changes AD-17's rule, which is the architect's or owner's call (review 2026-11-26: blind-hunter, edge-case-hunter, intent-alignment). 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is restored.
+status: done 2026-11-26
+resolution: moved to backlog story 6: criterion 10 and its Note "one nudge per sender per daily question" replace the slots and key the limit on the daily question.
+decision: 2026-11-26 close — moved to backlog story 6, as the progress line below says.
 progress: 2026-11-26 the owner superseded this entry's decision: backlog story 6 keys the limit as one nudge per sender per daily question and removes the two slots. Do not build the per-question-day migration from the decision line; story 6 closes this entry.
 decision: 2026-11-26 per-question-day — the owner chose the standard practice: key the nudge limit on the day being nudged about, (from_user, day_id, slot), instead of (from_user, sender_local_date, slot), so crossing the sender's midnight neither adds a nudge about the old day nor spends the new day's slot. A migration changes record_daily_nudge, the unique key and the snapshot's spent read; AD-17 is updated to match.
 
-### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the
+### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the other.
 origin: spec-deferred 54bfbe5d4e23
 location: supabase/migrations/20261126020000_daily_nudge.sql:154-155
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
 severity: low
-reason: Under READ COMMITTED each statement in the volatile function takes a fresh snapshot, and get_daily_day may update user_time_zones from the same account's other device in between. Real low defect, deferred because it needs a zone change within the same milliseconds as a nudge; the fix is to read the zone once and derive both values from it (review 2026-11-26: edge-case-hunter).
-status: open
+reason: Under READ COMMITTED each statement in the volatile function takes a fresh snapshot, and get_daily_day may update user_time_zones from the same account's other device in between. Real low defect, deferred because it needs a zone change within the same milliseconds as a nudge; the fix is to read the zone once and derive both values from it (review 2026-11-26: edge-case-hunter). 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is restored.
+status: done 2026-11-26
+resolution: moved to backlog story 6: removing the nudge slots removes daily_nudge_slot, the second zone read (20261126020000_daily_nudge.sql:154-155), and one read cannot mix two zones. Story 6 lists this entry.
+decision: 2026-11-26 close — moved to backlog story 6.
 
 ### DW-534: tests/api/push-daily-nudge.spec.ts takes today from the host clock before seeding, so a run that crosses host-local midnight between the seed and the nudge fails spuriously.
 origin: spec-deferred e25547d0886d
@@ -4555,40 +4579,44 @@ reason: The server picks the slot (after_pick before 20:00 on the sender's store
 status: done 2026-11-26
 resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called in `daily-question-nudge.spec.ts` before the pair's days are cleared.
 
-### DW-536: The client keeps nudge.spent per (day_id, slot), while the server spends a slot per (sender-local date, slot), so a sender whose date has passed the shown day sees a greyed button the server would
+### DW-536: The client keeps nudge.spent per (day_id, slot), while the server spends a slot per (sender-local date, slot), so a sender whose date has passed the shown day sees a greyed button the server would still accept.
 origin: spec-deferred d00b99c79ea2
-location: src/services/dailyDaysCopy.ts keepNudgeSpent
+location: src/services/dailyDaysCopy.ts:73-82 (`keepNudgeSpent`), applied at dailyDaysCopy.ts:184 and src/stores/slices/dailyDaySlice.ts:218 (`mergeAnswer`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: keepNudgeSpent keeps a stored {after_pick, spent: true} over a later {after_pick, spent: false} for the same day_id. With the sender far ahead of the partner (UTC+9 against UTC-5) and the day still on screen after the sender's midnight, the server opens a fresh after_pick slot on the sender's new date for the same day, and the button stays greyed. Same root cause as story 8.7's deferred sender-date crossing (AD-17 keys the limit on the sender's date); the snapshot carries no date to tell the two slots apart (review 2026-11-26: blind-hunter).
-status: open
+reason: keepNudgeSpent keeps a stored {after_pick, spent: true} over a later {after_pick, spent: false} for the same day_id. With the sender far ahead of the partner (UTC+9 against UTC-5) and the day still on screen after the sender's midnight, the server opens a fresh after_pick slot on the sender's new date for the same day, and the button stays greyed. Same root cause as story 8.7's deferred sender-date crossing (AD-17 keys the limit on the sender's date); the snapshot carries no date to tell the two slots apart (review 2026-11-26: blind-hunter). 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is restored.
+status: done 2026-11-26
+resolution: moved to backlog story 6: its Note "one nudge per sender per daily question" supersedes DW-532 and this entry, and removing the slots removes the per-slot spent rule.
+decision: 2026-11-26 close — moved to backlog story 6, as the progress line below says.
 progress: 2026-11-26 superseded with DW-532: backlog story 6 removes the slots, so the client's per-slot spent rule goes with them; story 6 closes this entry.
 decision: 2026-11-26 follows-DW-532 — fixed by DW-532's per-question-day key: the client already keeps spent per (day_id, slot), which then matches the server.
 
 ### DW-537: After a P0002 refusal (the pair changed) the nudge's re-read of the same day_id fails too, so the stale waiting card keeps an enabled button that fails on every tap.
 origin: spec-deferred 50678f62b2da
-location: src/stores/slices/dailyDaySlice.ts sendDailyNudge
+location: src/stores/slices/dailyDaySlice.ts:646 (`sendDailyNudge`'s re-read), :468-491 (`refreshDailyDay`, which only logs at :489)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter).
+reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter). 2026-11-26 triage: it needs a server-side change of `users.partner_id`, as the app has no unlink action (`src/components/Settings/PartnerPage.tsx:13-14`) and `accept_partner_request` refuses a linked user (`20260818000000_revoke_anon_execute_and_fix_partner_guards.sql:170-175`). Waits for backlog story 6: the waiting card's button goes (criterion 9), but the prompt keeps an enabled Nudge after a P0002, and criterion 12's new re-read meets the same dead end. Then a small bundle with DW-547 (nudge-failure-path): a P0002 from `refreshDailyDay` falls back to `loadDailyDay`, which also covers the broadcast re-reads at `useDailyPickListener.ts:66,72`; the title's waiting card then reads as the nudge prompt.
 status: open
 
 ### DW-538: Daily does not re-read at the sender's local midnight, so a page left open and visible across midnight keeps the old day and its nudge slot.
 origin: spec-deferred 300c948db47a
-location: src/hooks/useDailyDayRereads.ts
+location: src/hooks/useDailyDayRereads.ts:42-71
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter).
+reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter). 2026-11-26 triage: what remains once backlog story 6 removes the slots and the waiting card's button: the header, question, chip and week stay on the old day, and an open write sheet stays until its send is refused with DQ006. It waits for story 6 only because story 6 deletes the 20:00 timer in the same hook. Then a one-entry bundle (daily-midnight-reread) re-reads the day and the streak just after the device's local midnight, re-armed daily and cleared on unmount or a session change, with one more read a few seconds later if the day is still not the device date; once story 6 lands the title drops "and its nudge slot".
 status: open
 progress: 2026-11-26 epic 8 retrospective (F1e): the partner's midnight is not re-read either, so a page left open across it keeps an enabled Nudge button that DQ009 refuses on every tap. Backlog story 6 removes the waiting card's Nudge button, which covers that case. The stale day across the sender's own midnight remains.
 
 ### DW-539: A nudge request that times out after the server committed it shows "Your nudge could not be sent." although the push went out.
 origin: spec-deferred 31cd9232798f
-location: src/components/DailyQuestion/DailyQuestion.tsx WaitingCard
+location: src/components/DailyQuestion/DailyQuestion.tsx:225-235 (`WaitingCard`); src/components/DailyQuestion/NudgeSheet.tsx:64-77; src/components/DailyQuestion/nudgeFailureMessage.ts:14-18
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: requestTimeout aborts the client request; the row and its trigger post may already be committed. The card shows NUDGE_FAILED_MESSAGE, and the re-read then greys the button (spent), so the line and the state disagree. Real low defect, deferred because it needs a timeout after commit; the fix needs a rule for when the re-read overrides the line that the intent does not give (review 2026-11-26: edge-case-hunter).
-status: open
+reason: requestTimeout aborts the client request; the row and its trigger post may already be committed. The card shows NUDGE_FAILED_MESSAGE, and the re-read then greys the button (spent), so the line and the state disagree. Real low defect, deferred because it needs a timeout after commit; the fix needs a rule for when the re-read overrides the line that the intent does not give (review 2026-11-26: edge-case-hunter). 2026-11-26 triage: the nudge sheet (399766c6) shows the same line and is the surface story 6 keeps.
+status: done 2026-11-26
+resolution: moved to backlog story 6: criterion 12 builds the rule recorded below ("unknown is not failed") on the after-answer prompt.
+decision: 2026-11-26 close — moved to backlog story 6, as the progress line below says.
 progress: 2026-11-26 the owner put this rule into backlog story 6 (criterion 12), on the after-answer prompt, since the waiting card loses its button; story 6 closes this entry.
 decision: 2026-11-26 unknown-is-not-failed — the owner left the rule to standard practice: a send that times out or fails on the network is unknown, not failed. Show no line at first and re-read the day; if the re-read has the slot spent, show it as sent (button grey, no line); if not, show NUDGE_FAILED_MESSAGE and leave the button enabled (a retry cannot double-send: one nudge per slot is a unique key). A server refusal (DQ007 to DQ010, P0002) keeps today's behaviour.
 
@@ -4598,7 +4626,9 @@ location: src/hooks/useDailyDayRereads.ts
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
 reason: get_daily_day stores the zone of whichever device read last; Daily's mount read stores this device's zone, so they agree unless another device of the same account in another zone reads in between. Then the timer fires at the wrong hour and the evening slot shows only on a return or reload (review 2026-11-26: edge-case-hunter, intent-alignment).
-status: open
+status: done 2026-11-26
+resolution: accepted by design: one account reading Daily from two devices in two time zones at once is not supported, and the newest-reported zone wins (AD-3, AD-7); the 20:00 re-read (F1c) goes with backlog story 6, which removes the nudge slots and that timer.
+decision: 2026-11-26 accept-by-design — the owner closed it: the couple do not use one account on two devices in different zones.
 progress: 2026-11-26 epic 8 retrospective (F1a, F1c). F1a: inside one `get_daily_day` the day is dated with the zone the request sends, while the stored zone is replaced only by a newer `reported_at` (`supabase/migrations/20261105210000_daily_question_own_clocks.sql:116-121, 282-286`). With a second device of the same account in another zone, the day comes from this device, and DQ009 and the scheduled pushes from the other device's zone. F1c: the 20:00:05 re-read (`src/hooks/useDailyDayRereads.ts`) fires once with no retry, so device clock skew past 5 s or a failed read leaves the evening slot unseen until a return or reload. Backlog story 6 removes the nudge slots, which covers F1c and the 20:00 timer this entry names; F1a remains.
 
 ### DW-541: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the pick and the reload.
@@ -4610,12 +4640,12 @@ reason: The server picks the nudge slot (after_pick before 20:00 on the sender's
 status: done 2026-11-26
 resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called at the top of the `setup` fixture in `daily-question-after-pick-nudge.spec.ts`, before the pair's days are cleared.
 
-### DW-542: The live check fails on the wrong sheet when UTC midnight passes between bot A's first Daily read and its pick on a day A is the writer.
+### DW-542: The live check's turn guard reads the host clock, so a local run on a host not on UTC can cross the bots' UTC midnight and, on bot A's writing day, fail on the wrong sheet.
 origin: spec-deferred 04fbea10cd5f
-location: tests/live/daily-question-live.spec.ts (the `openedA.snapshot.write.mine` branch)
+location: tests/live/daily-question-live.spec.ts:362 (the `waitClearOfDailyTurns` call with no zone), :408-417 (the `openedA.snapshot.write.mine` branch); tests/support/helpers/events.ts:233-258
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-after-every-deploy-the-live-check-also-sends-a-nudge-plan.md`
 severity: low
-reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC.
+reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC. 2026-11-26 triage: `showWriteSheet` is now at `DailyQuestion.tsx:497-506`. The guard builds the 00:00 and 20:00 turns on the host clock (`events.ts:233-241`), while the bots run on UTC (`daily-question-live.spec.ts:68`, `:373`; `playwright.live.config.ts:34`). The progress line holds for deploy runs, but backlog story 6's criterion 14 is checked in local mode on a host not on UTC, and story 6 keeps the write-sheet branch. The fix gives `waitClearOfDailyTurns` and `msUntilClearOfDailyTurns` an optional zone that builds the turns with `Date.UTC`, passed at :362 only.
 status: open
 progress: 2026-11-26 `ea53dabb` (PR #513 review) runs `waitClearOfDailyTurns` before the reset, and the deploy runner is on UTC, so a deploy run waits past both UTC turns and this crossing cannot happen there. It remains only for a local live run on a host not on UTC. Backlog story 6 rewrites the live check's nudge step.
 
@@ -4624,45 +4654,52 @@ origin: epic 8 retrospective, 2026-11-26
 location: supabase/functions/send-push/handler.ts:436-454 (`resolveSource`), :657-658 (the send-time `now`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F1b. The trigger posts within seconds, and the sender compares the day with `user_local_date(recipient, now())` at send time. A first pick made just before the recipient's midnight and sent after it is dropped as late, and a second pick is worded "That day counts." though it was on the day. Backlog story 6 removes the partner-picked push, which takes the first half; the both-answered wording remains.
-status: open
+reason: Retrospective F1b. The trigger posts within seconds, and the sender compares the day with `user_local_date(recipient, now())` at send time. A first pick made just before the recipient's midnight and sent after it is dropped as late, and a second pick is worded "That day counts." though it was on the day. Backlog story 6 removes the partner-picked push, which takes the first half; the both-answered wording remains. 2026-11-26 triage: AD-10 reads `user_local_date(user_id, at)` and names an offline pick that lands after its day as late; it does not say whether `at` is the send, the insert (`created_at`) or `picked_at`.
+status: done 2026-11-26
+resolution: accepted: push-copy.md:16 defines a late pick by the recipient's current date when the push is sent, which is what their Daily shows; the partner-picked half goes with backlog story 6.
+decision: 2026-11-26 keep-send-time — the both-answered wording keeps judging the day by the recipient's date at send time.
 
 ### DW-544: push-daily-reminders.spec.ts's guard counts a throwaway pair left behind by a killed run. PLAUSIBLE, not reproduced.
 origin: epic 8 retrospective, 2026-11-26
 location: tests/api/push-daily-reminders.spec.ts:106 (the guard before the rpc)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F5 R4. The spec's throwaway `dailyrem-*` pair is removed by its cleanup, which a killed run never reaches. The next run's guard counts that pair as an account due in the window and stops before the rpc, so a red P0 api spec reads like a reminder bug. The fix is to exclude the spec's own prefix or delete leftovers before seeding.
-status: open
+reason: Retrospective F5 R4. The spec's throwaway `dailyrem-*` pair is removed by its cleanup, which a killed run never reaches. The next run's guard counts that pair as an account due in the window and stops before the rpc, so a red P0 api spec reads like a reminder bug. The fix is to exclude the spec's own prefix or delete leftovers before seeding. 2026-11-26 triage: confirmed by reading the spec (:86-98, :106-107), not reproduced; excluding the prefix alone fails `expect(morning.data).toBe(2)`, as DW-530 now records.
+status: done 2026-11-26
+resolution: merged into DW-530
+decision: 2026-11-26 merge — the same guard in push-daily-reminders.spec.ts:55-68, fixed once in DW-530.
 
 ### DW-545: send-push reads the couple's streak before it checks the recipient's switch.
 origin: epic 8 retrospective, 2026-11-26
 location: supabase/functions/send-push/handler.ts:448, 462, 505 (`getCoupleStreak`) against :669 (`isPushEnabled`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F5 R5. `resolveSource` builds each daily kind with `couple_streak` before the handler reads the switch, so a kind the recipient turned off still costs a streak read and answers 500 when that read fails, though it would have been dropped.
-status: open
+reason: Retrospective F5 R5. `resolveSource` builds each daily kind with `couple_streak` before the handler reads the switch, so a kind the recipient turned off still costs a streak read and answers 500 when that read fails, though it would have been dropped. 2026-11-26 triage: the reads are `daily_both_answered`'s (:448), `daily_nudge`'s (:462) and the morning `daily_question`'s (:505). Story 8.3 put them before the switch on purpose (`story-the-sender-knows-the-five-daily-pushes-plan.md:208`), and its review rejected this finding as no wrong push (:166); a 500 claims nothing and pg_net does not retry.
+status: done 2026-11-26
+resolution: accepted by design: the reads before the switch check are deliberate (story 8.3's plan); a switched-off push is dropped either way, and a 500 claims nothing.
+decision: 2026-11-26 close — accepted by design.
 
 ### DW-546: Three daily push api specs hand-write the couple-day lookup and the linked-pair recipe that shared helpers already give.
 origin: epic 8 retrospective, 2026-11-26
-location: tests/api/push-daily-nudge.spec.ts:47-82; tests/api/push-daily-sender.spec.ts:63-100; tests/api/push-daily-picks.spec.ts:58-82
+location: tests/api/push-daily-nudge.spec.ts:47-82; tests/api/push-daily-sender.spec.ts:63-100; tests/api/push-daily-picks.spec.ts:58-82; tests/api/push-daily-reminders.spec.ts:149-150
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F6 (duplication map). Each spec queries `couple_days` by sorted `user_a`/`user_b` itself, although `tests/support/factories/daily-question.ts` exports `readPairDayIds` and `orderedPair`; two specs also copy the `setUpPair` recipe and redeclare `type Cleanup`. AGENTS.md, Shared test helpers (DW-313). The 8.5 and 8.6 reviews moved the other helpers into `tests/support/helpers/push-requests.ts` and left these.
+reason: Retrospective F6 (duplication map). Each spec queries `couple_days` by sorted `user_a`/`user_b` itself, although `tests/support/factories/daily-question.ts` exports `readPairDayIds` and `orderedPair`; two specs also copy the `setUpPair` recipe and redeclare `type Cleanup`. AGENTS.md, Shared test helpers (DW-313). The 8.5 and 8.6 reviews moved the other helpers into `tests/support/helpers/push-requests.ts` and left these. 2026-11-26 triage: correction: `daily-question.ts` orders the pair with the module-private `orderedPair` (:220) and reads the pair's day ids with `readPairDayIds` (:225, ids only, no dates), and `type Cleanup` is exported by `tests/support/fixtures/cleanup.ts:51`; `push-daily-reminders.spec.ts:149-150` is a fourth instance. The fix gives the factory one read of the pair's days as a date-to-id map, exports the pair ordering, and moves the linked-pair recipe into `tests/support/helpers/push-requests.ts`, with no assertion changed.
 status: open
 
-### DW-547: A refused nudge is logged twice.
+### DW-547: A failed nudge (refused or transport) is logged twice.
 origin: epic 8 retrospective, 2026-11-26
-location: src/api/dailyQuestionApi.ts:300 (`logSupabaseError`); src/components/DailyQuestion/nudgeFailureMessage.ts:16 (`console.error`)
+location: src/api/dailyQuestionApi.ts:300 (`logSupabaseError`); src/services/accountDataError.ts:108 (`toAccountDataError` logs a transport failure); src/components/DailyQuestion/nudgeFailureMessage.ts:16 (`console.error`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F6 (duplication map). `sendDailyNudge` logs a refusal before throwing `AccountDataError('refused')`, and `nudgeFailureMessage` logs the same failure again on its way to the line it shows.
+reason: Retrospective F6 (duplication map). `sendDailyNudge` logs a refusal before throwing `AccountDataError('refused')`, and `nudgeFailureMessage` logs the same failure again on its way to the line it shows. 2026-11-26 triage: a transport failure is logged twice too, by `toAccountDataError` (`accountDataError.ts:108`) and then by `nudgeFailureMessage`. Only `NudgeSheet.test.tsx:115,133,235` assert the second log, and the API's own log is never asserted. Waits for backlog story 6, which removes the waiting card's handler and rewrites the sheet's transport handling (criterion 12); a timed-out send that turns out recorded must not log a failure. Then a small bundle with DW-537 (nudge-failure-path) logs each failed nudge once, where the error is mapped.
 status: open
 
 ### DW-548: Drop the `push_preferences` columns for New question and Partner picked once installed builds have taken story 6's update.
 origin: epic 8 retrospective, 2026-11-26
-location: push_preferences.daily_question, push_preferences.daily_partner_picked; src/services/pushPreferencesService.ts (the column list); supabase/tests/database/36_push_preferences.sql (PUSH-PREF-009); src/types/database.types.ts
+location: push_preferences.daily_question, push_preferences.daily_partner_picked; src/services/pushPreferencesService.ts (the column list); supabase/tests/database/36_push_preferences.sql (PUSH-PREF-009); supabase/tests/database/47_daily_pushes.sql:397-418 (DAILY-PUSH-051, 052, 056, 057); src/types/database.types.ts
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Backlog story 6 removes both switches and the pushes they controlled, but keeps the columns (owner, 2026-11-26): installed shells run the old web bundle until they take the live update, and that bundle reads both columns by name, so dropping them in the same deploy would fail its Settings reads. Drop them in a later migration, after the owner's and partner's shells run a bundle from story 6 or later, regenerating the types and updating PUSH-PREF-009 in the same change.
+reason: Backlog story 6 removes both switches and the pushes they controlled, but keeps the columns (owner, 2026-11-26): installed shells run the old web bundle until they take the live update, and that bundle reads both columns by name, so dropping them in the same deploy would fail its Settings reads. Drop them in a later migration, after the owner's and partner's shells run a bundle from story 6 or later, regenerating the types and updating PUSH-PREF-009 in the same change. 2026-11-26 triage: a precondition the story does not yet state: story 6's deploy must stop the client selecting and upserting both columns (`pushPreferencesService.ts:99-100`, `:106`, `:134`, `:162`), since AD-10 (`architecture-daily-question.md:158`) requires stop reading, ship, then drop. Before the drop, read the hosted catalog of `push_preferences` for dependents, read-only (AGENTS.md). No gate line is added: this entry blocks no ticket, and a backlog file name is not a valid gate token.
 status: open
+decision: 2026-11-26 epic-10 — rides epic 10's second-step `push_preferences` drop: one migration with the moods and pokes-and-kisses columns, one `npm run db:types` and one PUSH-PREF-009 edit; the PO adds it to epic 10's Notes and the drop story declares it in its plan's `closes_deferred`.
