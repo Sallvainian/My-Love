@@ -693,6 +693,26 @@ describe('notificationsSummary', () => {
   ] as const)('%s', (_name, preferences, permission, withReminders, expected) => {
     expect(notificationsSummary(preferences, permission, withReminders)).toBe(expected);
   });
+
+  // Each of the five daily switches counts, both ways: a summary that left one
+  // out would read On with it off, and Off with only it on.
+  const DAILY_KEYS = [
+    'dailyQuestion',
+    'dailyPartnerPicked',
+    'dailyNudge',
+    'dailyReminder',
+    'dailyBothAnswered',
+  ] as const;
+
+  it.each(DAILY_KEYS)('%s off, every other switch on, reads Some', (key) => {
+    expect(notificationsSummary({ ...ALL_PUSH_PREFERENCES_ON, [key]: false }, 'granted', true)).toBe(
+      'Some'
+    );
+  });
+
+  it.each(DAILY_KEYS)('%s on, every other switch off, reads Some', (key) => {
+    expect(notificationsSummary({ ...allOff, [key]: true }, 'granted', true)).toBe('Some');
+  });
 });
 
 describe('NotificationsRow', () => {
