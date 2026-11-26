@@ -160,11 +160,15 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
         get().userId === userId && get().authSessionVersion === authSessionVersion;
       const seq = ++partnerLoadSeq;
 
-      // Spinner only while nothing has answered: a refresh over a shown partner
-      // must not swap the view for a loading state, and neither must one over a
-      // confirmed "unlinked" answer, which would unmount the Connect UI and lose
-      // what is typed, searched or reported there.
-      if (get().partner === null && !get().partnerKnown) set({ isLoadingPartner: true });
+      // Spinner only while nothing has answered, or while the load error is what
+      // is shown (a retry then hides the error card until an answer lands): a
+      // refresh over a shown partner must not swap the view for a loading state,
+      // and neither must one over a confirmed "unlinked" answer, which would
+      // unmount the Connect UI and lose what is typed, searched or reported
+      // there. The Connect UI is not mounted while the load error is up.
+      if (get().partner === null && (!get().partnerKnown || get().partnerLoadError)) {
+        set({ isLoadingPartner: true });
+      }
 
       // Every early return below releases the flag. PartnerMoodView gates its
       // branches on it, so a stuck flag renders a blank tab. Cutting short the

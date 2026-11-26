@@ -31,8 +31,9 @@ vi.mock('../../../hooks/usePartnerStreakListener', () => ({
   usePartnerStreakListener: vi.fn(),
 }));
 
-import { openMyLoveDB } from '../../../services/dbSchema';
 import { useAppStore } from '../../../stores/useAppStore';
+import { deferred } from '../../../../tests/unit/stores/accountDataFixtures';
+import { clearCopies } from '../../../../tests/unit/stores/dateRemindersAtLaunchFixture';
 import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
 import { PartnerView } from '../PartnerView';
 
@@ -40,23 +41,6 @@ const USER = 'USER-A-ID';
 const TARGET_ID = '00000000-0000-4000-8000-00000000f00d';
 const EMAIL = 'jessie@example.test';
 const LOADING = 'Loading partner information...';
-
-function deferred<T>() {
-  let settle: (value: T) => void = () => {};
-  const promise = new Promise<T>((resolve) => {
-    settle = resolve;
-  });
-  return { promise, settle };
-}
-
-async function clearCopies(): Promise<void> {
-  const db = await openMyLoveDB();
-  try {
-    await db.clear('local-copies');
-  } finally {
-    db.close();
-  }
-}
 
 const store = () => useAppStore.getState();
 

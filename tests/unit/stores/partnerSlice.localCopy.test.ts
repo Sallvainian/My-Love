@@ -453,6 +453,29 @@ describe('partner profile on the local copy', () => {
       expect(state().partnerLoadError).toBe(false);
     });
 
+    it('is raised by a retry over a confirmed unlinked answer that a failed read turned into a load error', async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+      await state().loadPartner();
+      // The saved copy is gone (a failed IndexedDB read answers null) and the
+      // server read fails: the load error is what the screen shows now.
+      await clearCopies();
+      getPartner.mockResolvedValue(READ_FAILED);
+      await state().loadPartner();
+      expect(state().partnerKnown).toBe(true);
+      expect(state().partnerLoadError).toBe(true);
+
+      // Retry: the error card is hidden until an answer lands.
+      const server = deferred<unknown>();
+      getPartner.mockReturnValue(server.promise);
+      const inFlight = state().loadPartner();
+      expect(state().isLoadingPartner).toBe(true);
+
+      server.settle({ status: 'unlinked' });
+      await inFlight;
+      expect(state().isLoadingPartner).toBe(false);
+      expect(state().partnerLoadError).toBe(false);
+    });
+
     it('is raised again for the next account after a sign-out', async () => {
       getPartner.mockResolvedValue({ status: 'unlinked' });
       await state().loadPartner();
