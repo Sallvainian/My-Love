@@ -690,10 +690,30 @@ describe('DailyQuestion', () => {
       expect(screen.queryByTestId('daily-streak-cold')).toBeNull();
     });
 
+    /** The viewer's week at the fixture's date (Thursday 2026-11-05, today last), oldest first. */
+    const weekOf = (states: Array<'done' | 'missed' | 'open'>) => {
+      const days = [
+        '2026-10-30',
+        '2026-10-31',
+        '2026-11-01',
+        '2026-11-02',
+        '2026-11-03',
+        '2026-11-04',
+        '2026-11-05',
+      ];
+      return days.map((day, index) => ({ day, state: states[index] ?? 'open' }));
+    };
+
     it('blue with one missed date: a blue chip with a snowflake and the "Yesterday was" banner', async () => {
       fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
       fetchCoupleStreak.mockResolvedValue(
-        okStreak({ held: 12, run: 0, today_state: 'blue', missed: 1 })
+        okStreak({
+          held: 12,
+          run: 0,
+          today_state: 'blue',
+          missed: 1,
+          week: weekOf(['open', 'open', 'open', 'open', 'done', 'missed', 'open']),
+        })
       );
 
       render(<DailyQuestion />);
@@ -710,10 +730,15 @@ describe('DailyQuestion', () => {
       );
     });
 
-    it('blue with several missed dates: "The last 3 days were missed"', async () => {
+    it('blue with several missed dates, yesterday among them: "The last 3 days were missed"', async () => {
       fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
       fetchCoupleStreak.mockResolvedValue(
-        okStreak({ held: 5, today_state: 'blue', missed: 3 })
+        okStreak({
+          held: 5,
+          today_state: 'blue',
+          missed: 3,
+          week: weekOf(['open', 'open', 'done', 'missed', 'missed', 'missed', 'open']),
+        })
       );
 
       render(<DailyQuestion />);
@@ -721,6 +746,65 @@ describe('DailyQuestion', () => {
       expect(await screen.findByTestId('daily-streak-cold')).toHaveTextContent(
         "The last 3 days were missed, so it's frozen at 5. You keep the 5."
       );
+    });
+
+    it('one missed date that is the day before yesterday (yesterday still open): names its weekday (DW-515)', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(
+        okStreak({
+          held: 2,
+          run: 0,
+          today_state: 'blue',
+          missed: 1,
+          // 2026-11-03 is a Tuesday; yesterday (Wednesday) has not closed yet.
+          week: weekOf(['open', 'open', 'open', 'open', 'missed', 'open', 'open']),
+        })
+      );
+
+      render(<DailyQuestion />);
+
+      const banner = await screen.findByTestId('daily-streak-cold');
+      expect(banner).toHaveTextContent(
+        "Tuesday was missed, so it's frozen at 2. You keep the 2. Both answer today to light it back up."
+      );
+      expect(banner).not.toHaveTextContent('Yesterday');
+    });
+
+    it('one missed date, an older one with yesterday not missed: names the newest missed date', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(
+        okStreak({
+          held: 4,
+          today_state: 'blue',
+          missed: 1,
+          week: weekOf(['open', 'open', 'open', 'missed', 'open', 'open', 'open']),
+        })
+      );
+
+      render(<DailyQuestion />);
+
+      // 2026-11-02 is a Monday.
+      expect(await screen.findByTestId('daily-streak-cold')).toHaveTextContent(
+        "Monday was missed, so it's frozen at 4."
+      );
+    });
+
+    it('several missed dates, yesterday open and an older one missed: "{n} days were missed"', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(
+        okStreak({
+          held: 3,
+          today_state: 'blue',
+          missed: 2,
+          week: weekOf(['open', 'done', 'missed', 'missed', 'open', 'open', 'open']),
+        })
+      );
+
+      render(<DailyQuestion />);
+
+      const banner = await screen.findByTestId('daily-streak-cold');
+      expect(banner).toHaveTextContent("2 days were missed, so it's frozen at 3.");
+      expect(banner).not.toHaveTextContent('The last');
     });
 
     it('the strip shows each date in the state the server gave', async () => {
@@ -905,6 +989,90 @@ describe('DailyQuestion', () => {
       expect(screen.queryByTestId('daily-day-changed')).toBeNull();
       expect(await screen.findByTestId('daily-pick-queued')).toBeInTheDocument();
       expect(submitDailyPickRequest).not.toHaveBeenCalled();
+    });
+
+    /** Pick, let the clock pass midnight and Send: the card is refused and the notice raised. */
+    async function refuseSend(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByTestId('daily-option-this'));
+      vi.setSystemTime(NEXT_DAY);
+      await user.click(screen.getByTestId('daily-send-pick'));
+    }
+
+    it('goes when the re-read day is already picked, and stays gone on a later day that takes a pick (DW-496)', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(
+        ok({ ...waitingSnapshot('that'), day_id: 'next-day', day: '2026-11-06' })
+      );
+
+      render(<DailyQuestion />);
+      await refuseSend(user);
+
+      await screen.findByTestId('daily-waiting');
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+      expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+
+      // A later day that offers a Send does not bring the notice back.
+      fetchDailyDay.mockResolvedValueOnce(
+        ok(dailySnapshot({ day_id: 'later-day', day: '2026-11-07', question: { this: 'Sun', that: 'Rain' } }))
+      );
+      vi.setSystemTime(new Date(2026, 10, 7, 12));
+      await act(async () => {
+        await useAppStore.getState().loadDailyDay();
+      });
+      expect(await screen.findByText('Sun or Rain?', { exact: false })).toBeInTheDocument();
+      expect(screen.getByTestId('daily-send-pick')).toBeInTheDocument();
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+    });
+
+    it('goes when the re-read day is the reveal', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(
+        ok({ ...revealSnapshot('this', 'that'), day_id: 'next-day', day: '2026-11-06' })
+      );
+
+      render(<DailyQuestion />);
+      await refuseSend(user);
+
+      await screen.findByTestId('daily-reveal');
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+    });
+
+    it('goes when the re-read day has this account\'s own pick queued, which hides the Send', async () => {
+      const user = userEvent.setup();
+      await enqueuePick({
+        user_id: 'USER-A-ID',
+        day_id: 'next-day',
+        choice: 'that',
+        picked_at: NEXT_DAY.toISOString(),
+        time_zone: 'America/New_York',
+        utc_offset_minutes: -300,
+        failed: false,
+        failure: null,
+      });
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+
+      render(<DailyQuestion />);
+      await refuseSend(user);
+
+      expect(await screen.findByTestId('daily-pick-queued')).toBeInTheDocument();
+      expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+    });
+
+    it('stays while the re-read day offers a Send, even when the partner has picked', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce(ok({ ...nextDay, state: 'partner', partner_choice: 'this' }));
+
+      render(<DailyQuestion />);
+      await refuseSend(user);
+
+      await screen.findByText('Tea or Coffee?', { exact: false });
+      expect(screen.getByTestId('daily-send-pick')).toBeInTheDocument();
+      expect(screen.getByTestId('daily-day-changed')).toHaveTextContent(DAY_CHANGED_MESSAGE);
     });
 
     it('clears on an account change', async () => {

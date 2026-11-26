@@ -290,6 +290,40 @@ describe("the write tomorrow's question sheet", () => {
     expect(sheet()).toBeNull();
   });
 
+  it('a saved day with the turn open and a failed read: the sheet never shows, a retry that answers opens it', async () => {
+    const user = userEvent.setup();
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: writerSnapshot() });
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-error');
+
+    // The saved day is up with its turn open, but this mount has no server answer.
+    expect(screen.getByTestId('daily-question')).toBeInTheDocument();
+    expect(sheet()).toBeNull();
+
+    fetchDailyDay.mockResolvedValue(writer());
+    await user.click(screen.getByTestId('daily-retry'));
+
+    expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
+  });
+
+  it('a saved day with the turn open and no connection: the sheet never shows', async () => {
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: writerSnapshot() });
+    setOnline(false);
+    // The real API refuses offline before any request; mirror it here.
+    fetchDailyDay.mockRejectedValue(
+      new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+    );
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-question');
+    await waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(useAppStore.getState().dailyDayLoading).toBe(false));
+
+    expect(sheet()).toBeNull();
+  });
+
   it('a later background load does not take the open sheet away', async () => {
     const user = userEvent.setup();
     await open();

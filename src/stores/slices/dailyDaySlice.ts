@@ -155,9 +155,11 @@ export interface DailyDaySlice {
   /**
    * Read today's day from the server. Never throws; a failure keeps what is
    * shown. An `ok` answer for the device's date also deletes the signed-in
-   * account's `failed` queued picks for other days.
+   * account's `failed` queued picks for other days. Resolves `true` when a
+   * read it waited on stored the server's answer (a day or `unlinked`), and
+   * `false` when none did: offline, a failed read, or a session that changed.
    */
-  loadDailyDay: () => Promise<void>;
+  loadDailyDay: () => Promise<boolean>;
   /**
    * Re-read one day by id (a partner's `daily_pick` named it) and merge the
    * answer into the saved days. It is shown only when it is the day on screen,
@@ -240,7 +242,9 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
 
 export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, api) => {
   // A signed-in start and the window `online` event refresh the saved days.
-  registerLocalCopy(DAILY_DAYS_COPY_KIND, () => get().loadDailyDay());
+  registerLocalCopy(DAILY_DAYS_COPY_KIND, async () => {
+    await get().loadDailyDay();
+  });
 
   /** Re-read the account's queued picks into `dailyQueuedPicks`, while `isCurrent()`. */
   const showQueuedPicks = async (userId: string, isCurrent: () => boolean): Promise<void> => {
@@ -305,7 +309,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   // identity asks for one more read after the running one, never joins it; a
   // call in another identity starts its own, and the old read, now stale,
   // writes nothing.
-  let dayRead: { key: string; again: boolean; promise: Promise<void> } | null = null;
+  let dayRead: { key: string; again: boolean; promise: Promise<boolean> } | null = null;
 
   // The retry after a pass stops on a transient failure while online, or ends
   // 'other-tab' (pending rows remain after another tab's lock let go). One timer
@@ -454,10 +458,13 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     return result;
   };
 
-  /** One read: the saved day, then the server's answer. Never throws. */
-  const readDayOnce = async (): Promise<void> => {
+  /**
+   * One read: the saved day, then the server's answer. Never throws. Resolves
+   * `true` once the server's answer is stored, `false` on every other path.
+   */
+  const readDayOnce = async (): Promise<boolean> => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-    if (!requestedBy) return;
+    if (!requestedBy) return false;
     const isCurrent = () =>
       get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
@@ -474,7 +481,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       readDeclinedWriteDays(requestedBy),
       showQueuedPicks(requestedBy, isCurrent),
     ]);
-    if (!isCurrent()) return;
+    if (!isCurrent()) return false;
     set({ dailyWriteDeclined: declined });
     if (saved) {
       const shown = get().dailyDay;
@@ -486,27 +493,30 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       }
     }
 
+    let stored = false;
     try {
       // 2. The server's answer, merged into the copy and then shown.
       const answer = await fetchDailyDay();
-      if (!isCurrent()) return;
+      if (!isCurrent()) return false;
       // Only an `ok` answer is tagged; `unlinked` writes `{}` and needs no partner.
       const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
-      if (!isCurrent()) return;
+      if (!isCurrent()) return false;
       const merged = await mergeDailyDay(requestedBy, answer, partnerId, isCurrent);
-      if (!isCurrent()) return;
+      if (!isCurrent()) return false;
       set({
         dailyDay: mergeAnswer(get().dailyDay, merged),
         dailyDayLoading: false,
         dailyDayError: null,
       });
+      stored = true;
       // A server answer for today: a refused pick for another day is shown
       // nowhere and no new pick can replace it, so it goes (DW-483).
       if (answer.status === 'ok' && answer.snapshot.day === today) {
         await pruneFailedPicks(requestedBy, answer.snapshot.day_id, isCurrent);
       }
+      return true;
     } catch (error) {
-      if (!isCurrent()) return;
+      if (!isCurrent()) return stored;
       const shown = get().dailyDay;
       if (
         error instanceof AccountDataError &&
@@ -516,13 +526,14 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       ) {
         // No connection and today's saved day is up: nothing to report.
         set({ dailyDayLoading: false, dailyDayError: null });
-        return;
+        return stored;
       }
       console.error("[DailyQuestion] Failed to load today's question:", error);
       set({
         dailyDayLoading: false,
         dailyDayError: error instanceof Error ? error.message : "Could not load today's question.",
       });
+      return stored;
     }
   };
 
@@ -535,29 +546,32 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
 
     loadDailyDay: () => {
       const { userId, authSessionVersion } = get();
-      if (!userId) return Promise.resolve();
+      if (!userId) return Promise.resolve(false);
       const key = `${userId}:${authSessionVersion}`;
       // One read in flight plus one trailing pass per identity: a call that
       // arrives while a read runs asks for one more read, started after its
       // cause (a re-read after a pick, a partner link or a reconnect must not
       // be answered by a read that began before it), and gets the promise,
-      // which settles after that trailing pass.
+      // which settles after that trailing pass and says whether any pass of the
+      // run stored the server's answer.
       if (dayRead?.key === key) {
         dayRead.again = true;
         return dayRead.promise;
       }
-      const read = { key, again: false, promise: Promise.resolve() };
+      const read = { key, again: false, promise: Promise.resolve(false) };
       dayRead = read;
       read.promise = (async () => {
+        let stored = false;
         try {
           do {
             read.again = false;
-            await readDayOnce();
+            if (await readDayOnce()) stored = true;
           } while (
             read.again &&
             get().userId === userId &&
             get().authSessionVersion === authSessionVersion
           );
+          return stored;
         } finally {
           if (dayRead === read) dayRead = null;
         }

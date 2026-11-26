@@ -76,6 +76,11 @@
  * sheet). Nudge sends through `sendDailyNudge` and closes it; Not now, the scrim
  * and Escape close it with nothing sent. The partner's `daily_pick` for that day,
  * or any re-read that leaves the state `me`, ends it.
+ * The write sheet opens only after a read of this mount stored the server's
+ * answer (`loadDailyDay` resolves `true`), never after a failed or offline read
+ * (DW-491). The day-changed notice is dropped for good once the shown day offers
+ * no Send (DW-496), and the cold banner names a missed date that is not
+ * yesterday by its weekday (DW-515).
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
@@ -165,9 +170,36 @@ function StreakHeader({
   );
 }
 
+/**
+ * The opening words of the cold banner (DW-515). The streak's `week` ends with
+ * the viewer's date, so the entry before the last one is yesterday. A date
+ * closes only after both partners' midnights, so the missed date can be the day
+ * before yesterday; the words name it then:
+ *   - one missed date: "Yesterday was", or the weekday of the newest missed
+ *     date in `week` ("Tuesday was");
+ *   - several: "The last {n} days were" while yesterday is among the missed
+ *     dates, "{n} days were" otherwise.
+ * With no missed date in `week` to name (or one that does not parse), the
+ * count alone decides, as before.
+ */
+function coldBannerWords(streak: CoupleStreak): string {
+  const { week, missed } = streak;
+  const newestMissed = [...week].reverse().find((entry) => entry.state === 'missed');
+  const yesterday = week.length >= 2 ? week[week.length - 2] : undefined;
+  const yesterdayMissed = yesterday?.state === 'missed';
+  if (missed === 1) {
+    if (!newestMissed || newestMissed === yesterday) return 'Yesterday was';
+    const date = parseEventDate(newestMissed.day);
+    return date
+      ? `${date.toLocaleDateString('en-US', { weekday: 'long' })} was`
+      : 'Yesterday was';
+  }
+  if (!newestMissed || yesterdayMissed) return `The last ${missed} days were`;
+  return `${missed} days were`;
+}
+
 function ColdBanner({ streak }: { streak: CoupleStreak }) {
-  const missed =
-    streak.missed === 1 ? 'Yesterday was' : `The last ${streak.missed} days were`;
+  const missed = coldBannerWords(streak);
   return (
     <div
       className="flex flex-col gap-1 rounded-[20px] bg-cold-tint p-4 text-cold-ink"
@@ -265,6 +297,16 @@ function WaitingCard({
   );
 }
 
+/** The day takes a pick and the account's queued one for it is still waiting to be sent. */
+function hasPendingPick(state: DailyDaySnapshot['state'], queued: QueuedDailyPick | null): boolean {
+  return (state === 'none' || state === 'partner') && queued !== null && !queued.failed;
+}
+
+/** Whether the day card renders a Send: the day takes a pick and none is queued and waiting. */
+function offersSend(state: DailyDaySnapshot['state'], queued: QueuedDailyPick | null): boolean {
+  return (state === 'none' || state === 'partner') && !hasPendingPick(state, queued);
+}
+
 function DayCard({
   snapshot,
   queued,
@@ -316,7 +358,7 @@ function DayCard({
   const mine = snapshot.my_choice ? question[snapshot.my_choice] : null;
   const theirs = snapshot.partner_choice ? question[snapshot.partner_choice] : null;
   // The server's pick wins; a pending queued pick stands in for the own pick.
-  const waitingToSend = (state === 'none' || state === 'partner') && queued && !queued.failed;
+  const waitingToSend = hasPendingPick(state, queued) ? queued : null;
   const refused = (state === 'none' || state === 'partner') && queued?.failed ? queued : null;
   const partnerStatus = (
     <p className="text-[13px] leading-[1.4] text-muted" data-testid="daily-partner-status">
@@ -335,9 +377,9 @@ function DayCard({
 
       {waitingToSend && (
         <div className="flex flex-col gap-2">
-          <PickCard label="Your pick" text={question[queued.choice]} testId="daily-my-pick" />
+          <PickCard label="Your pick" text={question[waitingToSend.choice]} testId="daily-my-pick" />
           <p className="text-[13px] leading-[1.4] text-muted" data-testid="daily-my-pick-time">
-            {pickedTime(queued.picked_at)}
+            {pickedTime(waitingToSend.picked_at)}
           </p>
           <p className="text-[15px] font-semibold text-ink" data-testid="daily-pick-queued">
             Waiting for a connection to send your pick.
@@ -346,7 +388,7 @@ function DayCard({
         </div>
       )}
 
-      {(state === 'none' || state === 'partner') && !waitingToSend && (
+      {offersSend(state, queued) && (
         <>
           <div className="flex flex-col gap-2">
             <button
@@ -447,6 +489,21 @@ export function DailyQuestion() {
   const showDayChanged = dayChangedIn === sessionKey;
   const clearDayChanged = useCallback(() => setDayChangedIn(null), []);
   const raiseDayChanged = useCallback(() => setDayChangedIn(sessionKey), [sessionKey]);
+  // The notice sits above a card that can send, and goes with the last Send it
+  // could be cleared by: once the shown day offers none (the partner's pick
+  // moved it to `me` or `both`, or the own pick is queued) it is dropped for
+  // good, so a later day that offers a Send does not bring it back. Adjusted
+  // while rendering, which React re-runs at once, rather than in an effect.
+  if (
+    showDayChanged &&
+    dailyDay?.status === 'ok' &&
+    !offersSend(
+      dailyDay.snapshot.state,
+      queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null
+    )
+  ) {
+    setDayChangedIn(null);
+  }
 
   // The +1 overlay, kept with the session that raised it so an account change
   // hides it, like the day-changed notice above.
@@ -484,8 +541,11 @@ export function DailyQuestion() {
     });
   }, [celebration, claimStreakMilestone]);
 
-  // The session whose read this mount has had answered (see the effect below).
+  // The session whose read this mount has had finished, answered or not (see
+  // the effect below), and the one whose read this mount has had stored the
+  // server's answer for: the write sheet waits for that one (DW-491).
   const [readFor, setReadFor] = useState<string | null>(null);
+  const [answeredFor, setAnsweredFor] = useState<string | null>(null);
 
   // The write sheet, closed by a scrim tap or Escape, stays closed for this
   // mount of Daily: the day it was closed for, so a new day can ask again.
@@ -502,7 +562,7 @@ export function DailyQuestion() {
     !writeDeclined.includes(writeSnapshot.day_id) &&
     writeSnapshot.day === formatDateISO(new Date()) &&
     writeClosedFor !== writeSnapshot.day_id &&
-    readFor === sessionKey &&
+    answeredFor === sessionKey &&
     !celebrationShown;
 
   // The nudge offer (R2), raised only by the in-view Send my pick and kept with
@@ -547,13 +607,28 @@ export function DailyQuestion() {
 
   // Re-read on each mount, and for a new session while the view stays open (an
   // account switch clears `dailyDay` through signedOutState). The sheet waits
-  // for this mount's read to answer: the day shown first may be a saved one
-  // whose turn was written on another device. A flag, not `dailyDayLoading`: a
-  // later background load must not take the sheet away mid-typing.
+  // for a read of this mount to store the server's answer: the day shown first
+  // may be a saved one whose turn was written on another device, and a read
+  // that failed or ran offline has not shown otherwise. The nudge offer and the
+  // +1 claim wait for any finished read (`readFor`). Flags, not
+  // `dailyDayLoading`: a later background load must not take the sheet away
+  // mid-typing.
   useEffect(() => {
-    void loadDailyDay().then(() => setReadFor(sessionKey));
+    void loadDailyDay().then((stored) => {
+      setReadFor(sessionKey);
+      if (stored) setAnsweredFor(sessionKey);
+    });
     void loadCoupleStreak();
   }, [loadDailyDay, loadCoupleStreak, sessionKey]);
+  // Retry after a failed first read: a read that stores the server's answer
+  // also lets the sheet ask, as the mount's own read would have.
+  const retryRead = useCallback(
+    () =>
+      void loadDailyDay().then((stored) => {
+        if (stored) setAnsweredFor(sessionKey);
+      }),
+    [loadDailyDay, sessionKey]
+  );
 
   // Only a successful, linked answer shows anything; a null, unlinked or failed
   // read leaves the header without a chip, with no strip and no banner.
@@ -704,7 +779,7 @@ export function DailyQuestion() {
               type="button"
               className={SECONDARY_BUTTON}
               disabled={loading}
-              onClick={() => void loadDailyDay()}
+              onClick={retryRead}
               data-testid="daily-retry"
             >
               Retry
