@@ -565,7 +565,7 @@ select ok(
   and (select count(*)::int from pg_constraint
         where conrelid = 'public.push_requests'::regclass
           and conname in ('push_requests_event_token_key', 'push_requests_anniversary_token_key')) = 2,
-  'PUSH-DB-062: the source check names eight sources and each date source has its (id, token) unique key'
+  'PUSH-DB-062: the source check names the eight older sources and each date source has its (id, token) unique key'
 );
 
 select has_column('public', 'push_preferences', 'dates', 'PUSH-DB-063: push_preferences.dates is back');

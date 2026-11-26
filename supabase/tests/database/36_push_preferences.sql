@@ -108,8 +108,8 @@ select is(
      left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
     where a.attrelid = 'public.push_preferences'::regclass and a.attnum > 0 and not a.attisdropped
       and a.atttypid = 'boolean'::regtype),
-  'love_notes:true:true,moods:true:true,photos:true:true,pokes_and_kisses:true:true,partner_requests:true:true,date_reminders:true:true,dates:true:true',
-  'PUSH-PREF-009: the seven switches are boolean not null default true'
+  'love_notes:true:true,moods:true:true,photos:true:true,pokes_and_kisses:true:true,partner_requests:true:true,date_reminders:true:true,dates:true:true,daily_question:true:true,daily_partner_picked:true:true,daily_nudge:true:true,daily_reminder:true:true,daily_both_answered:true:true',
+  'PUSH-PREF-009: the twelve switches (seven, then the five daily kinds) are boolean not null default true'
 );
 
 select fk_ok('public', 'push_preferences', 'user_id', 'auth', 'users', 'id',

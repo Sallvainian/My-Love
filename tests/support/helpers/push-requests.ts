@@ -23,7 +23,10 @@ export type SourceColumn =
   | 'partner_request_id'
   | 'partner_accept_id'
   | 'event_id'
-  | 'anniversary_id';
+  | 'anniversary_id'
+  | 'daily_pick_id'
+  | 'daily_nudge_id'
+  | 'daily_reminder_id';
 
 /** Rows the sender records for a note (or another source row), ordered by token. */
 export async function requestsFor(

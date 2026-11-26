@@ -4458,3 +4458,27 @@ location: tests/e2e/settings/new-date-forms.spec.ts:55 (the second context, line
 severity: low
 reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait.
 status: open
+
+### DW-525: send-push does not check a pick's is_second against the posted kind, so a mis-posted daily_partner_picked or daily_both_answered sends the wrong copy and, because both kinds share the (daily_pick_id,
+origin: spec-deferred 3f83caf550f5
+location: supabase/functions/send-push/handler.ts resolveSource, daily_partner_picked / daily_both_answered
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+reason: getDailyPick (supabase/functions/send-push/index.ts) selects id, day_id, user_id; service_role may read is_second. Reachable only if a story 6 trigger's WHEN is wrong or a call with the shared secret is forged; reminders already get a posted/stored kind guard. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter).
+status: open
+
+### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's
+origin: spec-deferred 184bc275beae
+location: supabase/functions/send-push/handler.ts resolveSource, daily_question / daily_reminder
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+reason: resolveSource takes getPartnerId(reminder.user_id) and never compares it with the day's other seat; picks use otherInPair(day, ...). The ticket says the reminder's sender is the recipient's partner; the gap is a partner change within the seconds between the story 5 enqueue and pg_net's post. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter, intent-alignment).
+status: open
+
+### DW-527: tests/api/push-daily-sender.spec.ts fixes "today" and "two days ago" from the host clock when it seeds the pair, while send-push reads the recipient's date from its own now(), so a run that crosses
+origin: spec-deferred 5c56c69dc1e9
+location: tests/api/push-daily-sender.spec.ts setUpPair and the pick-kinds case (twoDaysAgo)
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+reason: setUpPair takes today = isoDateDaysFromNow(0, new Date()) and seedPairDays writes a user_time_zones row in the host's zone; the pick-kinds case takes twoDaysAgo the same way. user_local_date(recipient, now()) then answers the next day after midnight, so the on-day partner-picked push is dropped as late and the "3-day streak", "Day 4" and "See ...'s pick." assertions miss. Real low flake, deferred because a run must straddle local midnight within seconds (follow-up review 2026-11-25: blind-hunter, edge-case-hunter); the fix is a guard (skip within a few minutes of local midnight) or re-deriving the date from user_local_date before each post.
+status: open

@@ -245,6 +245,59 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_nudges: {
+        Row: {
+          created_at: string
+          day_id: string
+          from_user: string
+          id: string
+          sender_local_date: string
+          slot: string
+          to_user: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          day_id: string
+          from_user: string
+          id?: string
+          sender_local_date: string
+          slot: string
+          to_user: string
+        }
+        Update: {
+          created_at?: string
+          day_id?: string
+          from_user?: string
+          id?: string
+          sender_local_date?: string
+          slot?: string
+          to_user?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_nudges_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "couple_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_nudges_from_user_fkey"
+            columns: ["from_user"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_nudges_to_user_fkey"
+            columns: ["to_user"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_picks: {
         Row: {
           choice: string
@@ -347,6 +400,52 @@ export type Database = {
           {
             foreignKeyName: "daily_questions_user_b_fkey"
             columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_reminders: {
+        Row: {
+          created_at: string
+          day_id: string
+          id: string
+          kind: string
+          local_date: string
+          slot: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          day_id: string
+          id?: string
+          kind: string
+          local_date: string
+          slot?: never
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_id?: string
+          id?: string
+          kind?: string
+          local_date?: string
+          slot?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reminders_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "couple_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reminders_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -705,6 +804,11 @@ export type Database = {
       push_preferences: {
         Row: {
           created_at: string
+          daily_both_answered: boolean
+          daily_nudge: boolean
+          daily_partner_picked: boolean
+          daily_question: boolean
+          daily_reminder: boolean
           date_reminders: boolean
           dates: boolean
           love_notes: boolean
@@ -717,6 +821,11 @@ export type Database = {
         ComputedFields: never
         Insert: {
           created_at?: string
+          daily_both_answered?: boolean
+          daily_nudge?: boolean
+          daily_partner_picked?: boolean
+          daily_question?: boolean
+          daily_reminder?: boolean
           date_reminders?: boolean
           dates?: boolean
           love_notes?: boolean
@@ -728,6 +837,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          daily_both_answered?: boolean
+          daily_nudge?: boolean
+          daily_partner_picked?: boolean
+          daily_question?: boolean
+          daily_reminder?: boolean
           date_reminders?: boolean
           dates?: boolean
           love_notes?: boolean
@@ -743,6 +857,9 @@ export type Database = {
         Row: {
           anniversary_id: string | null
           created_at: string
+          daily_nudge_id: string | null
+          daily_pick_id: string | null
+          daily_reminder_id: string | null
           delivery: string
           environment: string
           event_id: string | null
@@ -760,6 +877,9 @@ export type Database = {
         Insert: {
           anniversary_id?: string | null
           created_at?: string
+          daily_nudge_id?: string | null
+          daily_pick_id?: string | null
+          daily_reminder_id?: string | null
           delivery: string
           environment: string
           event_id?: string | null
@@ -776,6 +896,9 @@ export type Database = {
         Update: {
           anniversary_id?: string | null
           created_at?: string
+          daily_nudge_id?: string | null
+          daily_pick_id?: string | null
+          daily_reminder_id?: string | null
           delivery?: string
           environment?: string
           event_id?: string | null
@@ -795,6 +918,27 @@ export type Database = {
             columns: ["anniversary_id"]
             isOneToOne: false
             referencedRelation: "anniversaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_daily_nudge_id_fkey"
+            columns: ["daily_nudge_id"]
+            isOneToOne: false
+            referencedRelation: "daily_nudges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_daily_pick_id_fkey"
+            columns: ["daily_pick_id"]
+            isOneToOne: false
+            referencedRelation: "daily_picks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_requests_daily_reminder_id_fkey"
+            columns: ["daily_reminder_id"]
+            isOneToOne: false
+            referencedRelation: "daily_reminders"
             referencedColumns: ["id"]
           },
           {
@@ -1131,6 +1275,10 @@ export type Database = {
         Returns: undefined
       }
       unregister_push_device: { Args: { p_token: string }; Returns: undefined }
+      user_local_date: {
+        Args: { at: string; user_id: string }
+        Returns: string
+      }
       visible_daily_picks: {
         Args: { at: string; viewer: string }
         Returns: {
