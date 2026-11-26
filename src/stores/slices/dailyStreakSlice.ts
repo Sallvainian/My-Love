@@ -56,7 +56,7 @@ import {
   saveStreakAnswer,
 } from '../../services/dailyStreakCopy';
 import { registerLocalCopy } from '../../services/localCopy';
-import { mergePartnerId, shownPartnerId } from '../dailyPartnerIds';
+import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
 import type { AppStateCreator } from '../types';
 
 export interface DailyStreakSlice {
@@ -133,9 +133,10 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
         set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
         try {
           // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
-          const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
+          const partner =
+            answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : NO_PARTNER_TAG;
           if (!isCurrent()) return;
-          await saveStreakAnswer(requestedBy, answer, partnerId);
+          await saveStreakAnswer(requestedBy, answer, partner, isCurrent);
         } catch (error) {
           console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
         }

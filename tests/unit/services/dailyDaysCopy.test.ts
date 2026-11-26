@@ -21,8 +21,11 @@ import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { withWaitingLock } from '../../../src/services/syncLock';
 import {
   dailySnapshot,
+  linked,
   nudgeSnapshot,
   revealSnapshot,
+  UNKNOWN_PARTNER,
+  UNLINKED,
   waitingSnapshot,
   writerSnapshot,
 } from '../stores/dailyQuestionFixture';
@@ -96,43 +99,43 @@ describe('keepNudgeSpent', () => {
 
 describe('mergeDailyDay nudge', () => {
   it('a slow read of the same slot never moves spent back to false', async () => {
-    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', false)), null, current);
+    const result = await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', false)), UNLINKED, current);
 
     expect(result).toEqual(ok(nudgeSnapshot('after_pick', true)));
     expect(await savedMap()).toEqual(keyed(nudgeSnapshot('after_pick', true)));
   });
 
   it('a new slot is taken as the answer has it: unspent', async () => {
-    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(nudgeSnapshot('evening', false)), null, current);
+    const result = await mergeDailyDay(A, ok(nudgeSnapshot('evening', false)), UNLINKED, current);
 
     expect(result).toEqual(ok(nudgeSnapshot('evening', false)));
   });
 
   it('keeps spent when a higher state replaces the entry in the same slot', async () => {
-    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), UNLINKED, current);
     const higher = { ...revealSnapshot('this', 'that'), nudge: { slot: 'after_pick' as const, spent: false } };
 
-    const result = await mergeDailyDay(A, ok(higher), null, current);
+    const result = await mergeDailyDay(A, ok(higher), UNLINKED, current);
 
     expect(result).toEqual(ok({ ...higher, nudge: { slot: 'after_pick', spent: true } }));
   });
 
   it('a stored day with no nudge and an answer with one saves the answer', async () => {
-    await mergeDailyDay(A, ok(waitingSnapshot('this')), null, current);
+    await mergeDailyDay(A, ok(waitingSnapshot('this')), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', false)), null, current);
+    const result = await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', false)), UNLINKED, current);
 
     expect(result).toEqual(ok(nudgeSnapshot('after_pick', false)));
   });
 
   it('a page of past questions keeps spent the same way', async () => {
-    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), UNLINKED, current);
 
-    await mergeDailyDays(A, [nudgeSnapshot('after_pick', false)], null, current);
+    await mergeDailyDays(A, [nudgeSnapshot('after_pick', false)], UNLINKED, current);
 
     expect(await savedMap()).toEqual(keyed(nudgeSnapshot('after_pick', true)));
   });
@@ -146,26 +149,26 @@ describe('mergeDailyDay nudge', () => {
 
 describe('mergeDailyDay', () => {
   it('saves an ok answer under its day_id and returns it', async () => {
-    const result = await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    const result = await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
     expect(result).toEqual(ok(dailySnapshot()));
     expect(await savedMap()).toEqual(keyed(dailySnapshot()));
   });
 
   it('a higher state replaces the stored entry of the same day_id', async () => {
-    await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(waitingSnapshot('this')), null, current);
+    const result = await mergeDailyDay(A, ok(waitingSnapshot('this')), UNLINKED, current);
 
     expect(result).toEqual(ok(waitingSnapshot('this')));
     expect(await savedMap()).toEqual(keyed(waitingSnapshot('this')));
   });
 
   it('an equal state replaces the stored entry (the newer answer wins a tie)', async () => {
-    await mergeDailyDay(A, ok(dailySnapshot({ state: 'partner' })), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot({ state: 'partner' })), UNLINKED, current);
     const later = dailySnapshot({ state: 'me', my_choice: 'that', my_picked_at: '2026-11-05T16:00:00.000Z' });
 
-    await mergeDailyDay(A, ok(later), null, current);
+    await mergeDailyDay(A, ok(later), UNLINKED, current);
 
     expect(await savedMap()).toEqual(keyed(later));
   });
@@ -175,9 +178,9 @@ describe('mergeDailyDay', () => {
     ['both', revealSnapshot('this', 'that'), dailySnapshot()],
     ['me', waitingSnapshot('this'), dailySnapshot()],
   ])('a lower read does not move a stored %s entry back', async (_s, stored, late) => {
-    await mergeDailyDay(A, ok(stored), null, current);
+    await mergeDailyDay(A, ok(stored), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(late), null, current);
+    const result = await mergeDailyDay(A, ok(late), UNLINKED, current);
 
     expect(result).toEqual(ok(stored));
     expect(await savedMap()).toEqual(keyed(stored));
@@ -185,9 +188,9 @@ describe('mergeDailyDay', () => {
 
   it('a late read with write.done false does not reopen a written turn', async () => {
     const written = writerSnapshot('this', { write: { mine: true, done: true } });
-    await mergeDailyDay(A, ok(written), null, current);
+    await mergeDailyDay(A, ok(written), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(writerSnapshot('this')), null, current);
+    const result = await mergeDailyDay(A, ok(writerSnapshot('this')), UNLINKED, current);
 
     expect(result).toEqual(ok(written));
     expect(await savedMap()).toEqual(keyed(written));
@@ -195,9 +198,9 @@ describe('mergeDailyDay', () => {
 
   it('a higher state with write.done false keeps write.done true', async () => {
     const written = writerSnapshot('this', { write: { mine: true, done: true } });
-    await mergeDailyDay(A, ok(written), null, current);
+    await mergeDailyDay(A, ok(written), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, ok(revealSnapshot('this', 'that')), null, current);
+    const result = await mergeDailyDay(A, ok(revealSnapshot('this', 'that')), UNLINKED, current);
 
     expect(result).toEqual(
       ok({ ...revealSnapshot('this', 'that'), write: { mine: false, done: true } })
@@ -206,17 +209,17 @@ describe('mergeDailyDay', () => {
 
   it('keeps other days when one is merged', async () => {
     const yesterday = forDay('2026-11-04', { state: 'both' });
-    await mergeDailyDay(A, ok(yesterday), null, current);
+    await mergeDailyDay(A, ok(yesterday), UNLINKED, current);
 
-    await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
     expect(await savedMap()).toEqual(keyed(yesterday, dailySnapshot()));
   });
 
   it('an unlinked answer writes an empty map and returns unlinked', async () => {
-    await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
-    const result = await mergeDailyDay(A, { status: 'unlinked' }, null, current);
+    const result = await mergeDailyDay(A, { status: 'unlinked' }, UNLINKED, current);
 
     expect(result).toEqual({ status: 'unlinked' });
     expect(await savedMap()).toEqual({});
@@ -228,8 +231,8 @@ describe('mergeDailyDay', () => {
     );
     expect(new Set(days.map((snapshot) => snapshot.day)).size).toBe(40);
 
-    await mergeDailyDays(A, days, 'C', current);
-    await mergeDailyDay(A, ok(forDay('2026-11-05')), 'C', current);
+    await mergeDailyDays(A, days, linked('C'), current);
+    await mergeDailyDay(A, ok(forDay('2026-11-05')), linked('C'), current);
 
     const saved = (await savedMap())!;
     expect(Object.keys(saved)).toHaveLength(41);
@@ -243,61 +246,76 @@ describe('mergeDailyDay', () => {
     const other = forDay('2026-11-04');
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, keyed(old, other));
 
-    await mergeDailyDay(A, ok(forDay('2026-11-05', { day_id: 'd-new' })), null, current);
+    await mergeDailyDay(A, ok(forDay('2026-11-05', { day_id: 'd-new' })), UNLINKED, current);
 
     expect(await savedMap()).toEqual(keyed(other, forDay('2026-11-05', { day_id: 'd-new' })));
   });
 
-  it('tags the entry with the given partner, and the newest tag wins even over a kept higher state', async () => {
+  it('keeps each stored entry\'s tag when the partner is unknown, and leaves a new entry untagged', async () => {
     const both = revealSnapshot('this', 'that');
-    await mergeDailyDay(A, ok(both), 'B', current);
+    await mergeDailyDay(A, ok(both), linked('B'), current);
+
+    await mergeDailyDay(A, ok(dailySnapshot()), UNKNOWN_PARTNER, current);
     expect(await savedMap()).toEqual(keyedFor('B', both));
 
-    const result = await mergeDailyDay(A, ok(dailySnapshot()), 'C', current);
+    const fresh = forDay('2026-11-04');
+    await mergeDailyDays(A, [fresh], UNKNOWN_PARTNER, current);
+    expect(await savedMap()).toEqual({
+      ...keyedFor('B', both),
+      ...keyedFor(null, fresh),
+    });
+  });
+
+  it('tags the entry with the given partner, and the newest tag wins even over a kept higher state', async () => {
+    const both = revealSnapshot('this', 'that');
+    await mergeDailyDay(A, ok(both), linked('B'), current);
+    expect(await savedMap()).toEqual(keyedFor('B', both));
+
+    const result = await mergeDailyDay(A, ok(dailySnapshot()), linked('C'), current);
 
     expect(result).toEqual(ok(both));
     expect(await savedMap()).toEqual(keyedFor('C', both));
   });
 
   it('never hands partner_id back in the merged answer', async () => {
-    const result = await mergeDailyDay(A, ok(dailySnapshot()), 'C', current);
+    const result = await mergeDailyDay(A, ok(dailySnapshot()), linked('C'), current);
 
     expect(result).toEqual(ok(dailySnapshot()));
     expect(result.status === 'ok' && 'partner_id' in result.snapshot).toBe(false);
   });
 
   it('writes nothing when isCurrent is false, and still returns the merged answer', async () => {
-    const result = await mergeDailyDay(A, ok(dailySnapshot()), null, () => false);
+    const result = await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, () => false);
 
     expect(result).toEqual(ok(dailySnapshot()));
     expect(await savedMap()).toBeNull();
   });
 
   it('writes nothing for an unlinked answer when isCurrent is false', async () => {
-    await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
-    await mergeDailyDay(A, { status: 'unlinked' }, null, () => false);
+    await mergeDailyDay(A, { status: 'unlinked' }, UNLINKED, () => false);
 
     expect(await savedMap()).toEqual(keyed(dailySnapshot()));
   });
 
   it('writes under the given account only', async () => {
-    await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
     expect(await readLocalCopy(B, DAILY_DAYS_COPY_KIND)).toBeNull();
   });
 
   it('serialises two concurrent merges, so the higher one wins whatever the order', async () => {
     await Promise.all([
-      mergeDailyDay(A, ok(waitingSnapshot('this')), null, current),
-      mergeDailyDay(A, ok(revealSnapshot('this', 'that')), null, current),
+      mergeDailyDay(A, ok(waitingSnapshot('this')), UNLINKED, current),
+      mergeDailyDay(A, ok(revealSnapshot('this', 'that')), UNLINKED, current),
     ]);
     expect((await savedMap())![dailySnapshot().day_id]).toMatchObject({ state: 'both' });
 
     await clearStores();
     await Promise.all([
-      mergeDailyDay(A, ok(revealSnapshot('this', 'that')), null, current),
-      mergeDailyDay(A, ok(waitingSnapshot('this')), null, current),
+      mergeDailyDay(A, ok(revealSnapshot('this', 'that')), UNLINKED, current),
+      mergeDailyDay(A, ok(waitingSnapshot('this')), UNLINKED, current),
     ]);
     expect((await savedMap())![dailySnapshot().day_id]).toMatchObject({ state: 'both' });
   });
@@ -306,7 +324,7 @@ describe('mergeDailyDay', () => {
     const one = forDay('2026-11-03');
     const two = forDay('2026-11-04');
 
-    await Promise.all([mergeDailyDay(A, ok(one), null, current), mergeDailyDay(A, ok(two), null, current)]);
+    await Promise.all([mergeDailyDay(A, ok(one), UNLINKED, current), mergeDailyDay(A, ok(two), UNLINKED, current)]);
 
     expect(await savedMap()).toEqual(keyed(one, two));
   });
@@ -316,7 +334,7 @@ describe('mergeDailyDay', () => {
     vi.spyOn(localCopy, 'writeLocalCopy').mockRejectedValue(failure);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(mergeDailyDay(A, ok(dailySnapshot()), null, current)).resolves.toEqual(
+    await expect(mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current)).resolves.toEqual(
       ok(dailySnapshot())
     );
 
@@ -339,13 +357,13 @@ describe('mergeDailyDay', () => {
     const fresh = forDay('2026-11-06');
     expect(dailyStateRank(higher.state)).toBeGreaterThan(dailyStateRank(fresh.state));
 
-    await expect(mergeDailyDay(A, ok(fresh), 'C', current)).resolves.toEqual(ok(fresh));
+    await expect(mergeDailyDay(A, ok(fresh), linked('C'), current)).resolves.toEqual(ok(fresh));
 
     expect(errorSpy).toHaveBeenCalledWith('[localCopy] Failed to read daily-days copy:', failure);
     expect(writeSpy).not.toHaveBeenCalled();
     expect(await savedMap()).toEqual(keyed(...stored));
 
-    await mergeDailyDay(A, ok(fresh), 'C', current);
+    await mergeDailyDay(A, ok(fresh), linked('C'), current);
 
     expect(await savedMap()).toEqual({ ...keyed(...stored), ...keyedFor('C', higher) });
   });
@@ -353,7 +371,7 @@ describe('mergeDailyDay', () => {
   it('drops a malformed stored entry when it rewrites the map', async () => {
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { broken: { day_id: 'broken' } });
 
-    await mergeDailyDay(A, ok(dailySnapshot()), null, current);
+    await mergeDailyDay(A, ok(dailySnapshot()), UNLINKED, current);
 
     expect(await savedMap()).toEqual(keyed(dailySnapshot()));
   });
@@ -421,7 +439,7 @@ describe('readSavedDailyDay partner filter', () => {
   it('a legacy entry is re-tagged by the next merge', async () => {
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { [dailySnapshot().day_id]: dailySnapshot() });
 
-    await mergeDailyDay(A, ok(dailySnapshot()), 'C', current);
+    await mergeDailyDay(A, ok(dailySnapshot()), linked('C'), current);
 
     expect(await savedMap()).toEqual(keyedFor('C', dailySnapshot()));
   });
@@ -432,7 +450,7 @@ describe('mergeDailyDays', () => {
     const page = [forDay('2026-11-05', { state: 'both' }), forDay('2026-11-04', { state: 'both' }), forDay('2026-11-03', { state: 'both' })];
     const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
 
-    await mergeDailyDays(A, page, 'C', current);
+    await mergeDailyDays(A, page, linked('C'), current);
 
     expect(writeSpy).toHaveBeenCalledTimes(1);
     expect(await savedMap()).toEqual(keyedFor('C', ...page));
@@ -441,7 +459,7 @@ describe('mergeDailyDays', () => {
   it('writes nothing for an empty page', async () => {
     const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
 
-    await mergeDailyDays(A, [], 'C', current);
+    await mergeDailyDays(A, [], linked('C'), current);
 
     expect(writeSpy).not.toHaveBeenCalled();
     expect(await savedMap()).toBeNull();
@@ -453,7 +471,7 @@ describe('mergeDailyDays', () => {
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, keyed(stored, old));
     const fresh = forDay('2026-11-04', { day_id: 'd-new', state: 'both' });
 
-    await mergeDailyDays(A, [dailySnapshot(), fresh], 'C', current);
+    await mergeDailyDays(A, [dailySnapshot(), fresh], linked('C'), current);
 
     expect(await savedMap()).toEqual(keyedFor('C', stored, fresh));
   });
@@ -469,19 +487,19 @@ describe('mergeDailyDays', () => {
     });
     const fresh = forDay('2026-11-06');
 
-    await expect(mergeDailyDays(A, [fresh], 'C', current)).resolves.toBeUndefined();
+    await expect(mergeDailyDays(A, [fresh], linked('C'), current)).resolves.toBeUndefined();
 
     expect(errorSpy).toHaveBeenCalledWith('[localCopy] Failed to read daily-days copy:', failure);
     expect(writeSpy).not.toHaveBeenCalled();
     expect(await savedMap()).toEqual(keyed(...stored));
 
-    await mergeDailyDays(A, [fresh], 'C', current);
+    await mergeDailyDays(A, [fresh], linked('C'), current);
 
     expect(await savedMap()).toEqual({ ...keyed(...stored), ...keyedFor('C', fresh) });
   });
 
   it('writes nothing when isCurrent is false', async () => {
-    await mergeDailyDays(A, [dailySnapshot()], 'C', () => false);
+    await mergeDailyDays(A, [dailySnapshot()], linked('C'), () => false);
 
     expect(await savedMap()).toBeNull();
   });
@@ -491,7 +509,7 @@ describe('mergeDailyDays', () => {
     vi.spyOn(localCopy, 'writeLocalCopy').mockRejectedValue(failure);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(mergeDailyDays(A, [dailySnapshot()], 'C', current)).resolves.toBeUndefined();
+    await expect(mergeDailyDays(A, [dailySnapshot()], linked('C'), current)).resolves.toBeUndefined();
 
     expect(errorSpy).toHaveBeenCalledWith(
       '[DailyQuestion] Failed to save the daily days copy:',

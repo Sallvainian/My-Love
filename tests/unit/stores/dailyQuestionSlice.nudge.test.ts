@@ -30,7 +30,14 @@ import { AccountDataError } from '../../../src/services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { deleteAccountCopies, readLocalCopy } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { DAY_ID, dailySnapshot, nudgeSnapshot, revealSnapshot } from './dailyQuestionFixture';
+import {
+  DAY_ID,
+  KNOWN_PARTNER_ID,
+  dailySnapshot,
+  knownPartnerState,
+  nudgeSnapshot,
+  revealSnapshot,
+} from './dailyQuestionFixture';
 import { deferred } from './loaderIdentityGuardsFixture';
 import { setOnline } from './navigatorFixtures';
 
@@ -89,6 +96,19 @@ describe('sendDailyNudge', () => {
     expect(announceDailyNudge).toHaveBeenCalledTimes(1);
     expect(announceDailyNudge).toHaveBeenCalledWith(DAY_ID);
     expect(fetchDailyDayById).not.toHaveBeenCalled();
+  });
+
+  it('tags the saved day with the known partner', async () => {
+    useAppStore.setState(knownPartnerState());
+    sendDailyNudgeRequest.mockResolvedValue(nudgeSnapshot('after_pick', true));
+
+    await state().sendDailyNudge();
+
+    const saved = await readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+    expect(saved?.[DAY_ID]).toEqual({
+      ...nudgeSnapshot('after_pick', true),
+      partner_id: KNOWN_PARTNER_ID,
+    });
   });
 
   it('logs a failed broadcast and still resolves', async () => {

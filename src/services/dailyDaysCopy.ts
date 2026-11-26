@@ -28,6 +28,7 @@ import {
   type DailyDaySnapshot,
   DailyDaySnapshotSchema,
 } from '../api/validation/dailyQuestionSchemas';
+import { type PartnerTag, resolvePartnerTag } from './dailyPartnerTag';
 import { readLocalCopy, readLocalCopyStatus, writeLocalCopy } from './localCopy';
 import { DAILY_DAYS_LOCK, withWaitingLock } from './syncLock';
 
@@ -163,21 +164,23 @@ export async function readSavedDailyHistory(
 
 /**
  * The one merge: `snapshots` (all from successful server answers) into the
- * saved entries, `partnerId` as their tag. Per snapshot the stored entry for
+ * saved entries, `partner` as their tag. Per snapshot the stored entry for
  * its `day_id` wins only when it ranks higher (never moving `write.done` back
  * to false, nor `nudge.spent` to false within the same slot), the tag is
- * always the new one, and every other entry for the same `day` under a
+ * the new one (an `unknown` partner keeps the stored entry's tag, and a new
+ * entry stays untagged), and every other entry for the same `day` under a
  * different `day_id` is dropped. Returns the entries now saved
  * for those `day_id`s, in order.
  */
 function mergeSnapshots(
   days: Record<string, SavedDay>,
   snapshots: DailyDaySnapshot[],
-  partnerId: string | null
+  partner: PartnerTag
 ): DailyDaySnapshot[] {
   const merged: DailyDaySnapshot[] = [];
   for (const snapshot of snapshots) {
     const stored = days[snapshot.day_id]?.snapshot;
+    const storedTag = days[snapshot.day_id]?.partnerId;
     const keepStored =
       stored !== undefined && dailyStateRank(stored.state) > dailyStateRank(snapshot.state);
     const [kept, other] = keepStored ? [stored, snapshot] : [snapshot, stored];
@@ -185,14 +188,14 @@ function mergeSnapshots(
     for (const [dayId, saved] of Object.entries(days)) {
       if (saved.snapshot.day === snapshot.day && dayId !== snapshot.day_id) delete days[dayId];
     }
-    days[snapshot.day_id] = { snapshot: entry, partnerId };
+    days[snapshot.day_id] = { snapshot: entry, partnerId: resolvePartnerTag(partner, storedTag) };
     merged.push(entry);
   }
   return merged;
 }
 
 /**
- * Merge a successful server answer into the copy, tagged with `partnerId`, and
+ * Merge a successful server answer into the copy, tagged with `partner`, and
  * return the answer to show.
  *
  * - `ok`: the merge rule above. Returns the merged entry.
@@ -206,7 +209,7 @@ function mergeSnapshots(
 export async function mergeDailyDay(
   userId: string,
   answer: DailyDayAnswer,
-  partnerId: string | null,
+  partner: PartnerTag,
   isCurrent: () => boolean
 ): Promise<DailyDayAnswer> {
   return withWaitingLock(DAILY_DAYS_LOCK, async () => {
@@ -217,7 +220,7 @@ export async function mergeDailyDay(
       const read = await readLocalCopyStatus<unknown>(userId, DAILY_DAYS_COPY_KIND);
       if (read.status === 'failed') return answer;
       const days = parseSavedDays(read.status === 'found' ? read.value : null);
-      const [entry] = mergeSnapshots(days, [answer.snapshot], partnerId);
+      const [entry] = mergeSnapshots(days, [answer.snapshot], partner);
       merged = { status: 'ok', snapshot: entry ?? answer.snapshot };
       next = toStored(days);
     }
@@ -241,7 +244,7 @@ export async function mergeDailyDay(
 export async function mergeDailyDays(
   userId: string,
   snapshots: DailyDaySnapshot[],
-  partnerId: string | null,
+  partner: PartnerTag,
   isCurrent: () => boolean
 ): Promise<void> {
   if (snapshots.length === 0) return;
@@ -249,7 +252,7 @@ export async function mergeDailyDays(
     const read = await readLocalCopyStatus<unknown>(userId, DAILY_DAYS_COPY_KIND);
     if (read.status === 'failed') return;
     const days = parseSavedDays(read.status === 'found' ? read.value : null);
-    mergeSnapshots(days, snapshots, partnerId);
+    mergeSnapshots(days, snapshots, partner);
     if (!isCurrent()) return;
     try {
       await writeLocalCopy(userId, DAILY_DAYS_COPY_KIND, toStored(days));

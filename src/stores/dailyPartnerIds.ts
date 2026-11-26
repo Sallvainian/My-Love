@@ -5,6 +5,7 @@
  */
 
 import { lookupPartnerId } from '../api/supabaseClient';
+import type { PartnerTag } from '../services/dailyPartnerTag';
 import { readSavedPartner } from './slices/partnerSlice';
 import type { AppState } from './types';
 
@@ -18,23 +19,25 @@ export const shownPartnerId = async (
   return saved?.status === 'linked' ? saved.partner.id : null;
 };
 
+/** For a write that needs no partner (an `unlinked` answer): nothing is tagged. */
+export const NO_PARTNER_TAG: PartnerTag = { status: 'unlinked' };
+
 /**
- * The partner a merge tags its entries with: the linked id from the store or
- * the saved partner copy when one is known, else `lookupPartnerId()`, where
- * anything but a `linked` answer (or a throw) gives `null`.
+ * The partner a merge tags its entries with: `linked` from the store or the
+ * saved partner copy when one is known, else `lookupPartnerId()`'s answer.
+ * A lookup that failed or threw is `unknown`, never `unlinked`, so the merge
+ * keeps the tag an entry already has.
  */
-export const mergePartnerId = async (
-  get: () => AppState,
-  userId: string
-): Promise<string | null> => {
+export const mergePartnerId = async (get: () => AppState, userId: string): Promise<PartnerTag> => {
   const known = get().partner?.id;
-  if (known) return known;
+  if (known) return { status: 'linked', partnerId: known };
   const saved = await readSavedPartner(userId);
-  if (saved?.status === 'linked') return saved.partner.id;
+  if (saved?.status === 'linked') return { status: 'linked', partnerId: saved.partner.id };
   try {
     const lookup = await lookupPartnerId();
-    return lookup?.status === 'linked' ? lookup.partnerId : null;
+    if (lookup?.status === 'linked') return { status: 'linked', partnerId: lookup.partnerId };
+    return lookup?.status === 'unlinked' ? { status: 'unlinked' } : { status: 'unknown' };
   } catch {
-    return null;
+    return { status: 'unknown' };
   }
 };

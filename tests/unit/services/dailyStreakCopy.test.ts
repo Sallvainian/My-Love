@@ -13,7 +13,9 @@ import {
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import * as localCopy from '../../../src/services/localCopy';
 import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
-import { coupleStreak } from '../stores/dailyQuestionFixture';
+import { coupleStreak, linked, UNKNOWN_PARTNER, UNLINKED } from '../stores/dailyQuestionFixture';
+
+const current = () => true;
 
 const A = 'USER-A';
 const B = 'USER-B';
@@ -114,8 +116,8 @@ describe('readSavedStreak', () => {
 
 describe('saveStreakAnswer', () => {
   it('writes the streak of an ok answer, replacing the previous one', async () => {
-    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, null);
-    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 3 }) }, null);
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, UNLINKED, current);
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 3 }) }, UNLINKED, current);
 
     expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
       ...coupleStreak({ held: 3 }),
@@ -124,7 +126,7 @@ describe('saveStreakAnswer', () => {
   });
 
   it('tags an ok answer with the partner it was read with', async () => {
-    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 5 }) }, PARTNER_X);
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 5 }) }, linked(PARTNER_X), current);
 
     expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
       ...coupleStreak({ held: 5 }),
@@ -137,18 +139,69 @@ describe('saveStreakAnswer', () => {
     await writeLocalCopy(A, 'daily-days', {});
     await writeLocalCopy(B, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 7 }));
 
-    await saveStreakAnswer(A, { status: 'unlinked' }, null);
+    await saveStreakAnswer(A, { status: 'unlinked' }, UNLINKED, current);
 
     expect(await readSavedStreak(A, null)).toBeNull();
     expect(await readLocalCopy(A, 'daily-days')).toEqual({});
     expect(await readSavedStreak(B, null)).toEqual(coupleStreak({ held: 7 }));
   });
 
+  it('keeps the stored tag when the partner is unknown', async () => {
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, linked(PARTNER_X), current);
+
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 3 }) }, UNKNOWN_PARTNER, current);
+
+    expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
+      ...coupleStreak({ held: 3 }),
+      partner_id: PARTNER_X,
+    });
+  });
+
+  it('leaves an unknown partner untagged when nothing is stored, or the stored copy has no tag', async () => {
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, UNKNOWN_PARTNER, current);
+    expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
+      ...coupleStreak({ held: 2 }),
+      partner_id: null,
+    });
+
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 4 }));
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 5 }) }, UNKNOWN_PARTNER, current);
+    expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
+      ...coupleStreak({ held: 5 }),
+      partner_id: null,
+    });
+  });
+
+  it('writes nothing when the stored copy cannot be read to keep its tag', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, linked(PARTNER_X), current);
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(() => {
+      throw new Error('READ-FAILED');
+    });
+    const write = vi.spyOn(localCopy, 'writeLocalCopy');
+
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 3 }) }, UNKNOWN_PARTNER, current);
+
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing once the session is no longer current, read or not', async () => {
+    const write = vi.spyOn(localCopy, 'writeLocalCopy');
+    const del = vi.spyOn(localCopy, 'deleteLocalCopy');
+
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak() }, linked(PARTNER_X), () => false);
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak() }, UNKNOWN_PARTNER, () => false);
+    await saveStreakAnswer(A, { status: 'unlinked' }, UNLINKED, () => false);
+
+    expect(write).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
   it('throws when the storage fails', async () => {
     vi.spyOn(localCopy, 'writeLocalCopy').mockRejectedValue(new Error('WRITE-FAILED'));
 
     await expect(
-      saveStreakAnswer(A, { status: 'ok', streak: coupleStreak() }, null)
+      saveStreakAnswer(A, { status: 'ok', streak: coupleStreak() }, UNLINKED, current)
     ).rejects.toThrow('WRITE-FAILED');
   });
 });

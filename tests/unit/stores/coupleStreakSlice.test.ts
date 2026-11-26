@@ -38,6 +38,7 @@ vi.mock('../../../src/services/dateReminders', async (importOriginal) => {
   return { ...actual, cancelDateReminders: vi.fn(actual.cancelDateReminders) };
 });
 
+import { lookupPartnerId } from '../../../src/api/supabaseClient';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { cancelDateReminders } from '../../../src/services/dateReminders';
 import { DAILY_STREAK_COPY_KIND } from '../../../src/services/dailyStreakCopy';
@@ -83,6 +84,7 @@ const savedCopy = (userId: string = A) => readLocalCopy<unknown>(userId, DAILY_S
 beforeEach(async () => {
   vi.clearAllMocks();
   fetchCoupleStreak.mockReset();
+  vi.mocked(lookupPartnerId).mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(moodService, 'deleteSyncedForUser');
   setOnline(true);
@@ -290,6 +292,26 @@ describe('the daily-streak local copy', () => {
     await state().loadCoupleStreak();
 
     expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 12 }), partner_id: null });
+  });
+
+  it('keeps the saved tag when the partner lookup answers an error', async () => {
+    vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'error', reason: 'x' });
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, { ...coupleStreak({ held: 2 }), partner_id: 'PARTNER-OLD' });
+    fetchCoupleStreak.mockResolvedValue(okStreak({ held: 3 }));
+
+    await state().loadCoupleStreak();
+
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 3 }), partner_id: 'PARTNER-OLD' });
+  });
+
+  it('keeps the saved tag when the partner lookup throws', async () => {
+    vi.mocked(lookupPartnerId).mockRejectedValue(new Error('boom'));
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, { ...coupleStreak({ held: 2 }), partner_id: 'PARTNER-OLD' });
+    fetchCoupleStreak.mockResolvedValue(okStreak({ held: 3 }));
+
+    await state().loadCoupleStreak();
+
+    expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 3 }), partner_id: 'PARTNER-OLD' });
   });
 
   it('replaces an older saved streak with the new ok answer', async () => {
