@@ -7,8 +7,14 @@
  *     `PartnerLoadError`, never the Connect UI;
  *   - no partner, nothing failed: `PartnerConnect` alone (search, requests,
  *     linking), whatever the slice holds for the streak;
- *   - a partner: their name, then the streak card, then (when the history holds
- *     a day both partners picked) the Past questions card.
+ *   - a partner: their name, then in place of the streak card a loading block
+ *     while the streak is being read or has not been asked yet (a null answer with
+ *     nothing loading or failed), the streak card once there is an `ok` answer,
+ *     or an error box with a Retry (online only) when the read failed with
+ *     nothing to show; then (when the history holds a day both partners picked)
+ *     the Past questions card. An `unlinked` streak answer under a shown partner
+ *     reads the partner again (once per answer), so the partner slice decides
+ *     between the name and the Connect UI.
  *
  * The streak is read when a partner is present (keyed on the partner's id) and
  * kept current by `usePartnerStreakListener`. The slice shows the saved
@@ -110,14 +116,23 @@ export function PartnerView() {
     showPartnerPage('');
   }, [unlinkedOnHistory, showPartnerPage]);
 
-  // The streak says unlinked while a partner is shown (the server unlinked them, or
-  // the partner read failed after one): ask the partner slice again, which decides
-  // between the name and the Connect screen. Keyed on the answer's status, so one
-  // read per answer and no loop if the server still reports a partner.
-  const streakUnlinked = coupleStreak?.status === 'unlinked';
+  // The streak answers unlinked while a partner is shown (the server unlinked them, or
+  // the partner read failed after one and the slice kept the name): ask the partner
+  // slice again, which decides between the name and the Connect screen. Keyed on the
+  // answer itself, so each fresh `unlinked` answer reads the partner once (a failed
+  // partner read is tried again by the next streak read), and there is no loop: a
+  // partner answer with the same id starts no streak read. The render in which the
+  // partner's id changed is skipped: the answer then in the slice is the old pair's
+  // (or the one from before a first link), and the streak read the id change starts
+  // will answer for the new one.
+  const unlinkedAnswer = coupleStreak?.status === 'unlinked' ? coupleStreak : null;
+  const lastPartnerId = useRef<string | null>(null);
   useEffect(() => {
-    if (partnerId && streakUnlinked) void loadPartner();
-  }, [partnerId, streakUnlinked, loadPartner]);
+    const partnerChanged = lastPartnerId.current !== partnerId;
+    lastPartnerId.current = partnerId;
+    if (partnerChanged) return;
+    if (partnerId && unlinkedAnswer) void loadPartner();
+  }, [partnerId, unlinkedAnswer, loadPartner]);
 
   const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
 

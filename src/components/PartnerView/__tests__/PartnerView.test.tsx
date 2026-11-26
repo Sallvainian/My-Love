@@ -137,16 +137,28 @@ describe('PartnerView', () => {
       expect(screen.queryByTestId('partner-streak-error')).not.toBeInTheDocument();
     });
 
-    it('a partner and an unlinked streak: the partner is read again, once, so the slice decides', () => {
+    it('a partner and an unlinked streak: the partner is read again, once per answer, so the slice decides', () => {
       state = makeState({ coupleStreak: { status: 'unlinked' } as CoupleStreakAnswer });
       const { rerender } = render(<PartnerView />);
 
-      // Once from the mount's own read, once for the unlinked answer.
-      expect(state.loadPartner).toHaveBeenCalledTimes(2);
+      // Only the mount's own read: the answer was in the slice before this
+      // partner's streak read, so it is not yet this pair's.
+      expect(state.loadPartner).toHaveBeenCalledTimes(1);
       expect(screen.queryByTestId('partner-streak-card')).not.toBeInTheDocument();
 
+      // The streak read answers unlinked: one more partner read.
+      state = { ...state, coupleStreak: { status: 'unlinked' } as CoupleStreakAnswer };
       rerender(<PartnerView />);
       expect(state.loadPartner).toHaveBeenCalledTimes(2);
+
+      // The same answer again is not a new one.
+      rerender(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(2);
+
+      // The partner read failed and kept the name; a later unlinked answer tries again.
+      state = { ...state, coupleStreak: { status: 'unlinked' } as CoupleStreakAnswer };
+      rerender(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(3);
 
       // The slice answered unlinked: Connect replaces the name.
       state = { ...state, partner: null };
@@ -154,8 +166,31 @@ describe('PartnerView', () => {
       expect(screen.getByTestId('partner-search-card')).toBeInTheDocument();
     });
 
+    it('a stale unlinked answer from before a first link does not read the partner again', () => {
+      state = makeState({ partner: null, coupleStreak: { status: 'unlinked' } as CoupleStreakAnswer });
+      const { rerender } = render(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(1);
+
+      // The link lands (acceptPartnerRequest or partner_linked); the answer in
+      // the slice is still the one from before it.
+      state = { ...state, partner: PARTNER };
+      rerender(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(1);
+      expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+
+      // The new pair's streak read answers unlinked: that one is asked about.
+      state = { ...state, coupleStreak: { status: 'unlinked' } as CoupleStreakAnswer };
+      rerender(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(2);
+    });
+
     it('an ok streak, or none, reads the partner on mount only', () => {
       state = makeState({ coupleStreak: okStreak() });
+      const { unmount } = render(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(1);
+      unmount();
+
+      state = makeState({ coupleStreak: null });
       render(<PartnerView />);
       expect(state.loadPartner).toHaveBeenCalledTimes(1);
     });
@@ -355,6 +390,14 @@ describe('PartnerView', () => {
       // The load effect is shared.
       expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
       expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    });
+
+    it('with a partner and nothing read yet (null history): the loading card, not "No past questions yet"', () => {
+      state = makeState({ partnerPath: 'history', coupleStreak: okStreak(), dailyHistory: null });
+      render(<PartnerView />);
+
+      expect(screen.getByTestId('partner-history-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('partner-history-empty')).not.toBeInTheDocument();
     });
 
     it('no partner confirmed on an entry the app created: goes back, so no /partner entry is doubled', () => {

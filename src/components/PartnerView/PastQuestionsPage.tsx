@@ -11,6 +11,15 @@
  * row, watched by an `IntersectionObserver` with a 600px margin, asks the slice
  * for the next page (`loadMoreDailyHistory`) as the list nears its end.
  *
+ * Without a day to show it never paints the title alone. A `null` history with
+ * no failed read (the first read has not answered or started) counts as
+ * loading, shown as a loading card; a read that answered with no day both
+ * partners picked shows a muted "No past questions yet" card (`[]` is none,
+ * `null` is not loaded, which is why `PartnerView` passes the history through).
+ * A first read that failed with no row to show gets the error box with a Retry
+ * (online only) that runs the first read again; a failed "more" under rows
+ * keeps its own Retry.
+ *
  * Back runs `history.back()` when the app created the entry; on a page a fresh
  * load opened it replaces the entry with `/partner` instead of leaving the app.
  * It sits inside `<main>`, so it inherits `--dock-clearance` and
