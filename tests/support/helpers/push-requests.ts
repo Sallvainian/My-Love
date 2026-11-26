@@ -5,8 +5,8 @@
  * `tests/api/push-daily-sender.spec.ts`, `tests/api/push-daily-reminders.spec.ts`,
  * `tests/api/push-daily-picks.spec.ts` and `tests/api/push-daily-nudge.spec.ts`):
  * read what the `send-push` Edge Function recorded in `push_requests`, speak as a
- * user with a real JWT, build and link throwaway pairs with devices (and seed their days), and post to the
- * sender as the triggers do.
+ * user with a real JWT, build and link throwaway pairs with devices (and seed their
+ * days), and post to the sender as the triggers do.
  *
  * Import by this deep path: `tests/support/helpers` has no barrel.
  */
