@@ -202,3 +202,121 @@ describe('the saved days copy and the partner', () => {
     expect(await copy()).toBeNull();
   });
 });
+
+describe('the partner changes in the session', () => {
+  const PARTNER_B = 'PARTNER-B';
+  const PARTNER_C = 'PARTNER-C';
+  const withPartner = (id: string) =>
+    useAppStore.setState({
+      partner: { id, email: 'p@example.com', displayName: 'Harper', linkedSince: null, birthday: null },
+      partnerKnown: true,
+    });
+  const unlink = () => useAppStore.setState({ partner: null, partnerKnown: true });
+  const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+
+  beforeEach(() => {
+    vi.mocked(lookupPartnerId).mockReset();
+    // A read started by a partner change stays open unless a test answers it.
+    fetchDailyDay.mockReturnValue(new Promise(() => {}));
+  });
+
+  it('a new partner clears the shown day and its error, and reads the day again', async () => {
+    withPartner(PARTNER_B);
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')), dailyDayError: 'old' });
+
+    withPartner(PARTNER_C);
+
+    expect(state().dailyDay).toBeNull();
+    expect(state().dailyDayError).toBeNull();
+    // This is the new partner's read.
+    expect(state().dailyDayLoading).toBe(true);
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+  });
+
+  it("the new partner's answer replaces the old pair's day on screen", async () => {
+    withPartner(PARTNER_B);
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+    fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot({ day_id: 'new-pairing' })));
+
+    withPartner(PARTNER_C);
+
+    await vi.waitFor(() =>
+      expect(state().dailyDay).toEqual(ok(dailySnapshot({ day_id: 'new-pairing' })))
+    );
+    expect(await copy()).toEqual({
+      'new-pairing': { ...dailySnapshot({ day_id: 'new-pairing' }), partner_id: PARTNER_C },
+    });
+  });
+
+  it('a new partner after an unlink clears the day too', () => {
+    withPartner(PARTNER_B);
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+    unlink();
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+
+    withPartner(PARTNER_C);
+
+    expect(state().dailyDay).toBeNull();
+  });
+
+  it('a first link and a reload of the same partner clear nothing', () => {
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+    withPartner(PARTNER_B);
+    withPartner(PARTNER_B);
+    unlink();
+    withPartner(PARTNER_B);
+
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    expect(fetchDailyDay).not.toHaveBeenCalled();
+  });
+
+  it('a change with no day shown or loading starts no read', () => {
+    withPartner(PARTNER_B);
+
+    withPartner(PARTNER_C);
+
+    expect(fetchDailyDay).not.toHaveBeenCalled();
+    expect(state().dailyDayLoading).toBe(false);
+  });
+
+  it('a change while signed out starts no read', () => {
+    withPartner(PARTNER_B);
+    state().clearAuth();
+    useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+    withPartner(PARTNER_B);
+
+    withPartner(PARTNER_C);
+
+    expect(fetchDailyDay).not.toHaveBeenCalled();
+  });
+
+  it('a read in flight for the old partner writes nothing, to the field or the copy', async () => {
+    withPartner(PARTNER_B);
+    const request = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(request.promise);
+
+    const load = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    withPartner(PARTNER_C);
+    request.settle(ok(dailySnapshot({ day_id: 'old-pairing' })));
+    await load;
+
+    expect(state().dailyDay).toBeNull();
+    expect(await copy()).toBeNull();
+  });
+
+  it('a failure of the old partner read leaves no error behind', async () => {
+    withPartner(PARTNER_B);
+    const request = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(request.promise);
+
+    const load = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    withPartner(PARTNER_C);
+    request.fail(new Error('late'));
+    await load;
+
+    expect(state().dailyDayError).toBeNull();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});

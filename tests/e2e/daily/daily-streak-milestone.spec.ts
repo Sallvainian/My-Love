@@ -236,8 +236,11 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
     await expect(partner.getByTestId('daily-streak-up')).toHaveCount(0);
     await expect(partner.getByTestId('daily-milestone')).toHaveCount(0);
     expect(
-      await savedLocalCopy<{ held: number; milestones: number }>(partner, CELEBRATED_KIND)
-    ).toEqual({ held: 25, milestones: 1 });
+      await savedLocalCopy<{ held: number; milestones: number; partner_id: string }>(
+        partner,
+        CELEBRATED_KIND
+      )
+    ).toEqual({ held: 25, milestones: 1, partner_id: expect.any(String) });
   });
 
   test('[P0] the first picker, returning to Daily, sees the +1 then the milestone and closes it', async ({

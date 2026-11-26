@@ -57,15 +57,17 @@
  *
  * When the shown partner changes from one id to another in a session (an unlink
  * and a new link, or a refreshed partner read that answers a new id), this
- * slice's one `api.subscribe` listener calls `resetDailyHistoryForNewPair` and
- * `resetCoupleStreakForNewPair` (the history and streak slices), which
- * clear the streak, the past questions and their errors, loading flags and end
- * flag, and make the reads in flight for the old pair write nothing, to the
- * fields or to the copy; a streak that was shown or being read is then read
- * again for the new partner. Only a non-null id that differs from the last
- * non-null one seen in the session counts: a first link and a reload of the
- * same partner clear nothing, and an identity change (`userId`/
- * `authSessionVersion`) forgets the last id.
+ * slice's one `api.subscribe` listener clears the day (`dailyDay`, its error and
+ * loading flag) and calls `resetDailyHistoryForNewPair` and
+ * `resetCoupleStreakForNewPair` (the history and streak slices), which clear the
+ * streak, the past questions and their errors, loading flags and end flag. The
+ * reads in flight for the old pair write nothing, to the fields or to the copy;
+ * a day or streak that was shown or being read is then read again for the new
+ * partner. The `daily-celebrated` kind is not touched there: it is tagged with
+ * its partner (`services/dailyCelebrated.ts`), so the next claim re-seeds it.
+ * Only a non-null id that differs from the last non-null one seen in the session
+ * counts: a first link and a reload of the same partner clear nothing, and an
+ * identity change (`userId`/`authSessionVersion`) forgets the last id.
  *
  * A nudge (AD-13, AD-16, AD-17): `sendDailyNudge` sends it for the shown day and
  * merges the returned snapshot (whose `nudge.spent` is then true) like
@@ -258,6 +260,22 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   let lastPartnerId: string | null = null;
   let seenIdentity = '';
 
+  // Bumped when the partner changes: a `loadDailyDay` that began before it is
+  // the old pair's and writes nothing.
+  let pairEpoch = 0;
+
+  /**
+   * The old pair's day is gone and the reads in flight for it write nothing; a
+   * day that was shown or being read is read again for the new partner, since
+   * Daily's read effect does not re-run on a partner change.
+   */
+  const resetDayForNewPair = () => {
+    const dayWanted = get().dailyDay !== null || get().dailyDayLoading;
+    pairEpoch += 1;
+    set({ dailyDay: null, dailyDayLoading: false, dailyDayError: null });
+    if (dayWanted && get().userId) void get().loadDailyDay();
+  };
+
   // The tab's running drain, and whether a call arrived while it ran.
   let drainInFlight: Promise<void> | null = null;
   let drainRequested = false;
@@ -301,7 +319,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     }
 
     // A new partner id after another one (never a first link or the same
-    // partner again) ends the old pair's streak and past questions.
+    // partner again) ends the old pair's day, streak and past questions.
     const identity = `${state.userId}:${state.authSessionVersion}`;
     if (identity !== seenIdentity) {
       seenIdentity = identity;
@@ -314,6 +332,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     if (changed) {
       // History first, so the streak re-read starts last.
       get().resetDailyHistoryForNewPair();
+      resetDayForNewPair();
       get().resetCoupleStreakForNewPair();
     }
   });
@@ -402,8 +421,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     loadDailyDay: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return;
+      const epoch = pairEpoch;
       const isCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairEpoch === epoch;
 
       set({ dailyDayLoading: true });
 

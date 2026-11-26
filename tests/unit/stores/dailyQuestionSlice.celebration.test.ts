@@ -19,12 +19,21 @@ import {
   readCelebrated,
 } from '../../../src/services/dailyCelebrated';
 import * as celebrated from '../../../src/services/dailyCelebrated';
-import { deleteAccountCopies, writeLocalCopy } from '../../../src/services/localCopy';
+import { lookupPartnerId } from '../../../src/api/supabaseClient';
+import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { coupleStreak } from './dailyQuestionFixture';
 
 const A = 'USER-A-ID';
 const C = 'USER-C-ID';
+const PARTNER = 'PARTNER-P-ID';
+const NEW_PARTNER = 'PARTNER-Q-ID';
+
+const withPartner = (id: string) =>
+  useAppStore.setState({
+    partner: { id, email: 'p@example.com', displayName: 'Harper', linkedSince: null, birthday: null },
+    partnerKnown: true,
+  });
 
 function state() {
   return useAppStore.getState();
@@ -35,11 +44,13 @@ beforeEach(async () => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   state().clearAuth();
   state().setAuthUser(A);
+  withPartner(PARTNER);
   await deleteAccountCopies(A);
   await deleteAccountCopies(C);
 });
 
 afterEach(() => {
+  useAppStore.setState({ partner: null, partnerKnown: false });
   vi.restoreAllMocks();
 });
 
@@ -48,6 +59,63 @@ describe('claimStreakCelebration', () => {
     await expect(state().claimStreakCelebration(coupleStreak({ held: 3 }))).resolves.toEqual(NO_CELEBRATION);
 
     expect(await readCelebrated(A)).toEqual({ held: 3, milestones: 0 });
+  });
+
+  it("tags what it writes with the store's partner", async () => {
+    await state().claimStreakCelebration(coupleStreak({ held: 3 }));
+
+    expect(await readLocalCopy(A, DAILY_CELEBRATED_KIND)).toEqual({
+      held: 3,
+      milestones: 0,
+      partner_id: PARTNER,
+    });
+  });
+
+  it("a new pair's lower held total plays nothing and re-seeds the value", async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 40, milestones: 1, partner_id: PARTNER });
+    withPartner(NEW_PARTNER);
+
+    await expect(state().claimStreakCelebration(coupleStreak({ held: 2 }))).resolves.toEqual(
+      NO_CELEBRATION
+    );
+    expect(await readLocalCopy(A, DAILY_CELEBRATED_KIND)).toEqual({
+      held: 2,
+      milestones: 0,
+      partner_id: NEW_PARTNER,
+    });
+
+    await expect(state().claimStreakCelebration(coupleStreak({ held: 3 }))).resolves.toMatchObject({
+      play: true,
+    });
+  });
+
+  it('no known partner: nothing is claimed or written', async () => {
+    useAppStore.setState({ partner: null, partnerKnown: true });
+    vi.mocked(lookupPartnerId).mockResolvedValue({ status: 'unlinked' });
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 3, milestones: 0, partner_id: PARTNER });
+
+    await expect(state().claimStreakCelebration(coupleStreak({ held: 4 }))).resolves.toEqual(
+      NO_CELEBRATION
+    );
+
+    expect(await readLocalCopy(A, DAILY_CELEBRATED_KIND)).toEqual({
+      held: 3,
+      milestones: 0,
+      partner_id: PARTNER,
+    });
+  });
+
+  it('a partner change during the claim: no play, and the value is not overwritten', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 3, milestones: 0, partner_id: PARTNER });
+    const pending = state().claimStreakCelebration(coupleStreak({ held: 4 }));
+    withPartner(NEW_PARTNER);
+
+    await expect(pending).resolves.toEqual(NO_CELEBRATION);
+    expect(await readLocalCopy(A, DAILY_CELEBRATED_KIND)).toEqual({
+      held: 3,
+      milestones: 0,
+      partner_id: PARTNER,
+    });
   });
 
   it('a higher held plays once, rolling up from the stored value', async () => {
@@ -119,6 +187,28 @@ describe('claimStreakMilestone', () => {
     await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(false);
 
     expect(await readCelebrated(A)).toEqual({ held: 25, milestones: 1 });
+  });
+
+  it("tags the stored milestone with the store's partner", async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, owed);
+
+    await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(true);
+
+    expect(await readLocalCopy(A, DAILY_CELEBRATED_KIND)).toEqual({
+      held: 25,
+      milestones: 1,
+      partner_id: PARTNER,
+    });
+  });
+
+  it("a value tagged with another partner: answers false, and the new pair's value is untouched", async () => {
+    const old = { held: 25, milestones: 0, partner_id: PARTNER };
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, old);
+    withPartner(NEW_PARTNER);
+
+    await expect(state().claimStreakMilestone(reached, canShow)).resolves.toBe(false);
+
+    expect(await readLocalCopy(A, DAILY_CELEBRATED_KIND)).toEqual(old);
   });
 
   it('signed out: answers false and touches nothing', async () => {
