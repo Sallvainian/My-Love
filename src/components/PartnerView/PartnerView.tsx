@@ -48,6 +48,7 @@ export function PartnerView() {
   const partner = useAppStore((state) => state.partner);
   const isLoadingPartner = useAppStore((state) => state.isLoadingPartner);
   const partnerLoadError = useAppStore((state) => state.partnerLoadError);
+  const partnerKnown = useAppStore((state) => state.partnerKnown);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const loadPartner = useAppStore((state) => state.loadPartner);
   const loadPendingRequests = useAppStore((state) => state.loadPendingRequests);
@@ -101,10 +102,11 @@ export function PartnerView() {
   // been seen under way.
   const sawLoading = useRef(false);
   useEffect(() => {
-    // A partner already in the store is never loaded afresh (`loadPartner`
-    // raises the flag only when there is none), so seeing one counts too.
-    if (isLoadingPartner || partner) sawLoading.current = true;
-  }, [isLoadingPartner, partner]);
+    // A partner already in the store, or an answer already in (a confirmed
+    // "unlinked" is one), is never loaded afresh (`loadPartner` raises the flag
+    // only while nothing has answered), so seeing either counts too.
+    if (isLoadingPartner || partner || partnerKnown) sawLoading.current = true;
+  }, [isLoadingPartner, partner, partnerKnown]);
   const unlinkedOnHistory =
     partnerPath === 'history' && !partner && !isLoadingPartner && !partnerLoadError;
   useEffect(() => {
