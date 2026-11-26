@@ -27,16 +27,14 @@
  * the other push specs never run at once.
  */
 import type { TypedSupabaseClient } from '../support/factories';
-import { seedPairDays } from '../support/factories/daily-question';
+import type { Cleanup } from '../support/fixtures/cleanup';
 import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import {
   awaitRequests,
-  createParty as createThrowawayParty,
   dailyPayload,
-  link,
   postKindToSender,
-  registerDevice,
   requestsFor,
+  setUpPair,
   zeros,
   type Party,
 } from '../support/helpers/push-requests';
@@ -44,41 +42,22 @@ import { test, expect } from '../support/merged-fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
-type Cleanup = { defer: (name: string, fn: () => Promise<unknown>) => void };
-
 test.describe('Daily nudge', () => {
-  const createParty = (supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup, role: string) =>
-    createThrowawayParty(supabaseAdmin, cleanup, 'dailynudge', 'Nudge', role);
-
   /**
    * A linked pair, `first` with one device and `second` with two, and today's day seeded
    * with `first`'s pick only. `first`'s device is registered so that a nudge recording
    * exactly `second`'s tokens also shows the sender's own device hears nothing.
    */
-  async function setUpPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup, roles: [string, string]) {
-    const first = await createParty(supabaseAdmin, cleanup, roles[0]);
-    const second = await createParty(supabaseAdmin, cleanup, roles[1]);
-    await link(supabaseAdmin, first, second);
-    await registerDevice(first, 'sandbox');
-    const secondDevices = [
-      await registerDevice(second, 'sandbox'),
-      await registerDevice(second, 'production'),
-    ];
-
-    await seedPairDays(supabaseAdmin, { userId: first.userId, partnerId: second.userId }, [
-      { daysAgo: 0, picks: 'user' },
-    ]);
-    const today = isoDateDaysFromNow(0, new Date());
-    const [userA, userB] = [first.userId, second.userId].sort();
-    const { data: dayRows, error } = await supabaseAdmin
-      .from('couple_days')
-      .select('id')
-      .eq('user_a', userA)
-      .eq('user_b', userB)
-      .eq('day', today)
-      .single();
-    expect(error).toBeNull();
-    return { first, second, secondDevices, dayId: dayRows!.id };
+  async function setUpDailyPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup, roles: [string, string]) {
+    const { first, second, secondDevices, dayIds } = await setUpPair(
+      supabaseAdmin,
+      cleanup,
+      { prefix: 'dailynudge', displayPrefix: 'Nudge', roles },
+      [{ daysAgo: 0, picks: 'user' }]
+    );
+    const dayId = dayIds[isoDateDaysFromNow(0, new Date())];
+    expect(dayId).toBeDefined();
+    return { first, second, secondDevices, dayId };
   }
 
   async function nudgesFrom(supabaseAdmin: TypedSupabaseClient, party: Party) {
@@ -96,7 +75,7 @@ test.describe('Daily nudge', () => {
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
     // Alice nudges Bob: both of Bob's devices hear it, with the default sound.
-    const { first: alice, second: bob, secondDevices, dayId } = await setUpPair(supabaseAdmin, cleanup, ['a', 'b']);
+    const { first: alice, second: bob, secondDevices, dayId } = await setUpDailyPair(supabaseAdmin, cleanup, ['a', 'b']);
 
     const sent = await alice.client.rpc('send_daily_nudge', { day_id: dayId });
     expect(sent.error).toBeNull();
@@ -136,7 +115,7 @@ test.describe('Daily nudge', () => {
     cleanup,
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
-    const { first: carol, second: dave, dayId: pairDay } = await setUpPair(supabaseAdmin, cleanup, ['c', 'd']);
+    const { first: carol, second: dave, dayId: pairDay } = await setUpDailyPair(supabaseAdmin, cleanup, ['c', 'd']);
     const switchOff = await supabaseAdmin.from('push_preferences').upsert({ user_id: dave.userId, daily_nudge: false });
     expect(switchOff.error).toBeNull();
 

@@ -13,6 +13,7 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../../support/helpers/reads';
 import { clockAnchor } from '../../support/helpers/events';
+import { observeReadAfterNavigation } from '../../support/helpers/read-after-navigation';
 import { openNewDateForm } from '../../support/helpers/new-date-forms';
 import { recurseUntil } from '../../support/helpers/recurse';
 import { WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
@@ -235,11 +236,11 @@ test.describe('Account data follows the account, not the browser', () => {
 
     const fresh = await signInFresh(second, email);
 
-    const anniversaryRead = observeOn({
-      page: fresh,
+    // The sign-in started Home's own anniversaries read, which the navigation
+    // cuts off; only the Dates page's read counts.
+    const anniversaryRead = observeReadAfterNavigation(fresh, {
       method: 'GET',
       url: ANNIVERSARIES_READ,
-      timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
     await fresh.goto('/settings/dates');
     const anniversaryRows = await anniversaryRead;
