@@ -19,7 +19,7 @@ Five pushes bring each partner back: the new question at 8 AM, the partner picke
 
 ## Outcome
 
-Each partner is called back to the day's question at the right moment on their own clock. Signal: each push kind arriving on the owner's iPhone.
+Each partner is called back to the day's question at the right moment on their own clock. Signal: each push kind sent by the server in the api and E2E specs, and the post-deploy Live Daily Check passing.
 
 ## Requirements
 
