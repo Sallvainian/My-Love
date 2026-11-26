@@ -78,6 +78,19 @@ async function clearCopies(): Promise<void> {
   }
 }
 
+// Sets the shown partner; a change from one id to another is a new pair.
+const withPartner = (id: string) =>
+  useAppStore.setState({
+    partner: {
+      id,
+      email: 'p@example.com',
+      displayName: 'Harper',
+      linkedSince: null,
+      birthday: null,
+    },
+    partnerKnown: true,
+  });
+
 const savedCopy = (userId: string = A) => readLocalCopy<unknown>(userId, DAILY_STREAK_COPY_KIND);
 
 beforeEach(async () => {
@@ -195,38 +208,87 @@ describe('loadCoupleStreak', () => {
     expect(state().coupleStreakError).toBeNull();
   });
 
-  it('two overlapping reads: the newer answer is kept when the older lands last', async () => {
+  it('an overlapping call asks for one more read after the running one: its answer is kept', async () => {
     const older = deferred<ReturnType<typeof okStreak>>();
     const newer = deferred<ReturnType<typeof okStreak>>();
     fetchCoupleStreak.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    const shown: number[] = [];
+    const unsubscribe = useAppStore.subscribe((next) => {
+      if (next.coupleStreak?.status !== 'ok') return;
+      const held = next.coupleStreak.streak.held;
+      if (shown.at(-1) !== held) shown.push(held);
+    });
 
     const first = state().loadCoupleStreak();
-    // The first read must be past its copy read, or the second supersedes it
-    // before it fetches.
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
     const second = state().loadCoupleStreak();
-    newer.settle(okStreak({ held: 8 }));
-    await second;
+    // The second call sends nothing while the first read runs.
+    await Promise.resolve();
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
     older.settle(okStreak({ held: 7 }));
-    await first;
+    // The trailing read starts after the first one ends, and both promises wait for it.
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(2));
+    expect(state().coupleStreakLoading).toBe(true);
+    newer.settle(okStreak({ held: 8 }));
+    await Promise.all([first, second]);
+    unsubscribe();
 
+    // The running read's answer was shown, then the trailing read's replaced it.
+    expect(shown).toEqual([7, 8]);
     expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
     expect(state().coupleStreakLoading).toBe(false);
   });
 
-  it('an older failure landing after a newer answer changes nothing', async () => {
-    const older = deferred<ReturnType<typeof okStreak>>();
+  it('three overlapping calls send exactly two reads', async () => {
+    const running = deferred<ReturnType<typeof okStreak>>();
     fetchCoupleStreak
-      .mockReturnValueOnce(older.promise)
-      .mockResolvedValueOnce(okStreak({ held: 8 }));
+      .mockReturnValueOnce(running.promise)
+      .mockResolvedValueOnce(okStreak({ held: 9 }));
+    const shown: number[] = [];
+    const unsubscribe = useAppStore.subscribe((next) => {
+      if (next.coupleStreak?.status !== 'ok') return;
+      const held = next.coupleStreak.streak.held;
+      if (shown.at(-1) !== held) shown.push(held);
+    });
+
+    const calls = [state().loadCoupleStreak()];
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
+    calls.push(state().loadCoupleStreak(), state().loadCoupleStreak());
+    running.settle(okStreak({ held: 8 }));
+    await Promise.all(calls);
+    unsubscribe();
+
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(shown).toEqual([8, 9]);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 9 }));
+  });
+
+  it('a call after the reads ended starts a new read', async () => {
+    fetchCoupleStreak
+      .mockResolvedValueOnce(okStreak({ held: 1 }))
+      .mockResolvedValueOnce(okStreak({ held: 2 }));
+
+    await state().loadCoupleStreak();
+    await state().loadCoupleStreak();
+
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 2 }));
+  });
+
+  it('a failed running read still gets its trailing read, and its answer clears the error', async () => {
+    const running = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak
+      .mockReturnValueOnce(running.promise)
+      .mockResolvedValueOnce(okStreak({ held: 3 }));
 
     const first = state().loadCoupleStreak();
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
-    await state().loadCoupleStreak();
-    older.fail(new Error('late'));
-    await first;
+    const second = state().loadCoupleStreak();
+    running.fail(new Error('boom'));
+    await Promise.all([first, second]);
 
-    expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 3 }));
     expect(state().coupleStreakError).toBeNull();
   });
 
@@ -407,15 +469,17 @@ describe('the daily-streak local copy', () => {
 
   describe('a session change', () => {
     it('a newer read during the copy read: the older read never fetches', async () => {
+      // Only a new pair starts a read beside the running one: a plain call joins it.
+      withPartner('PARTNER-A-ID');
       await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 6 }));
       fetchCoupleStreak.mockResolvedValue(okStreak({ held: 7 }));
 
       const first = state().loadCoupleStreak();
-      await state().loadCoupleStreak();
+      withPartner('PARTNER-C-ID');
       await first;
+      await vi.waitFor(() => expect(state().coupleStreak).toEqual(okStreak({ held: 7 })));
 
       expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
-      expect(state().coupleStreak).toEqual(okStreak({ held: 7 }));
     });
 
     it('during the copy read: nothing is written to state or copy', async () => {
@@ -446,6 +510,7 @@ describe('the daily-streak local copy', () => {
     });
 
     it('a newer read during the fetch: the older answer is not saved', async () => {
+      withPartner('PARTNER-A-ID');
       const older = deferred<ReturnType<typeof okStreak>>();
       fetchCoupleStreak
         .mockReturnValueOnce(older.promise)
@@ -453,11 +518,12 @@ describe('the daily-streak local copy', () => {
 
       const first = state().loadCoupleStreak();
       await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
-      await state().loadCoupleStreak();
+      withPartner('PARTNER-C-ID');
+      await vi.waitFor(() => expect(state().coupleStreak).toEqual(okStreak({ held: 8 })));
       older.settle(okStreak({ held: 7 }));
       await first;
 
-      expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 8 }), partner_id: null });
+      expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 8 }), partner_id: 'PARTNER-C-ID' });
     });
   });
 
@@ -485,17 +551,6 @@ describe('the daily-streak local copy', () => {
 describe('the partner changes in the session', () => {
   const PARTNER_A = 'PARTNER-A-ID';
   const PARTNER_C = 'PARTNER-C-ID';
-  const withPartner = (id: string) =>
-    useAppStore.setState({
-      partner: {
-        id,
-        email: 'p@example.com',
-        displayName: 'Harper',
-        linkedSince: null,
-        birthday: null,
-      },
-      partnerKnown: true,
-    });
   const unlink = () => useAppStore.setState({ partner: null, partnerKnown: true });
 
   beforeEach(() => {
@@ -706,12 +761,59 @@ describe('the partner changes in the session', () => {
     await state().loadCoupleStreak();
     expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
 
-    withPartner(PARTNER_C);
+    // The pair change itself starts the new partner's read.
     fetchCoupleStreak.mockRejectedValueOnce(new AccountDataError('transport', 'boom'));
-    await state().loadCoupleStreak();
+    withPartner(PARTNER_C);
+    await vi.waitFor(() => expect(state().coupleStreakError).toBe('boom'));
 
     expect(state().coupleStreak).toBeNull();
-    expect(state().coupleStreakError).toBe('boom');
     expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 6 }), partner_id: PARTNER_A });
+  });
+
+  it("a new pair's read never joins the old pair's: an old failure landing last changes nothing", async () => {
+    withPartner(PARTNER_A);
+    const older = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak
+      .mockReset()
+      .mockReturnValueOnce(older.promise)
+      .mockResolvedValueOnce(okStreak({ held: 8 }));
+
+    const first = state().loadCoupleStreak();
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
+    withPartner(PARTNER_C);
+    // The new pair's own read sends at once, though the old pair's is still open.
+    await vi.waitFor(() => expect(state().coupleStreak).toEqual(okStreak({ held: 8 })));
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+    older.fail(new Error('late'));
+    await first;
+
+    // The old read's end sends no trailing pass for the old pair.
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
+    expect(state().coupleStreakError).toBeNull();
+  });
+
+  it('a call during the new pair read joins that read, not the old one', async () => {
+    withPartner(PARTNER_A);
+    const older = deferred<ReturnType<typeof okStreak>>();
+    const newer = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak
+      .mockReset()
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise)
+      .mockResolvedValueOnce(okStreak({ held: 5 }));
+
+    void state().loadCoupleStreak();
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
+    withPartner(PARTNER_C);
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(2));
+    const joined = state().loadCoupleStreak();
+    newer.settle(okStreak({ held: 4 }));
+    await joined;
+
+    // One trailing pass for the new pair after its running read.
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(3);
+    expect(state().coupleStreak).toEqual(okStreak({ held: 5 }));
+    older.settle(okStreak({ held: 1 }));
   });
 });

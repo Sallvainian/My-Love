@@ -12,9 +12,13 @@
  * is at least as new), and a successful answer then replaces it (`ok`) or
  * deletes it (`unlinked`); a failed read leaves it. The copy is tagged with the
  * partner it was read with and shown only for the current partner
- * (`shownPartnerId`), as the saved days are. Only the newest started read writes
- * (a sequence counter), and a read that outlives the session writes nothing, to
- * the field or to the copy. `signedOutState()` clears all three fields.
+ * (`shownPartnerId`), as the saved days are. Overlapping calls collapse: one read
+ * runs per signed-in identity and pair, and a call that arrives meanwhile asks for
+ * one more read after it (never joins it, so the read starts after its cause) and
+ * gets the promise, which settles after that trailing pass. Only the newest
+ * started read writes (a sequence counter), and a read that outlives the session
+ * or its pair writes nothing, to the field or to the copy. `signedOutState()` clears all
+ * three fields.
  * Daily shows the streak too, so `submitDailyPick` and the queue drain
  * (`dailyDaySlice`) re-read it (`void loadCoupleStreak()`) after each pick the
  * server confirmed, once the session is still current; a queued pick and a
@@ -101,56 +105,96 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
   // The newest started `loadCoupleStreak`: an older read that lands later writes nothing.
   let streakSeq = 0;
 
+  // The new pairs seen: bumped only by `resetCoupleStreakForNewPair`, so a read
+  // started for the new pair never joins one started for the old pair.
+  let pairEpoch = 0;
+
+  // The tab's running streak read, the identity and pair it was started for,
+  // and whether a call arrived while it ran: a call for the same identity and
+  // pair asks for one more read after the running one, never joins it.
+  let streakRead: { key: string; again: boolean; promise: Promise<void> } | null = null;
+
+  /** One read: the saved streak, then the server's answer. Never throws. */
+  const readStreakOnce = async (): Promise<void> => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) return;
+    const mine = ++streakSeq;
+    const isCurrent = () =>
+      get().userId === requestedBy &&
+      get().authSessionVersion === requestedInSession &&
+      streakSeq === mine;
+
+    set({ coupleStreakLoading: true });
+
+    // 1. The saved streak, at once, over nothing only.
+    const savedFor = await shownPartnerId(get, requestedBy);
+    if (!isCurrent()) return;
+    const saved = await readSavedStreak(requestedBy, savedFor);
+    if (!isCurrent()) return;
+    if (saved && get().coupleStreak === null) {
+      set({ coupleStreak: { status: 'ok', streak: saved } });
+    }
+
+    try {
+      // 2. The server's answer, shown and then saved.
+      const answer = await fetchCoupleStreak();
+      if (!isCurrent()) return;
+      set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
+      try {
+        // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
+        const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
+        if (!isCurrent()) return;
+        await saveStreakAnswer(requestedBy, answer, partnerId);
+      } catch (error) {
+        console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
+      }
+    } catch (error) {
+      if (!isCurrent()) return;
+      // An offline refusal is expected, not a fault: the error is still set.
+      if (!(error instanceof AccountDataError && error.code === 'offline')) {
+        console.error("[DailyQuestion] Failed to load the couple's streak:", error);
+      }
+      set({
+        coupleStreakLoading: false,
+        coupleStreakError:
+          error instanceof Error ? error.message : "Could not load your couple's streak.",
+      });
+    }
+  };
+
   return {
     coupleStreak: null,
     coupleStreakLoading: false,
     coupleStreakError: null,
 
-    loadCoupleStreak: async () => {
-      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      if (!requestedBy) return;
-      const mine = ++streakSeq;
-      const isCurrent = () =>
-        get().userId === requestedBy &&
-        get().authSessionVersion === requestedInSession &&
-        streakSeq === mine;
-
-      set({ coupleStreakLoading: true });
-
-      // 1. The saved streak, at once, over nothing only.
-      const savedFor = await shownPartnerId(get, requestedBy);
-      if (!isCurrent()) return;
-      const saved = await readSavedStreak(requestedBy, savedFor);
-      if (!isCurrent()) return;
-      if (saved && get().coupleStreak === null) {
-        set({ coupleStreak: { status: 'ok', streak: saved } });
+    loadCoupleStreak: () => {
+      const { userId, authSessionVersion } = get();
+      if (!userId) return Promise.resolve();
+      const key = `${userId}:${authSessionVersion}:${pairEpoch}`;
+      // One read in flight plus one trailing pass per identity and pair: a call
+      // that arrives while a read runs asks for one more read, started after its
+      // cause (a confirmed pick, a reconnect), and gets the promise, which
+      // settles after that trailing pass.
+      if (streakRead?.key === key) {
+        streakRead.again = true;
+        return streakRead.promise;
       }
-
-      try {
-        // 2. The server's answer, shown and then saved.
-        const answer = await fetchCoupleStreak();
-        if (!isCurrent()) return;
-        set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
+      const read = { key, again: false, promise: Promise.resolve() };
+      streakRead = read;
+      read.promise = (async () => {
         try {
-          // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
-          const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
-          if (!isCurrent()) return;
-          await saveStreakAnswer(requestedBy, answer, partnerId);
-        } catch (error) {
-          console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
+          do {
+            read.again = false;
+            await readStreakOnce();
+          } while (
+            read.again &&
+            `${get().userId}:${get().authSessionVersion}:${pairEpoch}` === key
+          );
+        } finally {
+          if (streakRead === read) streakRead = null;
         }
-      } catch (error) {
-        if (!isCurrent()) return;
-        // An offline refusal is expected, not a fault: the error is still set.
-        if (!(error instanceof AccountDataError && error.code === 'offline')) {
-          console.error("[DailyQuestion] Failed to load the couple's streak:", error);
-        }
-        set({
-          coupleStreakLoading: false,
-          coupleStreakError:
-            error instanceof Error ? error.message : "Could not load your couple's streak.",
-        });
-      }
+      })();
+      return read.promise;
     },
 
     resetCoupleStreakForNewPair: () => {
@@ -158,6 +202,7 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
       // was shown or being read is read again for the new partner.
       const streakWanted = get().coupleStreak !== null || get().coupleStreakLoading;
       streakSeq += 1;
+      pairEpoch += 1;
       set({ coupleStreak: null, coupleStreakLoading: false, coupleStreakError: null });
       if (streakWanted && get().userId) void get().loadCoupleStreak();
     },

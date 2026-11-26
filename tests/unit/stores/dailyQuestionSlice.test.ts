@@ -286,6 +286,114 @@ describe('loadDailyDay', () => {
   });
 });
 
+describe('overlapping loadDailyDay calls', () => {
+  it('three overlapping calls send exactly two reads: the running one and one trailing pass', async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay
+      .mockReturnValueOnce(running.promise)
+      .mockResolvedValueOnce(ok(waitingSnapshot('this')));
+
+    const calls = [state().loadDailyDay()];
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    calls.push(state().loadDailyDay(), state().loadDailyDay());
+    await Promise.resolve();
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+    running.settle(ok(dailySnapshot()));
+    await Promise.all(calls);
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    expect(state().dailyDayLoading).toBe(false);
+  });
+
+  it('a call that arrives while a read runs gets a read started after the call, not the running one', async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    const trailing = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(running.promise).mockReturnValueOnce(trailing.promise);
+
+    const first = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    let secondSettled = false;
+    const second = state().loadDailyDay().then(() => {
+      secondSettled = true;
+    });
+    running.settle(ok(dailySnapshot()));
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    // Both promises wait for the trailing pass.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(secondSettled).toBe(false);
+    expect(state().dailyDayLoading).toBe(true);
+    trailing.settle(ok(waitingSnapshot('this')));
+    await Promise.all([first, second]);
+
+    expect(secondSettled).toBe(true);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it('a read that fails still gets its trailing pass, and a later pass clears the error', async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay
+      .mockReturnValueOnce(running.promise)
+      .mockResolvedValueOnce(ok(dailySnapshot()));
+
+    const first = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    const second = state().loadDailyDay();
+    running.fail(new AccountDataError('transport', 'boom'));
+    await Promise.all([first, second]);
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(state().dailyDayError).toBeNull();
+  });
+
+  it('a call after the reads ended starts a new read', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+    await state().loadDailyDay();
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+  });
+
+  it('a call in a new session starts its own read and never joins the old session\'s', async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(old.promise).mockResolvedValueOnce(ok(waitingSnapshot('this')));
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    await state().loadDailyDay();
+
+    // The new session's read sent while the old one was still open.
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+
+    // The old read's end writes nothing and sends no trailing pass.
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it('a call that asks for a trailing pass in a session that ended sends nothing for it', async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(old.promise);
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    void state().loadDailyDay();
+    state().clearAuth();
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+    expect(state().dailyDay).toBeNull();
+  });
+});
+
 describe('the saved days copy', () => {
   const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({
     [snapshot.day_id]: { ...snapshot, partner_id: null },
