@@ -28,8 +28,8 @@
  * A test visits Daily and Partner online before going offline so their lazy
  * chunks are loaded.
  *
- * Accounts: tests 1 and 2 use this worker's pooled pair, whose days are cleared
- * before each test and again at teardown. Tests 3 and 4 make throwaway accounts
+ * Accounts: items 1-3 use this worker's pooled pair, whose days are cleared
+ * before each test and again at teardown. Items 4 and 5 make throwaway accounts
  * and links and relinks only those; nothing links, unlinks or resets a pool
  * account.
  */

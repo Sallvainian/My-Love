@@ -159,6 +159,9 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
       await streakSettled(inSession);
       if (!inSession()) return;
       const partnerId = await mergePartnerId(get, userId);
+      // A full first page means the server has a partner; a null here is a failed
+      // lookup, and a null tag would hide every day this pages in.
+      if (partnerId === null || !inSession()) return;
       let cursor = startCursor;
       for (;;) {
         if (!inSession()) return;

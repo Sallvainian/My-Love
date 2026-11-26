@@ -88,6 +88,9 @@ beforeEach(() => {
   setOnline(true);
   state().clearAuth();
   state().setAuthUser(A);
+  // The slice keeps `historyFromCopy` and its generation in closure variables that
+  // sign-out does not reset; a test must not inherit them from an earlier one.
+  state().resetDailyHistoryForNewPair();
 });
 
 afterEach(async () => {
@@ -786,7 +789,8 @@ describe('the daily-days copy behind the past questions', () => {
     expect(state().dailyHistory).toHaveLength(2);
     expect(state().dailyHistoryEnd).toBe(true);
     const fresh = run(DAILY_HISTORY_PAGE_SIZE);
-    fetchDailyHistory.mockResolvedValueOnce(fresh);
+    // The page after the full one ends the background fill.
+    fetchDailyHistory.mockResolvedValueOnce(fresh).mockResolvedValueOnce([]);
 
     await state().loadDailyHistory();
 
@@ -824,8 +828,11 @@ describe('the daily-days copy behind the past questions', () => {
       expect(state().dailyHistory).toEqual(fresh);
       expect(state().dailyHistoryEnd).toBe(false);
       expect(state().dailyHistoryError).toBeNull();
+      // The fill the fresh page started has already asked for the page before its oldest day.
+      const callsBefore = fetchDailyHistory.mock.calls.length;
       fetchDailyHistory.mockResolvedValueOnce([]);
       await state().loadMoreDailyHistory();
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(callsBefore + 1);
       expect(fetchDailyHistory).toHaveBeenLastCalledWith('2026-10-02');
     });
 
@@ -975,6 +982,19 @@ describe('the daily-days copy behind the past questions', () => {
       await state().loadDailyHistory();
 
       expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fill when no partner is known and the lookup fails: a null tag would hide every day it saved', async () => {
+      useAppStore.setState({ partner: null, partnerKnown: false });
+      vi.mocked(lookupPartnerId).mockRejectedValue(new Error('lookup failed'));
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockResolvedValueOnce(MIDDLE);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+      expect(fetchDailyHistory).toHaveBeenCalledWith();
+      expect(state().dailyHistory).toEqual(FIRST);
+      expect(console.error).not.toHaveBeenCalled();
     });
 
     it('stops when a page goes no further back', async () => {
@@ -1148,7 +1168,8 @@ describe('the partner changes in the session', () => {
 
   it('a load-more read in flight for the old partner writes nothing, to the field or the copy', async () => {
     withPartner(PARTNER_A);
-    fetchDailyHistory.mockResolvedValueOnce(run(DAILY_HISTORY_PAGE_SIZE));
+    // The page after the full one ends the background fill.
+    fetchDailyHistory.mockResolvedValueOnce(run(DAILY_HISTORY_PAGE_SIZE)).mockResolvedValueOnce([]);
     await state().loadDailyHistory();
     await vi.waitFor(async () => expect(await copyOf()).not.toBeNull());
     const before = await copyOf();
@@ -1205,7 +1226,8 @@ describe('the partner changes in the session', () => {
     expect(state().dailyHistory).toHaveLength(1);
 
     withPartner(PARTNER_C);
-    fetchDailyHistory.mockResolvedValueOnce(run(DAILY_HISTORY_PAGE_SIZE));
+    // The page after the full one ends the background fill.
+    fetchDailyHistory.mockResolvedValueOnce(run(DAILY_HISTORY_PAGE_SIZE)).mockResolvedValueOnce([]);
     await state().loadDailyHistory();
 
     expect(state().dailyHistory).toEqual(run(DAILY_HISTORY_PAGE_SIZE));
