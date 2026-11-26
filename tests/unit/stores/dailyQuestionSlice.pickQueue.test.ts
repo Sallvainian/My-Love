@@ -32,7 +32,12 @@ import { pickZone } from '../../../src/api/dailyQuestionApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { deleteAccountCopies, readLocalCopy } from '../../../src/services/localCopy';
-import { type QueuedPick, enqueuePick, listQueuedPicks } from '../../../src/services/pickQueue';
+import {
+  type QueuedPick,
+  enqueuePick,
+  listQueuedPicks,
+  removeQueuedPick,
+} from '../../../src/services/pickQueue';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { PICK_QUEUE_LOCK } from '../../../src/services/syncLock';
 import { useAppStore } from '../../../src/stores/useAppStore';
@@ -487,6 +492,39 @@ describe('drainQueuedPicks', () => {
     expect(state().dailyQueuedPicks).toEqual([]);
   });
 
+  it('same-account re-login during the send: the confirmed pick is still announced, nothing else is written', async () => {
+    await enqueuePick(queued());
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const drain = state().drainQueuedPicks();
+    await vi.waitFor(() => expect(submitDailyPickRequest).toHaveBeenCalled());
+    state().clearAuth();
+    state().setAuthUser(A);
+    request.settle(waitingSnapshot('this'));
+    await drain;
+
+    expect(await listQueuedPicks(A)).toEqual([]);
+    expect(announceDailyPick).toHaveBeenCalledTimes(1);
+    expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
+    expect(await copy()).toBeNull();
+  });
+
+  it('sign-out during the send: the row goes and nothing is announced', async () => {
+    await enqueuePick(queued());
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const drain = state().drainQueuedPicks();
+    await vi.waitFor(() => expect(submitDailyPickRequest).toHaveBeenCalled());
+    state().clearAuth();
+    request.settle(waitingSnapshot('this'));
+    await drain;
+
+    expect(await listQueuedPicks(A)).toEqual([]);
+    expect(announceDailyPick).not.toHaveBeenCalled();
+  });
+
   it('lock held by another tab: sends nothing here, then reloads the day once it lets go', async () => {
     const tab = stubWebLocks();
     await enqueuePick(queued());
@@ -508,6 +546,158 @@ describe('drainQueuedPicks', () => {
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
     // The field is refreshed after the wait: the row is still there to show.
     expect(state().dailyQueuedPicks.map((row) => row.day_id)).toEqual([DAY_ID]);
+  });
+});
+
+describe("a refused pick for another day, after the server answers for today", () => {
+  const OLD_DAY = '00000000-0000-4000-8000-0000000000d0';
+  const refused = (overrides: Partial<QueuedPick> = {}) =>
+    queued({ day_id: OLD_DAY, failed: true, failure: 'REFUSED', ...overrides });
+
+  it("is deleted from the account's queue and from the shown rows", async () => {
+    await enqueuePick(refused());
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+
+    expect(await listQueuedPicks(A)).toEqual([]);
+    expect(state().dailyQueuedPicks).toEqual([]);
+  });
+
+  it("keeps a pending row, today's refused row, and another account's rows", async () => {
+    await enqueuePick(refused());
+    await enqueuePick(queued({ day_id: DAY_2 }));
+    await enqueuePick(queued({ failed: true, failure: 'REFUSED' }));
+    await enqueuePick(refused({ user_id: B }));
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+
+    expect((await listQueuedPicks(A)).map((row) => row.day_id).sort()).toEqual([DAY_ID, DAY_2]);
+    expect((await listQueuedPicks(B)).map((row) => row.day_id)).toEqual([OLD_DAY]);
+    expect(state().dailyQueuedPicks.map((row) => row.day_id).sort()).toEqual([DAY_ID, DAY_2]);
+  });
+
+  it('stays when the server read fails, or answers unlinked', async () => {
+    await enqueuePick(refused());
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('offline', 'You are offline.'));
+    await state().loadDailyDay();
+    fetchDailyDay.mockResolvedValueOnce({ status: 'unlinked' });
+    await state().loadDailyDay();
+
+    expect((await listQueuedPicks(A)).map((row) => row.day_id)).toEqual([OLD_DAY]);
+  });
+
+  it('stays when the answer is for a day other than the device date', async () => {
+    await enqueuePick(refused());
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ day: '2026-11-04' })));
+
+    await state().loadDailyDay();
+
+    expect((await listQueuedPicks(A)).map((row) => row.day_id)).toEqual([OLD_DAY]);
+  });
+
+  it('logs a failing delete and still shows the day', async () => {
+    await enqueuePick(refused());
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(() => {
+      throw new Error('IDB-DOWN');
+    });
+
+    await state().loadDailyDay();
+
+    expect(console.error).toHaveBeenCalledWith(
+      '[DailyQuestion] Could not clear refused picks for other days:',
+      expect.objectContaining({ message: 'IDB-DOWN' })
+    );
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(state().dailyDayError).toBeNull();
+  });
+});
+
+describe('another tab held the lock and let go', () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+    // setTimeout is faked for the retry timer; fake-indexeddb runs on setImmediate.
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(SAME_DAY);
+  });
+
+  /** Another tab takes the lock; `release` lets it go once `during` has run. */
+  async function otherTabHolds(during: () => Promise<void> = async () => {}) {
+    const tab = stubWebLocks();
+    const holder = deferred<void>();
+    const holding = tab.locks.request(PICK_QUEUE_LOCK, () => holder.promise);
+    return {
+      release: async () => {
+        await during();
+        holder.settle();
+        await holding;
+      },
+    };
+  }
+
+  it('retries a row that is still pending, as a transient stop does, and sends it', async () => {
+    await enqueuePick(queued());
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    const other = await otherTabHolds();
+
+    const drain = state().drainQueuedPicks();
+    await other.release();
+    await drain;
+
+    expect(submitDailyPickRequest).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(1);
+
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() => expect(submitDailyPickRequest).toHaveBeenCalledTimes(1));
+    await vi.waitFor(async () => expect(await listQueuedPicks(A)).toEqual([]));
+    await vi.waitFor(() => expect(vi.getTimerCount()).toBe(0));
+  });
+
+  it('sets no retry when the other tab sent the row, and a pass that ends done cancels one', async () => {
+    await enqueuePick(queued());
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    // A transient stop here leaves a retry timer.
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'Network error'));
+    await state().drainQueuedPicks();
+    expect(vi.getTimerCount()).toBe(1);
+
+    const other = await otherTabHolds(() => removeQueuedPick(A, DAY_ID));
+    const drain = state().drainQueuedPicks();
+    await other.release();
+    await drain;
+
+    expect(await listQueuedPicks(A)).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('sets no retry for a refused row, which is not pending', async () => {
+    await enqueuePick(queued({ failed: true, failure: 'REFUSED' }));
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    const other = await otherTabHolds();
+
+    const drain = state().drainQueuedPicks();
+    await other.release();
+    await drain;
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('sets no retry when the session changed while it waited', async () => {
+    await enqueuePick(queued());
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    const other = await otherTabHolds(async () => {
+      state().clearAuth();
+    });
+
+    const drain = state().drainQueuedPicks();
+    await other.release();
+    await drain;
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(submitDailyPickRequest).not.toHaveBeenCalled();
   });
 });
 

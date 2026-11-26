@@ -100,6 +100,7 @@ import {
   enqueuePick,
   listQueuedPicks,
   markQueuedPickFailed,
+  removeFailedQueuedPicksExcept,
   removeQueuedPick,
 } from '../../services/pickQueue';
 import { PICK_QUEUE_LOCK, waitForSyncLock, withSyncLock } from '../../services/syncLock';
@@ -189,7 +190,10 @@ export interface DailyDaySlice {
   declineWrittenQuestion: (dayId: string) => Promise<void>;
 }
 
-/** What one drain pass ended on (see `drainOnce`). */
+/**
+ * What one drain pass ended on (see `drainOnce`). `other-tab` means another
+ * tab held the lock and pending rows remain after it let go.
+ */
 type DrainPassOutcome = 'done' | 'transient' | 'stale' | 'offline' | 'other-tab' | 'failed';
 
 /**
@@ -237,6 +241,26 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         failure: row.failure,
       })),
     });
+  };
+
+  /**
+   * Delete the account's `failed` queue rows for days other than `keepDayId`,
+   * then refresh the shown rows. Never throws: a failure is logged and the rows
+   * stay for the next read. The delete is scoped to `userId`, so it cannot
+   * touch another account's rows even if the session changed meanwhile.
+   */
+  const pruneFailedPicks = async (
+    userId: string,
+    keepDayId: string,
+    isCurrent: () => boolean
+  ): Promise<void> => {
+    try {
+      if (!isCurrent()) return;
+      const removed = await removeFailedQueuedPicksExcept(userId, keepDayId);
+      if (removed > 0) await showQueuedPicks(userId, isCurrent);
+    } catch (error) {
+      console.error('[DailyQuestion] Could not clear refused picks for other days:', error);
+    }
   };
 
   /**
@@ -318,6 +342,13 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     }
   });
 
+  /** Tell the partner's open Daily about a confirmed pick, without waiting for it. */
+  const announceConfirmedPick = (dayId: string): void => {
+    void announceDailyPick(dayId).catch((error: unknown) => {
+      console.error('[DailyQuestion] Could not announce the pick:', error);
+    });
+  };
+
   /**
    * One pass over the signed-in account's pending rows. Never throws. Answers
    * what the pass ended on, which decides the retry.
@@ -355,10 +386,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
           }
           // Confirmed: the pick is committed, whatever the session did meanwhile.
           await removeQueuedPick(requestedBy, row.day_id);
+          // Announce while the same account is signed in, even across a
+          // same-account re-login (it bumps the session version): the
+          // announcement resolves the partner from the current session, so a
+          // switch to another account or a sign-out must send nothing.
+          if (get().userId === requestedBy) announceConfirmedPick(snapshot.day_id);
           if (!isCurrent()) return 'stale';
-          void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
-            console.error('[DailyQuestion] Could not announce the pick:', error);
-          });
           // A late pick can finish a past date: the streak corrects itself.
           void get().loadCoupleStreak();
           const partnerId = await mergePartnerId(get, requestedBy);
@@ -377,11 +410,18 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       if (pass.ran) {
         result = pass.result;
       } else {
-        // Another tab is sending: look at what it did once it lets go. Its
-        // own retry covers a transient stop there.
-        result = 'other-tab';
+        // Another tab is sending: look at what it did once it lets go. If it
+        // left pending rows (it stopped on a transient failure and may have
+        // closed, taking its retry timer along), this tab retries them.
+        result = 'stale';
         await waitForSyncLock(PICK_QUEUE_LOCK);
-        if (isCurrent()) await get().loadDailyDay();
+        if (isCurrent()) {
+          await get().loadDailyDay();
+          if (isCurrent()) {
+            const left = (await listQueuedPicks(requestedBy)).filter((row) => !row.failed);
+            result = left.length > 0 ? 'other-tab' : 'done';
+          }
+        }
       }
     } catch (error) {
       console.error('[DailyQuestion] Could not send the queued picks:', error);
@@ -444,6 +484,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
           dailyDayLoading: false,
           dailyDayError: null,
         });
+        // A server answer for today: a refused pick for another day is shown
+        // nowhere and no new pick can replace it, so it goes (DW-483).
+        if (answer.status === 'ok' && answer.snapshot.day === today) {
+          await pruneFailedPicks(requestedBy, answer.snapshot.day_id, isCurrent);
+        }
       } catch (error) {
         if (!isCurrent()) return;
         const shown = get().dailyDay;
@@ -539,12 +584,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         console.error('[DailyQuestion] Could not clear the queued pick:', error);
       }
       await showQueuedPicks(requestedBy, isCurrent);
-      if (!isCurrent()) return;
       // Tell the partner's open Daily, without waiting for it: the pick is
-      // confirmed and stays shown whatever the broadcast does.
-      void announceDailyPick(snapshot.day_id).catch((error: unknown) => {
-        console.error('[DailyQuestion] Could not announce the pick:', error);
-      });
+      // confirmed and stays shown whatever the broadcast does. A same-account
+      // re-login still announces; a switch or sign-out does not (the partner
+      // is resolved from the current session).
+      if (get().userId === requestedBy) announceConfirmedPick(snapshot.day_id);
+      if (!isCurrent()) return;
       // The pick may finish the day: re-read the streak, without waiting.
       void get().loadCoupleStreak();
       // A confirmed own write is a fill source for the copy.
@@ -585,7 +630,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
           const { userId, authSessionVersion } = get();
           if (outcome === 'done' || outcome === 'offline') {
             cancelDrainRetry();
-          } else if ((outcome === 'transient' || outcome === 'failed') && userId && isOnline()) {
+          } else if (
+            (outcome === 'transient' || outcome === 'failed' || outcome === 'other-tab') &&
+            userId &&
+            isOnline()
+          ) {
             scheduleDrainRetry(userId, authSessionVersion);
           }
         } finally {

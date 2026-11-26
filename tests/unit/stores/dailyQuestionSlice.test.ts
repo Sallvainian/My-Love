@@ -737,6 +737,34 @@ describe('submitDailyPick', () => {
     expect(announceDailyPick).not.toHaveBeenCalled();
   });
 
+  it('announces the confirmed pick after a same-account re-login during the send', async () => {
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+    const account = state().userId as string;
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    state().setAuthUser(account);
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(announceDailyPick).toHaveBeenCalledTimes(1);
+    expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
+  });
+
+  it('announces nothing when another account signed in before the answer', async () => {
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    state().setAuthUser('USER-OTHER-ID');
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(announceDailyPick).not.toHaveBeenCalled();
+  });
+
   it('does not let a lower-state answer undo a stored reveal', async () => {
     useAppStore.setState({ dailyDay: ok(revealSnapshot('this', 'that')) });
     submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
