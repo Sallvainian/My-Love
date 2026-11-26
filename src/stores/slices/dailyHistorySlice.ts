@@ -22,8 +22,22 @@
  * no cap), and a failed first read with nothing shown fills the list from that
  * copy (the current partner's `both` days, newest first, `dailyHistoryEnd`
  * set); the next successful first page replaces such a list rather than
- * merging with it, and a failed read never writes the copy.
- * `signedOutState()` clears all seven fields.
+ * merging with it, and a failed read never writes the copy. An offline refusal
+ * (of the first page or of a "more") with rows already shown appends the saved
+ * rows older than the oldest shown, sets `dailyHistoryEnd` and marks the list
+ * as filled from the copy, so the next online first page replaces it and the
+ * paging resumes; with no older saved row nothing changes.
+ *
+ * The copy is filled in the background too: after a full first page lands
+ * online, `fillCopyInBackground` pages every older done day into the
+ * `daily-days` copy only (never into `dailyHistory`), through `mergeDailyDays`,
+ * until a short page, a page that goes no further back, or until the saved done
+ * days for the partner reach the streak's `done` (it waits for a streak read
+ * under way and reads the count before each page, so a copy already complete
+ * asks for nothing). One fill runs at a time per session and pair; a session or
+ * pair change stops it before its next write, an offline refusal or a failure
+ * ends it quietly or with a log, and it never sets the error fields.
+ * `loadDailyHistory` resolves after it. `signedOutState()` clears all seven fields.
  *
  * When the shown partner changes from one id to another in a session, the day
  * slice's one pair-change subscriber calls `resetDailyHistoryForNewPair`: the
@@ -69,7 +83,10 @@ export interface DailyHistorySlice {
   resetDailyHistoryForNewPair: () => void;
 }
 
-export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set, get, _api) => {
+const isOfflineRefusal = (error: unknown): boolean =>
+  error instanceof AccountDataError && error.code === 'offline';
+
+export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set, get, api) => {
   // The newest started `loadDailyHistory`: an older read that lands later writes nothing.
   let historySeq = 0;
   // The shown history was filled from the copy after a failed first read: the
@@ -78,6 +95,97 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
   // Bumped when the shown partner changes: a history read started under an
   // older generation belongs to the old pair and writes nothing.
   let pairGeneration = 0;
+  // The background copy fill under way, if any: one at a time per session and pair.
+  let activeFill: { userId: string; version: number; generation: number } | null = null;
+
+  /**
+   * Rows saved in the copy older than the oldest shown are appended to the list
+   * after an offline refusal, which then counts as filled from the copy. Writes
+   * nothing when the copy has no older row, the list is empty, or the session,
+   * the pair or the list's oldest day changed meanwhile.
+   */
+  const appendSavedOlder = async (userId: string, inSession: () => boolean) => {
+    const asked = get().dailyHistory?.at(-1)?.day;
+    if (asked === undefined) return;
+    const partnerId = await shownPartnerId(get, userId);
+    if (!inSession()) return;
+    const saved = await readSavedDailyHistory(userId, partnerId);
+    if (!inSession()) return;
+    const rows = get().dailyHistory;
+    if (!rows || rows[rows.length - 1]?.day !== asked) return;
+    const present = new Set(rows.map((row) => row.day_id));
+    const older = saved.filter((row) => row.day < asked && !present.has(row.day_id));
+    if (older.length === 0) return;
+    historyFromCopy = true;
+    set({ dailyHistory: [...rows, ...older], dailyHistoryEnd: true });
+  };
+
+  /** Resolves once no streak read is in flight (or `inSession` stops holding). */
+  const streakSettled = (inSession: () => boolean) =>
+    new Promise<void>((resolve) => {
+      if (!get().coupleStreakLoading || !inSession()) return resolve();
+      const unsubscribe = api.subscribe(() => {
+        if (get().coupleStreakLoading && inSession()) return;
+        unsubscribe();
+        resolve();
+      });
+    });
+
+  /**
+   * Page every done day older than `cursor` into the `daily-days` copy and
+   * nothing else, until a short page, a page that goes no further back, the
+   * streak's `done` is saved for the partner, or the session or the pair
+   * changes. Never throws and never sets a field.
+   */
+  const fillCopyInBackground = async (userId: string, startCursor: string) => {
+    const version = get().authSessionVersion;
+    const generation = pairGeneration;
+    const inSession = () =>
+      get().userId === userId &&
+      get().authSessionVersion === version &&
+      pairGeneration === generation;
+    if (
+      activeFill &&
+      activeFill.userId === userId &&
+      activeFill.version === version &&
+      activeFill.generation === generation
+    ) {
+      return;
+    }
+    const mine = { userId, version, generation };
+    activeFill = mine;
+    try {
+      // The server's count decides when the copy is complete; wait for a read under way.
+      await streakSettled(inSession);
+      if (!inSession()) return;
+      const partner = await mergePartnerId(get, userId);
+      // A full first page means the server has a partner; anything but `linked`
+      // here is a failed lookup, and an untagged day would be hidden once paged in.
+      if (partner.status !== 'linked' || !inSession()) return;
+      const { partnerId } = partner;
+      let cursor = startCursor;
+      for (;;) {
+        if (!inSession()) return;
+        const streak = get().coupleStreak;
+        const wanted = streak?.status === 'ok' ? streak.streak.done : null;
+        if (wanted !== null) {
+          const saved = await readSavedDailyHistory(userId, partnerId);
+          if (!inSession() || saved.length >= wanted) return;
+        }
+        const days = await fetchDailyHistory(cursor);
+        if (!inSession()) return;
+        await mergeDailyDays(userId, days, partner, inSession);
+        const oldest = days[days.length - 1];
+        if (days.length < DAILY_HISTORY_PAGE_SIZE || !oldest || oldest.day >= cursor) return;
+        cursor = oldest.day;
+      }
+    } catch (error) {
+      if (!inSession() || isOfflineRefusal(error)) return;
+      console.error('[DailyQuestion] Failed to fill the past questions copy:', error);
+    } finally {
+      if (activeFill === mine) activeFill = null;
+    }
+  };
 
   return {
     dailyHistory: null,
@@ -135,17 +243,22 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
         const partner = await mergePartnerId(get, requestedBy);
         if (!inSession()) return;
         await mergeDailyDays(requestedBy, days, partner, inSession);
+        // A full page means older done days exist: save them for offline too.
+        const oldestRead = days[days.length - 1];
+        if (days.length >= DAILY_HISTORY_PAGE_SIZE && oldestRead && inSession()) {
+          await fillCopyInBackground(requestedBy, oldestRead.day);
+        }
       } catch (error) {
         if (!isCurrent()) return;
         // An offline refusal is expected, not a fault: the error is still set.
-        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+        if (!isOfflineRefusal(error)) {
           console.error('[DailyQuestion] Failed to load the past questions:', error);
         }
         set({
           dailyHistoryLoading: false,
           dailyHistoryError:
             error instanceof Error ? error.message : 'Could not load your past questions.',
-          dailyHistoryErrorOffline: error instanceof AccountDataError && error.code === 'offline',
+          dailyHistoryErrorOffline: isOfflineRefusal(error),
           dailyHistoryErrorMore: false,
         });
         // Nothing shown: fill the list from the copy (never written on a failure).
@@ -158,6 +271,9 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
             set({ dailyHistory: saved, dailyHistoryEnd: true });
             historyFromCopy = true;
           }
+        } else if (isOfflineRefusal(error)) {
+          // Rows shown: the saved ones older than the oldest follow them.
+          await appendSavedOlder(requestedBy, isCurrent);
         }
       }
     },
@@ -201,7 +317,7 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
         await mergeDailyDays(requestedBy, days, partner, inSession);
       } catch (error) {
         if (!inSession()) return;
-        if (!(error instanceof AccountDataError && error.code === 'offline')) {
+        if (!isOfflineRefusal(error)) {
           console.error('[DailyQuestion] Failed to load more past questions:', error);
         }
         // A failed first page still pending outranks this: it keeps the error
@@ -214,9 +330,11 @@ export const createDailyHistorySlice: AppStateCreator<DailyHistorySlice> = (set,
           dailyHistoryLoadingMore: false,
           dailyHistoryError:
             error instanceof Error ? error.message : 'Could not load your past questions.',
-          dailyHistoryErrorOffline: error instanceof AccountDataError && error.code === 'offline',
+          dailyHistoryErrorOffline: isOfflineRefusal(error),
           dailyHistoryErrorMore: true,
         });
+        // Offline, the saved rows older than the oldest shown follow it.
+        if (isOfflineRefusal(error)) await appendSavedOlder(requestedBy, inSession);
       }
     },
 

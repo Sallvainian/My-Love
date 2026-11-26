@@ -337,17 +337,75 @@ describe('PastQuestionsPage', () => {
       expect(screen.queryByTestId('partner-history-retry')).not.toBeInTheDocument();
     });
 
-    it('offers no Retry above an empty list or while offline', () => {
+    it('offers Retry above an empty list online, which reads the first page again', async () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      renderPage({ history: [] });
+
+      expect(screen.getByTestId('partner-history-error')).toBeVisible();
+      const retry = within(screen.getByTestId('partner-history-error')).getByTestId(
+        'partner-history-retry'
+      );
+      expect(retry).toBeEnabled();
+      await userEvent.setup().click(retry);
+
+      expect(state.loadDailyHistory).toHaveBeenCalledTimes(1);
+      expect(state.loadMoreDailyHistory).not.toHaveBeenCalled();
+    });
+
+    it('offers Retry after a failed first read that left the list unloaded (null)', () => {
+      state.dailyHistoryError = 'Could not load your past questions.';
+      renderPage({ history: null });
+
+      expect(screen.getByTestId('partner-history-error')).toBeVisible();
+      expect(screen.getByTestId('partner-history-retry')).toBeInTheDocument();
+      expect(screen.queryByTestId('partner-history-loading')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('partner-history-empty')).not.toBeInTheDocument();
+    });
+
+    it('offers no Retry above an empty list while offline, or under rows while offline', () => {
+      state.syncStatus = { isOnline: false };
       state.dailyHistoryError = 'Could not load your past questions.';
       renderPage({ history: [] });
       expect(screen.getByTestId('partner-history-error')).toBeVisible();
       expect(screen.queryByTestId('partner-history-retry')).not.toBeInTheDocument();
 
       cleanup();
-      state.syncStatus = { isOnline: false };
       renderPage();
       expect(screen.getByTestId('partner-history-error')).toBeVisible();
       expect(screen.queryByTestId('partner-history-retry')).not.toBeInTheDocument();
+    });
+
+    it('shows "No past questions yet" when the read found none, and no loading block or error', () => {
+      renderPage({ history: [] });
+
+      expect(screen.getByTestId('partner-history-empty')).toHaveTextContent('No past questions yet');
+      expect(screen.getByTestId('partner-history-title')).toBeVisible();
+      expect(screen.queryByTestId('partner-history-loading')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('partner-history-error')).not.toBeInTheDocument();
+    });
+
+    it('shows the loading block, not the empty line, while nothing has been read (null)', () => {
+      renderPage({ history: null });
+
+      expect(screen.getByTestId('partner-history-loading')).toBeVisible();
+      expect(screen.queryByTestId('partner-history-empty')).not.toBeInTheDocument();
+    });
+
+    it('shows no empty line while a read runs, after a failed read, or with rows', () => {
+      state.dailyHistoryLoading = true;
+      renderPage({ history: [] });
+      expect(screen.queryByTestId('partner-history-empty')).not.toBeInTheDocument();
+
+      cleanup();
+      state.dailyHistoryLoading = false;
+      state.dailyHistoryError = 'Could not load your past questions.';
+      renderPage({ history: [] });
+      expect(screen.queryByTestId('partner-history-empty')).not.toBeInTheDocument();
+
+      cleanup();
+      state.dailyHistoryError = null;
+      renderPage();
+      expect(screen.queryByTestId('partner-history-empty')).not.toBeInTheDocument();
     });
 
     it('shows no loading block or error when the read succeeded', () => {

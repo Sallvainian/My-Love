@@ -48,12 +48,13 @@ export function usePartnerLinkListener(): void {
   const loadPartner = useAppStore((state) => state.loadPartner);
   const loadPendingRequests = useAppStore((state) => state.loadPendingRequests);
 
-  // Wait for the first partner load, then stop watching isLoadingPartner: every
-  // later load (each reconnect, each Partner-tab mount) raises it too, and
-  // gating on it tore the channel down and re-joined it each time, dropping any
-  // broadcast that landed in between. Before a load has even started the store
-  // reads "no partner" for a linked account as well, so that is not settled
-  // either. A partner or a load error is written only by a finished load.
+  // Wait for the first partner load, then stop watching isLoadingPartner: only
+  // a session's first load (or a retry over a load error) raises it, and the
+  // latch settles the hook on that one rise, so a later rise never tears the
+  // channel down and re-joins it, dropping any broadcast that landed in
+  // between. Before a load has even started the store reads "no partner" for a
+  // linked account as well, so that is not settled either. A partner or a load
+  // error is written only by a finished load.
   const session = userId ? `${userId}:${authSessionVersion}` : null;
   const [firstLoad, setFirstLoad] = useState<FirstLoad>({
     session: null,

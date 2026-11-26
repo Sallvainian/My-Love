@@ -11,6 +11,15 @@
  * row, watched by an `IntersectionObserver` with a 600px margin, asks the slice
  * for the next page (`loadMoreDailyHistory`) as the list nears its end.
  *
+ * Without a day to show it never paints the title alone. A `null` history with
+ * no failed read (the first read has not answered or started) counts as
+ * loading, shown as a loading card; a read that answered with no day both
+ * partners picked shows a muted "No past questions yet" card (`[]` is none,
+ * `null` is not loaded, which is why `PartnerView` passes the history through).
+ * A first read that failed with no row to show gets the error box with a Retry
+ * (online only) that runs the first read again; a failed "more" under rows
+ * keeps its own Retry.
+ *
  * Back runs `history.back()` when the app created the entry; on a page a fresh
  * load opened it replaces the entry with `/partner` instead of leaving the app.
  * It sits inside `<main>`, so it inherits `--dock-clearance` and
@@ -53,7 +62,8 @@ function formatDay(day: string): string {
 
 interface PastQuestionsPageProps {
   partnerName: string;
-  history: DailyDaySnapshot[];
+  /** `null` before the first read answered (or filled the list); `[]` once it found no day. */
+  history: DailyDaySnapshot[] | null;
   /** The couple's streak, when it was read; the summary needs it. */
   streak: CoupleStreak | null;
 }
@@ -71,7 +81,7 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const days = history.filter(isShown);
+  const days = (history ?? []).filter(isShown);
 
   useEffect(() => {
     window.scrollTo?.(0, 0);
@@ -148,7 +158,9 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
           )}
         </div>
 
-        {days.length === 0 && dailyHistoryLoading && (
+        {/* Nothing answered yet counts as loading: the first read starts after the
+            first paint, and `null` is not "no past question". */}
+        {days.length === 0 && (dailyHistoryLoading || (history === null && !dailyHistoryError)) && (
           <div
             className="flex flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-5 py-10 text-center shadow-card"
             data-testid="partner-history-loading"
@@ -157,6 +169,21 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
             <p className="text-sm text-muted">Loading your past questions...</p>
           </div>
         )}
+
+        {/* A read that answered with no day both partners picked. */}
+        {history !== null &&
+          days.length === 0 &&
+          (history.length === 0 || dailyHistoryEnd) &&
+          !dailyHistoryLoading &&
+          !dailyHistoryLoadingMore &&
+          !dailyHistoryError && (
+            <div
+              className="rounded-[20px] border border-line bg-card px-5 py-10 text-center shadow-card"
+              data-testid="partner-history-empty"
+            >
+              <p className="text-sm text-muted">No past questions yet</p>
+            </div>
+          )}
 
         {days.length > 0 && (
           <div className="rounded-[20px] border border-line bg-card px-3.5 shadow-card">
@@ -228,9 +255,10 @@ export function PastQuestionsPage({ partnerName, history, streak }: PastQuestion
           >
             <span>{dailyHistoryError}</span>
             {/* Nothing re-asks after a failed read under the rows (the sentinel
-                stays in view after a "more"), so the person does: Retry runs the
-                read that failed. A failed "more" at the end has none left to ask. */}
-            {days.length > 0 && isOnline && !(dailyHistoryErrorMore && dailyHistoryEnd) && (
+                stays in view after a "more"), and nothing does after a failed first
+                read with no rows (it is not observed), so the person does: Retry runs
+                the read that failed. A failed "more" at the end has none left to ask. */}
+            {isOnline && !(dailyHistoryErrorMore && dailyHistoryEnd) && (
               <button
                 type="button"
                 className={SECONDARY_BUTTON}

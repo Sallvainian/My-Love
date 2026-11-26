@@ -7,8 +7,14 @@
  *     `PartnerLoadError`, never the Connect UI;
  *   - no partner, nothing failed: `PartnerConnect` alone (search, requests,
  *     linking), whatever the slice holds for the streak;
- *   - a partner: their name, then the streak card, then (when the history holds
- *     a day both partners picked) the Past questions card.
+ *   - a partner: their name, then in place of the streak card a loading block
+ *     while the streak is being read or has not been asked yet (a null answer with
+ *     nothing loading or failed), the streak card once there is an `ok` answer,
+ *     or an error box with a Retry (online only) when the read failed with
+ *     nothing to show; then (when the history holds a day both partners picked)
+ *     the Past questions card. An `unlinked` streak answer under a shown partner
+ *     reads the partner again (once per answer), so the partner slice decides
+ *     between the name and the Connect UI.
  *
  * The streak is read when a partner is present (keyed on the partner's id) and
  * kept current by `usePartnerStreakListener`. The slice shows the saved
@@ -35,12 +41,14 @@ import { PartnerConnect } from './PartnerConnect';
 import { PartnerLoadError } from './PartnerLoadError';
 import { PastQuestionsCard } from './PastQuestionsCard';
 import { PastQuestionsPage } from './PastQuestionsPage';
+import { SECONDARY_BUTTON } from '../shared/kitClasses';
 import { StreakCard } from './StreakCard';
 
 export function PartnerView() {
   const partner = useAppStore((state) => state.partner);
   const isLoadingPartner = useAppStore((state) => state.isLoadingPartner);
   const partnerLoadError = useAppStore((state) => state.partnerLoadError);
+  const partnerKnown = useAppStore((state) => state.partnerKnown);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const loadPartner = useAppStore((state) => state.loadPartner);
   const loadPendingRequests = useAppStore((state) => state.loadPendingRequests);
@@ -76,8 +84,10 @@ export function PartnerView() {
   // copy first; offline the read refuses and what is shown (the copy, if any)
   // stays. They are read offline too (not gated), and again when the device
   // comes back online. The history shows no copy first: a refused first read
-  // with nothing shown fills it from the `daily-days` copy, and the next
-  // online read replaces that fill.
+  // fills it from the `daily-days` copy (all the saved rows when nothing is
+  // shown, the saved rows older than the oldest shown otherwise), and the next
+  // online read replaces that fill. An online first read of a full page also
+  // pages the older done days into that copy in the background.
   const partnerId = partner?.id ?? null;
   useEffect(() => {
     if (partnerId) {
@@ -94,10 +104,11 @@ export function PartnerView() {
   // been seen under way.
   const sawLoading = useRef(false);
   useEffect(() => {
-    // A partner already in the store is never loaded afresh (`loadPartner`
-    // raises the flag only when there is none), so seeing one counts too.
-    if (isLoadingPartner || partner) sawLoading.current = true;
-  }, [isLoadingPartner, partner]);
+    // A partner already in the store, or an answer already in (a confirmed
+    // "unlinked" is one), is never loaded afresh (`loadPartner` raises the flag
+    // only while nothing has answered), so seeing either counts too.
+    if (isLoadingPartner || partner || partnerKnown) sawLoading.current = true;
+  }, [isLoadingPartner, partner, partnerKnown]);
   const unlinkedOnHistory =
     partnerPath === 'history' && !partner && !isLoadingPartner && !partnerLoadError;
   useEffect(() => {
@@ -109,6 +120,24 @@ export function PartnerView() {
     showPartnerPage('');
   }, [unlinkedOnHistory, showPartnerPage]);
 
+  // The streak answers unlinked while a partner is shown (the server unlinked them, or
+  // the partner read failed after one and the slice kept the name): ask the partner
+  // slice again, which decides between the name and the Connect screen. Keyed on the
+  // answer itself, so each fresh `unlinked` answer reads the partner once (a failed
+  // partner read is tried again by the next streak read), and there is no loop: a
+  // partner answer with the same id starts no streak read. The render in which the
+  // partner's id changed is skipped: the answer then in the slice is the old pair's
+  // (or the one from before a first link), and the streak read the id change starts
+  // will answer for the new one.
+  const unlinkedAnswer = coupleStreak?.status === 'unlinked' ? coupleStreak : null;
+  const lastPartnerId = useRef<string | null>(null);
+  useEffect(() => {
+    const partnerChanged = lastPartnerId.current !== partnerId;
+    lastPartnerId.current = partnerId;
+    if (partnerChanged) return;
+    if (partnerId && unlinkedAnswer) void loadPartner();
+  }, [partnerId, unlinkedAnswer, loadPartner]);
+
   const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
 
   if (partner && !isLoadingPartner && partnerPath === 'history') {
@@ -116,7 +145,7 @@ export function PartnerView() {
       <div className="min-h-screen bg-page" data-testid="partner-view">
         <PastQuestionsPage
           partnerName={partner.displayName}
-          history={dailyHistory ?? []}
+          history={dailyHistory}
           streak={streak}
         />
       </div>
@@ -152,7 +181,7 @@ export function PartnerView() {
 
             {streak ? (
               <StreakCard streak={streak} />
-            ) : coupleStreakLoading ? (
+            ) : coupleStreakLoading || (coupleStreak === null && !coupleStreakError) ? (
               <div
                 className="flex flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-5 py-10 text-center shadow-card"
                 data-testid="partner-streak-loading"
@@ -165,10 +194,21 @@ export function PartnerView() {
               </div>
             ) : coupleStreakError ? (
               <div
-                className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
+                className="flex flex-col gap-3 rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
                 data-testid="partner-streak-error"
               >
-                {coupleStreakError}
+                <span>{coupleStreakError}</span>
+                {isOnline && (
+                  <button
+                    type="button"
+                    className={SECONDARY_BUTTON}
+                    disabled={coupleStreakLoading}
+                    onClick={() => void loadCoupleStreak()}
+                    data-testid="partner-streak-retry"
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             ) : null}
 
