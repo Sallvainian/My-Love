@@ -4538,3 +4538,51 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes
 severity: low
 reason: setUpPair seeds today with isoDateDaysFromNow(0, new Date()) and host-zone user_time_zones rows; after midnight user_local_date(recipient, now()) is the next date and send_daily_nudge refuses DQ009. The same low flake stories 8.3 and 8.6 deferred for push-daily-sender.spec.ts and push-daily-picks.spec.ts; the shared fix is a guard near local midnight (review 2026-11-26: intent-alignment).
 status: open
+
+### DW-535: tests/e2e/daily/daily-question-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the nudge and the reload.
+origin: spec-deferred bdab4a51c247
+location: tests/e2e/daily/daily-question-nudge.spec.ts after the nudge send
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: The server picks the slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the spec expects the button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6 and 8.7 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.8 implementation, 2026-11-26).
+status: open
+
+### DW-536: The client keeps nudge.spent per (day_id, slot), while the server spends a slot per (sender-local date, slot), so a sender whose date has passed the shown day sees a greyed button the server would
+origin: spec-deferred d00b99c79ea2
+location: src/services/dailyDaysCopy.ts keepNudgeSpent
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: keepNudgeSpent keeps a stored {after_pick, spent: true} over a later {after_pick, spent: false} for the same day_id. With the sender far ahead of the partner (UTC+9 against UTC-5) and the day still on screen after the sender's midnight, the server opens a fresh after_pick slot on the sender's new date for the same day, and the button stays greyed. Same root cause as story 8.7's deferred sender-date crossing (AD-17 keys the limit on the sender's date); the snapshot carries no date to tell the two slots apart (review 2026-11-26: blind-hunter).
+status: open
+
+### DW-537: After a P0002 refusal (the pair changed) the nudge's re-read of the same day_id fails too, so the stale waiting card keeps an enabled button that fails on every tap.
+origin: spec-deferred 50678f62b2da
+location: src/stores/slices/dailyDaySlice.ts sendDailyNudge
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter).
+status: open
+
+### DW-538: Daily does not re-read at the sender's local midnight, so a page left open and visible across midnight keeps the old day and its nudge slot.
+origin: spec-deferred 300c948db47a
+location: src/hooks/useDailyDayRereads.ts
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter).
+status: open
+
+### DW-539: A nudge request that times out after the server committed it shows "Your nudge could not be sent." although the push went out.
+origin: spec-deferred 31cd9232798f
+location: src/components/DailyQuestion/DailyQuestion.tsx WaitingCard
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: requestTimeout aborts the client request; the row and its trigger post may already be committed. The card shows NUDGE_FAILED_MESSAGE, and the re-read then greys the button (spent), so the line and the state disagree. Real low defect, deferred because it needs a timeout after commit; the fix needs a rule for when the re-read overrides the line that the intent does not give (review 2026-11-26: edge-case-hunter).
+status: open
+
+### DW-540: The 20:00 re-read uses the device's clock while the server's slot uses the stored zone, which differ when the same account reads Daily from a second device in another zone.
+origin: spec-deferred 24a822fb1e50
+location: src/hooks/useDailyDayRereads.ts
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: get_daily_day stores the zone of whichever device read last; Daily's mount read stores this device's zone, so they agree unless another device of the same account in another zone reads in between. Then the timer fires at the wrong hour and the evening slot shows only on a return or reload (review 2026-11-26: edge-case-hunter, intent-alignment).
+status: open

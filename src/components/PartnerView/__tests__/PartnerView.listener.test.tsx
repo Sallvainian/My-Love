@@ -106,7 +106,7 @@ describe('PartnerView re-reading through the real listener', () => {
     expect(state.loadPendingRequests).not.toHaveBeenCalled();
   });
 
-  it('new_mood and dates_changed read nothing extra', async () => {
+  it('new_mood, daily_nudge and dates_changed read nothing extra', async () => {
     const handlers = await mount();
 
     act(() => {
@@ -115,6 +115,7 @@ describe('PartnerView re-reading through the real listener', () => {
     });
 
     expect(handlers.new_mood).toBeUndefined();
+    expect(handlers.daily_nudge).toBeUndefined();
     expect(handlers.dates_changed).toBeUndefined();
     expect(state.loadCoupleStreak).not.toHaveBeenCalled();
     expect(state.loadDailyHistory).not.toHaveBeenCalled();

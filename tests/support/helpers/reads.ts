@@ -129,3 +129,6 @@ export const WRITTEN_QUESTION_SEND = '**/rest/v1/rpc/submit_written_question';
 
 /** A named day's re-read after a partner's `daily_pick` (`dailyQuestionApi.fetchDailyDayById`): the `get_daily_day_by_id` RPC. Observe it with `method: 'POST'`. */
 export const DAILY_DAY_BY_ID_READ = '**/rest/v1/rpc/get_daily_day_by_id';
+
+/** A nudge's send (`dailyQuestionApi.sendDailyNudge`): the `send_daily_nudge` RPC. Observe it with `method: 'POST'`. */
+export const DAILY_NUDGE_SEND = '**/rest/v1/rpc/send_daily_nudge';

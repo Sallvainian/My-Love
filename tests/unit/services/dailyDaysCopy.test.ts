@@ -9,6 +9,7 @@ import 'fake-indexeddb/auto';
 import {
   DAILY_DAYS_COPY_KIND,
   dailyStateRank,
+  keepNudgeSpent,
   mergeDailyDay,
   mergeDailyDays,
   readSavedDailyDay,
@@ -20,6 +21,7 @@ import { readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { withWaitingLock } from '../../../src/services/syncLock';
 import {
   dailySnapshot,
+  nudgeSnapshot,
   revealSnapshot,
   waitingSnapshot,
   writerSnapshot,
@@ -66,6 +68,79 @@ describe('dailyStateRank', () => {
     expect(dailyStateRank('me')).toBe(1);
     expect(dailyStateRank('partner')).toBe(1);
     expect(dailyStateRank('both')).toBe(2);
+  });
+});
+
+describe('keepNudgeSpent', () => {
+  it('sets spent when the other has it for the same slot', () => {
+    expect(keepNudgeSpent(nudgeSnapshot('after_pick', false), nudgeSnapshot('after_pick', true))).toEqual(
+      nudgeSnapshot('after_pick', true)
+    );
+  });
+
+  it.each([
+    ['a different slot', nudgeSnapshot('after_pick', false), nudgeSnapshot('evening', true)],
+    ['a null slot', nudgeSnapshot(null, false), nudgeSnapshot(null, true)],
+    ['an other that is unspent', nudgeSnapshot('after_pick', false), nudgeSnapshot('after_pick', false)],
+    ['an other with no nudge', nudgeSnapshot('after_pick', false), waitingSnapshot('this')],
+    ['no other', nudgeSnapshot('after_pick', false), undefined],
+  ])('leaves the entry as it is for %s', (_label, entry, other) => {
+    expect(keepNudgeSpent(entry, other)).toBe(entry);
+  });
+
+  it('leaves an entry with no nudge as it is', () => {
+    const entry = waitingSnapshot('this');
+    expect(keepNudgeSpent(entry, nudgeSnapshot('after_pick', true))).toBe(entry);
+  });
+});
+
+describe('mergeDailyDay nudge', () => {
+  it('a slow read of the same slot never moves spent back to false', async () => {
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+
+    const result = await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', false)), null, current);
+
+    expect(result).toEqual(ok(nudgeSnapshot('after_pick', true)));
+    expect(await savedMap()).toEqual(keyed(nudgeSnapshot('after_pick', true)));
+  });
+
+  it('a new slot is taken as the answer has it: unspent', async () => {
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+
+    const result = await mergeDailyDay(A, ok(nudgeSnapshot('evening', false)), null, current);
+
+    expect(result).toEqual(ok(nudgeSnapshot('evening', false)));
+  });
+
+  it('keeps spent when a higher state replaces the entry in the same slot', async () => {
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+    const higher = { ...revealSnapshot('this', 'that'), nudge: { slot: 'after_pick' as const, spent: false } };
+
+    const result = await mergeDailyDay(A, ok(higher), null, current);
+
+    expect(result).toEqual(ok({ ...higher, nudge: { slot: 'after_pick', spent: true } }));
+  });
+
+  it('a stored day with no nudge and an answer with one saves the answer', async () => {
+    await mergeDailyDay(A, ok(waitingSnapshot('this')), null, current);
+
+    const result = await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', false)), null, current);
+
+    expect(result).toEqual(ok(nudgeSnapshot('after_pick', false)));
+  });
+
+  it('a page of past questions keeps spent the same way', async () => {
+    await mergeDailyDay(A, ok(nudgeSnapshot('after_pick', true)), null, current);
+
+    await mergeDailyDays(A, [nudgeSnapshot('after_pick', false)], null, current);
+
+    expect(await savedMap()).toEqual(keyed(nudgeSnapshot('after_pick', true)));
+  });
+
+  it('a saved day without nudge still reads back (the field is optional)', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, keyed(waitingSnapshot('this')));
+
+    expect(await readSavedDailyDay(A, '2026-11-05', null)).toEqual(waitingSnapshot('this'));
   });
 });
 

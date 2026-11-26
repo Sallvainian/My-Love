@@ -56,19 +56,29 @@
  * the +1 is not replayed. Only a +1 claimed before this mount's first claim
  * counts as cut short; one claimed since, by another tab, may still be playing
  * there. A milestone that showed never shows again.
+ * Once only the own pick is in (`me`), the card below the day card is the board's
+ * dashed waiting card (`WaitingCard`, test id `daily-waiting`, "Waiting on
+ * {partner}") with a Nudge button (AD-17). The button follows the snapshot's
+ * `nudge`: disabled when it is missing, has no `slot`, is `spent`, or a send is in
+ * flight; offline it stays enabled and a tap shows the offline sentence with no
+ * request. A refusal or a failed request shows `NUDGE_FAILED_MESSAGE` and the
+ * slice re-reads the day. `useDailyDayRereads` re-reads the day at 20:00 (the
+ * evening slot) and when the page comes back to the front.
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Flame, Snowflake } from 'lucide-react';
+import { Bell, Flame, Hourglass, Snowflake } from 'lucide-react';
 import {
   type CoupleStreak,
   DAY_CHANGED_MESSAGE,
+  NUDGE_FAILED_MESSAGE,
   type DailyChoice,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
+import { useDailyDayRereads } from '../../hooks/useDailyDayRereads';
 import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError } from '../../services/accountDataError';
 import { parseEventDate } from '../../services/eventsService';
@@ -177,11 +187,79 @@ function PickCard({
   );
 }
 
+/**
+ * The waiting card (the board's `Waiting.dc.html`): the viewer's pick is in and
+ * the partner's is not. Its Nudge button sends one nudge for the slot the
+ * snapshot names; the failure box shows the offline sentence or
+ * `NUDGE_FAILED_MESSAGE`, and clears on the next tap.
+ */
+function WaitingCard({
+  snapshot,
+  partnerNameInline,
+}: {
+  snapshot: DailyDaySnapshot;
+  /** The partner's name, or "your partner" (for the middle of a sentence). */
+  partnerNameInline: string;
+}) {
+  const sendDailyNudge = useAppStore((state) => state.sendDailyNudge);
+  const [sending, setSending] = useState(false);
+  const [nudgeError, setNudgeError] = useState<string | null>(null);
+
+  const nudge = snapshot.nudge;
+  const canNudge = nudge !== undefined && nudge.slot !== null && !nudge.spent && !sending;
+
+  const nudgePartner = useCallback(async () => {
+    setNudgeError(null);
+    setSending(true);
+    try {
+      await sendDailyNudge();
+    } catch (caught) {
+      if (caught instanceof AccountDataError && caught.code === 'offline') {
+        setNudgeError(caught.message);
+      } else {
+        console.error('[DailyQuestion] Could not send the nudge:', caught);
+        setNudgeError(NUDGE_FAILED_MESSAGE);
+      }
+    } finally {
+      setSending(false);
+    }
+  }, [sendDailyNudge]);
+
+  return (
+    <div
+      className="flex flex-col items-center gap-2.5 rounded-[20px] border-2 border-dashed border-partner/40 bg-ptint/50 p-[18px] text-center"
+      data-testid="daily-waiting"
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-ptint text-partner">
+        <Hourglass className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <p className="text-[15px] font-semibold text-ink">Waiting on {partnerNameInline}</p>
+      <p className="text-[13px] leading-[1.4] text-muted">
+        They can&apos;t see your pick until they make theirs.
+      </p>
+      <button
+        type="button"
+        className="inline-flex h-11 items-center gap-2 rounded-full bg-ptint px-[18px] text-sm font-semibold text-partner transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-partner disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!canNudge}
+        onClick={() => void nudgePartner()}
+        data-testid="daily-nudge"
+      >
+        <Bell className="h-4 w-4" aria-hidden="true" />
+        Nudge {partnerNameInline}
+      </button>
+      {nudgeError && (
+        <div className={`${FAILURE_BOX} self-stretch`} role="alert" data-testid="daily-nudge-error">
+          {nudgeError}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DayCard({
   snapshot,
   queued,
   partnerName,
-  partnerNameInline,
   onSendStart,
   onDayChanged,
 }: {
@@ -190,8 +268,6 @@ function DayCard({
   queued: QueuedDailyPick | null;
   /** The partner's name, or "Your partner" (for the start of a sentence). */
   partnerName: string;
-  /** The partner's name, or "your partner" (for the middle of a sentence). */
-  partnerNameInline: string;
   /** A Send began: the parent clears its day-changed notice. */
   onSendStart: () => void;
   /** The pick was refused because the date changed; the parent shows the notice. */
@@ -309,9 +385,6 @@ function DayCard({
               {pickedTime(snapshot.my_picked_at)}
             </p>
           )}
-          <p className="text-[15px] font-semibold text-ink" data-testid="daily-waiting">
-            Waiting on {partnerNameInline}
-          </p>
         </div>
       )}
 
@@ -483,6 +556,8 @@ export function DailyQuestion() {
 
   // The partner's pick shows without a reload (AD-11).
   useDailyPickListener();
+  // The evening slot and a return to the front re-read the day.
+  useDailyDayRereads();
 
   return (
     <div
@@ -527,10 +602,17 @@ export function DailyQuestion() {
               snapshot={dailyDay.snapshot}
               queued={queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null}
               partnerName={partnerName}
-              partnerNameInline={partnerNameInline}
               onSendStart={clearDayChanged}
               onDayChanged={raiseDayChanged}
             />
+
+            {dailyDay.snapshot.state === 'me' && dailyDay.snapshot.my_choice && (
+              <WaitingCard
+                key={`${dailyDay.snapshot.day_id}:waiting`}
+                snapshot={dailyDay.snapshot}
+                partnerNameInline={partnerNameInline}
+              />
+            )}
           </>
         )}
 

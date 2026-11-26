@@ -1,9 +1,10 @@
 /**
  * useDailyPickListener — one subscriber on the shared partner channel while
- * the account is signed in and online. A `daily_pick` re-reads the named day;
+ * the account is signed in and online. A `daily_pick` re-reads the named day
+ * and the streak; a `daily_nudge` re-reads the named day alone;
  * a `partner_linked` re-reads today's, so the invitation to link gives way to
  * the day; every SUBSCRIBED re-reads today's, because a broadcast is never
- * replayed. Each of the three also re-reads the couple's streak.
+ * replayed. Every one but `daily_nudge` also re-reads the couple's streak.
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -45,12 +46,13 @@ describe('useDailyPickListener', () => {
     });
   });
 
-  it('holds one subscriber, with a handler for daily_pick, partner_linked and the status', async () => {
+  it('holds one subscriber, with a handler for daily_pick, daily_nudge, partner_linked and the status', async () => {
     renderHook(() => useDailyPickListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
 
     const handlers = subscribe.mock.calls[0][0];
     expect(handlers.daily_pick).toBeTypeOf('function');
+    expect(handlers.daily_nudge).toBeTypeOf('function');
     expect(handlers.partner_linked).toBeTypeOf('function');
     expect(handlers.onStatus).toBeTypeOf('function');
     expect(handlers.new_mood).toBeUndefined();
@@ -66,6 +68,18 @@ describe('useDailyPickListener', () => {
     expect(state.refreshDailyDay).toHaveBeenCalledTimes(1);
     expect(state.refreshDailyDay).toHaveBeenCalledWith(DAY_ID);
     expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    expect(state.loadDailyDay).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the named day alone when a daily_nudge arrives', async () => {
+    renderHook(() => useDailyPickListener());
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    act(() => subscribe.mock.calls[0][0].daily_nudge!({ event: 'daily_nudge', day_id: DAY_ID }));
+
+    expect(state.refreshDailyDay).toHaveBeenCalledTimes(1);
+    expect(state.refreshDailyDay).toHaveBeenCalledWith(DAY_ID);
+    expect(state.loadCoupleStreak).not.toHaveBeenCalled();
     expect(state.loadDailyDay).not.toHaveBeenCalled();
   });
 
@@ -113,6 +127,7 @@ describe('useDailyPickListener', () => {
 
     unmount();
     act(() => handlers.daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
+    act(() => handlers.daily_nudge!({ event: 'daily_nudge', day_id: DAY_ID }));
     act(() => handlers.partner_linked!({ event: 'partner_linked' }));
     act(() => handlers.onStatus!('SUBSCRIBED'));
 

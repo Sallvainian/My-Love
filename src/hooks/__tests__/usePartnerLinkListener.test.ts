@@ -80,6 +80,13 @@ describe('usePartnerLinkListener', () => {
     expect(state.loadPendingRequests).toHaveBeenCalledTimes(1);
   });
 
+  it('registers no daily_nudge handler', async () => {
+    renderSettled();
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    expect(subscribe.mock.calls[0][0].daily_nudge).toBeUndefined();
+  });
+
   it('re-reads the partner when a SUBSCRIBED finds the account linked', async () => {
     lookup.mockResolvedValue({ status: 'linked', partnerId: 'PARTNER' });
     renderSettled();

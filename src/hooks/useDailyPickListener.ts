@@ -10,6 +10,8 @@
  *   - `daily_pick { day_id }` re-reads that one day (`refreshDailyDay`) and the
  *     streak (`loadCoupleStreak`): a partner's pick can finish a day. The
  *     event carries no choice and is trusted for nothing else.
+ *   - `daily_nudge { day_id }` re-reads that one day (`refreshDailyDay`) only,
+ *     with no streak read: a nudge changes no streak.
  *   - `partner_linked` re-reads today's day (`loadDailyDay`) and the streak: the device that
  *     accepted this account's partner request sends it, and the topic is the
  *     account's own, so it arrives while Daily shows the invitation to link.
@@ -55,6 +57,10 @@ export function useDailyPickListener(): void {
           if (!active) return;
           void refreshDailyDay(day_id);
           void loadCoupleStreak();
+        },
+        daily_nudge: ({ day_id }) => {
+          if (!active) return;
+          void refreshDailyDay(day_id);
         },
         partner_linked: () => {
           if (!active) return;

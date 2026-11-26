@@ -37,6 +37,18 @@ export const DailyDaySnapshotSchema = z.object({
      */
     target_day: z.string().optional(),
   }),
+  /**
+   * The viewer's nudge (AD-13, AD-17): `slot` is the slot a nudge sent now would
+   * take, or null when none may be sent; `spent` is whether the viewer already
+   * sent that slot's nudge. Missing from a snapshot saved before the server sent
+   * it, which reads as `{ slot: null, spent: false }`.
+   */
+  nudge: z
+    .object({
+      slot: z.enum(['after_pick', 'evening']).nullable(),
+      spent: z.boolean(),
+    })
+    .optional(),
 });
 
 export type DailyDaySnapshot = z.infer<typeof DailyDaySnapshotSchema>;

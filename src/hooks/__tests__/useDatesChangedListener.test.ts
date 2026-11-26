@@ -58,6 +58,13 @@ describe('useDatesChangedListener', () => {
     expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(1);
   });
 
+  it('registers no daily_nudge handler', async () => {
+    renderHook(() => useDatesChangedListener());
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    expect(subscribe.mock.calls[0][0].daily_nudge).toBeUndefined();
+  });
+
   it.each([
     ['signed out', { userId: null }],
     ['offline', { syncStatus: { isOnline: false } }],
