@@ -42,17 +42,16 @@
  * file and the other push specs never run at once.
  */
 import type { TypedSupabaseClient } from '../support/factories';
-import { readPairQuestionsByDay, seedPairDays } from '../support/factories/daily-question';
+import { readPairQuestionsByDay } from '../support/factories/daily-question';
+import type { Cleanup } from '../support/fixtures/cleanup';
 import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
-  createParty as createThrowawayParty,
   dailyPayload,
-  link,
   postKindToSender,
-  registerDevice,
   requestsFor,
+  setUpPair,
   zeros,
   type Party,
 } from '../support/helpers/push-requests';
@@ -60,42 +59,34 @@ import { test, expect } from '../support/merged-fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
-type Cleanup = { defer: (name: string, fn: () => Promise<unknown>) => void };
-
 test.describe('Daily push sender', () => {
-  const createParty = (supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup, role: string) =>
-    createThrowawayParty(supabaseAdmin, cleanup, 'dailypush', 'Daily', role);
-
   /**
    * A linked pair with devices (Alice one, Bob two) and its days seeded: three past
    * days both picked, yesterday absent, today with Alice's pick only.
    */
-  async function setUpPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup) {
-    const alice = await createParty(supabaseAdmin, cleanup, 'a');
-    const bob = await createParty(supabaseAdmin, cleanup, 'b');
-    await link(supabaseAdmin, alice, bob);
-    const aliceDevice = await registerDevice(alice, 'sandbox');
-    const [bobPhone, bobTablet] = [await registerDevice(bob, 'sandbox'), await registerDevice(bob, 'production')];
-
-    const pair = { userId: alice.userId, partnerId: bob.userId };
-    await seedPairDays(supabaseAdmin, pair, [
-      { daysAgo: 4, picks: 'both' },
-      { daysAgo: 3, picks: 'both' },
-      { daysAgo: 2, picks: 'both' },
-      { daysAgo: 0, picks: 'user' },
-    ]);
+  async function setUpDailyPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup) {
+    const {
+      first: alice,
+      second: bob,
+      firstDevice: aliceDevice,
+      secondDevices: [bobPhone, bobTablet],
+      pair,
+      dayIds,
+    } = await setUpPair(
+      supabaseAdmin,
+      cleanup,
+      { prefix: 'dailypush', displayPrefix: 'Daily' },
+      [
+        { daysAgo: 4, picks: 'both' },
+        { daysAgo: 3, picks: 'both' },
+        { daysAgo: 2, picks: 'both' },
+        { daysAgo: 0, picks: 'user' },
+      ]
+    );
     const today = isoDateDaysFromNow(0, new Date());
     const days = await readPairQuestionsByDay(supabaseAdmin, pair);
     const todayQuestion = days.find((d) => d.day === today)!;
     const asked = `${todayQuestion.this} or ${todayQuestion.that}?`;
-
-    const [userA, userB] = [alice.userId, bob.userId].sort();
-    const { data: dayRows } = await supabaseAdmin
-      .from('couple_days')
-      .select('id, day')
-      .eq('user_a', userA)
-      .eq('user_b', userB);
-    const dayIds = Object.fromEntries(dayRows!.map((d) => [d.day, d.id]));
     return { alice, bob, aliceDevice, bobPhone, bobTablet, today, asked, dayId: dayIds[today], dayIds };
   }
 
@@ -104,7 +95,7 @@ test.describe('Daily push sender', () => {
     cleanup,
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
-    const { alice, bob, aliceDevice, bobPhone, bobTablet, today, asked, dayId } = await setUpPair(
+    const { alice, bob, aliceDevice, bobPhone, bobTablet, today, asked, dayId } = await setUpDailyPair(
       supabaseAdmin,
       cleanup
     );
@@ -210,7 +201,7 @@ test.describe('Daily push sender', () => {
     cleanup,
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
-    const { alice, bob, aliceDevice, bobPhone, bobTablet, today, dayIds } = await setUpPair(supabaseAdmin, cleanup);
+    const { alice, bob, aliceDevice, bobPhone, bobTablet, today, dayIds } = await setUpDailyPair(supabaseAdmin, cleanup);
     const twoDaysAgo = isoDateDaysFromNow(-2, new Date());
 
     async function pickOf(day: string, party: Party) {

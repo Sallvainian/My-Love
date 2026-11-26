@@ -24,7 +24,7 @@
  * (`needs-edge-functions` in CI); the `api` project runs one worker.
  */
 import type { TypedSupabaseClient } from '../support/factories';
-import { readPairQuestionsByDay } from '../support/factories/daily-question';
+import { orderedPair, readPairQuestionsByDay } from '../support/factories/daily-question';
 import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
@@ -142,12 +142,13 @@ test.describe('Daily reminders on each person\'s clock', () => {
     expect(await requestsFor(supabaseAdmin, bobMorning.id, 'daily_reminder_id')).toEqual(bobMorningRows);
 
     // ---- Alice picks D; 8 PM then tells her Bob has not, and Bob to pick ----
+    const [userA, userB] = orderedPair(pair);
     const picked = await runPsql(
       'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
         `select cd.id, '${alice.userId}', 'this', timestamptz '${morningAt}' + interval '1 hour', '${ZONE}', ${OFFSET_MINUTES}, ` +
         `public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), false ` +
-        `from public.couple_days cd where cd.user_a = '${[alice.userId, bob.userId].sort()[0]}' ` +
-        `and cd.user_b = '${[alice.userId, bob.userId].sort()[1]}' and cd.day = date '${day}';\n`
+        `from public.couple_days cd where cd.user_a = '${userA}' ` +
+        `and cd.user_b = '${userB}' and cd.day = date '${day}';\n`
     );
     expect(picked.code, picked.stderr).toBe(0);
 

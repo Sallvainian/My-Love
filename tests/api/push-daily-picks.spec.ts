@@ -32,16 +32,13 @@
  * the `api` project runs one worker, so this file and
  * the other push specs never run at once.
  */
-import { seedPairDays } from '../support/factories/daily-question';
 import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import {
   awaitRequests,
-  createParty as createThrowawayParty,
   dailyPayload,
-  link,
   postKindToSender,
-  registerDevice,
   requestsFor,
+  setUpPair,
   zeros,
   type Party,
 } from '../support/helpers/push-requests';
@@ -55,14 +52,13 @@ test.describe('Daily pick pushes', () => {
     cleanup,
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
-    const createParty = (role: string) => createThrowawayParty(supabaseAdmin, cleanup, 'dailypick', 'Pick', role);
-    const alice = await createParty('a');
-    const bob = await createParty('b');
-    await link(supabaseAdmin, alice, bob);
-    const aliceDevice = await registerDevice(alice, 'sandbox');
-    const [bobPhone, bobTablet] = [await registerDevice(bob, 'sandbox'), await registerDevice(bob, 'production')];
-
-    await seedPairDays(supabaseAdmin, { userId: alice.userId, partnerId: bob.userId }, [
+    const {
+      first: alice,
+      second: bob,
+      firstDevice: aliceDevice,
+      secondDevices: [bobPhone, bobTablet],
+      dayIds,
+    } = await setUpPair(supabaseAdmin, cleanup, { prefix: 'dailypick', displayPrefix: 'Pick' }, [
       { daysAgo: 2, picks: 'none' },
       { daysAgo: 1, picks: 'none' },
       { daysAgo: 0, picks: 'none' },
@@ -71,15 +67,6 @@ test.describe('Daily pick pushes', () => {
     const today = isoDateDaysFromNow(0, now);
     const yesterday = isoDateDaysFromNow(-1, now);
     const twoDaysAgo = isoDateDaysFromNow(-2, now);
-
-    const [userA, userB] = [alice.userId, bob.userId].sort();
-    const { data: dayRows, error: dayError } = await supabaseAdmin
-      .from('couple_days')
-      .select('id, day')
-      .eq('user_a', userA)
-      .eq('user_b', userB);
-    expect(dayError).toBeNull();
-    const dayIds = Object.fromEntries(dayRows!.map((d) => [d.day, d.id]));
 
     /** `submit_daily_pick` as `party`: today at the current instant, a past date at host-local noon. */
     async function submitPick(party: Party, day: string) {

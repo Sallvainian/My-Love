@@ -217,7 +217,7 @@ export async function readPairQuestionsByDay(
 }
 
 /** The pair in `couple_days` order: `user_a < user_b`. */
-function orderedPair(pair: WorkerPairIds): [string, string] {
+export function orderedPair(pair: WorkerPairIds): [string, string] {
   return pair.userId < pair.partnerId ? [pair.userId, pair.partnerId] : [pair.partnerId, pair.userId];
 }
 
@@ -238,6 +238,28 @@ export async function readPairDayIds(
   }
 
   return (data ?? []).map((row) => row.id);
+}
+
+/**
+ * The ids of this worker pair's `couple_days` rows by date (`YYYY-MM-DD`), so a
+ * spec can name a day by its date; `readPairDayIds` gives the ids alone.
+ */
+export async function readPairDayIdsByDate(
+  supabaseAdmin: TypedSupabaseClient,
+  pair: WorkerPairIds
+): Promise<Record<string, string>> {
+  const [userA, userB] = orderedPair(pair);
+  const { data, error } = await supabaseAdmin
+    .from('couple_days')
+    .select('id, day')
+    .eq('user_a', userA)
+    .eq('user_b', userB);
+
+  if (error) {
+    throw new Error(`readPairDayIdsByDate: failed to read the pair's days: ${error.message}`);
+  }
+
+  return Object.fromEntries((data ?? []).map((row) => [row.day, row.id]));
 }
 
 /** Set `created_at` on every `couple_days` row of this worker pair. */
