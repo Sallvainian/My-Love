@@ -158,8 +158,10 @@ export interface DailyDaySlice {
    * - the request's own error otherwise.
    * Without a connection it queues the pick (no request) and resolves; a queue
    * write failure throws.
+   * Resolves with the answer it stored, or `undefined` when it queued the pick
+   * or the session changed before the answer was stored.
    */
-  submitDailyPick: (choice: DailyChoice) => Promise<void>;
+  submitDailyPick: (choice: DailyChoice) => Promise<DailyDayAnswer | undefined>;
   /**
    * Send the account's pending queued picks, oldest first, under
    * `PICK_QUEUE_LOCK`. Never throws; does nothing signed out or offline.
@@ -555,10 +557,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         isCurrent
       );
       if (!isCurrent()) return;
+      const stored = mergeAnswer(get().dailyDay, merged);
       set({
-        dailyDay: mergeAnswer(get().dailyDay, merged),
+        dailyDay: stored,
         dailyDayError: null,
       });
+      return stored;
     },
 
     drainQueuedPicks: () => {

@@ -351,7 +351,9 @@ describe('failing queue writes', () => {
       throw new Error('IDB-DOWN');
     });
 
-    await expect(state().submitDailyPick('that')).resolves.toBeUndefined();
+    await expect(state().submitDailyPick('that')).resolves.toEqual(
+      ok(revealSnapshot('that', 'this'))
+    );
 
     expect(console.error).toHaveBeenCalledWith(
       '[DailyQuestion] Could not clear the queued pick:',

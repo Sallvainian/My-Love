@@ -87,6 +87,7 @@ import {
   type CoupleStreak,
   DAY_CHANGED_MESSAGE,
   type DailyChoice,
+  type DailyDayAnswer,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
 import { useDailyDayRereads } from '../../hooks/useDailyDayRereads';
@@ -281,8 +282,8 @@ function DayCard({
   onSendStart: () => void;
   /** The pick was refused because the date changed; the parent shows the notice. */
   onDayChanged: () => void;
-  /** The pick's request answered (not queued, not refused): the parent decides on the nudge offer. */
-  onPickSent: (dayId: string) => void;
+  /** The pick's request answered (not queued, not refused): the parent decides on the nudge offer from the answer stored. */
+  onPickSent: (dayId: string, stored: DailyDayAnswer) => void;
 }) {
   const submitDailyPick = useAppStore((state) => state.submitDailyPick);
   const [selected, setSelected] = useState<DailyChoice | null>(null);
@@ -297,8 +298,8 @@ function DayCard({
     setSendError(null);
     setSending(true);
     try {
-      await submitDailyPick(selected);
-      onPickSent(snapshot.day_id);
+      const stored = await submitDailyPick(selected);
+      if (stored) onPickSent(snapshot.day_id, stored);
     } catch (caught) {
       if (caught instanceof AccountDataError && caught.code === 'day-changed') {
         // The notice sits above the card: a new day_id remounts the card.
@@ -518,10 +519,8 @@ export function DailyQuestion() {
   // day with only the own pick in and an open slot. A queued pick leaves the
   // state `none` or `partner`, so it raises nothing.
   const offerNudge = useCallback(
-    (dayId: string) => {
-      // eslint-disable-next-line no-restricted-properties -- the answer was stored after the send's await, so a render's value is stale
-      const shown = useAppStore.getState().dailyDay;
-      if (shown?.status !== 'ok') return;
+    (dayId: string, shown: DailyDayAnswer) => {
+      if (shown.status !== 'ok') return;
       const snap = shown.snapshot;
       if (snap.day_id !== dayId || snap.state !== 'me' || !snap.my_choice) return;
       if (!snap.nudge || snap.nudge.slot === null || snap.nudge.spent) return;
