@@ -9,7 +9,8 @@
  * cannot undo a reveal, and a server answer for a date drops that date's other
  * `day_id`s (a relink or `reset_bot_daily_days` gives the date a new day).
  * Each entry also records the partner it was read with (`partner_id`, the newest
- * tag wins; an entry saved before the tag reads as `null`), and the readers
+ * known tag wins; a failed partner lookup keeps the stored tag and a new entry stays
+ * untagged; an entry saved before the tag reads as `null`), and the readers
  * give only the current partner's entries, so an old pairing's day is hidden. It
  * does not stay saved: a server answer for its date deletes it (the drop above,
  * whatever its tag). `readSavedDailyDay` also gives an untagged entry, so the day saved

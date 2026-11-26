@@ -62,8 +62,9 @@ const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as co
 function setPartner(displayName: string | null) {
   useAppStore.setState({
     partner: displayName === null ? null : { id: 'USER-B-ID', displayName, email: 'b@example.com' },
-    // `loadPartner` sets both together: a partner state with `partnerKnown` false is never reached.
-    partnerKnown: true,
+    // `loadPartner` sets `partnerKnown` with a set partner: that state without it is never reached.
+    // A null partner is not confirmed unlinked here, so `partnerKnown` stays false (not yet loaded).
+    partnerKnown: displayName !== null,
   } as unknown as Parameters<typeof useAppStore.setState>[0]);
 }
 

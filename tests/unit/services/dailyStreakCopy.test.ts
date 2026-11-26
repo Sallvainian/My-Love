@@ -173,16 +173,45 @@ describe('saveStreakAnswer', () => {
   });
 
   it('writes nothing when the stored copy cannot be read to keep its tag', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, linked(PARTNER_X), current);
+    const failure = new Error('READ-FAILED');
     vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(() => {
-      throw new Error('READ-FAILED');
+      throw failure;
     });
     const write = vi.spyOn(localCopy, 'writeLocalCopy');
+    errorSpy.mockClear();
 
     await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 3 }) }, UNKNOWN_PARTNER, current);
 
+    expect(errorSpy).toHaveBeenCalledWith('[localCopy] Failed to read daily-streak copy:', failure);
     expect(write).not.toHaveBeenCalled();
+
+    vi.mocked(IDBObjectStore.prototype.get).mockRestore();
+    expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
+      ...coupleStreak({ held: 2 }),
+      partner_id: PARTNER_X,
+    });
+  });
+
+  it('writes nothing when the session ends while the stored copy is being read', async () => {
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 2 }) }, linked(PARTNER_X), current);
+    let live = true;
+    const realRead = localCopy.readLocalCopyStatus;
+    vi.spyOn(localCopy, 'readLocalCopyStatus').mockImplementation(async (...args) => {
+      const result = await realRead(...args);
+      live = false;
+      return result;
+    });
+    const write = vi.spyOn(localCopy, 'writeLocalCopy');
+
+    await saveStreakAnswer(A, { status: 'ok', streak: coupleStreak({ held: 3 }) }, UNKNOWN_PARTNER, () => live);
+
+    expect(write).not.toHaveBeenCalled();
+    expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
+      ...coupleStreak({ held: 2 }),
+      partner_id: PARTNER_X,
+    });
   });
 
   it('writes nothing once the session is no longer current, read or not', async () => {
