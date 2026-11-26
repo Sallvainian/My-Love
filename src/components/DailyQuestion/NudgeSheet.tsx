@@ -9,7 +9,8 @@
  * `NUDGE_FAILED_MESSAGE` shows in the failure box with the sheet kept open (the
  * slice re-reads the day after a refusal). "Not now", a tap on the scrim and
  * Escape only call `onClose`; nothing is sent. Both buttons are disabled while
- * a send is in flight.
+ * a send is in flight, and the scrim and Escape do nothing then, so a failed
+ * send's line is never closed away unseen.
  *
  * It opens and closes at once, with no animation (the iOS back swipe pictures
  * whatever is still fading out, and Reduce Motion). The scrim and panel are the
@@ -48,16 +49,21 @@ export function NudgeSheet({ canNudge, onClose }: NudgeSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // The focus trap re-arms (and moves focus) on a new Escape handler, so it
-  // gets a stable one that calls the latest `onClose`.
+  // gets a stable one that calls the latest `onClose`. A ref, not `sending`,
+  // tells it a send is in flight, for the same reason.
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
-  const close = useCallback(() => onCloseRef.current(), []);
+  const sendingRef = useRef(false);
+  const close = useCallback(() => {
+    if (!sendingRef.current) onCloseRef.current();
+  }, []);
   useFocusTrap(panelRef, true, { onEscape: close, initialFocusRef: panelRef });
 
   const nudge = async () => {
     setError(null);
+    sendingRef.current = true;
     setSending(true);
     try {
       await sendDailyNudge();
@@ -65,6 +71,7 @@ export function NudgeSheet({ canNudge, onClose }: NudgeSheetProps) {
     } catch (caught) {
       setError(nudgeFailureMessage(caught));
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
