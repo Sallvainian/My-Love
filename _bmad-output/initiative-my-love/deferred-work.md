@@ -4586,3 +4586,11 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-scre
 severity: low
 reason: get_daily_day stores the zone of whichever device read last; Daily's mount read stores this device's zone, so they agree unless another device of the same account in another zone reads in between. Then the timer fires at the wrong hour and the evening slot shows only on a return or reload (review 2026-11-26: edge-case-hunter, intent-alignment).
 status: open
+
+### DW-541: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the pick and the reload.
+origin: spec-deferred 038b11dcab84
+location: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts after the nudge send
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-app-offers-a-nudge-right-after-a-pick-plan.md`
+severity: low
+reason: The server picks the nudge slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the first test expects the waiting button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6, 8.7 and 8.8 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.9 implementation, 2026-11-26).
+status: open

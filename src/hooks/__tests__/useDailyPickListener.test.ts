@@ -71,6 +71,49 @@ describe('useDailyPickListener', () => {
     expect(state.loadDailyDay).not.toHaveBeenCalled();
   });
 
+  it('calls onPartnerPick with the day id on a daily_pick, and on no other event', async () => {
+    const onPartnerPick = vi.fn();
+    renderHook(() => useDailyPickListener(onPartnerPick));
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+    const handlers = subscribe.mock.calls[0][0];
+
+    act(() => handlers.daily_nudge!({ event: 'daily_nudge', day_id: DAY_ID }));
+    act(() => handlers.partner_linked!({ event: 'partner_linked' }));
+    act(() => handlers.onStatus!('SUBSCRIBED'));
+    expect(onPartnerPick).not.toHaveBeenCalled();
+
+    act(() => handlers.daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
+    expect(onPartnerPick).toHaveBeenCalledTimes(1);
+    expect(onPartnerPick).toHaveBeenCalledWith(DAY_ID);
+  });
+
+  it('a new onPartnerPick does not re-subscribe, and the latest one is called', async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const { rerender } = renderHook(({ cb }) => useDailyPickListener(cb), {
+      initialProps: { cb: first },
+    });
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    rerender({ cb: second });
+    await Promise.resolve();
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalled();
+
+    act(() => subscribe.mock.calls[0][0].daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith(DAY_ID);
+  });
+
+  it('a daily_pick without a callback still re-reads the day', async () => {
+    renderHook(() => useDailyPickListener());
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+
+    act(() => subscribe.mock.calls[0][0].daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
+
+    expect(state.refreshDailyDay).toHaveBeenCalledWith(DAY_ID);
+  });
+
   it('re-reads the named day alone when a daily_nudge arrives', async () => {
     renderHook(() => useDailyPickListener());
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
@@ -134,6 +177,18 @@ describe('useDailyPickListener', () => {
     expect(state.refreshDailyDay).not.toHaveBeenCalled();
     expect(state.loadDailyDay).not.toHaveBeenCalled();
     expect(state.loadCoupleStreak).not.toHaveBeenCalled();
+  });
+
+  it('does not call onPartnerPick for a daily_pick that arrives after unmount', async () => {
+    const onPartnerPick = vi.fn();
+    const { unmount } = renderHook(() => useDailyPickListener(onPartnerPick));
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+    const handlers = subscribe.mock.calls[0][0];
+
+    unmount();
+    act(() => handlers.daily_pick!({ event: 'daily_pick', day_id: DAY_ID }));
+
+    expect(onPartnerPick).not.toHaveBeenCalled();
   });
 
   it('releases a subscription that resolves after unmount', async () => {

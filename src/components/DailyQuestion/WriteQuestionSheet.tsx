@@ -16,6 +16,8 @@
  * sheet kept open. A successful send ends the prompt through the snapshot's
  * `write.done`; "No thanks, pick one for us" saves the day on this device. A tap
  * on the scrim or Escape only calls `onClose`, which hides it for this mount.
+ * `onShown`, when given, is called once as the sheet mounts, so `DailyQuestion`
+ * can keep the nudge offer from following it in the same mount.
  *
  * It opens and closes at once, with no animation (the iOS back swipe pictures
  * whatever is still fading out, and Reduce Motion). The scrim and panel clear
@@ -36,13 +38,10 @@ import {
   FOOTNOTE,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
+  SHEET_PANEL,
+  SHEET_SCRIM,
   fieldClass,
 } from '../shared/kitClasses';
-
-const SHEET_SCRIM =
-  'fixed inset-0 z-50 flex items-end justify-center bg-black/50 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]';
-const SHEET_PANEL =
-  'flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-t-[28px] bg-card px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] outline-hidden';
 
 /**
  * The weekday name (`Thursday`) of `targetDay` when it is not the day after
@@ -68,6 +67,8 @@ interface WriteQuestionSheetProps {
   partnerName: string;
   /** Scrim or Escape: hide the sheet until the next mount of Daily. */
   onClose: () => void;
+  /** Called once when the sheet mounts: `DailyQuestion` remembers it showed. */
+  onShown?: () => void;
 }
 
 export function WriteQuestionSheet({
@@ -76,6 +77,7 @@ export function WriteQuestionSheet({
   targetDay,
   partnerName,
   onClose,
+  onShown,
 }: WriteQuestionSheetProps) {
   const weekday = laterWeekday(day, targetDay);
   const submitWrittenQuestion = useAppStore((state) => state.submitWrittenQuestion);
@@ -98,6 +100,13 @@ export function WriteQuestionSheet({
     onCloseRef.current = onClose;
   }, [onClose]);
   const close = useCallback(() => onCloseRef.current(), []);
+  const onShownRef = useRef(onShown);
+  useEffect(() => {
+    onShownRef.current = onShown;
+  }, [onShown]);
+  useEffect(() => {
+    onShownRef.current?.();
+  }, []);
   useFocusTrap(panelRef, true, { onEscape: close, initialFocusRef: panelRef });
 
   const send = async () => {

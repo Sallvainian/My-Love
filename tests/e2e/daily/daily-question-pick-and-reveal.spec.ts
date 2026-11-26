@@ -20,10 +20,12 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
 import {
   clearPairDays,
+  readPairDayWriter,
   readPairQuestionTexts,
 } from '../../support/factories/daily-question';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { DAILY_DAY_READ, DAILY_PICK_SEND, SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
 
 test.describe('Daily question: pick and reveal', () => {
@@ -87,6 +89,7 @@ test.describe('Daily question: pick and reveal', () => {
     await page.getByTestId('daily-send-pick').click();
     expect((await ownPick).status).toBe(200);
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
+    await closeAfterPickSheet(page, (await readPairDayWriter(supabaseAdmin, pair)) === pair.userId);
     await expect(page.getByTestId('daily-my-pick')).toHaveText(thisText);
     await expect(page.getByTestId('daily-my-pick-time')).toHaveText(/^\d{1,2}:\d{2}\s[AP]M$/);
     await expect(page.getByTestId('daily-option-this')).toHaveCount(0);

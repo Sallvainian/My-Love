@@ -27,6 +27,7 @@ import {
 } from '../../support/factories/daily-question';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import {
@@ -146,6 +147,8 @@ writerTest.describe('Daily question: write tomorrow', () => {
     await expect(writerPage.getByTestId('daily-write-sheet')).toHaveCount(0);
     await pickThis(otherPage);
     await expect(otherPage.getByTestId('daily-write-sheet')).toHaveCount(0);
+    // The first picker who is not the writer meets the nudge sheet instead.
+    await closeAfterPickSheet(otherPage, false);
     await expect(writerPage.getByTestId('daily-write-sheet')).toHaveCount(0);
 
     await log.step('The writer picks and the sheet shows right after');

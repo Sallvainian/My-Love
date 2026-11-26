@@ -64,6 +64,18 @@
  * request. A refusal or a failed request shows `NUDGE_FAILED_MESSAGE` and the
  * slice re-reads the day. `useDailyDayRereads` re-reads the day at 20:00 (the
  * evening slot) and when the page comes back to the front.
+ *
+ * The nudge offer (R2): right after the first picker's Send my pick answers, when
+ * the day on screen is that day in state `me` with a `nudge` that has a slot and
+ * is not spent, `NudgeSheet` ("Do you want to nudge your partner?") opens once.
+ * It is raised only by that in-view send (a queued pick leaves the state `none`
+ * or `partner`, a queue drain raises nothing) and is state of this mount, so a
+ * reload, a remount or an account switch offers nothing. It waits behind the
+ * +1/milestone overlays and this mount's first read, and never shows alongside
+ * the write sheet or after it has shown in this mount (the writer meets one
+ * sheet). Nudge sends through `sendDailyNudge` and closes it; Not now, the scrim
+ * and Escape close it with nothing sent. The partner's `daily_pick` for that day,
+ * or any re-read that leaves the state `me`, ends it.
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
@@ -74,7 +86,6 @@ import { Bell, Flame, Hourglass, Snowflake } from 'lucide-react';
 import {
   type CoupleStreak,
   DAY_CHANGED_MESSAGE,
-  NUDGE_FAILED_MESSAGE,
   type DailyChoice,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
@@ -88,6 +99,8 @@ import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
 import { StreakWeek } from '../shared/StreakWeek';
 import { Milestone } from './Milestone';
+import { NudgeSheet } from './NudgeSheet';
+import { nudgeFailureMessage } from './nudgeFailureMessage';
 import { StreakUp } from './StreakUp';
 import { WriteQuestionSheet } from './WriteQuestionSheet';
 
@@ -214,12 +227,7 @@ function WaitingCard({
     try {
       await sendDailyNudge();
     } catch (caught) {
-      if (caught instanceof AccountDataError && caught.code === 'offline') {
-        setNudgeError(caught.message);
-      } else {
-        console.error('[DailyQuestion] Could not send the nudge:', caught);
-        setNudgeError(NUDGE_FAILED_MESSAGE);
-      }
+      setNudgeError(nudgeFailureMessage(caught));
     } finally {
       setSending(false);
     }
@@ -262,6 +270,7 @@ function DayCard({
   partnerName,
   onSendStart,
   onDayChanged,
+  onPickSent,
 }: {
   snapshot: DailyDaySnapshot;
   /** The account's queued pick for this day, if any. */
@@ -272,6 +281,8 @@ function DayCard({
   onSendStart: () => void;
   /** The pick was refused because the date changed; the parent shows the notice. */
   onDayChanged: () => void;
+  /** The pick's request answered (not queued, not refused): the parent decides on the nudge offer. */
+  onPickSent: (dayId: string) => void;
 }) {
   const submitDailyPick = useAppStore((state) => state.submitDailyPick);
   const [selected, setSelected] = useState<DailyChoice | null>(null);
@@ -287,6 +298,7 @@ function DayCard({
     setSending(true);
     try {
       await submitDailyPick(selected);
+      onPickSent(snapshot.day_id);
     } catch (caught) {
       if (caught instanceof AccountDataError && caught.code === 'day-changed') {
         // The notice sits above the card: a new day_id remounts the card.
@@ -298,7 +310,7 @@ function DayCard({
     } finally {
       setSending(false);
     }
-  }, [selected, submitDailyPick, onSendStart, onDayChanged]);
+  }, [selected, submitDailyPick, onSendStart, onDayChanged, onPickSent, snapshot.day_id]);
 
   const mine = snapshot.my_choice ? question[snapshot.my_choice] : null;
   const theirs = snapshot.partner_choice ? question[snapshot.partner_choice] : null;
@@ -492,6 +504,48 @@ export function DailyQuestion() {
     readFor === sessionKey &&
     !celebrationShown;
 
+  // The nudge offer (R2), raised only by the in-view Send my pick and kept with
+  // the session it was raised in, so an account change hides it. It is state of
+  // this mount: a reload or a remount offers nothing. Whether it shows is
+  // decided below from the shown day, never from the offer alone.
+  const [nudgeOffer, setNudgeOffer] = useState<{ session: string; dayId: string } | null>(null);
+  // The session in which the write sheet has shown in this mount: the offer
+  // never shows alongside it or after it.
+  const [writeShownIn, setWriteShownIn] = useState<string | null>(null);
+  const markWriteShown = useCallback(() => setWriteShownIn(sessionKey), [sessionKey]);
+  const closeNudgeOffer = useCallback(() => setNudgeOffer(null), []);
+  // A pick the server answered: offer the nudge when the day on screen is that
+  // day with only the own pick in and an open slot. A queued pick leaves the
+  // state `none` or `partner`, so it raises nothing.
+  const offerNudge = useCallback(
+    (dayId: string) => {
+      // eslint-disable-next-line no-restricted-properties -- the answer was stored after the send's await, so a render's value is stale
+      const shown = useAppStore.getState().dailyDay;
+      if (shown?.status !== 'ok') return;
+      const snap = shown.snapshot;
+      if (snap.day_id !== dayId || snap.state !== 'me' || !snap.my_choice) return;
+      if (!snap.nudge || snap.nudge.slot === null || snap.nudge.spent) return;
+      setNudgeOffer({ session: sessionKey, dayId });
+    },
+    [sessionKey]
+  );
+  // The partner's pick on that day ends the offer for good.
+  const dropNudgeOffer = useCallback(
+    (dayId: string) => setNudgeOffer((current) => (current?.dayId === dayId ? null : current)),
+    []
+  );
+  const nudgeSnapshot = dailyDay?.status === 'ok' ? dailyDay.snapshot : null;
+  const showNudgeSheet =
+    nudgeOffer !== null &&
+    nudgeOffer.session === sessionKey &&
+    nudgeSnapshot !== null &&
+    nudgeSnapshot.day_id === nudgeOffer.dayId &&
+    nudgeSnapshot.state === 'me' &&
+    readFor === sessionKey &&
+    !celebrationShown &&
+    !showWriteSheet &&
+    writeShownIn !== sessionKey;
+
   // Re-read on each mount, and for a new session while the view stays open (an
   // account switch clears `dailyDay` through signedOutState). The sheet waits
   // for this mount's read to answer: the day shown first may be a saved one
@@ -555,7 +609,7 @@ export function DailyQuestion() {
   }, [shownStreak, sessionKey, claimStreakCelebration, claimStreakMilestone]);
 
   // The partner's pick shows without a reload (AD-11).
-  useDailyPickListener();
+  useDailyPickListener(dropNudgeOffer);
   // The evening slot and a return to the front re-read the day.
   useDailyDayRereads();
 
@@ -604,6 +658,7 @@ export function DailyQuestion() {
               partnerName={partnerName}
               onSendStart={clearDayChanged}
               onDayChanged={raiseDayChanged}
+              onPickSent={offerNudge}
             />
 
             {dailyDay.snapshot.state === 'me' && dailyDay.snapshot.my_choice && (
@@ -686,6 +741,19 @@ export function DailyQuestion() {
           targetDay={writeSnapshot.write.target_day}
           partnerName={partnerName}
           onClose={closeWriteSheet}
+          onShown={markWriteShown}
+        />
+      )}
+
+      {showNudgeSheet && (
+        <NudgeSheet
+          key={nudgeSnapshot.day_id}
+          canNudge={
+            nudgeSnapshot.nudge !== undefined &&
+            nudgeSnapshot.nudge.slot !== null &&
+            !nudgeSnapshot.nudge.spent
+          }
+          onClose={closeNudgeOffer}
         />
       )}
     </div>

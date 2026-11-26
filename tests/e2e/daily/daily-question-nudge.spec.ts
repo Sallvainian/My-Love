@@ -29,6 +29,7 @@ import {
 } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { goOffline } from '../../support/helpers/offline';
 import {
   DAILY_DAY_READ,
@@ -106,13 +107,10 @@ test.describe('Daily question: nudge the partner', () => {
     expect((await ownPick).status).toBe(200);
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
 
-    // The day's writer is asked to write tomorrow's question after the pick; its
-    // sheet covers the card until it is closed (Escape hides it for this mount).
-    if ((await readPairDayWriter(supabaseAdmin, pair)) === pair.userId) {
-      await expect(page.getByTestId('daily-write-sheet')).toBeVisible();
-      await page.keyboard.press('Escape');
-      await expect(page.getByTestId('daily-write-sheet')).toHaveCount(0);
-    }
+    // The first picker is asked something right after the pick: the day's writer
+    // to write tomorrow's question, anyone else whether to nudge. Either sheet
+    // covers the card until it is closed.
+    await closeAfterPickSheet(page, (await readPairDayWriter(supabaseAdmin, pair)) === pair.userId);
     await expect(page.getByTestId('daily-nudge')).toBeEnabled();
 
     await log.step('Offline, a tap shows the offline sentence and sends nothing');

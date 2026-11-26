@@ -34,6 +34,7 @@ import {
 } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 import { goOffline } from '../../support/helpers/offline';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -140,8 +141,8 @@ test.describe('Daily streak', () => {
     await partnerPage.goto('/daily');
     expect((await partnerDay).status).toBe(200);
 
-    // Today's day exists now, so its writer is known: they say "No thanks" to
-    // the sheet that follows their pick.
+    // Today's day exists now, so its writer is known: the sheet that follows
+    // their pick is the write sheet, anyone else's is the nudge sheet.
     const writer = await readPairDayWriter(
       supabaseAdmin,
       pair,
@@ -168,7 +169,7 @@ test.describe('Daily streak', () => {
     );
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
     await expect(chip).toHaveAttribute('data-state', 'grey');
-    if (writer === pair.userId) await page.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(page, writer === pair.userId, 'decline');
 
     await log.step("The partner picks in the second browser: the worker's Daily turns orange");
     await partnerPage.getByTestId('daily-option-that').click();
