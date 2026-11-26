@@ -31,10 +31,11 @@
  * Daily view calls it for each `ok` streak it shows, and the device-state
  * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
  * whether that held total is new to this device and, in the same claim, whether
- * its milestone screen has yet to show. Both claims pass the partner the streak
- * was read with (`mergePartnerId`, as the saved days are tagged), which the
- * kind stores with its value: a value tagged with another partner is re-seeded,
- * not played, and with no known partner nothing is claimed. That claim stores the held total alone;
+ * its milestone screen has yet to show. Both claims pass the partner known when
+ * the claim is made (`mergePartnerId`, the source the saved days are tagged
+ * from), which the kind stores with its value: a value tagged with another
+ * partner is re-seeded, not played, and with no known partner nothing is
+ * claimed. `claimStreakCelebration` stores the held total alone;
  * `claimStreakMilestone(streak)` stores the milestone count just before its
  * screen shows (R5), so a +1 cut short leaves the milestone for the next open of
  * Daily. Both hold no state here, so sign-out needs nothing in

@@ -57,6 +57,8 @@ interface PairSetup {
   /** The partner's page, in a second context. */
   partner: Page;
   ownIsWriter: boolean;
+  /** The worker's account id: the partner's page is paired with it. */
+  ownId: string;
   ownName: string;
   partnerName: string;
 }
@@ -156,6 +158,7 @@ const test = base.extend<{ setup: PairSetup }>({
       own: page,
       partner: partnerPage,
       ownIsWriter: writer === pair.userId,
+      ownId: pair.userId,
       ownName: names[pair.userId],
       partnerName: names[pair.partnerId],
     });
@@ -208,7 +211,7 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
   test.describe.configure({ timeout: 150_000 });
 
   test('[P0] the second picker sees the +1 then the milestone, and a reload shows neither', async ({
-    setup: { own, partner, ownIsWriter, ownName },
+    setup: { own, partner, ownIsWriter, ownId, ownName },
   }) => {
     await log.step('The worker picks and waits; the partner picks second');
     await pick(own, 'this');
@@ -240,7 +243,7 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
         partner,
         CELEBRATED_KIND
       )
-    ).toEqual({ held: 25, milestones: 1, partner_id: expect.any(String) });
+    ).toEqual({ held: 25, milestones: 1, partner_id: ownId });
   });
 
   test('[P0] the first picker, returning to Daily, sees the +1 then the milestone and closes it', async ({

@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyDay = vi.fn();
+const fetchDailyDayById = vi.fn();
+const submitDailyPickRequest = vi.fn();
 
 vi.mock('../../../src/api/supabaseClient', () => ({
   supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
@@ -19,6 +21,9 @@ vi.mock('../../../src/api/supabaseClient', () => ({
 vi.mock('../../../src/api/dailyQuestionApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  fetchDailyDayById: (...args: unknown[]) => fetchDailyDayById(...args),
+  announceDailyPick: vi.fn().mockResolvedValue(undefined),
+  submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
 
 import { lookupPartnerId } from '../../../src/api/supabaseClient';
@@ -42,6 +47,8 @@ const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({ status: 'ok' as co
 beforeEach(async () => {
   vi.clearAllMocks();
   fetchDailyDay.mockReset();
+  fetchDailyDayById.mockReset();
+  submitDailyPickRequest.mockReset();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   setOnline(true);
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -303,6 +310,66 @@ describe('the partner changes in the session', () => {
 
     expect(state().dailyDay).toBeNull();
     expect(await copy()).toBeNull();
+  });
+
+  describe('a re-read in flight for the old partner', () => {
+    const oldPairing = () => dailySnapshot({ day_id: 'old-pairing' });
+
+    async function startRefresh() {
+      withPartner(PARTNER_B);
+      useAppStore.setState({ dailyDay: ok(oldPairing()) });
+      const request = deferred<ReturnType<typeof dailySnapshot>>();
+      fetchDailyDayById.mockReturnValueOnce(request.promise);
+      const refresh = state().refreshDailyDay('old-pairing');
+      await vi.waitFor(() => expect(fetchDailyDayById).toHaveBeenCalledTimes(1));
+      return { request, refresh };
+    }
+
+    it('landing after the reset does not put the old day back on the cleared screen', async () => {
+      const { request, refresh } = await startRefresh();
+
+      withPartner(PARTNER_C);
+      expect(state().dailyDay).toBeNull();
+      request.settle(oldPairing());
+      await refresh;
+
+      expect(state().dailyDay).toBeNull();
+      expect(await copy()).toBeNull();
+    });
+
+    it("landing after the new partner's own read does not tag the old day with the new partner", async () => {
+      const { request, refresh } = await startRefresh();
+      fetchDailyDay.mockReset();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot({ day_id: 'new-pairing' })));
+
+      withPartner(PARTNER_C);
+      await vi.waitFor(() =>
+        expect(state().dailyDay).toEqual(ok(dailySnapshot({ day_id: 'new-pairing' })))
+      );
+      request.settle(oldPairing());
+      await refresh;
+
+      expect(state().dailyDay).toEqual(ok(dailySnapshot({ day_id: 'new-pairing' })));
+      expect(await copy()).toEqual({
+        'new-pairing': { ...dailySnapshot({ day_id: 'new-pairing' }), partner_id: PARTNER_C },
+      });
+    });
+
+    it('a pick confirmed after the change is not saved for the new partner', async () => {
+      withPartner(PARTNER_B);
+      useAppStore.setState({ dailyDay: ok(waitingSnapshot('this')) });
+      const request = deferred<ReturnType<typeof dailySnapshot>>();
+      submitDailyPickRequest.mockReturnValueOnce(request.promise);
+      const submit = state().submitDailyPick('this');
+      await vi.waitFor(() => expect(submitDailyPickRequest).toHaveBeenCalledTimes(1));
+
+      withPartner(PARTNER_C);
+      request.settle(dailySnapshot({ day_id: 'old-pairing', my_choice: 'this' }));
+      await expect(submit).resolves.toBeUndefined();
+
+      expect(state().dailyDay).toBeNull();
+      expect(await copy()).toBeNull();
+    });
   });
 
   it('a failure of the old partner read leaves no error behind', async () => {

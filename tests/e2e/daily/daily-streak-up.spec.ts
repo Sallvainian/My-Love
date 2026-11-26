@@ -42,6 +42,7 @@ import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { navigateTo } from '../../support/helpers/navigation';
+import { goOffline } from '../../support/helpers/offline';
 import {
   COUPLE_STREAK_READ,
   DAILY_DAY_READ,
@@ -325,8 +326,7 @@ test.describe('Daily: the streak goes up by one', () => {
     expect(await savedLocalCopy<{ held: number }>(own, CELEBRATED_KIND)).toMatchObject({ held: 1 });
 
     await log.step('Drop the connection, then tap Daily in the dock');
-    await own.context().setOffline(true);
-    await own.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await goOffline(own, true);
     expect(await own.evaluate(() => navigator.onLine), 'premise: the page is offline').toBe(false);
     await navigateTo(own, 'daily');
 
