@@ -128,6 +128,62 @@ describe('PartnerView', () => {
       );
     });
 
+    it('a partner and a null streak with nothing loading or failed: the loading block, not the name alone', () => {
+      state = makeState({ coupleStreak: null, coupleStreakLoading: false, coupleStreakError: null });
+      render(<PartnerView />);
+
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Jessie');
+      expect(screen.getByTestId('partner-streak-loading')).toHaveTextContent('Loading your streak...');
+      expect(screen.queryByTestId('partner-streak-error')).not.toBeInTheDocument();
+    });
+
+    it('a partner and an unlinked streak: the partner is read again, once, so the slice decides', () => {
+      state = makeState({ coupleStreak: { status: 'unlinked' } as CoupleStreakAnswer });
+      const { rerender } = render(<PartnerView />);
+
+      // Once from the mount's own read, once for the unlinked answer.
+      expect(state.loadPartner).toHaveBeenCalledTimes(2);
+      expect(screen.queryByTestId('partner-streak-card')).not.toBeInTheDocument();
+
+      rerender(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(2);
+
+      // The slice answered unlinked: Connect replaces the name.
+      state = { ...state, partner: null };
+      rerender(<PartnerView />);
+      expect(screen.getByTestId('partner-search-card')).toBeInTheDocument();
+    });
+
+    it('an ok streak, or none, reads the partner on mount only', () => {
+      state = makeState({ coupleStreak: okStreak() });
+      render(<PartnerView />);
+      expect(state.loadPartner).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers Retry on the streak error online, which reads the streak again', () => {
+      state = makeState({ coupleStreakError: 'The streak could not be read.' });
+      render(<PartnerView />);
+
+      const error = screen.getByTestId('partner-streak-error');
+      expect(error).toHaveTextContent('The streak could not be read.');
+      state.loadCoupleStreak.mockClear();
+      const retry = within(error).getByTestId('partner-streak-retry');
+      expect(retry).toBeEnabled();
+      retry.click();
+      expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers no Retry on the streak error offline', () => {
+      state = makeState({
+        coupleStreakError: 'You are offline.',
+        syncStatus: { isOnline: false },
+      });
+      render(<PartnerView />);
+
+      expect(screen.getByTestId('partner-streak-error')).toHaveTextContent('You are offline.');
+      expect(screen.queryByTestId('partner-streak-retry')).not.toBeInTheDocument();
+    });
+
     it('a failed refresh leaves the card that is shown', () => {
       state = makeState({ coupleStreak: okStreak(), coupleStreakError: 'boom' });
       render(<PartnerView />);

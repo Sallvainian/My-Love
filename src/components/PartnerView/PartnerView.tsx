@@ -35,6 +35,7 @@ import { PartnerConnect } from './PartnerConnect';
 import { PartnerLoadError } from './PartnerLoadError';
 import { PastQuestionsCard } from './PastQuestionsCard';
 import { PastQuestionsPage } from './PastQuestionsPage';
+import { SECONDARY_BUTTON } from '../shared/kitClasses';
 import { StreakCard } from './StreakCard';
 
 export function PartnerView() {
@@ -109,6 +110,15 @@ export function PartnerView() {
     showPartnerPage('');
   }, [unlinkedOnHistory, showPartnerPage]);
 
+  // The streak says unlinked while a partner is shown (the server unlinked them, or
+  // the partner read failed after one): ask the partner slice again, which decides
+  // between the name and the Connect screen. Keyed on the answer's status, so one
+  // read per answer and no loop if the server still reports a partner.
+  const streakUnlinked = coupleStreak?.status === 'unlinked';
+  useEffect(() => {
+    if (partnerId && streakUnlinked) void loadPartner();
+  }, [partnerId, streakUnlinked, loadPartner]);
+
   const streak = coupleStreak?.status === 'ok' ? coupleStreak.streak : null;
 
   if (partner && !isLoadingPartner && partnerPath === 'history') {
@@ -116,7 +126,7 @@ export function PartnerView() {
       <div className="min-h-screen bg-page" data-testid="partner-view">
         <PastQuestionsPage
           partnerName={partner.displayName}
-          history={dailyHistory ?? []}
+          history={dailyHistory}
           streak={streak}
         />
       </div>
@@ -152,7 +162,7 @@ export function PartnerView() {
 
             {streak ? (
               <StreakCard streak={streak} />
-            ) : coupleStreakLoading ? (
+            ) : coupleStreakLoading || (coupleStreak === null && !coupleStreakError) ? (
               <div
                 className="flex flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-5 py-10 text-center shadow-card"
                 data-testid="partner-streak-loading"
@@ -165,10 +175,21 @@ export function PartnerView() {
               </div>
             ) : coupleStreakError ? (
               <div
-                className="rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
+                className="flex flex-col gap-3 rounded-[20px] bg-dtint px-4 py-3 text-sm font-medium text-danger"
                 data-testid="partner-streak-error"
               >
-                {coupleStreakError}
+                <span>{coupleStreakError}</span>
+                {isOnline && (
+                  <button
+                    type="button"
+                    className={SECONDARY_BUTTON}
+                    disabled={coupleStreakLoading}
+                    onClick={() => void loadCoupleStreak()}
+                    data-testid="partner-streak-retry"
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             ) : null}
 
