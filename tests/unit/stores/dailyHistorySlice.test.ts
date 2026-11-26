@@ -49,7 +49,7 @@ import { lookupPartnerId } from '../../../src/api/supabaseClient';
 import { moodService } from '../../../src/services/moodService';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { accountDeletesSettled, setOnline } from './accountDataFixtures';
-import { revealSnapshot } from './dailyQuestionFixture';
+import { coupleStreak, revealSnapshot } from './dailyQuestionFixture';
 import { deferred } from './loaderIdentityGuardsFixture';
 
 const A = 'USER-A-ID';
@@ -71,6 +71,14 @@ const run = (count: number, newest = 31) =>
 /** `count` days older than every `run`: `2026-09-30` down, ids `o<n>`. */
 const older = (count: number) =>
   Array.from({ length: count }, (_, i) => day(`o${i}`, `2026-09-${String(30 - i).padStart(2, '0')}`));
+
+/** `count` consecutive days, `start` (`YYYY-MM-DD`) and the ones before it, newest first, ids `<prefix><n>`. */
+const daysFrom = (start: string, count: number, prefix: string) =>
+  Array.from({ length: count }, (_, i) => {
+    const date = new Date(`${start}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - i);
+    return day(`${prefix}${i}`, date.toISOString().slice(0, 10));
+  });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -716,7 +724,8 @@ describe('the daily-days copy behind the past questions', () => {
 
   it('does not touch rows already shown when the read fails', async () => {
     withPartner(PARTNER_C);
-    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { c1: savedDone('c1', '2026-10-01', PARTNER_C) });
+    // The copy holds only a row already shown: an older saved row would follow them (see below).
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { d2: savedDone('d2', '2026-11-05', PARTNER_C) });
     useAppStore.setState({ dailyHistory: PAGE, dailyHistoryEnd: false });
     fetchDailyHistory.mockRejectedValue(offlineRefusal());
 
@@ -784,6 +793,270 @@ describe('the daily-days copy behind the past questions', () => {
     expect(state().dailyHistory).toEqual(fresh);
     expect(state().dailyHistoryEnd).toBe(false);
     expect(state().dailyHistoryError).toBeNull();
+  });
+
+  describe('an offline refusal with rows already shown', () => {
+    it('appends the saved rows older than the oldest shown, ends the paging, and the next online page replaces the list and resumes it', async () => {
+      withPartner(PARTNER_C);
+      await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+        d2: savedDone('d2', '2026-11-05', PARTNER_C),
+        d1: savedDone('d1', '2026-11-04', PARTNER_C),
+        c2: savedDone('c2', '2026-10-02', PARTNER_C),
+        c1: savedDone('c1', '2026-10-01', PARTNER_C),
+        b1: savedDone('b1', '2026-09-01', PARTNER_B),
+      });
+      useAppStore.setState({ dailyHistory: PAGE, dailyHistoryEnd: false });
+      fetchDailyHistory.mockRejectedValueOnce(offlineRefusal());
+
+      await state().loadDailyHistory();
+
+      expect(state().dailyHistory?.map((row) => row.day_id)).toEqual(['d2', 'd1', 'c2', 'c1']);
+      expect(state().dailyHistoryEnd).toBe(true);
+      expect(state().dailyHistoryError).toBe(offlineRefusal().message);
+      expect(state().dailyHistoryErrorOffline).toBe(true);
+      expect(console.error).not.toHaveBeenCalled();
+
+      // Back online: a full first page replaces the filled list and opens the paging.
+      const fresh = run(DAILY_HISTORY_PAGE_SIZE);
+      fetchDailyHistory.mockResolvedValueOnce(fresh).mockResolvedValueOnce([]);
+      await state().loadDailyHistory();
+
+      expect(state().dailyHistory).toEqual(fresh);
+      expect(state().dailyHistoryEnd).toBe(false);
+      expect(state().dailyHistoryError).toBeNull();
+      fetchDailyHistory.mockResolvedValueOnce([]);
+      await state().loadMoreDailyHistory();
+      expect(fetchDailyHistory).toHaveBeenLastCalledWith('2026-10-02');
+    });
+
+    it('leaves the list and the end flag as they were when no saved row is older', async () => {
+      withPartner(PARTNER_C);
+      await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+        d2: savedDone('d2', '2026-11-05', PARTNER_C),
+        d1: savedDone('d1', '2026-11-04', PARTNER_C),
+        n1: savedDone('n1', '2026-11-20', PARTNER_C),
+        b1: savedDone('b1', '2026-09-01', PARTNER_B),
+      });
+      useAppStore.setState({ dailyHistory: PAGE, dailyHistoryEnd: false });
+      fetchDailyHistory.mockRejectedValueOnce(offlineRefusal());
+
+      await state().loadDailyHistory();
+
+      expect(state().dailyHistory).toEqual(PAGE);
+      expect(state().dailyHistoryEnd).toBe(false);
+    });
+
+    it('appends nothing after a failure that is not an offline refusal', async () => {
+      withPartner(PARTNER_C);
+      await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { c1: savedDone('c1', '2026-10-01', PARTNER_C) });
+      useAppStore.setState({ dailyHistory: PAGE, dailyHistoryEnd: false });
+      fetchDailyHistory.mockRejectedValueOnce(new AccountDataError('transport', 'boom'));
+
+      await state().loadDailyHistory();
+
+      expect(state().dailyHistory).toEqual(PAGE);
+      expect(state().dailyHistoryEnd).toBe(false);
+    });
+
+    it('a refused "more" appends the saved older rows too, and the end is set', async () => {
+      withPartner(PARTNER_C);
+      await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+        c1: savedDone('c1', '2026-10-01', PARTNER_C),
+        b1: savedDone('b1', '2026-09-01', PARTNER_B),
+      });
+      const shown = run(DAILY_HISTORY_PAGE_SIZE);
+      useAppStore.setState({ dailyHistory: shown, dailyHistoryEnd: false });
+      fetchDailyHistory.mockRejectedValueOnce(offlineRefusal());
+
+      await state().loadMoreDailyHistory();
+
+      expect(state().dailyHistory?.map((row) => row.day_id)).toEqual([
+        ...shown.map((row) => row.day_id),
+        'c1',
+      ]);
+      expect(state().dailyHistoryEnd).toBe(true);
+      expect(state().dailyHistoryErrorOffline).toBe(true);
+      expect(state().dailyHistoryLoadingMore).toBe(false);
+      expect(console.error).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the background fill of the copy', () => {
+    const FIRST = run(DAILY_HISTORY_PAGE_SIZE); // 2026-10-31 down to 2026-10-02
+    const MIDDLE = daysFrom('2026-10-01', DAILY_HISTORY_PAGE_SIZE, 'm'); // down to 2026-09-02
+    const TAIL = daysFrom('2026-09-01', 7, 't');
+    const doneInCopy = async () =>
+      Object.values((await copyOf()) ?? {}).filter(
+        (entry) => entry.state === 'both' && entry.partner_id === PARTNER_C
+      ).length;
+    const streakOf = (done: number) =>
+      useAppStore.setState({ coupleStreak: { status: 'ok', streak: coupleStreak({ done }) } });
+
+    beforeEach(() => withPartner(PARTNER_C));
+
+    it('pages every older done day into the copy only, until a short page', async () => {
+      fetchDailyHistory
+        .mockResolvedValueOnce(FIRST)
+        .mockResolvedValueOnce(MIDDLE)
+        .mockResolvedValueOnce(TAIL);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(3);
+      expect(fetchDailyHistory).toHaveBeenNthCalledWith(1);
+      expect(fetchDailyHistory).toHaveBeenNthCalledWith(2, '2026-10-02');
+      expect(fetchDailyHistory).toHaveBeenNthCalledWith(3, '2026-09-02');
+      expect(await doneInCopy()).toBe(67);
+      // The list still holds the first page alone and is not at its end.
+      expect(state().dailyHistory).toEqual(FIRST);
+      expect(state().dailyHistoryEnd).toBe(false);
+      expect(state().dailyHistoryError).toBeNull();
+      expect(state().dailyHistoryLoadingMore).toBe(false);
+    });
+
+    it('stops once the saved done days for the partner reach the streak\'s done', async () => {
+      streakOf(60);
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockResolvedValueOnce(MIDDLE);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(2);
+      expect(await doneInCopy()).toBe(60);
+    });
+
+    it('asks for nothing more when the copy already holds the streak\'s done days', async () => {
+      streakOf(30);
+      await writeLocalCopy(
+        A,
+        DAILY_DAYS_COPY_KIND,
+        Object.fromEntries(FIRST.map((row) => [row.day_id, { ...row, partner_id: PARTNER_C }]))
+      );
+      fetchDailyHistory.mockResolvedValueOnce(FIRST);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not count another partner\'s saved days toward the streak', async () => {
+      streakOf(60);
+      await writeLocalCopy(
+        A,
+        DAILY_DAYS_COPY_KIND,
+        Object.fromEntries(MIDDLE.map((row) => [row.day_id, { ...row, partner_id: PARTNER_B }]))
+      );
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockResolvedValueOnce(MIDDLE);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(2);
+      expect(await doneInCopy()).toBe(60);
+    });
+
+    it('waits for a streak read under way before deciding how far to page', async () => {
+      useAppStore.setState({ coupleStreakLoading: true });
+      fetchDailyHistory.mockResolvedValueOnce(FIRST);
+
+      const load = state().loadDailyHistory();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+      useAppStore.setState({
+        coupleStreak: { status: 'ok', streak: coupleStreak({ done: 30 }) },
+        coupleStreakLoading: false,
+      });
+      await load;
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fill after a short first page', async () => {
+      fetchDailyHistory.mockResolvedValueOnce(PAGE);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops when a page goes no further back', async () => {
+      fetchDailyHistory.mockResolvedValue(FIRST);
+
+      await state().loadDailyHistory();
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(2);
+    });
+
+    it('an offline refusal ends the fill quietly and leaves the first page shown with no error', async () => {
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockRejectedValueOnce(offlineRefusal());
+
+      await state().loadDailyHistory();
+
+      expect(state().dailyHistory).toEqual(FIRST);
+      expect(state().dailyHistoryError).toBeNull();
+      expect(state().dailyHistoryErrorOffline).toBe(false);
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('a failure ends the fill with a log and never sets the error', async () => {
+      const failure = new AccountDataError('transport', 'boom');
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockRejectedValueOnce(failure);
+
+      await state().loadDailyHistory();
+
+      expect(console.error).toHaveBeenCalledWith(
+        '[DailyQuestion] Failed to fill the past questions copy:',
+        failure
+      );
+      expect(state().dailyHistory).toEqual(FIRST);
+      expect(state().dailyHistoryError).toBeNull();
+    });
+
+    it('writes nothing when the session ends while a page is read', async () => {
+      const page = deferred<typeof MIDDLE>();
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockReturnValueOnce(page.promise);
+      const writeSpy = vi.spyOn(localCopyModule, 'writeLocalCopy');
+
+      const load = state().loadDailyHistory();
+      await vi.waitFor(() => expect(fetchDailyHistory).toHaveBeenCalledTimes(2));
+      const writes = writeSpy.mock.calls.length;
+      state().clearAuth();
+      page.settle(MIDDLE);
+      await load;
+
+      expect(writeSpy.mock.calls).toHaveLength(writes);
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(2);
+    });
+
+    it('writes nothing when the partner changes while a page is read', async () => {
+      const page = deferred<typeof MIDDLE>();
+      fetchDailyHistory.mockResolvedValueOnce(FIRST).mockReturnValueOnce(page.promise);
+      const writeSpy = vi.spyOn(localCopyModule, 'writeLocalCopy');
+
+      const load = state().loadDailyHistory();
+      await vi.waitFor(() => expect(fetchDailyHistory).toHaveBeenCalledTimes(2));
+      const writes = writeSpy.mock.calls.length;
+      state().resetDailyHistoryForNewPair();
+      page.settle(MIDDLE);
+      await load;
+
+      expect(writeSpy.mock.calls).toHaveLength(writes);
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(2);
+    });
+
+    it('a second first-page read while a fill runs starts no second fill', async () => {
+      const page = deferred<typeof TAIL>();
+      fetchDailyHistory
+        .mockResolvedValueOnce(FIRST)
+        .mockReturnValueOnce(page.promise)
+        .mockResolvedValueOnce(FIRST);
+
+      const first = state().loadDailyHistory();
+      await vi.waitFor(() => expect(fetchDailyHistory).toHaveBeenCalledTimes(2));
+      await state().loadDailyHistory();
+      page.settle(TAIL);
+      await first;
+
+      expect(fetchDailyHistory).toHaveBeenCalledTimes(3);
+    });
   });
 });
 

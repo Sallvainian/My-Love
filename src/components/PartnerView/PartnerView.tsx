@@ -84,8 +84,10 @@ export function PartnerView() {
   // copy first; offline the read refuses and what is shown (the copy, if any)
   // stays. They are read offline too (not gated), and again when the device
   // comes back online. The history shows no copy first: a refused first read
-  // with nothing shown fills it from the `daily-days` copy, and the next
-  // online read replaces that fill.
+  // fills it from the `daily-days` copy (all the saved rows when nothing is
+  // shown, the saved rows older than the oldest shown otherwise), and the next
+  // online read replaces that fill. An online first read of a full page also
+  // pages the older done days into that copy in the background.
   const partnerId = partner?.id ?? null;
   useEffect(() => {
     if (partnerId) {

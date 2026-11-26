@@ -8,11 +8,15 @@
  * 2. 35 done days paged in on See all online are all saved: a reload of
  *    `/partner/history` that gets no history answer, and then offline, shows all
  *    35 rows.
- * 3. Throwaway A, linked to B with done days, is relinked by an admin to C (and
+ * 3. 65 done days, with See all never scrolled past its first 30: the background
+ *    fill saves all 65 (DW-522), so a reload of `/partner/history` that gets no
+ *    history answer, and then offline, shows all 65 rows; and with See all
+ *    open on its first 30 rows, going offline appends the saved older 35.
+ * 4. Throwaway A, linked to B with done days, is relinked by an admin to C (and
  *    B to D). After A loads Partner and Daily online again, a reload with the
  *    reads aborted and the device offline shows none of A and B's questions,
  *    though the copy still holds their entries: the partner filter hides them.
- * 4. Throwaway A, linked to B with done days, loads Partner online (the streak
+ * 5. Throwaway A, linked to B with done days, loads Partner online (the streak
  *    and the history are saved under B). An admin relinks A to C; a reload with
  *    the streak and history reads aborted (online, so the partner read answers
  *    C) shows C's name and neither A and B's streak card nor any of their
@@ -206,6 +210,89 @@ test.describe('Past questions offline, on the worker pair', () => {
     await expect(rows.last().getByTestId('partner-history-question')).toHaveText(
       `${oldest.this} or ${oldest.that}?`
     );
+  });
+
+  test('[P1] 65 days with See all never scrolled are all saved by the background fill and show after a reload with no answer, offline', async ({
+    page,
+    supabaseAdmin,
+    cleanup,
+    interceptNetworkCall,
+  }) => {
+    const { pair, questions } = await seedDoneDays({ supabaseAdmin, cleanup }, 65);
+    expect(questions).toHaveLength(65);
+
+    await log.step('GIVEN See all loaded its first 30 days online and was never scrolled');
+    const history = interceptNetworkCall({ method: 'POST', url: DAILY_HISTORY_READ });
+    const streak = interceptNetworkCall({ method: 'POST', url: COUPLE_STREAK_READ });
+    await page.goto('/partner/history');
+    expect((await history).status).toBe(200);
+    expect((await streak).status).toBe(200);
+    await expect(page.getByTestId('partner-history-row')).toHaveCount(30);
+
+    await log.step('THEN the background fill saves all 65 days without a row being added');
+    await recurseUntil(
+      () => savedDoneCount(page, pair.partnerId),
+      (count) => {
+        expect(count).toBe(65);
+      }
+    );
+    await expect(page.getByTestId('partner-history-row')).toHaveCount(30);
+
+    await log.step('WHEN the page reloads with the history read aborted, then goes offline');
+    const aborted = await abortReads(page, DAILY_HISTORY_READ);
+    await page.reload();
+    await expect(page.getByTestId('partner-history-row')).toHaveCount(65);
+    await recurseUntil(
+      async () => aborted.count(),
+      (count) => {
+        expect(count).toBeGreaterThan(0);
+      }
+    );
+    await goOffline(page, true);
+
+    await log.step('THEN all 65 rows show under the count');
+    await expect(page.getByTestId('partner-history-summary')).toHaveText(
+      'Same pick on 65 of your 65 days'
+    );
+    const rows = page.getByTestId('partner-history-row');
+    await expect(rows).toHaveCount(65);
+    const oldest = questions[64];
+    await expect(rows.last().getByTestId('partner-history-question')).toHaveText(
+      `${oldest.this} or ${oldest.that}?`
+    );
+  });
+
+  test('[P1] going offline with See all open on its first 30 days adds the saved older days', async ({
+    page,
+    supabaseAdmin,
+    cleanup,
+    interceptNetworkCall,
+  }) => {
+    const { pair, questions } = await seedDoneDays({ supabaseAdmin, cleanup }, 65);
+
+    await log.step('GIVEN See all shows its first 30 days online and the copy holds all 65');
+    const history = interceptNetworkCall({ method: 'POST', url: DAILY_HISTORY_READ });
+    await page.goto('/partner/history');
+    expect((await history).status).toBe(200);
+    await expect(page.getByTestId('partner-history-row')).toHaveCount(30);
+    await recurseUntil(
+      () => savedDoneCount(page, pair.partnerId),
+      (count) => {
+        expect(count).toBe(65);
+      }
+    );
+
+    await log.step('WHEN the device goes offline');
+    await goOffline(page, true);
+
+    await log.step('THEN the list holds all 65 rows, the oldest last, and no error box');
+    const rows = page.getByTestId('partner-history-row');
+    await expect(rows).toHaveCount(65);
+    const oldest = questions[64];
+    await expect(rows.last().getByTestId('partner-history-question')).toHaveText(
+      `${oldest.this} or ${oldest.that}?`
+    );
+    await expect(page.getByTestId('partner-history-error')).toHaveCount(0);
   });
 });
 
