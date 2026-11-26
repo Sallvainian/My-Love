@@ -68,7 +68,7 @@ export function writerSnapshot(
 }
 
 /** The seven dates ending 2030-03-07, oldest first, all `open` unless `states` overrides the newest ones. */
-function streakWeek(states: CoupleStreak['week'][number]['state'][] = []): CoupleStreak['week'] {
+export function streakWeek(states: CoupleStreak['week'][number]['state'][] = []): CoupleStreak['week'] {
   const padded = [...Array<'open'>(7 - states.length).fill('open'), ...states];
   return padded.map((state, index) => ({ day: `2030-03-0${index + 1}`, state }));
 }

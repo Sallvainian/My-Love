@@ -19,7 +19,7 @@
  * `me`/`partner` < `both`) does not replace it, so a slow read cannot undo a
  * reveal. Every async action captures `{ userId, authSessionVersion }` before
  * its first await and writes nothing after it if either changed.
- * `signedOutState()` clears all six fields.
+ * `signedOutState()` clears all seven fields.
  *
  * Overlapping `loadDailyDay` calls collapse: one read runs per signed-in
  * identity, and a call that arrives meanwhile asks for one more read after it
@@ -155,10 +155,18 @@ export interface DailyDaySlice {
    * How many server answers the store has shown since sign-in: a read, a
    * confirmed pick, a written question, a re-read or a nudge that set
    * `dailyDay`. The view compares it with the count it saw when it mounted, to
-   * know the day on screen has been answered by the server in this mount (the
-   * write sheet waits for that, DW-491). Never persisted.
+   * know the server has answered in this mount (the write sheet waits for that,
+   * DW-491). Never persisted.
    */
   dailyDayAnswers: number;
+  /**
+   * The `day_id` the last of those answers showed (`null` for an `unlinked`
+   * answer or none yet). The view also requires it to be the day on screen, so
+   * a saved day that a later read puts on screen, such as the next date after
+   * midnight, waits for the server's answer for itself and not for an earlier
+   * day's. Never persisted.
+   */
+  dailyDayAnsweredId: string | null;
 
   /**
    * Read today's day from the server. Never throws; a failure keeps what is
@@ -166,6 +174,10 @@ export interface DailyDaySlice {
    * account's `failed` queued picks for other days. Resolves `true` when a
    * read it waited on stored the server's answer (a day or `unlinked`), and
    * `false` when none did: offline, a failed read, or a session that changed.
+   * The write sheet does not read it: it counts the answers the store shows
+   * (`dailyDayAnswers`), which also covers a re-read, a confirmed pick and a
+   * refresh. The value is kept for a caller that has to know whether its own
+   * read reached the server.
    */
   loadDailyDay: () => Promise<boolean>;
   /**
@@ -248,6 +260,20 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
   return next;
 }
 
+/**
+ * The fields that record one more server answer shown: the count, and the day
+ * it showed, for the day now on screen (`shown`).
+ */
+function countAnswer(
+  state: { dailyDayAnswers: number },
+  shown: DailyDayAnswer
+): Pick<DailyDaySlice, 'dailyDayAnswers' | 'dailyDayAnsweredId'> {
+  return {
+    dailyDayAnswers: state.dailyDayAnswers + 1,
+    dailyDayAnsweredId: shown.status === 'ok' ? shown.snapshot.day_id : null,
+  };
+}
+
 export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, api) => {
   // A signed-in start and the window `online` event refresh the saved days.
   registerLocalCopy(DAILY_DAYS_COPY_KIND, async () => {
@@ -299,10 +325,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     const isShownDay = shown?.status === 'ok' && shown.snapshot.day_id === snapshot.day_id;
     const fillsEmptyScreen = shown?.status !== 'ok' && snapshot.day === formatDateISO(new Date());
     if (isShownDay || fillsEmptyScreen) {
+      const next = mergeAnswer(shown, merged);
       set((state) => ({
-        dailyDay: mergeAnswer(shown, merged),
+        dailyDay: next,
         dailyDayError: null,
-        dailyDayAnswers: state.dailyDayAnswers + 1,
+        ...countAnswer(state, next),
       }));
     }
   };
@@ -515,12 +542,15 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       if (!isCurrent()) return false;
       const merged = await mergeDailyDay(requestedBy, answer, partnerId, isCurrent);
       if (!isCurrent()) return false;
-      set((state) => ({
-        dailyDay: mergeAnswer(state.dailyDay, merged),
-        dailyDayLoading: false,
-        dailyDayError: null,
-        dailyDayAnswers: state.dailyDayAnswers + 1,
-      }));
+      set((state) => {
+        const next = mergeAnswer(state.dailyDay, merged);
+        return {
+          dailyDay: next,
+          dailyDayLoading: false,
+          dailyDayError: null,
+          ...countAnswer(state, next),
+        };
+      });
       stored = true;
       // A server answer for today: a refused pick for another day is shown
       // nowhere and no new pick can replace it, so it goes (DW-483).
@@ -557,6 +587,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     dailyQueuedPicks: [],
     dailyWriteDeclined: [],
     dailyDayAnswers: 0,
+    dailyDayAnsweredId: null,
 
     loadDailyDay: () => {
       const { userId, authSessionVersion } = get();
@@ -689,7 +720,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       set((state) => ({
         dailyDay: stored,
         dailyDayError: null,
-        dailyDayAnswers: state.dailyDayAnswers + 1,
+        ...countAnswer(state, stored),
       }));
       return stored;
     },
@@ -754,11 +785,10 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         isCurrent
       );
       if (!isCurrent()) return;
-      set((state) => ({
-        dailyDay: mergeAnswer(state.dailyDay, merged),
-        dailyDayError: null,
-        dailyDayAnswers: state.dailyDayAnswers + 1,
-      }));
+      set((state) => {
+        const next = mergeAnswer(state.dailyDay, merged);
+        return { dailyDay: next, dailyDayError: null, ...countAnswer(state, next) };
+      });
     },
 
     sendDailyNudge: async () => {

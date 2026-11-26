@@ -11,6 +11,7 @@ import {
   dailySnapshot,
   DAY_ID,
   revealSnapshot,
+  streakWeek,
   waitingSnapshot,
 } from '../../../../tests/unit/stores/dailyQuestionFixture';
 import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
@@ -690,20 +691,6 @@ describe('DailyQuestion', () => {
       expect(screen.queryByTestId('daily-streak-cold')).toBeNull();
     });
 
-    /** The viewer's week at the fixture's date (Thursday 2026-11-05, today last), oldest first. */
-    const weekOf = (states: Array<'done' | 'missed' | 'open'>) => {
-      const days = [
-        '2026-10-30',
-        '2026-10-31',
-        '2026-11-01',
-        '2026-11-02',
-        '2026-11-03',
-        '2026-11-04',
-        '2026-11-05',
-      ];
-      return days.map((day, index) => ({ day, state: states[index] ?? 'open' }));
-    };
-
     it('blue with one missed date: a blue chip with a snowflake and the "Yesterday was" banner', async () => {
       fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
       fetchCoupleStreak.mockResolvedValue(
@@ -712,7 +699,7 @@ describe('DailyQuestion', () => {
           run: 0,
           today_state: 'blue',
           missed: 1,
-          week: weekOf(['open', 'open', 'open', 'open', 'done', 'missed', 'open']),
+          week: streakWeek(['open', 'open', 'open', 'open', 'done', 'missed', 'open']),
         })
       );
 
@@ -737,7 +724,7 @@ describe('DailyQuestion', () => {
           held: 5,
           today_state: 'blue',
           missed: 3,
-          week: weekOf(['open', 'open', 'done', 'missed', 'missed', 'missed', 'open']),
+          week: streakWeek(['open', 'open', 'done', 'missed', 'missed', 'missed', 'open']),
         })
       );
 
@@ -756,8 +743,9 @@ describe('DailyQuestion', () => {
           run: 0,
           today_state: 'blue',
           missed: 1,
-          // 2026-11-03 is a Tuesday; yesterday (Wednesday) has not closed yet.
-          week: weekOf(['open', 'open', 'open', 'open', 'missed', 'open', 'open']),
+          // The week ends Thursday 2030-03-07: the fifth entry (03-05) is a Tuesday, and
+          // yesterday (Wednesday) has not closed yet.
+          week: streakWeek(['open', 'open', 'open', 'open', 'missed', 'open', 'open']),
         })
       );
 
@@ -777,13 +765,13 @@ describe('DailyQuestion', () => {
           held: 4,
           today_state: 'blue',
           missed: 1,
-          week: weekOf(['open', 'open', 'open', 'missed', 'open', 'open', 'open']),
+          week: streakWeek(['open', 'open', 'open', 'missed', 'open', 'open', 'open']),
         })
       );
 
       render(<DailyQuestion />);
 
-      // 2026-11-02 is a Monday.
+      // The fourth entry of the week (2030-03-04) is a Monday.
       expect(await screen.findByTestId('daily-streak-cold')).toHaveTextContent(
         "Monday was missed, so it's frozen at 4."
       );
@@ -796,7 +784,7 @@ describe('DailyQuestion', () => {
           held: 3,
           today_state: 'blue',
           missed: 2,
-          week: weekOf(['open', 'done', 'missed', 'missed', 'open', 'open', 'open']),
+          week: streakWeek(['open', 'done', 'missed', 'missed', 'open', 'open', 'open']),
         })
       );
 
@@ -1036,6 +1024,28 @@ describe('DailyQuestion', () => {
       await refuseSend(user);
 
       await screen.findByTestId('daily-reveal');
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+    });
+
+    it('goes when the re-read answers unlinked, and stays gone after a relink (DW-496)', async () => {
+      const user = userEvent.setup();
+      fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+      fetchDailyDay.mockResolvedValueOnce({ status: 'unlinked' });
+
+      render(<DailyQuestion />);
+      await refuseSend(user);
+
+      await screen.findByTestId('daily-invite');
+      expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+      expect(screen.queryByTestId('daily-day-changed')).toBeNull();
+
+      // The pair links again: the later day offers a Send, and the notice stays gone.
+      fetchDailyDay.mockResolvedValueOnce(ok(nextDay));
+      await act(async () => {
+        await useAppStore.getState().loadDailyDay();
+      });
+      expect(await screen.findByText('Tea or Coffee?', { exact: false })).toBeInTheDocument();
+      expect(screen.getByTestId('daily-send-pick')).toBeInTheDocument();
       expect(screen.queryByTestId('daily-day-changed')).toBeNull();
     });
 

@@ -326,6 +326,30 @@ describe('drainQueuedPicks', () => {
     expect(await listQueuedPicks(A)).toEqual([]);
   });
 
+  it('a confirmed drained pick for the day on screen grows the shown answers, one for another day does not (DW-491)', async () => {
+    await enqueuePick(queued());
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().drainQueuedPicks();
+
+    expect(state().dailyDayAnswers).toBe(1);
+    expect(state().dailyDayAnsweredId).toBe(DAY_ID);
+
+    // The same pick, drained while another day is on screen: the copy alone.
+    useAppStore.setState({
+      dailyDay: ok(dailySnapshot({ day_id: DAY_2, day: '2026-11-06' })),
+      dailyDayAnswers: 0,
+      dailyDayAnsweredId: null,
+    });
+    await enqueuePick(queued());
+    await state().drainQueuedPicks();
+
+    expect(submitDailyPickRequest).toHaveBeenCalledTimes(2);
+    expect(state().dailyDayAnswers).toBe(0);
+    expect(state().dailyDayAnsweredId).toBeNull();
+  });
+
   it('an idempotent answer for a pick made elsewhere removes the row', async () => {
     await enqueuePick(queued({ choice: 'that' }));
     useAppStore.setState({ dailyDay: ok(dailySnapshot()) });

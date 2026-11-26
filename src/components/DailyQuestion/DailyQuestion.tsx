@@ -17,11 +17,11 @@
  * bottom sheet (`WriteQuestionSheet`) opens while the snapshot on screen holds
  * the account's own server pick (`my_choice`, so a queued pick never opens it),
  * `write.mine` is true and `write.done` false, the day is not in
- * `dailyWriteDeclined`, and the snapshot's `day` is the device's date, once this
- * mount's own read of the day has answered (the saved day shown first may be
- * out of date). A tap on its scrim or Escape hides it until the next mount of
- * this view; only a successful send (`write.done`) or "No thanks" ends it for
- * the day.
+ * `dailyWriteDeclined`, and the snapshot's `day` is the device's date, once the
+ * server has answered in this mount for that very day (the saved day shown
+ * first may be out of date). A tap on its scrim or Escape hides it until the
+ * next mount of this view; only a successful send (`write.done`) or "No
+ * thanks" ends it for the day.
  *
  * The couple's streak shows above the card from the slice's `coupleStreak`
  * (`get_couple_streak`; nothing is counted here, only the sentence chosen): a
@@ -79,10 +79,12 @@
  * The write sheet opens only once the server has answered for the shown day in
  * this mount: any answer the store shows after the mount counts (`dailyDayAnswers`
  * has grown since it), whether a read, a re-read, the pick's own confirmation or
- * a refresh, and never a failed or offline read alone (DW-491). The day-changed
- * notice is dropped for good once the shown day offers no Send (DW-496), and
- * the cold banner names a missed date that is not yesterday by its weekday
- * (DW-515).
+ * a refresh, and only when that answer was for the day on screen
+ * (`dailyDayAnsweredId`), so a saved day that replaces it after midnight waits
+ * for its own answer. A failed or offline read alone never opens it (DW-491).
+ * The day-changed notice is dropped for good once the shown day offers no Send
+ * or the pair is unlinked (DW-496), and the cold banner names a missed date
+ * that is not yesterday by its weekday (DW-515).
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
@@ -494,15 +496,18 @@ export function DailyQuestion() {
   // The notice sits above a card that can send, and goes with the last Send it
   // could be cleared by: once the shown day offers none (the partner's pick
   // moved it to `me` or `both`, or the own pick is queued) it is dropped for
-  // good, so a later day that offers a Send does not bring it back. Adjusted
-  // while rendering, which React re-runs at once, rather than in an effect.
+  // good, so a later day that offers a Send does not bring it back. An
+  // `unlinked` re-read leaves no card and no Send, so it drops the notice too.
+  // Adjusted while rendering, which React re-runs at once, rather than in an
+  // effect.
   if (
     showDayChanged &&
-    dailyDay?.status === 'ok' &&
-    !offersSend(
-      dailyDay.snapshot.state,
-      queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null
-    )
+    (dailyDay?.status === 'unlinked' ||
+      (dailyDay?.status === 'ok' &&
+        !offersSend(
+          dailyDay.snapshot.state,
+          queuedPicks.find((row) => row.day_id === dailyDay.snapshot.day_id) ?? null
+        )))
   ) {
     setDayChangedIn(null);
   }
@@ -549,10 +554,13 @@ export function DailyQuestion() {
   // The write sheet waits for the server's answer in this mount (DW-491): the
   // store's count of shown answers, taken when this mount began its session,
   // and the count now. Whatever the server answers after that, a read, a pick's
-  // confirmation or a re-read, lets the sheet ask; the saved day shown first
-  // does not. The baseline is adjusted while rendering, as the day-changed
-  // notice is, so no render sees the new session against the old count.
+  // confirmation or a re-read, lets the sheet ask, provided the answer was for
+  // the day now on screen (`dailyDayAnsweredId`): the saved day shown first
+  // does not, nor one that replaces the day after midnight. The baseline is
+  // adjusted while rendering, as the day-changed notice is, so no render sees
+  // the new session against the old count.
   const answers = useAppStore((state) => state.dailyDayAnswers);
+  const answeredDayId = useAppStore((state) => state.dailyDayAnsweredId);
   const [answersAtMount, setAnswersAtMount] = useState({ session: sessionKey, count: answers });
   if (answersAtMount.session !== sessionKey) {
     setAnswersAtMount({ session: sessionKey, count: answers });
@@ -575,6 +583,7 @@ export function DailyQuestion() {
     writeSnapshot.day === formatDateISO(new Date()) &&
     writeClosedFor !== writeSnapshot.day_id &&
     answeredHere &&
+    answeredDayId === writeSnapshot.day_id &&
     !celebrationShown;
 
   // The nudge offer (R2), raised only by the in-view Send my pick and kept with

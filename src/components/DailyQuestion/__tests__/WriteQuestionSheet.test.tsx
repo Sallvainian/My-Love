@@ -18,6 +18,7 @@ import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
 const fetchDailyDay = vi.fn();
 const submitDailyPickRequest = vi.fn();
 const submitWrittenQuestionRequest = vi.fn();
+const fetchDailyDayById = vi.fn();
 const fetchCoupleStreak = vi.fn();
 
 vi.mock('../../../api/supabaseClient', () => ({
@@ -35,6 +36,7 @@ vi.mock('../../../hooks/useDailyPickListener', () => ({
 vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/dailyQuestionApi')>()),
   fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
+  fetchDailyDayById: (...args: unknown[]) => fetchDailyDayById(...args),
   fetchCoupleStreak: (...args: unknown[]) => fetchCoupleStreak(...args),
   announceDailyPick: vi.fn(async () => {}),
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
@@ -69,6 +71,7 @@ beforeEach(async () => {
   fetchDailyDay.mockReset();
   submitDailyPickRequest.mockReset();
   submitWrittenQuestionRequest.mockReset();
+  fetchDailyDayById.mockReset();
   fetchCoupleStreak.mockReset();
   fetchCoupleStreak.mockResolvedValue({ status: 'unlinked' });
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -381,6 +384,63 @@ describe("the write tomorrow's question sheet", () => {
 
     expect(screen.getByTestId('daily-question')).toBeInTheDocument();
     expect(sheet()).toBeNull();
+  });
+
+  it('a saved day with the turn open and a failed read: a re-read of that day that answers opens the sheet', async () => {
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: writerSnapshot() });
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
+    fetchDailyDayById.mockResolvedValue(writerSnapshot());
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-error');
+    expect(sheet()).toBeNull();
+
+    // The partner's `daily_pick` names the day, as the listener does.
+    await act(async () => {
+      await useAppStore.getState().refreshDailyDay(DAY_ID);
+    });
+
+    expect(fetchDailyDayById).toHaveBeenCalledWith(DAY_ID);
+    expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
+  });
+
+  it('a day that replaces the answered one after midnight waits for its own answer', async () => {
+    const NEXT_DAY_ID = 'next-day';
+    const NEXT_DAY = new Date(2026, 10, 6, 0, 1);
+    // The mount's read answers today, which has no turn to write.
+    await open(ok(dailySnapshot()));
+    expect(sheet()).toBeNull();
+
+    // Midnight passes. The copy now holds the next date with the turn open, as a
+    // pick made on another device would leave it, and the next read fails.
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
+      [NEXT_DAY_ID]: writerSnapshot('this', { day_id: NEXT_DAY_ID, day: '2026-11-06' }),
+    });
+    vi.setSystemTime(NEXT_DAY);
+    fetchDailyDay.mockReset();
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'The server is down'));
+    await act(async () => {
+      await useAppStore.getState().loadDailyDay();
+    });
+
+    // The saved next day is on screen, the mount has had an answer, but not for it.
+    await screen.findByTestId('daily-error');
+    expect(screen.getByTestId('daily-question')).toBeInTheDocument();
+    expect(useAppStore.getState().dailyDay).toMatchObject({
+      status: 'ok',
+      snapshot: { day_id: NEXT_DAY_ID },
+    });
+    expect(sheet()).toBeNull();
+
+    // The server's answer for that day opens it.
+    fetchDailyDay.mockReset();
+    fetchDailyDay.mockResolvedValue(
+      ok(writerSnapshot('this', { day_id: NEXT_DAY_ID, day: '2026-11-06' }))
+    );
+    await act(async () => {
+      await useAppStore.getState().loadDailyDay();
+    });
+    expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
   });
 
   it('a later background load does not take the open sheet away', async () => {

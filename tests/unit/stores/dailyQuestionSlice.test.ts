@@ -727,6 +727,114 @@ describe('the saved days copy', () => {
   });
 });
 
+describe('the server answers the store shows (dailyDayAnswers, DW-491)', () => {
+  const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
+  const shownAnswers = () => ({
+    count: state().dailyDayAnswers,
+    dayId: state().dailyDayAnsweredId,
+  });
+
+  it('starts at none', () => {
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a read grows it and names the day the answer showed', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('an unlinked read grows it with no day', async () => {
+    fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
+
+    await state().loadDailyDay();
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: null });
+  });
+
+  it('a failed read leaves it as it was, though a saved day is shown', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: { ...dailySnapshot(), partner_id: null },
+    });
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a saved day that replaces the answered one leaves the answered day as it was', async () => {
+    fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+    await state().loadDailyDay();
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+      'next-day': { ...dailySnapshot({ day_id: 'next-day', day: '2026-11-06' }), partner_id: null },
+    });
+    vi.setSystemTime(NEXT_DAY);
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toMatchObject({ snapshot: { day_id: 'next-day' } });
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('a re-read of the day on screen grows it', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it("a re-read with nothing on screen shows today's day and grows it", async () => {
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('a re-read of another day than the one on screen leaves it as it was', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    fetchDailyDayById.mockResolvedValue({ ...OTHER_DAY, state: 'partner' as const });
+
+    await state().refreshDailyDay('other-day');
+
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a failed re-read leaves it as it was', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    fetchDailyDayById.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a confirmed pick grows it', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('a refused pick leaves it as it was', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await expect(state().submitDailyPick('this')).rejects.toThrow('boom');
+
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+});
+
 describe('refreshDailyDay', () => {
   const saved = (...snapshots: Array<ReturnType<typeof dailySnapshot>>) =>
     Object.fromEntries(

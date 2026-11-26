@@ -112,6 +112,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyQueuedPicks: [],
   dailyWriteDeclined: [],
   dailyDayAnswers: 0,
+  dailyDayAnsweredId: null,
   coupleStreak: null,
   coupleStreakLoading: false,
   coupleStreakError: null,
@@ -278,6 +279,7 @@ function seedSignedInSession(): void {
     dailyWriteDeclined: ['DAY-DECLINED'],
     // The server answers shown to the account.
     dailyDayAnswers: 4,
+    dailyDayAnsweredId: 'DAY-ANSWERED',
     // The couple's streak the account was shown, a read in flight and a failed read.
     coupleStreak: { status: 'ok', streak: coupleStreak({ held: 31, run: 4, milestones: 1 }) },
     coupleStreakLoading: true,
