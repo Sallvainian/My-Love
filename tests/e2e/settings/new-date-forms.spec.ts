@@ -12,11 +12,11 @@
  * pair's other rows are left alone. Bottom-dock form on a phone viewport, as
  * `dates-list.spec.ts` runs.
  */
-import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { test, expect } from '../../support/merged-fixtures';
 import { closeContext } from '../../support/fixtures/cleanup';
-import { ANNIVERSARIES_READ, SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
+import { observeReadAfterNavigation } from '../../support/helpers/read-after-navigation';
+import { ANNIVERSARIES_READ } from '../../support/helpers/reads';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { WELCOME_SPLASH_KEY } from '../../support/helpers/welcome-splash';
 import { dayMonth } from '../../support/helpers/dates-list-format';
@@ -134,11 +134,11 @@ test.describe('Settings > Dates > adding a date', () => {
     await partnerPage.getByTestId('submit-button').click();
     await expect(partnerPage.getByTestId('app-container')).toBeVisible();
     // The partner's anniversaries read answers before the row is looked for.
-    const partnerRead = observeOn({
-      page: partnerPage,
+    // The sign-in started Home's own anniversaries read, which the navigation
+    // cuts off; only the Dates page's read counts.
+    const partnerRead = observeReadAfterNavigation(partnerPage, {
       method: 'GET',
       url: ANNIVERSARIES_READ,
-      timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
     await partnerPage.goto('/settings/dates');
     expect((await partnerRead).status).toBe(200);

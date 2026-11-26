@@ -41,7 +41,7 @@
  * four agree on one date.
  */
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
-import { expect, test, type Frame, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database.types';
 import {
@@ -53,6 +53,7 @@ import {
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../support/helpers/reads';
 import { waitClearOfDailyTurns } from '../support/helpers/events';
+import { observeReadAfterNavigation } from '../support/helpers/read-after-navigation';
 import { trackReads } from '../support/helpers/request-tracker';
 import { dismissWelcomeSplash } from '../support/helpers/welcome-splash';
 
@@ -240,32 +241,10 @@ function observeRpc(page: Page, url: string) {
 
 /**
  * Observe the first POST of an RPC sent by the document the next navigation
- * loads; start it before navigating. The page being left can send the same read
- * as it goes (Daily re-reads when its Realtime channel joins, Home's refreshers
- * run after sign-in), and the navigation cuts that one off unanswered.
+ * loads; start it before navigating (see `observeReadAfterNavigation`).
  */
-async function observeRpcAfterNavigation(
-  page: Page,
-  url: string
-): Promise<{ status: number; responseJson: unknown }> {
-  let navigated = false;
-  const onNavigated = (frame: Frame) => {
-    if (frame === page.mainFrame()) navigated = true;
-  };
-  page.on('framenavigated', onNavigated);
-  try {
-    // playwright-utils deviation: interceptNetworkCall's observe mode latches onto the first matching request, whichever document sent it, and throws when that one gets no response.
-    const request = await page.waitForRequest(
-      (candidate) =>
-        navigated && candidate.method() === 'POST' && candidate.url().endsWith(url.replace('**', '')),
-      { timeout: SECOND_CONTEXT_READ_TIMEOUT }
-    );
-    const response = await request.response();
-    if (!response) throw new Error(`${url}: the loaded page's own read got no response`);
-    return { status: response.status(), responseJson: await response.json() };
-  } finally {
-    page.off('framenavigated', onNavigated);
-  }
+function observeRpcAfterNavigation(page: Page, url: string) {
+  return observeReadAfterNavigation(page, { method: 'POST', url });
 }
 
 async function signInThroughUi(page: Page, bot: Bot): Promise<void> {
