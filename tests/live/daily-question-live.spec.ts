@@ -1,13 +1,21 @@
 /**
  * Live check: Daily on the real site (epic daily-question, story 6.11; R1, R2),
- * and the streak and Past questions on its Partner page (epic
- * streak-and-partner-page, story 7.11; R6, R7).
+ * the streak and Past questions on its Partner page (epic
+ * streak-and-partner-page, story 7.11; R6, R7), and a nudge (epic
+ * daily-pushes-and-nudge, story 8.11; R2).
  *
  * `deploy.yml` runs this after every deploy (`live-daily-check`) against the
  * deployed site and its hosted project, with `playwright.live.config.ts`. It
  * checks that the hidden-pick gate holds and the reveal works in production:
  * the two claude bot accounts open Daily in two browser pages and see one
- * question; bot A picks This and waits; bot B's own RPC answers before B's pick
+ * question; bot A picks This and waits. A's pick raises one sheet: when A's own
+ * day answer says A is the day's writer (`write.mine`), A answers the write
+ * sheet "No thanks", so no question row is written, and meets no nudge sheet;
+ * otherwise A answers the nudge sheet "Not now". A's waiting card then sends a
+ * nudge (one `send_daily_nudge` answered 200), and after a reload A's day answer
+ * has the nudge spent and the Nudge button is grey. The spec registers no push
+ * device for either bot.
+ * Bot B's own RPC answers before B's pick
  * (`get_daily_day`, `get_daily_day_by_id`) carry no choice, mark or count; B's
  * page says A has picked and shows no reveal; B picks That; both pages, after a
  * reload, show the reveal with "Different picks". Then each bot loads its
@@ -21,7 +29,8 @@
  * (`CLAUDE_BOT_PASSWORD`) and `claude-bot-partner@test.example.com`
  * (`CLAUDE_BOT_PARTNER_PASSWORD`) with the publishable key and nothing else, and
  * clears only their pair's days through their own `reset_bot_daily_days()` RPC,
- * so a rerun starts from an empty pair. The Supabase secret key appears nowhere.
+ * so a rerun starts from an empty pair (a day's nudges and picks go with it).
+ * The Supabase secret key appears nowhere.
  *
  * Live mode (`LIVE_BASE_URL` set) never signs up, links or unlinks: a missing or
  * unlinked bot fails the test and says so. Local mode (no `LIVE_BASE_URL`) runs
@@ -39,9 +48,11 @@ import {
   COUPLE_STREAK_READ,
   DAILY_DAY_READ,
   DAILY_HISTORY_READ,
+  DAILY_NUDGE_SEND,
   DAILY_PICK_SEND,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../support/helpers/reads';
+import { trackReads } from '../support/helpers/request-tracker';
 import { dismissWelcomeSplash } from '../support/helpers/welcome-splash';
 
 type BotClient = SupabaseClient<Database>;
@@ -54,6 +65,7 @@ const BOT_B_PASSWORD_VAR = 'CLAUDE_BOT_PARTNER_PASSWORD';
 const BOT_B_NAME = 'Claude Partner';
 
 const UTC_ZONE = { time_zone: 'UTC', utc_offset_minutes: 0 } as const;
+const NUDGE_SEND_PATH = '/rest/v1/rpc/send_daily_nudge';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 
 interface Target {
@@ -315,7 +327,7 @@ async function expectOneDayTogether(
 }
 
 test.describe('Live Daily check', () => {
-  test('[P0] the bot pair sees one question, a hidden pick, the reveal on the second pick, and the day on Partner', async ({
+  test('[P0] the bot pair sees one question, a hidden pick, a nudge, the reveal on the second pick, and the day on Partner', async ({
     browser,
     baseURL,
   }) => {
@@ -366,7 +378,9 @@ test.describe('Live Daily check', () => {
       await signInThroughUi(pageB, b);
 
       // Both open /daily and show the same question.
-      await openDaily(pageA, () => pageA.goto('/daily'));
+      const openedA = (await openDaily(pageA, () => pageA.goto('/daily'))) as {
+        snapshot: { write: { mine: boolean } };
+      };
       await openDaily(pageB, () => pageB.goto('/daily'));
       const questionA = await pageA.getByTestId('daily-question').innerText();
       await expect(pageB.getByTestId('daily-question')).toHaveText(questionA);
@@ -381,6 +395,38 @@ test.describe('Live Daily check', () => {
       expect((await sent).status).toBe(200);
       await expect(pageA.getByTestId('daily-waiting')).toBeVisible();
       await expect(pageA.getByTestId('daily-my-pick')).toHaveText(thisText);
+
+      // A's pick raises one sheet. As the day's writer A declines to write, so
+      // no question row is written, and is never also asked to nudge;
+      // otherwise A turns down the nudge offer.
+      if (openedA.snapshot.write.mine) {
+        await expect(pageA.getByTestId('daily-write-sheet')).toBeVisible();
+        await pageA.getByTestId('daily-write-decline').click();
+        await expect(pageA.getByTestId('daily-write-sheet')).toHaveCount(0);
+        await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
+      } else {
+        await expect(pageA.getByTestId('daily-nudge-sheet')).toBeVisible();
+        await pageA.getByTestId('daily-nudge-sheet-dismiss').click();
+        await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
+      }
+
+      // A's waiting card nudges B once, on the project's send_daily_nudge, and
+      // its button greys. The button is also disabled while the send is in
+      // flight, so the grey is read after a reload, from the server's answer.
+      const nudgeButton = pageA.getByTestId('daily-nudge');
+      await expect(nudgeButton).toBeEnabled();
+      const nudgeSends = trackReads(pageA, NUDGE_SEND_PATH, 'POST');
+      const nudged = observeRpc(pageA, DAILY_NUDGE_SEND);
+      await nudgeButton.click();
+      expect((await nudged).status).toBe(200);
+      const afterNudge = (await openDaily(pageA, () => pageA.reload())) as {
+        snapshot: { nudge?: { spent: boolean } };
+      };
+      expect(afterNudge.snapshot.nudge?.spent).toBe(true);
+      await expect(nudgeButton).toBeDisabled();
+      await expect(pageA.getByTestId('daily-nudge-error')).toHaveCount(0);
+      await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
+      expect(nudgeSends.started()).toBe(1);
 
       // B has not picked: B's own answers say a pick was made and nothing of it.
       const { data: answer, error: dayError } = await b.client.rpc('get_daily_day', {

@@ -4600,3 +4600,11 @@ severity: low
 reason: The server picks the nudge slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the first test expects the waiting button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6, 8.7 and 8.8 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.9 implementation, 2026-11-26).
 status: done 2026-11-26
 resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called at the top of the `setup` fixture in `daily-question-after-pick-nudge.spec.ts`, before the pair's days are cleared.
+
+### DW-542: The live check fails on the wrong sheet when UTC midnight passes between bot A's first Daily read and its pick on a day A is the writer.
+origin: spec-deferred 04fbea10cd5f
+location: tests/live/daily-question-live.spec.ts (the `openedA.snapshot.write.mine` branch)
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-after-every-deploy-the-live-check-also-sends-a-nudge-plan.md`
+severity: low
+reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC.
+status: open
