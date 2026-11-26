@@ -339,6 +339,32 @@ describe('readSavedPushPreferences', () => {
     expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
   });
 
+  it('reads a copy saved before story 8.4 (no daily keys) with the five daily switches on', async () => {
+    const {
+      dailyQuestion: _q,
+      dailyPartnerPicked: _p,
+      dailyNudge: _n,
+      dailyReminder: _r,
+      dailyBothAnswered: _b,
+      ...beforeDaily
+    } = { ...ALL_PUSH_PREFERENCES_ON, moods: false };
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, beforeDaily);
+
+    expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
+  });
+
+  it('keeps a saved daily switch that is off', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, { ...ALL_PUSH_PREFERENCES_ON, dailyNudge: false });
+
+    expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, dailyNudge: false });
+  });
+
+  it('returns null for a daily switch that is not a boolean', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, { ...ALL_PUSH_PREFERENCES_ON, dailyNudge: 'no' });
+
+    expect(await readSavedPushPreferences(A)).toBeNull();
+  });
+
   it('does not read another account\'s copy', async () => {
     await writeLocalCopy(B, PUSH_PREFERENCES_COPY_KIND, REMINDERS_OFF);
 

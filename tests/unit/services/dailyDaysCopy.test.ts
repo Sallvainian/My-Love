@@ -251,6 +251,30 @@ describe('mergeDailyDay', () => {
     );
   });
 
+  it('writes nothing and returns the answer when the read of the saved map fails', async () => {
+    const higher = forDay('2026-11-06', { state: 'both' });
+    const stored = [dailySnapshot(), forDay('2026-11-04'), higher];
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, keyed(...stored));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
+    const failure = new Error('read failed');
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+      throw failure;
+    });
+    const fresh = forDay('2026-11-06');
+    expect(dailyStateRank(higher.state)).toBeGreaterThan(dailyStateRank(fresh.state));
+
+    await expect(mergeDailyDay(A, ok(fresh), 'C', current)).resolves.toEqual(ok(fresh));
+
+    expect(errorSpy).toHaveBeenCalledWith('[localCopy] Failed to read daily-days copy:', failure);
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await savedMap()).toEqual(keyed(...stored));
+
+    await mergeDailyDay(A, ok(fresh), 'C', current);
+
+    expect(await savedMap()).toEqual({ ...keyed(...stored), ...keyedFor('C', higher) });
+  });
+
   it('drops a malformed stored entry when it rewrites the map', async () => {
     await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, { broken: { day_id: 'broken' } });
 
@@ -357,6 +381,28 @@ describe('mergeDailyDays', () => {
     await mergeDailyDays(A, [dailySnapshot(), fresh], 'C', current);
 
     expect(await savedMap()).toEqual(keyedFor('C', stored, fresh));
+  });
+
+  it('writes nothing and keeps the saved map when the read fails', async () => {
+    const stored = [dailySnapshot(), forDay('2026-11-04')];
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, keyed(...stored));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
+    const failure = new Error('read failed');
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+      throw failure;
+    });
+    const fresh = forDay('2026-11-06');
+
+    await expect(mergeDailyDays(A, [fresh], 'C', current)).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith('[localCopy] Failed to read daily-days copy:', failure);
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await savedMap()).toEqual(keyed(...stored));
+
+    await mergeDailyDays(A, [fresh], 'C', current);
+
+    expect(await savedMap()).toEqual({ ...keyed(...stored), ...keyedFor('C', fresh) });
   });
 
   it('writes nothing when isCurrent is false', async () => {

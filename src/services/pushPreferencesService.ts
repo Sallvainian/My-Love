@@ -5,6 +5,9 @@
  *
  * `dates` is the switch for the push sent when the partner adds an event or an
  * anniversary (2026-11-05); a change to a date never pushes (story 5.4).
+ * The five `daily*` switches are the Daily pushes' (story 8.4, columns from
+ * story 8.3): New question, Partner picked, Nudges, Evening reminder (both 8 PM
+ * variants) and Both answered; each is on by default on the server.
  *
  * Supabase is the source of truth. This service caches nothing: Settings loads
  * the switches when its push section opens (`notificationsSlice.pushPreferences`),
@@ -37,6 +40,16 @@ export interface PushPreferences {
   dates: boolean;
   /** The iOS shell's date reminders (local notifications, story 4.3); no push is behind it. */
   dateReminders: boolean;
+  /** The 8 AM push with today's question. */
+  dailyQuestion: boolean;
+  /** The push sent when the partner picked first. */
+  dailyPartnerPicked: boolean;
+  /** The push sent when the partner nudges. */
+  dailyNudge: boolean;
+  /** The 8 PM push, both variants. */
+  dailyReminder: boolean;
+  /** The push sent when the partner picked second. */
+  dailyBothAnswered: boolean;
 }
 
 export type PushPreferenceKey = keyof PushPreferences;
@@ -50,6 +63,11 @@ export const ALL_PUSH_PREFERENCES_ON: PushPreferences = {
   partnerRequests: true,
   dates: true,
   dateReminders: true,
+  dailyQuestion: true,
+  dailyPartnerPicked: true,
+  dailyNudge: true,
+  dailyReminder: true,
+  dailyBothAnswered: true,
 };
 
 /** The `push_preferences` column behind each switch. */
@@ -61,6 +79,11 @@ interface PreferencesRow {
   partner_requests: boolean;
   dates: boolean;
   date_reminders: boolean;
+  daily_question: boolean;
+  daily_partner_picked: boolean;
+  daily_nudge: boolean;
+  daily_reminder: boolean;
+  daily_both_answered: boolean;
 }
 
 type PreferenceColumn = Exclude<keyof PreferencesRow, never>;
@@ -73,6 +96,11 @@ const COLUMN: Record<PushPreferenceKey, PreferenceColumn> = {
   partnerRequests: 'partner_requests',
   dates: 'dates',
   dateReminders: 'date_reminders',
+  dailyQuestion: 'daily_question',
+  dailyPartnerPicked: 'daily_partner_picked',
+  dailyNudge: 'daily_nudge',
+  dailyReminder: 'daily_reminder',
+  dailyBothAnswered: 'daily_both_answered',
 };
 
 const COLUMNS = Object.values(COLUMN).join(', ');
@@ -88,6 +116,11 @@ function toPushPreferences(row: PreferencesRow): PushPreferences {
     partnerRequests: row.partner_requests,
     dates: row.dates,
     dateReminders: row.date_reminders,
+    dailyQuestion: row.daily_question,
+    dailyPartnerPicked: row.daily_partner_picked,
+    dailyNudge: row.daily_nudge,
+    dailyReminder: row.daily_reminder,
+    dailyBothAnswered: row.daily_both_answered,
   };
 }
 

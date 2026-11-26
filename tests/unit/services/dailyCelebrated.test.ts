@@ -210,6 +210,32 @@ describe('claimCelebration', () => {
     expect(await readCelebrated(A)).toEqual({ held: 7, milestones: 2 });
   });
 
+  it('read fails: answers NO_CELEBRATION and writes nothing, the stored value stays', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 3, milestones: 1 });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
+    const failure = new Error('read failed');
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    await expect(claimCelebration(A, streak(4, 1), current)).resolves.toEqual(NO_CELEBRATION);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[localCopy] Failed to read daily-celebrated copy:',
+      failure
+    );
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await readCelebrated(A)).toEqual({ held: 3, milestones: 1 });
+
+    await expect(claimCelebration(A, streak(4, 1), current)).resolves.toEqual({
+      play: true,
+      previous: { held: 3, milestones: 1 },
+      milestone: false,
+    });
+    expect(await readCelebrated(A)).toEqual({ held: 4, milestones: 1 });
+  });
+
   it('session changed: writes nothing and does not play', async () => {
     await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 4, milestones: 0 });
 
@@ -286,6 +312,28 @@ describe('claimMilestone', () => {
 
     expect(claims.filter(Boolean)).toHaveLength(1);
     expect(await readCelebrated(A)).toEqual({ held: 25, milestones: 1 });
+  });
+
+  it('read fails: answers false and writes nothing, the stored value stays', async () => {
+    await writeLocalCopy(A, DAILY_CELEBRATED_KIND, { held: 3, milestones: 1 });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
+    const failure = new Error('read failed');
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    await expect(claimMilestone(A, { milestones: 2 }, current)).resolves.toBe(false);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[localCopy] Failed to read daily-celebrated copy:',
+      failure
+    );
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await readCelebrated(A)).toEqual({ held: 3, milestones: 1 });
+
+    await expect(claimMilestone(A, { milestones: 2 }, current)).resolves.toBe(true);
+    expect(await readCelebrated(A)).toEqual({ held: 3, milestones: 2 });
   });
 
   it('no longer current: answers false and the milestone stays owed', async () => {

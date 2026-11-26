@@ -4151,7 +4151,8 @@ location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/dailyWri
 source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-day-offline-and-invites-an-unlinked-ac-plan.md`
 severity: low
 reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined. The same weakness is in `addDeclinedWriteDay` (`src/services/dailyWriteDeclined.ts:41-53`, story 6.8): `readDeclinedWriteDays` answers `[]` on a failed read (`:27-31`) and the add then writes a list holding only the new day, so earlier "No thanks" days are lost and the write prompt comes back for them (epic 6 retrospective, A2, 2026-11-06). Story 7.9 added a third, `mergeDailyDays`, and removed the 31-day cap: one failed read while a history page is merged now rewrites the whole copy with that page, so every other saved day is gone until its page is read online again. DW-509 is the same root in `claimCelebration`; one `readLocalCopy` variant that tells "absent" from "failed", used by all four merges, closes both (epic 7 retrospective, G2, 2026-11-07).
-status: open
+resolution: `localCopy.ts` gains `readLocalCopyStatus`, which answers `found`, `absent` or `failed` (`readLocalCopy` delegates to it and keeps its behaviour). `mergeDailyDay` and `mergeDailyDays` write nothing on `failed` (`mergeDailyDay` returns the answer as it is); `addDeclinedWriteDay` throws and writes nothing, so the slice's catch leaves the declined list as it was. Unit: `localCopy.test.ts` (`readLocalCopyStatus`), `dailyDaysCopy.test.ts` (both merges) and `dailyWriteDeclined.test.ts`, each failing the IndexedDB read once.
+status: done 2026-11-25
 
 ### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
 origin: spec-deferred b8c1506b047a
@@ -4333,7 +4334,8 @@ location: src/services/dailyCelebrated.ts (claimCelebration)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
 reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it. Story 6 did not add it. Same root as DW-487: one `readLocalCopy` variant closes both (epic 7 retrospective, G2, 2026-11-07).
-status: open
+resolution: `claimCelebration` and `claimMilestone` read through `readLocalCopyStatus` (DW-487's read): on `failed` they write nothing, answering `NO_CELEBRATION` and `false`; absent and malformed values behave as before. Unit: `dailyCelebrated.test.ts`, failing the IndexedDB read once in each claim.
+status: done 2026-11-25
 
 ### DW-510: After an in-session unlink and relink to a different partner, the Partner page shows the previous pair's past questions under the new partner's name until the new history read lands, or indefinitely
 origin: spec-deferred 744eb5a8fd58
@@ -4455,4 +4457,28 @@ origin: epic 7 closure check, from the scheduled Tests runs, 2026-11-25; not thi
 location: tests/e2e/settings/new-date-forms.spec.ts:55 (the second context, lines 138-148)
 severity: low
 reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait.
+status: open
+
+### DW-525: send-push does not check a pick's is_second against the posted kind, so a mis-posted daily_partner_picked or daily_both_answered sends the wrong copy and, because both kinds share the (daily_pick_id,
+origin: spec-deferred 3f83caf550f5
+location: supabase/functions/send-push/handler.ts resolveSource, daily_partner_picked / daily_both_answered
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+reason: getDailyPick (supabase/functions/send-push/index.ts) selects id, day_id, user_id; service_role may read is_second. Reachable only if a story 6 trigger's WHEN is wrong or a call with the shared secret is forged; reminders already get a posted/stored kind guard. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter).
+status: open
+
+### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's
+origin: spec-deferred 184bc275beae
+location: supabase/functions/send-push/handler.ts resolveSource, daily_question / daily_reminder
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+reason: resolveSource takes getPartnerId(reminder.user_id) and never compares it with the day's other seat; picks use otherInPair(day, ...). The ticket says the reminder's sender is the recipient's partner; the gap is a partner change within the seconds between the story 5 enqueue and pg_net's post. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter, intent-alignment).
+status: open
+
+### DW-527: tests/api/push-daily-sender.spec.ts fixes "today" and "two days ago" from the host clock when it seeds the pair, while send-push reads the recipient's date from its own now(), so a run that crosses
+origin: spec-deferred 5c56c69dc1e9
+location: tests/api/push-daily-sender.spec.ts setUpPair and the pick-kinds case (twoDaysAgo)
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+reason: setUpPair takes today = isoDateDaysFromNow(0, new Date()) and seedPairDays writes a user_time_zones row in the host's zone; the pick-kinds case takes twoDaysAgo the same way. user_local_date(recipient, now()) then answers the next day after midnight, so the on-day partner-picked push is dropped as late and the "3-day streak", "Day 4" and "See ...'s pick." assertions miss. Real low flake, deferred because a run must straddle local midnight within seconds (follow-up review 2026-11-25: blind-hunter, edge-case-hunter); the fix is a guard (skip within a few minutes of local midnight) or re-deriving the date from user_local_date before each post.
 status: open

@@ -4,6 +4,11 @@ import type { ApnsClient } from './apns.ts';
 import {
   handleSendPush,
   secretsMatch,
+  type CoupleDayRow,
+  type CoupleStreak,
+  type DailyNudgeRow,
+  type DailyPickRow,
+  type DailyReminderRow,
   type DateRow,
   type DeviceRow,
   type InteractionRow,
@@ -27,6 +32,10 @@ const OLD_DATE_CHANGE_ID = '55555555-5555-4555-8555-555555555555';
 const PARTNER_REQUEST_ID = '66666666-6666-4666-8666-666666666666';
 const EVENT_ID = '77777777-7777-4777-8777-777777777777';
 const ANNIVERSARY_ID = '88888888-8888-4888-8888-888888888888';
+const DAILY_PICK_ID = '99999999-9999-4999-8999-999999999999';
+const DAILY_NUDGE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const DAILY_REMINDER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const COUPLE_DAY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const SECRET = 'a-shared-secret-for-tests';
 
 const textNote: NoteRow = {
@@ -62,7 +71,49 @@ const poke: InteractionRow = { id: INTERACTION_ID, from_user_id: 'sender', to_us
 const event: DateRow = { id: EVENT_ID, user_id: 'sender', label: 'Paris trip' };
 const anniversary: DateRow = { id: ANNIVERSARY_ID, user_id: 'sender', label: 'First date' };
 
+/** The pair's day: `recipient` and `sender` are the two seats (the fake does not check their order). */
+const coupleDay: CoupleDayRow = {
+  id: COUPLE_DAY_ID,
+  user_a: 'recipient',
+  user_b: 'sender',
+  day: '2027-01-15',
+  this_text: 'Tea',
+  that_text: 'Coffee',
+};
+/** `sender` picked; the other seat is `recipient`. */
+const dailyPick: DailyPickRow = { id: DAILY_PICK_ID, day_id: COUPLE_DAY_ID, user_id: 'sender' };
+/** From `sender` to `recipient`. */
+const dailyNudge: DailyNudgeRow = {
+  id: DAILY_NUDGE_ID,
+  from_user: 'sender',
+  to_user: 'recipient',
+  day_id: COUPLE_DAY_ID,
+};
+/** For `recipient`, whose partner is `sender` (these rows are used with `partnerId: 'sender'`). */
+const morningReminder: DailyReminderRow = {
+  id: DAILY_REMINDER_ID,
+  user_id: 'recipient',
+  kind: 'morning',
+  day_id: COUPLE_DAY_ID,
+};
+const eveningSelf: DailyReminderRow = { ...morningReminder, kind: 'evening_self' };
+const eveningPartner: DailyReminderRow = { ...morningReminder, kind: 'evening_partner' };
+
 function fakeDb(options: {
+  dailyPick?: DailyPickRow | null;
+  dailyNudge?: DailyNudgeRow | null;
+  dailyReminder?: DailyReminderRow | null;
+  coupleDay?: CoupleDayRow | null;
+  /** The recipient's current date (`user_local_date`); defaults to the couple day's date. */
+  localDate?: string;
+  /** Every `user_local_date` call, as `[userId, atIso]`. */
+  dateLookups?: [string, string][];
+  /** What `couple_streak` answers; defaults to held 0, run 0. */
+  streak?: CoupleStreak;
+  /** Every `couple_streak` call, as `[userA, userB, viewer, atIso]`. */
+  streakLookups?: [string, string, string, string][];
+  /** Every `getCoupleDay` call's day id. */
+  dayLookups?: string[];
   note?: NoteRow | null;
   mood?: MoodRow | null;
   photo?: PhotoRow | null;
@@ -82,7 +133,7 @@ function fakeDb(options: {
   claimed?: PushRequestRow[];
   released?: string[];
   deletedGone?: [string, number][];
-  failOn?: 'getNote' | 'isPushEnabled';
+  failOn?: 'getNote' | 'isPushEnabled' | 'getUserLocalDate' | 'getCoupleStreak' | 'getCoupleDay';
   /** The receiver's switches; one not listed is on, as is every switch of an account with no row. */
   preferences?: Partial<Record<PushPreference, boolean>>;
   /** Every switch looked up, as `[userId, preference]`. */
@@ -105,6 +156,24 @@ function fakeDb(options: {
       Promise.resolve(options.partnerRequest === undefined ? null : options.partnerRequest),
     getEvent: () => Promise.resolve(options.event === undefined ? null : options.event),
     getAnniversary: () => Promise.resolve(options.anniversary === undefined ? null : options.anniversary),
+    getDailyPick: () => Promise.resolve(options.dailyPick === undefined ? null : options.dailyPick),
+    getDailyNudge: () => Promise.resolve(options.dailyNudge === undefined ? null : options.dailyNudge),
+    getDailyReminder: () => Promise.resolve(options.dailyReminder === undefined ? null : options.dailyReminder),
+    getCoupleDay: (dayId) => {
+      options.dayLookups?.push(dayId);
+      if (options.failOn === 'getCoupleDay') return Promise.reject(new Error('db down'));
+      return Promise.resolve(options.coupleDay === undefined ? coupleDay : options.coupleDay);
+    },
+    getUserLocalDate: (userId, atIso) => {
+      options.dateLookups?.push([userId, atIso]);
+      if (options.failOn === 'getUserLocalDate') return Promise.reject(new Error('db down'));
+      return Promise.resolve(options.localDate ?? coupleDay.day);
+    },
+    getCoupleStreak: (userA, userB, viewer, atIso) => {
+      options.streakLookups?.push([userA, userB, viewer, atIso]);
+      if (options.failOn === 'getCoupleStreak') return Promise.reject(new Error('db down'));
+      return Promise.resolve(options.streak ?? { held: 0, run: 0 });
+    },
     getPartnerId: (userId) => {
       options.partnerLookups?.push(userId);
       return Promise.resolve(options.partnerId === undefined ? 'recipient' : options.partnerId);
@@ -757,7 +826,9 @@ Deno.test('a date post from an older trigger is a 400 and claims nothing', async
   });
   assertEquals(response.status, 400);
   assertEquals(await response.json(), {
-    error: 'kind must be mood, photo, interaction, partner_request, partner_accept, event or anniversary',
+    error:
+      'kind must be mood, photo, interaction, partner_request, partner_accept, event, anniversary, ' +
+      'daily_question, daily_partner_picked, daily_nudge, daily_reminder or daily_both_answered',
   });
   assertEquals(claimed.length, 0);
   assertEquals(listed, []);
@@ -968,6 +1039,27 @@ const KIND_CASES: { kind: PushKind; body: Record<string, string>; rows: Paramete
   },
   { kind: 'event', body: { kind: 'event', id: EVENT_ID }, rows: { event } },
   { kind: 'anniversary', body: { kind: 'anniversary', id: ANNIVERSARY_ID }, rows: { anniversary } },
+  {
+    kind: 'daily_question',
+    body: { kind: 'daily_question', id: DAILY_REMINDER_ID },
+    rows: { dailyReminder: morningReminder, partnerId: 'sender' },
+  },
+  {
+    kind: 'daily_partner_picked',
+    body: { kind: 'daily_partner_picked', id: DAILY_PICK_ID },
+    rows: { dailyPick },
+  },
+  { kind: 'daily_nudge', body: { kind: 'daily_nudge', id: DAILY_NUDGE_ID }, rows: { dailyNudge } },
+  {
+    kind: 'daily_reminder',
+    body: { kind: 'daily_reminder', id: DAILY_REMINDER_ID },
+    rows: { dailyReminder: eveningSelf, partnerId: 'sender' },
+  },
+  {
+    kind: 'daily_both_answered',
+    body: { kind: 'daily_both_answered', id: DAILY_PICK_ID },
+    rows: { dailyPick },
+  },
 ];
 
 const ALL_PREFERENCES: PushPreference[] = [
@@ -977,9 +1069,14 @@ const ALL_PREFERENCES: PushPreference[] = [
   'pokes_and_kisses',
   'partner_requests',
   'dates',
+  'daily_question',
+  'daily_partner_picked',
+  'daily_nudge',
+  'daily_reminder',
+  'daily_both_answered',
 ];
 
-Deno.test('every kind answers to one switch; both partner kinds share one, as do both date kinds', () => {
+Deno.test('every kind answers to one switch; both partner kinds share one, as do both date kinds, and each daily kind has its own', () => {
   assertEquals(
     KIND_CASES.map((c) => [c.kind, PREFERENCE_FOR_KIND[c.kind]]),
     [
@@ -991,6 +1088,11 @@ Deno.test('every kind answers to one switch; both partner kinds share one, as do
       ['partner_accept', 'partner_requests'],
       ['event', 'dates'],
       ['anniversary', 'dates'],
+      ['daily_question', 'daily_question'],
+      ['daily_partner_picked', 'daily_partner_picked'],
+      ['daily_nudge', 'daily_nudge'],
+      ['daily_reminder', 'daily_reminder'],
+      ['daily_both_answered', 'daily_both_answered'],
     ]
   );
   assertEquals(
@@ -1194,4 +1296,412 @@ Deno.test('a failed count read answers 500 and claims nothing', async () => {
   assertEquals(response.status, 500);
   await response.body?.cancel();
   assertEquals(claimed.length, 0);
+});
+
+// ---- Story 8.3: the five daily kinds ----
+
+const ZEROS = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
+const AT_ISO = new Date(NOW).toISOString();
+
+/** Posts one daily kind on the fixed clock and gives back the answer and what was claimed. */
+async function postDaily(
+  body: Record<string, string>,
+  options: Parameters<typeof fakeDb>[0],
+  devices: DeviceRow[] = [TWO_DEVICES[0]]
+) {
+  const claimed: PushRequestRow[] = [];
+  const response = await handleSendPush(request(body), {
+    db: fakeDb({ devices, claimed, ...options }),
+    apns: null,
+    now: () => NOW,
+  });
+  const status = response.status;
+  const answer = await response.json();
+  return { status, answer, claimed };
+}
+
+const PICK_POST = { kind: 'daily_partner_picked', id: DAILY_PICK_ID };
+const BOTH_POST = { kind: 'daily_both_answered', id: DAILY_PICK_ID };
+const NUDGE_POST = { kind: 'daily_nudge', id: DAILY_NUDGE_ID };
+const MORNING_POST = { kind: 'daily_question', id: DAILY_REMINDER_ID };
+const EVENING_POST = { kind: 'daily_reminder', id: DAILY_REMINDER_ID };
+
+Deno.test('a partner pick tells the pair\'s other member, titled with the picker, with no sound and no choice', async () => {
+  const listed: string[] = [];
+  const dateLookups: [string, string][] = [];
+  const { status, answer, claimed } = await postDaily(PICK_POST, {
+    dailyPick,
+    listed,
+    dateLookups,
+    // users.partner_id is not consulted for a pick: the pair decides.
+    partnerId: 'someone-else',
+  });
+  assertEquals(status, 200);
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
+  assertEquals(listed, ['recipient']);
+  assertEquals(dateLookups, [['recipient', AT_ISO]]);
+  assertEquals(claimed[0].kind, 'daily_partner_picked');
+  assertEquals(claimed[0].source_id, DAILY_PICK_ID);
+  assertEquals(claimed[0].payload, {
+    kind: 'daily_partner_picked',
+    aps: {
+      alert: { title: 'Casey made their pick', body: 'Pick yours to see what they chose.' },
+      'thread-id': 'partner-activity',
+      badge: 0,
+    },
+  });
+  assertFalse(JSON.stringify(claimed[0].payload).includes('choice'));
+});
+
+Deno.test('a pick made by the first seat goes to the second', async () => {
+  const listed: string[] = [];
+  await postDaily(PICK_POST, { dailyPick: { ...dailyPick, user_id: 'recipient' }, listed });
+  assertEquals(listed, ['sender']);
+});
+
+Deno.test('a partner pick for a day that is not the recipient\'s date is dropped and claims nothing', async () => {
+  const listed: string[] = [];
+  const countLookups: string[] = [];
+  const preferenceLookups: [string, PushPreference][] = [];
+  const { status, answer, claimed } = await postDaily(PICK_POST, {
+    dailyPick,
+    localDate: '2027-01-16',
+    listed,
+    countLookups,
+    preferenceLookups,
+  });
+  assertEquals(status, 200);
+  assertEquals(answer, ZEROS);
+  assertEquals(claimed.length, 0);
+  assertEquals(listed, []);
+  assertEquals(countLookups, []);
+  assertEquals(preferenceLookups, []);
+});
+
+Deno.test('a pick by someone outside the day\'s pair tells nobody', async () => {
+  for (const post of [PICK_POST, BOTH_POST]) {
+    const { answer, claimed } = await postDaily(post, { dailyPick: { ...dailyPick, user_id: 'stranger' } });
+    assertEquals(answer, ZEROS);
+    assertEquals(claimed.length, 0);
+  }
+});
+
+Deno.test('both answered titles by the run and tells the first picker', async () => {
+  const cases: [number, string, string][] = [
+    [5, '5 days in a row', "You both answered. See Casey's pick."],
+    [1, '1 day in a row', "You both answered. See Casey's pick."],
+    [0, 'You both answered', "See Casey's pick."],
+  ];
+  for (const [run, title, body] of cases) {
+    const listed: string[] = [];
+    const streakLookups: [string, string, string, string][] = [];
+    const { answer, claimed } = await postDaily(BOTH_POST, {
+      dailyPick,
+      streak: { held: 9, run },
+      listed,
+      streakLookups,
+    });
+    assertEquals(answer, { ...ZEROS, recorded: 1 }, `run ${run}`);
+    assertEquals(listed, ['recipient']);
+    assertEquals(streakLookups, [['recipient', 'sender', 'recipient', AT_ISO]]);
+    assertEquals(claimed[0].payload, {
+      kind: 'daily_both_answered',
+      aps: { alert: { title, body }, 'thread-id': 'partner-activity', badge: 0 },
+    });
+  }
+});
+
+Deno.test('a late both answered still sends, with That day counts. in place of the pick sentence', async () => {
+  const cases: [number, string, string][] = [
+    [5, '5 days in a row', 'You both answered. That day counts.'],
+    [0, 'You both answered', 'That day counts.'],
+  ];
+  for (const [run, title, body] of cases) {
+    const { answer, claimed } = await postDaily(BOTH_POST, {
+      dailyPick,
+      streak: { held: 9, run },
+      localDate: '2027-01-16',
+    });
+    assertEquals(answer, { ...ZEROS, recorded: 1 }, `run ${run}`);
+    assertEquals(claimed[0].payload.aps.alert, { title, body });
+  }
+});
+
+Deno.test('a nudge goes to_user, titled with from_user, quotes the held streak and plays the default sound', async () => {
+  const listed: string[] = [];
+  const streakLookups: [string, string, string, string][] = [];
+  const { status, answer, claimed } = await postDaily(NUDGE_POST, {
+    dailyNudge,
+    streak: { held: 12, run: 3 },
+    listed,
+    streakLookups,
+  });
+  assertEquals(status, 200);
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
+  assertEquals(listed, ['recipient']);
+  assertEquals(streakLookups, [['recipient', 'sender', 'recipient', AT_ISO]]);
+  assertEquals(claimed[0].kind, 'daily_nudge');
+  assertEquals(claimed[0].source_id, DAILY_NUDGE_ID);
+  assertEquals(claimed[0].payload, {
+    kind: 'daily_nudge',
+    aps: {
+      alert: { title: 'Casey nudged you', body: 'Your 12-day streak needs your pick today.' },
+      'thread-id': 'partner-activity',
+      sound: 'default',
+      badge: 0,
+    },
+  });
+});
+
+Deno.test('a nudge with a held streak of 0 drops the number', async () => {
+  const { claimed } = await postDaily(NUDGE_POST, { dailyNudge, streak: { held: 0, run: 0 } });
+  assertEquals(claimed[0].payload.aps.alert.body, 'Your streak needs your pick today.');
+  assertEquals(claimed[0].payload.aps.sound, 'default');
+});
+
+Deno.test('the morning push quotes the question and counts the day after the held streak, with no sound', async () => {
+  const listed: string[] = [];
+  const streakLookups: [string, string, string, string][] = [];
+  const { status, answer, claimed } = await postDaily(MORNING_POST, {
+    dailyReminder: morningReminder,
+    partnerId: 'sender',
+    streak: { held: 4, run: 4 },
+    listed,
+    streakLookups,
+  });
+  assertEquals(status, 200);
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
+  assertEquals(listed, ['recipient']);
+  assertEquals(streakLookups, [['recipient', 'sender', 'recipient', AT_ISO]]);
+  assertEquals(claimed[0].kind, 'daily_question');
+  assertEquals(claimed[0].source_id, DAILY_REMINDER_ID);
+  assertEquals(claimed[0].payload, {
+    kind: 'daily_question',
+    aps: {
+      alert: { title: 'Tea or Coffee?', body: "Today's question is here. Day 5 is waiting." },
+      'thread-id': 'partner-activity',
+      badge: 0,
+    },
+  });
+});
+
+Deno.test('the morning push with no streak says Day 1', async () => {
+  const { claimed } = await postDaily(MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' });
+  assertEquals(claimed[0].payload.aps.alert.body, "Today's question is here. Day 1 is waiting.");
+});
+
+Deno.test('the evening self reminder quotes the question and plays the default sound', async () => {
+  const streakLookups: [string, string, string, string][] = [];
+  const { answer, claimed } = await postDaily(EVENING_POST, {
+    dailyReminder: eveningSelf,
+    partnerId: 'sender',
+    streakLookups,
+  });
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
+  assertEquals(streakLookups, []);
+  assertEquals(claimed[0].kind, 'daily_reminder');
+  assertEquals(claimed[0].payload, {
+    kind: 'daily_reminder',
+    aps: {
+      alert: { title: "You haven't done your daily yet", body: 'Tea or Coffee? It takes two taps.' },
+      'thread-id': 'partner-activity',
+      sound: 'default',
+      badge: 0,
+    },
+  });
+});
+
+Deno.test('the evening partner reminder names the partner who has not picked and plays the default sound', async () => {
+  const dayLookups: string[] = [];
+  const streakLookups: [string, string, string, string][] = [];
+  const { answer, claimed } = await postDaily(EVENING_POST, {
+    dailyReminder: eveningPartner,
+    partnerId: 'sender',
+    dayLookups,
+    streakLookups,
+  });
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
+  assertEquals(dayLookups, []);
+  assertEquals(streakLookups, []);
+  assertEquals(claimed[0].payload, {
+    kind: 'daily_reminder',
+    aps: {
+      alert: { title: "Casey hasn't done their daily", body: 'Nudge them before midnight.' },
+      'thread-id': 'partner-activity',
+      sound: 'default',
+      badge: 0,
+    },
+  });
+});
+
+Deno.test('a partner with no name falls back to Your partner in every daily title', async () => {
+  const cases: [Record<string, string>, Parameters<typeof fakeDb>[0], string][] = [
+    [PICK_POST, { dailyPick }, 'Your partner made their pick'],
+    [NUDGE_POST, { dailyNudge }, 'Your partner nudged you'],
+    [EVENING_POST, { dailyReminder: eveningPartner, partnerId: 'sender' }, "Your partner hasn't done their daily"],
+    [BOTH_POST, { dailyPick, streak: { held: 3, run: 3 } }, '3 days in a row'],
+  ];
+  for (const [post, options, title] of cases) {
+    const { claimed } = await postDaily(post, { ...options, displayName: null });
+    assertEquals(claimed[0].payload.aps.alert.title, title);
+  }
+  const { claimed } = await postDaily(BOTH_POST, { dailyPick, displayName: null });
+  assertEquals(claimed[0].payload.aps.alert.body, "See Your partner's pick.");
+});
+
+Deno.test('a reminder whose stored kind does not match the posted kind is no push', async () => {
+  const cases: [Record<string, string>, DailyReminderRow][] = [
+    [MORNING_POST, eveningSelf],
+    [MORNING_POST, eveningPartner],
+    [EVENING_POST, morningReminder],
+  ];
+  for (const [post, dailyReminder] of cases) {
+    const listed: string[] = [];
+    const { status, answer, claimed } = await postDaily(post, { dailyReminder, partnerId: 'sender', listed });
+    assertEquals(status, 200);
+    assertEquals(answer, ZEROS);
+    assertEquals(claimed.length, 0);
+    assertEquals(listed, []);
+  }
+});
+
+Deno.test('a reminder for someone with no partner tells nobody', async () => {
+  for (const [post, dailyReminder] of [
+    [MORNING_POST, morningReminder],
+    [EVENING_POST, eveningSelf],
+    [EVENING_POST, eveningPartner],
+  ] as const) {
+    const listed: string[] = [];
+    const { status, answer, claimed } = await postDaily(post, { dailyReminder, partnerId: null, listed });
+    assertEquals(status, 200);
+    assertEquals(answer, ZEROS);
+    assertEquals(claimed.length, 0);
+    assertEquals(listed, []);
+  }
+});
+
+Deno.test('each daily kind with its own switch off answers zeros, lists no device, and leaves the others on', async () => {
+  const daily = KIND_CASES.filter((c) => c.kind.startsWith('daily_'));
+  assertEquals(daily.length, 5);
+  for (const { kind, body, rows } of daily) {
+    const listed: string[] = [];
+    const preferenceLookups: [string, PushPreference][] = [];
+    const off = await postDaily(body, { ...rows, listed, preferenceLookups, preferences: { [kind]: false } });
+    assertEquals(off.answer, ZEROS, kind);
+    assertEquals(off.claimed.length, 0, kind);
+    assertEquals(listed, [], kind);
+    assertEquals(preferenceLookups, [['recipient', kind]], kind);
+
+    // Every other daily switch off, and this one on: it still records.
+    const others = Object.fromEntries(daily.filter((c) => c.kind !== kind).map((c) => [c.kind, false]));
+    const on = await postDaily(body, { ...rows, preferences: others });
+    assertEquals(on.answer, { ...ZEROS, recorded: 1 }, kind);
+  }
+});
+
+Deno.test('a replayed daily post is skipped for every device', async () => {
+  const claimed: PushRequestRow[] = [];
+  const deps = { db: fakeDb({ dailyNudge, devices: TWO_DEVICES, claimed }), apns: null, now: () => NOW };
+  assertEquals(await (await handleSendPush(request(NUDGE_POST), deps)).json(), { ...ZEROS, recorded: 2 });
+  assertEquals(await (await handleSendPush(request(NUDGE_POST), deps)).json(), { ...ZEROS, skipped: 2 });
+  assertEquals(claimed.length, 2);
+});
+
+Deno.test('a daily post whose row is gone is a 404', async () => {
+  for (const post of [PICK_POST, BOTH_POST, NUDGE_POST, MORNING_POST, EVENING_POST]) {
+    const response = await handleSendPush(request(post), {
+      db: fakeDb({ devices: TWO_DEVICES }),
+      apns: null,
+      now: () => NOW,
+    });
+    assertEquals(response.status, 404, post.kind);
+    await response.body?.cancel();
+  }
+});
+
+Deno.test('a daily row whose day is gone is a 404', async () => {
+  const cases: [Record<string, string>, Parameters<typeof fakeDb>[0]][] = [
+    [PICK_POST, { dailyPick }],
+    [BOTH_POST, { dailyPick }],
+    [NUDGE_POST, { dailyNudge }],
+    [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }],
+    [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }],
+  ];
+  for (const [post, options] of cases) {
+    const { status, claimed } = await postDaily(post, { ...options, coupleDay: null });
+    assertEquals(status, 404, post.kind);
+    assertEquals(claimed.length, 0);
+  }
+});
+
+Deno.test('a failed read of the day, the date or the streak answers 500 and claims nothing', async () => {
+  const cases: [Record<string, string>, Parameters<typeof fakeDb>[0], 'getCoupleDay' | 'getUserLocalDate' | 'getCoupleStreak'][] = [
+    [PICK_POST, { dailyPick }, 'getCoupleDay'],
+    [PICK_POST, { dailyPick }, 'getUserLocalDate'],
+    [BOTH_POST, { dailyPick }, 'getUserLocalDate'],
+    [BOTH_POST, { dailyPick }, 'getCoupleStreak'],
+    [NUDGE_POST, { dailyNudge }, 'getCoupleDay'],
+    [NUDGE_POST, { dailyNudge }, 'getCoupleStreak'],
+    [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, 'getCoupleDay'],
+    [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, 'getCoupleStreak'],
+    [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }, 'getCoupleDay'],
+  ];
+  for (const [post, options, failOn] of cases) {
+    const listed: string[] = [];
+    const { status, claimed } = await postDaily(post, { ...options, failOn, listed });
+    assertEquals(status, 500, `${post.kind} ${failOn}`);
+    assertEquals(claimed.length, 0);
+    assertEquals(listed, []);
+  }
+});
+
+Deno.test('the sound and the kind reach APNs for a nudge and none for a partner pick', async () => {
+  const sent: { aps: { sound?: string }; kind?: string }[] = [];
+  const apns: ApnsClient = {
+    send: (_token, _environment, payload) => {
+      sent.push(payload as (typeof sent)[number]);
+      return Promise.resolve({ ok: true, status: 200, reason: null, timestamp: null });
+    },
+  };
+  for (const [post, rows] of [
+    [NUDGE_POST, { dailyNudge }],
+    [PICK_POST, { dailyPick }],
+  ] as const) {
+    await handleSendPush(request(post), {
+      db: fakeDb({ ...rows, devices: [TWO_DEVICES[0]] }),
+      apns,
+      now: () => NOW,
+    });
+  }
+  assertEquals(sent.map((p) => [p.kind, p.aps.sound]), [
+    ['daily_nudge', 'default'],
+    ['daily_partner_picked', undefined],
+  ]);
+});
+
+Deno.test('no daily payload carries a choice, and only the nudge and the 8 PM reminders carry a sound', async () => {
+  const cases: [Record<string, string>, Parameters<typeof fakeDb>[0], string | undefined][] = [
+    [PICK_POST, { dailyPick }, undefined],
+    [BOTH_POST, { dailyPick }, undefined],
+    [NUDGE_POST, { dailyNudge }, 'default'],
+    [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, undefined],
+    [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }, 'default'],
+    [EVENING_POST, { dailyReminder: eveningPartner, partnerId: 'sender' }, 'default'],
+  ];
+  for (const [post, options, sound] of cases) {
+    const { claimed } = await postDaily(post, options);
+    const payload = claimed[0].payload;
+    assertEquals(payload.aps.sound, sound, post.kind);
+    assertEquals(payload.aps['thread-id'], 'partner-activity', post.kind);
+    assertEquals(payload.aps.badge, 0, post.kind);
+    assertFalse(JSON.stringify(payload).toLowerCase().includes('choice'), post.kind);
+  }
+});
+
+Deno.test('a daily kind with a non-uuid id is a 400', async () => {
+  for (const kind of ['daily_question', 'daily_partner_picked', 'daily_nudge', 'daily_reminder', 'daily_both_answered']) {
+    const response = await handleSendPush(request({ kind, id: 'nope' }), { db: fakeDb({}), apns: null });
+    assertEquals(response.status, 400, kind);
+    await response.body?.cancel();
+  }
 });

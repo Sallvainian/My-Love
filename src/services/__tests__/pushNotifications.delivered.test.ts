@@ -402,6 +402,11 @@ describe('viewForPush', () => {
       ['photo', 'photos'],
       ['event', 'home'],
       ['anniversary', 'home'],
+      ['daily_question', 'daily'],
+      ['daily_partner_picked', 'daily'],
+      ['daily_nudge', 'daily'],
+      ['daily_reminder', 'daily'],
+      ['daily_both_answered', 'daily'],
     ];
     for (const [kind, view] of cases) {
       expect(viewForPush({ kind, aps: thread('partner-activity').aps }), kind).toBe(view);

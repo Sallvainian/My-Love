@@ -32,7 +32,7 @@ export const NOTE_QUEUE_LOCK = 'my-love:note-queue';
 
 /**
  * Held by one daily-question pick queue drain at a time
- * (`dailyQuestionSlice.drainQueuedPicks`), so two tabs never send the same
+ * (`dailyDaySlice.drainQueuedPicks`), so two tabs never send the same
  * queued pick concurrently.
  */
 export const PICK_QUEUE_LOCK = 'my-love:pick-queue';
