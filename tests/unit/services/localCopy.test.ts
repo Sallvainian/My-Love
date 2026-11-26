@@ -12,6 +12,7 @@ import {
   deleteLocalCopy,
   onLocalCopyWritten,
   readLocalCopy,
+  readLocalCopyStatus,
   refreshLocalCopies,
   refreshLocalCopy,
   registerLocalCopy,
@@ -50,6 +51,39 @@ describe('localCopy', () => {
   describe('storage', () => {
     it('reads null when nothing is saved', async () => {
       expect(await readLocalCopy(A, 'partner')).toBeNull();
+    });
+
+    describe('readLocalCopyStatus', () => {
+      it('is absent when nothing is saved', async () => {
+        expect(await readLocalCopyStatus(A, 'partner')).toEqual({ status: 'absent' });
+      });
+
+      it('is found with the value that was written', async () => {
+        await writeLocalCopy(A, 'partner', { status: 'unlinked' });
+
+        expect(await readLocalCopyStatus(A, 'partner')).toEqual({
+          status: 'found',
+          value: { status: 'unlinked' },
+        });
+      });
+
+      it('is failed, and logged, when the read throws; readLocalCopy still answers null', async () => {
+        await writeLocalCopy(A, 'partner', 'A-PARTNER');
+        const failure = new Error('GET-FAILED');
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+          throw failure;
+        });
+
+        expect(await readLocalCopyStatus(A, 'partner')).toEqual({ status: 'failed' });
+        expect(errorSpy).toHaveBeenCalledWith('[localCopy] Failed to read partner copy:', failure);
+
+        vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+          throw failure;
+        });
+        expect(await readLocalCopy(A, 'partner')).toBeNull();
+        expect(await readLocalCopy(A, 'partner')).toBe('A-PARTNER');
+      });
     });
 
     it('reads back what was written, replacing the previous value', async () => {

@@ -12,6 +12,9 @@
  * Storage (IndexedDB convention: reads return `null` on failure, writes throw):
  * - `readLocalCopy<T>(userId, kind)` — the saved value, or `null` when there is
  *   none or the read failed.
+ * - `readLocalCopyStatus<T>(userId, kind)` — the same read, told apart: `found`
+ *   with the value, `absent`, or `failed`. A read-then-write merge reads through
+ *   it, so a failed read never overwrites a good copy.
  * - `writeLocalCopy<T>(userId, kind, value)` — replace the saved value, then tell
  *   the write listeners. Throws.
  * - `onLocalCopyWritten(listener)` — call `listener(userId, kind)` after every
@@ -93,16 +96,34 @@ function getDb(): Promise<IDBPDatabase<MyLoveDBSchema>> {
   return dbPromise;
 }
 
-/** The saved copy of `kind` for `userId`, or `null` when absent or unreadable. */
-export async function readLocalCopy<T>(userId: string, kind: string): Promise<T | null> {
+/** What a read of one saved copy found: a value, nothing, or a failed read. */
+export type LocalCopyRead<T> =
+  | { status: 'found'; value: T }
+  | { status: 'absent' }
+  | { status: 'failed' };
+
+/**
+ * The saved copy of `kind` for `userId`, with "nothing saved" told apart from "the
+ * read failed". A read-then-write merge uses this and writes nothing on `failed`.
+ */
+export async function readLocalCopyStatus<T>(
+  userId: string,
+  kind: string
+): Promise<LocalCopyRead<T>> {
   try {
     const db = await getDb();
     const row = await db.get(STORE_NAMES.LOCAL_COPIES, [userId, kind]);
-    return row ? (row.value as T) : null;
+    return row ? { status: 'found', value: row.value as T } : { status: 'absent' };
   } catch (error) {
     console.error(`[localCopy] Failed to read ${kind} copy:`, error);
-    return null;
+    return { status: 'failed' };
   }
+}
+
+/** The saved copy of `kind` for `userId`, or `null` when absent or unreadable. */
+export async function readLocalCopy<T>(userId: string, kind: string): Promise<T | null> {
+  const read = await readLocalCopyStatus<T>(userId, kind);
+  return read.status === 'found' ? read.value : null;
 }
 
 /** Replace the saved copy of `kind` for `userId`. Throws on failure. */

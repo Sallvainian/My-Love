@@ -26,7 +26,7 @@ import {
   type DailyDaySnapshot,
   DailyDaySnapshotSchema,
 } from '../api/validation/dailyQuestionSchemas';
-import { readLocalCopy, writeLocalCopy } from './localCopy';
+import { readLocalCopy, readLocalCopyStatus, writeLocalCopy } from './localCopy';
 import { DAILY_DAYS_LOCK, withWaitingLock } from './syncLock';
 
 export const DAILY_DAYS_COPY_KIND = 'daily-days';
@@ -177,6 +177,8 @@ function mergeSnapshots(
  * - `ok`: the merge rule above. Returns the merged entry.
  * - `unlinked`: writes `{}`. Returns `unlinked`.
  *
+ * A failed read of the saved copy writes nothing and returns `answer` as it is.
+ *
  * Runs under `DAILY_DAYS_LOCK`, waiting for any other merge. Writes only while
  * `isCurrent()` holds; a failed write is logged and never thrown.
  */
@@ -191,7 +193,9 @@ export async function mergeDailyDay(
     let next: DailyDaysCopy = {};
 
     if (answer.status === 'ok') {
-      const days = parseSavedDays(await readLocalCopy<unknown>(userId, DAILY_DAYS_COPY_KIND));
+      const read = await readLocalCopyStatus<unknown>(userId, DAILY_DAYS_COPY_KIND);
+      if (read.status === 'failed') return answer;
+      const days = parseSavedDays(read.status === 'found' ? read.value : null);
       const [entry] = mergeSnapshots(days, [answer.snapshot], partnerId);
       merged = { status: 'ok', snapshot: entry ?? answer.snapshot };
       next = toStored(days);
@@ -211,6 +215,7 @@ export async function mergeDailyDay(
  * Merge a page of successfully read snapshots (past questions) into the copy by
  * the same rule as `mergeDailyDay`, in one read and one write. `[]` writes
  * nothing. Same lock and write rules; a failed write is logged and never thrown.
+ * A failed read of the saved copy writes nothing.
  */
 export async function mergeDailyDays(
   userId: string,
@@ -220,7 +225,9 @@ export async function mergeDailyDays(
 ): Promise<void> {
   if (snapshots.length === 0) return;
   await withWaitingLock(DAILY_DAYS_LOCK, async () => {
-    const days = parseSavedDays(await readLocalCopy<unknown>(userId, DAILY_DAYS_COPY_KIND));
+    const read = await readLocalCopyStatus<unknown>(userId, DAILY_DAYS_COPY_KIND);
+    if (read.status === 'failed') return;
+    const days = parseSavedDays(read.status === 'found' ? read.value : null);
     mergeSnapshots(days, snapshots, partnerId);
     if (!isCurrent()) return;
     try {
