@@ -86,6 +86,36 @@ describe('NudgeSheet', () => {
   });
 
   it.each([
+    ['Escape', async (user: ReturnType<typeof userEvent.setup>) => user.keyboard('{Escape}')],
+    [
+      'a scrim tap',
+      async (user: ReturnType<typeof userEvent.setup>) =>
+        user.click(screen.getByTestId('daily-nudge-sheet')),
+    ],
+  ])('%s during a send does not close the sheet, so a failure line shows', async (_label, dismiss) => {
+    const user = userEvent.setup();
+    let fail: (error: Error) => void = () => {};
+    sendDailyNudge.mockReturnValue(new Promise<void>((_resolve, reject) => (fail = reject)));
+    render(<NudgeSheet canNudge onClose={onClose} />);
+
+    await user.click(screen.getByTestId('daily-nudge-sheet-send'));
+    // The tapped Nudge button is now disabled; put focus back in the panel, as
+    // a Safari tap that never focused the button leaves it, so Escape reaches
+    // the focus trap.
+    act(() => screen.getByTestId('daily-nudge-panel').focus());
+    await dismiss(user);
+
+    expect(onClose).not.toHaveBeenCalled();
+    const failure = new AccountDataError('refused', NUDGE_FAILED_MESSAGE);
+    await act(async () => fail(failure));
+    expect(await screen.findByTestId('daily-nudge-sheet-error')).toHaveTextContent(
+      /^Your nudge could not be sent\.$/
+    );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith('[DailyQuestion] Could not send the nudge:', failure);
+  });
+
+  it.each([
     ['a refusal', new AccountDataError('refused', NUDGE_FAILED_MESSAGE)],
     ['a failed request', new AccountDataError('transport', 'Failed to fetch')],
     ['a plain error', new Error('boom')],
