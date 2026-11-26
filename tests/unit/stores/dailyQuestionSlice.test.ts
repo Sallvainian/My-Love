@@ -287,6 +287,9 @@ describe('loadDailyDay', () => {
 });
 
 describe('overlapping loadDailyDay calls', () => {
+  // Long enough for a read to get through its saved-copy reads (fake-indexeddb) to its fetch.
+  const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+
   it('three overlapping calls send exactly two reads: the running one and one trailing pass', async () => {
     const running = deferred<ReturnType<typeof ok>>();
     fetchDailyDay
@@ -295,8 +298,11 @@ describe('overlapping loadDailyDay calls', () => {
 
     const calls = [state().loadDailyDay()];
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
-    calls.push(state().loadDailyDay(), state().loadDailyDay());
-    await Promise.resolve();
+    // Each call comes after the one before could have reached its fetch.
+    calls.push(state().loadDailyDay());
+    await pause();
+    calls.push(state().loadDailyDay());
+    await pause();
     expect(fetchDailyDay).toHaveBeenCalledTimes(1);
     running.settle(ok(dailySnapshot()));
     await Promise.all(calls);
@@ -314,13 +320,15 @@ describe('overlapping loadDailyDay calls', () => {
     const first = state().loadDailyDay();
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
     let secondSettled = false;
-    const second = state().loadDailyDay().then(() => {
-      secondSettled = true;
-    });
+    const second = state()
+      .loadDailyDay()
+      .then(() => {
+        secondSettled = true;
+      });
     running.settle(ok(dailySnapshot()));
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
     // Both promises wait for the trailing pass.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await pause();
     expect(secondSettled).toBe(false);
     expect(state().dailyDayLoading).toBe(true);
     trailing.settle(ok(waitingSnapshot('this')));
@@ -332,9 +340,7 @@ describe('overlapping loadDailyDay calls', () => {
 
   it('a read that fails still gets its trailing pass, and a later pass clears the error', async () => {
     const running = deferred<ReturnType<typeof ok>>();
-    fetchDailyDay
-      .mockReturnValueOnce(running.promise)
-      .mockResolvedValueOnce(ok(dailySnapshot()));
+    fetchDailyDay.mockReturnValueOnce(running.promise).mockResolvedValueOnce(ok(dailySnapshot()));
 
     const first = state().loadDailyDay();
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
@@ -356,9 +362,11 @@ describe('overlapping loadDailyDay calls', () => {
     expect(fetchDailyDay).toHaveBeenCalledTimes(2);
   });
 
-  it('a call in a new session starts its own read and never joins the old session\'s', async () => {
+  it("a call in a new session starts its own read and never joins the old session's", async () => {
     const old = deferred<ReturnType<typeof ok>>();
-    fetchDailyDay.mockReturnValueOnce(old.promise).mockResolvedValueOnce(ok(waitingSnapshot('this')));
+    fetchDailyDay
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce(ok(waitingSnapshot('this')));
 
     const oldLoad = state().loadDailyDay();
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
@@ -391,6 +399,54 @@ describe('overlapping loadDailyDay calls', () => {
 
     expect(fetchDailyDay).toHaveBeenCalledTimes(1);
     expect(state().dailyDay).toBeNull();
+  });
+
+  it('a trailing pass asked for before a same-account re-login is never sent in the new session', async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(old.promise).mockResolvedValue(ok(dailySnapshot()));
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    void state().loadDailyDay();
+    // The same account signs in again: the user id is the same, the session is not.
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+    await pause();
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+    expect(state().dailyDay).toBeNull();
+  });
+
+  it("the old session's read ending leaves the new session's read in its slot", async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    const fresh = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(fresh.promise)
+      .mockResolvedValueOnce(ok(waitingSnapshot('this')));
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    const freshLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+
+    // The new session's read is still open, so this call asks for a pass after it.
+    const joined = state().loadDailyDay();
+    await pause();
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    fresh.settle(ok(dailySnapshot()));
+    await Promise.all([freshLoad, joined]);
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(3);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 });
 

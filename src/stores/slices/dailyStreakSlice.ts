@@ -112,10 +112,11 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
   // The tab's running streak read, the identity and pair it was started for,
   // and whether a call arrived while it ran: a call for the same identity and
   // pair asks for one more read after the running one, never joins it.
-  let streakRead: { key: string; again: boolean; promise: Promise<void> } | null = null;
+  type StreakRead = { key: string; again: boolean; promise: Promise<void> };
+  let streakRead: StreakRead | null = null;
 
   /** One read: the saved streak, then the server's answer. Never throws. */
-  const readStreakOnce = async (): Promise<void> => {
+  const readStreakOnce = async (read: StreakRead): Promise<void> => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) return;
     const mine = ++streakSeq;
@@ -139,7 +140,10 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
       // 2. The server's answer, shown and then saved.
       const answer = await fetchCoupleStreak();
       if (!isCurrent()) return;
-      set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
+      // A trailing pass already asked for runs next in this session and pair (a
+      // change of either would have failed `isCurrent`), so the streak stays
+      // loading until its answer: Daily's claim gate waits for a settled streak.
+      set({ coupleStreak: answer, coupleStreakLoading: read.again, coupleStreakError: null });
       try {
         // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
         const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
@@ -185,7 +189,7 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
         try {
           do {
             read.again = false;
-            await readStreakOnce();
+            await readStreakOnce(read);
           } while (
             read.again &&
             `${get().userId}:${get().authSessionVersion}:${pairEpoch}` === key
