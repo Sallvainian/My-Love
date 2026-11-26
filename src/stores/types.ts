@@ -9,7 +9,9 @@ import type { StateCreator } from 'zustand';
 
 // Import slice interfaces (NOT the slice creators, NOT AppSlice)
 import type { AuthSlice } from './slices/authSlice';
-import type { DailyQuestionSlice } from './slices/dailyQuestionSlice';
+import type { DailyDaySlice } from './slices/dailyDaySlice';
+import type { DailyHistorySlice } from './slices/dailyHistorySlice';
+import type { DailyStreakSlice } from './slices/dailyStreakSlice';
 import type { DatesSlice } from './slices/datesSlice';
 import type { EventsSlice } from './slices/eventsSlice';
 import type { InteractionsSlice } from './slices/interactionsSlice';
@@ -63,7 +65,9 @@ export interface AppState
     PartnerSlice,
     NotesSlice,
     EventsSlice,
-    DailyQuestionSlice {}
+    DailyDaySlice,
+    DailyStreakSlice,
+    DailyHistorySlice {}
 
 /**
  * Type-safe slice creator for Zustand with persist middleware.
