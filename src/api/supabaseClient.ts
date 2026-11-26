@@ -382,8 +382,10 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
     if (knownOffline()) return { status: 'error', reason: 'offline', offline: true };
 
     // Query current user's partner_id from users table. Bounded like every
-    // Daily request: a stalled read ends as an error, so the single-flight
-    // pass waiting on it (`loadDailyDay`, `loadCoupleStreak`) frees its slot.
+    // Daily request, for every caller of this lookup (notes, dates, mood,
+    // Realtime delivery and Daily): a stalled read ends as an error, so the
+    // single-flight pass waiting on it (`loadDailyDay`, `loadCoupleStreak`)
+    // frees its slot and delivery retries instead of hanging.
     const { data, error } = await supabase
       .from('users')
       .select('partner_id')

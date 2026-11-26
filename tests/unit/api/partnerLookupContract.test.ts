@@ -15,6 +15,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { REQUEST_TIMEOUT_MS } from '@/services/accountDataError';
+
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const PARTNER_ID = '22222222-2222-4222-8222-222222222222';
 
@@ -52,7 +54,10 @@ async function answerRead(kind: 'single' | 'maybeSingle') {
       if (signal?.aborted) resolve();
       signal?.addEventListener('abort', () => resolve());
     });
-    return { data: null, error: { code: '', message: 'AbortError: signal timed out' } };
+    return {
+      data: null,
+      error: { code: '', message: 'TimeoutError: The operation was aborted due to timeout' },
+    };
   }
   const result = singleResults[singleCalls] ?? singleResults.at(-1);
   singleCalls += 1;
@@ -186,7 +191,7 @@ describe('partner lookup contract', () => {
       timeout.abort();
 
       await expect(pending).resolves.toMatchObject({ status: 'error' });
-      expect(AbortSignal.timeout).toHaveBeenCalledWith(30_000);
+      expect(AbortSignal.timeout).toHaveBeenCalledWith(REQUEST_TIMEOUT_MS);
     });
   });
 
