@@ -26,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(32);
+select plan(33);
 
 create or replace function tests.create_test_user(test_email text default 'test@example.com')
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -111,7 +111,7 @@ select is(
       and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       and has_function_privilege('authenticated', p.oid, 'EXECUTE')
   ),
-  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_couple_streak, get_daily_day, get_daily_day_by_id, get_daily_history, get_my_partner_id, get_my_pending_partner_requests, mark_love_notes_read, register_push_device, reset_bot_daily_days, submit_daily_pick, submit_written_question, unregister_all_push_devices, unregister_push_device',
+  'accept_partner_request, claim_love_note_upload, decline_partner_request, find_partner_by_email, get_couple_streak, get_daily_day, get_daily_day_by_id, get_daily_history, get_my_partner_id, get_my_pending_partner_requests, mark_love_notes_read, register_push_device, reset_bot_daily_days, send_daily_nudge, submit_daily_pick, submit_written_question, unregister_all_push_devices, unregister_push_device',
   'FN-GRANT-008: authenticated holds EXECUTE on exactly the app RPCs'
 );
 
@@ -227,6 +227,13 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.get_daily_history(date)', 'EXECUTE'),
   'FN-GRANT-023: get_daily_history is executable by authenticated'
+);
+
+-- 20261126020000, same shape: the waiting screen's Nudge button calls it, so
+-- without the grant every nudge answers 42501.
+select ok(
+  has_function_privilege('authenticated', 'public.send_daily_nudge(uuid)', 'EXECUTE'),
+  'FN-GRANT-024: send_daily_nudge is executable by authenticated'
 );
 
 -- ============================================

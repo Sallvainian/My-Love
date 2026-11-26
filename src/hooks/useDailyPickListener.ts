@@ -9,7 +9,12 @@
  *
  *   - `daily_pick { day_id }` re-reads that one day (`refreshDailyDay`) and the
  *     streak (`loadCoupleStreak`): a partner's pick can finish a day. The
- *     event carries no choice and is trusted for nothing else.
+ *     event carries no choice and is trusted for nothing else. It also calls
+ *     the optional `onPartnerPick(day_id)` (`DailyQuestion` closes the nudge
+ *     offer for that day); no other event does. The callback is held in a ref,
+ *     so a new one never re-subscribes.
+ *   - `daily_nudge { day_id }` re-reads that one day (`refreshDailyDay`) only,
+ *     with no streak read: a nudge changes no streak.
  *   - `partner_linked` re-reads today's day (`loadDailyDay`) and the streak: the device that
  *     accepted this account's partner request sends it, and the topic is the
  *     account's own, so it arrives while Daily shows the invitation to link.
@@ -26,17 +31,22 @@
  * the signed-in user's, read once at subscribe.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { moodSyncService } from '../api/moodSyncService';
 import { useAppStore } from '../stores/useAppStore';
 
-export function useDailyPickListener(): void {
+export function useDailyPickListener(onPartnerPick?: (dayId: string) => void): void {
   const userId = useAppStore((state) => state.userId);
   const authSessionVersion = useAppStore((state) => state.authSessionVersion);
   const isOnline = useAppStore((state) => state.syncStatus.isOnline);
   const loadDailyDay = useAppStore((state) => state.loadDailyDay);
   const refreshDailyDay = useAppStore((state) => state.refreshDailyDay);
   const loadCoupleStreak = useAppStore((state) => state.loadCoupleStreak);
+
+  const onPartnerPickRef = useRef(onPartnerPick);
+  useEffect(() => {
+    onPartnerPickRef.current = onPartnerPick;
+  }, [onPartnerPick]);
 
   const session = userId ? `${userId}:${authSessionVersion}` : null;
   const listening = userId !== null && isOnline;
@@ -55,6 +65,11 @@ export function useDailyPickListener(): void {
           if (!active) return;
           void refreshDailyDay(day_id);
           void loadCoupleStreak();
+          onPartnerPickRef.current?.(day_id);
+        },
+        daily_nudge: ({ day_id }) => {
+          if (!active) return;
+          void refreshDailyDay(day_id);
         },
         partner_linked: () => {
           if (!active) return;

@@ -24,6 +24,14 @@ export const PARTNER_LINKED_EVENT = 'partner_linked';
  */
 export const DAILY_PICK_EVENT = 'daily_pick';
 
+/**
+ * Sent on `mood-updates:<partnerId>` after a confirmed nudge (`send_daily_nudge`).
+ * The body is `{ day_id }` and nothing else, as `daily_pick`'s: the receiver
+ * re-reads that day from the server (architecture AD-11), and the push that
+ * carries the nudge's words is the server's.
+ */
+export const DAILY_NUDGE_EVENT = 'daily_nudge';
+
 /** Sent on `mood-updates:<partnerId>` by `moodSyncService.broadcastMoodToPartner`. */
 export const NEW_MOOD_EVENT = 'new_mood';
 
@@ -42,6 +50,7 @@ export const DATES_CHANGED_EVENT = 'dates_changed';
 export const PARTNER_EVENTS = [
   PARTNER_LINKED_EVENT,
   DAILY_PICK_EVENT,
+  DAILY_NUDGE_EVENT,
   NEW_MOOD_EVENT,
   DATES_CHANGED_EVENT,
 ] as const;
@@ -52,6 +61,7 @@ export type PartnerEventName = (typeof PARTNER_EVENTS)[number];
 export type PartnerEvent =
   | { event: typeof PARTNER_LINKED_EVENT }
   | { event: typeof DAILY_PICK_EVENT; day_id: string }
+  | { event: typeof DAILY_NUDGE_EVENT; day_id: string }
   | { event: typeof NEW_MOOD_EVENT; mood: SupabaseMood }
   | { event: typeof DATES_CHANGED_EVENT };
 
@@ -60,8 +70,8 @@ export type PartnerEvent =
  *
  * `love-notes:<uuid>` and `mood-updates:<uuid>` carry client-to-client
  * Realtime broadcasts. `mood-updates:<uuid>` carries one registry of partner
- * events (`PartnerEvent`: `partner_linked`, `daily_pick`, `new_mood`,
- * `dates_changed`), and
+ * events (`PartnerEvent`: `partner_linked`, `daily_pick`, `daily_nudge`,
+ * `new_mood`, `dates_changed`), and
  * `parsePartnerEvent` is the one door each of them passes through.
  *
  * RLS on `realtime.messages` decides who may join and who may send, but it
@@ -250,9 +260,30 @@ export function parseMoodBroadcast(
 /**
  * Wire schema of a `daily_pick` body. Zod strips unknown keys, so a payload
  * carrying anything beside `day_id` -- a choice above all -- reaches no
- * handler with it.
+ * handler with it. A `daily_nudge` body has the same shape.
  */
 export const DailyPickBroadcastSchema = z.object({ day_id: UUIDSchema });
+
+/**
+ * A `daily_pick` or `daily_nudge` body: a known partner and `{ day_id: uuid }`,
+ * or `null`. `what` names the event in the debug log.
+ */
+function parseDayBroadcast(
+  what: string,
+  raw: unknown,
+  identity: PartnerEventIdentity
+): string | null {
+  if (!identity.partnerId) {
+    logger.debug(`[BroadcastValidation] Dropped a ${what}: no partner identity to check against`);
+    return null;
+  }
+  const result = DailyPickBroadcastSchema.safeParse(raw);
+  if (!result.success) {
+    logger.debug(`[BroadcastValidation] Dropped a malformed ${what} broadcast`);
+    return null;
+  }
+  return result.data.day_id;
+}
 
 /**
  * Parse and authorize one partner broadcast, whichever event it is.
@@ -260,7 +291,7 @@ export const DailyPickBroadcastSchema = z.object({ day_id: UUIDSchema });
  * - `partner_linked` and `dates_changed` are always returned: their bodies are
  *   trusted for nothing, they only prompt a server re-read.
  * - `new_mood` goes through `parseMoodBroadcast`.
- * - `daily_pick` needs a known partner (a channel whose account changed is
+ * - `daily_pick` and `daily_nudge` need a known partner (a channel whose account changed is
  *   muted that way) and a body of `{ day_id: uuid }`. It too only asks for a
  *   server re-read, so nothing else on the wire is read.
  *
@@ -285,16 +316,12 @@ export function parsePartnerEvent(
       return mood ? { event: NEW_MOOD_EVENT, mood } : null;
     }
     case DAILY_PICK_EVENT: {
-      if (!identity.partnerId) {
-        logger.debug('[BroadcastValidation] Dropped a daily pick: no partner identity to check against');
-        return null;
-      }
-      const result = DailyPickBroadcastSchema.safeParse(raw);
-      if (!result.success) {
-        logger.debug('[BroadcastValidation] Dropped a malformed daily pick broadcast');
-        return null;
-      }
-      return { event: DAILY_PICK_EVENT, day_id: result.data.day_id };
+      const dayId = parseDayBroadcast('daily pick', raw, identity);
+      return dayId ? { event: DAILY_PICK_EVENT, day_id: dayId } : null;
+    }
+    case DAILY_NUDGE_EVENT: {
+      const dayId = parseDayBroadcast('daily nudge', raw, identity);
+      return dayId ? { event: DAILY_NUDGE_EVENT, day_id: dayId } : null;
     }
     default:
       logger.debug('[BroadcastValidation] Dropped a partner broadcast of an unknown event');

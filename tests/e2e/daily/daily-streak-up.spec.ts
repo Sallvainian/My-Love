@@ -35,6 +35,7 @@ import {
 } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -188,7 +189,7 @@ test.describe('Daily: the streak goes up by one', () => {
     await log.step('The worker picks and waits; the partner picks second');
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
     await pick(partner, 'that');
 
     await log.step('The partner sees the +1 screen at once, held 2, button on the reveal');
@@ -213,7 +214,7 @@ test.describe('Daily: the streak goes up by one', () => {
   }) => {
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
 
     await log.step('The worker leaves Daily; the partner finishes the day');
     await navigateTo(own, 'home');
@@ -246,7 +247,7 @@ test.describe('Daily: the streak goes up by one', () => {
   }) => {
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
     await expect(own.getByTestId('daily-streak-up')).toHaveCount(0);
 
     await log.step('The partner picks; the worker sees the +1 screen with no reload');
@@ -267,7 +268,7 @@ test.describe('Daily: the streak goes up by one', () => {
   }) => {
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
 
     await log.step('The worker opens Partner; the partner finishes the day');
     const firstRead = interceptNetworkCall({ method: 'POST', url: COUPLE_STREAK_READ });

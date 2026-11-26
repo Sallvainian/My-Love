@@ -4465,7 +4465,8 @@ location: supabase/functions/send-push/handler.ts resolveSource, daily_partner_p
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
 severity: low
 reason: getDailyPick (supabase/functions/send-push/index.ts) selects id, day_id, user_id; service_role may read is_second. Reachable only if a story 6 trigger's WHEN is wrong or a call with the shared secret is forged; reminders already get a posted/stored kind guard. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter).
-status: open
+status: done 2026-11-26
+resolution: `getDailyPick` now selects `is_second`, and `resolveSource` answers no recipient and no payload when it disagrees with the posted kind (`daily_partner_picked` needs false, `daily_both_answered` true): 200, every count 0, no device listed, nothing claimed, so the matching post later still records. Unit: `handler.test.ts` (both mismatches, and a mis-post followed by the correct post). The sentence in `supabase/migrations/20261125000000_daily_push_sender.sql` (lines 17-20) that says send-push does not check `is_second` (DW-525) predates this fix and is left as written.
 
 ### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's
 origin: spec-deferred 184bc275beae
@@ -4481,4 +4482,133 @@ location: tests/api/push-daily-sender.spec.ts setUpPair and the pick-kinds case 
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
 severity: low
 reason: setUpPair takes today = isoDateDaysFromNow(0, new Date()) and seedPairDays writes a user_time_zones row in the host's zone; the pick-kinds case takes twoDaysAgo the same way. user_local_date(recipient, now()) then answers the next day after midnight, so the on-day partner-picked push is dropped as late and the "3-day streak", "Day 4" and "See ...'s pick." assertions miss. Real low flake, deferred because a run must straddle local midnight within seconds (follow-up review 2026-11-25: blind-hunter, edge-case-hunter); the fix is a guard (skip within a few minutes of local midnight) or re-deriving the date from user_local_date before each post.
+status: done 2026-11-26
+resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in both tests of `push-daily-sender.spec.ts`, before `setUpPair`.
+
+### DW-528: The live daily-reminders cron job (every 5 minutes on real time) can act on api-spec accounts during a host-zone 08:00-08:30 or 20:00-20:30 window, so a tick that lands mid-spec makes
+origin: spec-deferred 2a1496a6b7b2
+location: tests/api/push-daily-sender.spec.ts addReminder; tests/api/push-partner-activity-trigger.spec.ts by-token count; supabase/migrations/20261126000000_daily_reminders_schedule.sql daily-reminders job
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: push-daily-sender.spec.ts setUpPair links a throwaway pair both ways, registers devices and seedPairDays writes a host-zone user_time_zones row, so enqueue_daily_reminders(now()) treats it as due; addReminder then asserts a null insert error (tests/api/push-daily-sender.spec.ts addReminder). push-partner-activity-trigger.spec.ts reads push_requests by token and expects toHaveLength(6) while the pool pair (linked, a stored zone from get_daily_day) holds devices. 35_push_devices.sql's unscoped net.http_request_queue counts are exposed the same way to a committed cron insert. Needs a tick inside a window during the few seconds a spec holds that state (about 0.1-0.2% of runs). Real low flake, deferred because developers are unlikely to meet it (review 2026-11-26: blind-hunter, edge-case-hunter, verification-gap). Fix: pause the job around the api leg or clear a cron-made row for (user, today, slot) before the spec inserts.
+status: open
+
+### DW-529: For partners on clocks four or more hours apart, the 8 PM evening_partner push can tell the earlier partner to nudge about a date the later partner can no longer pick, because the later partner's date
+origin: spec-deferred 916c1600ab8a
+location: supabase/migrations/20261126000000_daily_reminders_schedule.sql enqueue_daily_reminders, evening branch
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: enqueue_daily_reminders checks picks on the couple day for the recipient's own local date; record_daily_pick refuses a pick whose local date is not the day, and AD-17 refuses a nudge unless the day is the recipient's current date, so "Nudge them before midnight." asks for something neither partner can do. The intent and AD-9 state the evening_partner rule literally (only the recipient has picked, no spent evening nudge), so changing it needs an owner or architect decision. Real low defect, deferred because it needs partners far apart and the fix adds a branch (review 2026-11-26: blind-hunter, intent-alignment).
+status: done 2026-11-26
+resolution: won't fix -- decided 2026-11-26 by the owner: keep the evening_partner rule as AD-9 states it. The owner and partner share one clock, so the far-apart case does not arise for them.
+
+### DW-530: tests/api/push-daily-reminders.spec.ts fails its own guard on a host in a half-hour zone (for example +05:30), because the pool accounts then sit at 08:10 and 20:10 at the spec's Kathmandu 08:25 and
+origin: spec-deferred 64204ccf98b3
+location: tests/api/push-daily-reminders.spec.ts otherAccountsDueAt and the two instants
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment).
+status: open
+
+### DW-531: tests/api/push-daily-picks.spec.ts fixes today, yesterday and two days ago from the host clock when it seeds the pair, so a run that crosses host-local midnight between the seed and a pick fails
+origin: spec-deferred cf4802363580
+location: tests/api/push-daily-picks.spec.ts seed and submitPick
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-picks-push-the-partner-and-both-answered-plan.md`
+severity: low
+reason: The spec computes `today` with isoDateDaysFromNow(0, now) before seedPairDays, then submits today's pick with picked_at = new Date() for dayIds[today]; after midnight record_daily_pick refuses it with DQ001 (pick date is not the day's date), and user_local_date would also move the recipient's date so the on-date partner-picked push is dropped. The same low flake story 8.3 deferred for push-daily-sender.spec.ts. Real low flake, deferred because a run must straddle local midnight within seconds; the fix is a guard (skip within a few minutes of local midnight) shared by both specs.
+status: done 2026-11-26
+resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in `push-daily-picks.spec.ts`, before the pair is seeded.
+
+### DW-532: A sender whose clock is past midnight while the recipient's is still on the day can nudge about that day in a fresh slot of the sender's new date, which also spends that date's slot before the new
+origin: spec-deferred 900939320814
+location: supabase/migrations/20261126020000_daily_nudge.sql record_daily_nudge and daily_day_snapshot nudge block
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
+severity: low
+reason: record_daily_nudge and the snapshot key the limit on (from_user, sender_local_date, slot) and require only user_local_date(partner, at) = the day (AD-17 as written). With A on UTC and B in New York, at 2030-09-11 02:00 UTC A (picked 09-10, B not) gets slot after_pick for 09-10, unspent, so a third nudge about 09-10 lands and A's 09-11 after_pick slot is spent before 09-11's question. Real low defect, deferred because it needs partners in different zones and a nudge after the sender's midnight, and the fix (also requiring the sender's own date to be the day, or keying on day_id) changes AD-17's rule, which is the architect's or owner's call (review 2026-11-26: blind-hunter, edge-case-hunter, intent-alignment).
+status: open
+decision: 2026-11-26 per-question-day — the owner chose the standard practice: key the nudge limit on the day being nudged about, (from_user, day_id, slot), instead of (from_user, sender_local_date, slot), so crossing the sender's midnight neither adds a nudge about the old day nor spends the new day's slot. A migration changes record_daily_nudge, the unique key and the snapshot's spent read; AD-17 is updated to match.
+
+### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the
+origin: spec-deferred 54bfbe5d4e23
+location: supabase/migrations/20261126020000_daily_nudge.sql:154-155
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
+severity: low
+reason: Under READ COMMITTED each statement in the volatile function takes a fresh snapshot, and get_daily_day may update user_time_zones from the same account's other device in between. Real low defect, deferred because it needs a zone change within the same milliseconds as a nudge; the fix is to read the zone once and derive both values from it (review 2026-11-26: edge-case-hunter).
+status: open
+
+### DW-534: tests/api/push-daily-nudge.spec.ts takes today from the host clock before seeding, so a run that crosses host-local midnight between the seed and the nudge fails spuriously.
+origin: spec-deferred e25547d0886d
+location: tests/api/push-daily-nudge.spec.ts setUpPair
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
+severity: low
+reason: setUpPair seeds today with isoDateDaysFromNow(0, new Date()) and host-zone user_time_zones rows; after midnight user_local_date(recipient, now()) is the next date and send_daily_nudge refuses DQ009. The same low flake stories 8.3 and 8.6 deferred for push-daily-sender.spec.ts and push-daily-picks.spec.ts; the shared fix is a guard near local midnight (review 2026-11-26: intent-alignment).
+status: done 2026-11-26
+resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in both tests of `push-daily-nudge.spec.ts`, before `setUpPair`; the repeat-in-slot refusal is covered too.
+
+### DW-535: tests/e2e/daily/daily-question-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the nudge and the reload.
+origin: spec-deferred bdab4a51c247
+location: tests/e2e/daily/daily-question-nudge.spec.ts after the nudge send
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: The server picks the slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the spec expects the button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6 and 8.7 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.8 implementation, 2026-11-26).
+status: done 2026-11-26
+resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called in `daily-question-nudge.spec.ts` before the pair's days are cleared.
+
+### DW-536: The client keeps nudge.spent per (day_id, slot), while the server spends a slot per (sender-local date, slot), so a sender whose date has passed the shown day sees a greyed button the server would
+origin: spec-deferred d00b99c79ea2
+location: src/services/dailyDaysCopy.ts keepNudgeSpent
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: keepNudgeSpent keeps a stored {after_pick, spent: true} over a later {after_pick, spent: false} for the same day_id. With the sender far ahead of the partner (UTC+9 against UTC-5) and the day still on screen after the sender's midnight, the server opens a fresh after_pick slot on the sender's new date for the same day, and the button stays greyed. Same root cause as story 8.7's deferred sender-date crossing (AD-17 keys the limit on the sender's date); the snapshot carries no date to tell the two slots apart (review 2026-11-26: blind-hunter).
+status: open
+decision: 2026-11-26 follows-DW-532 — fixed by DW-532's per-question-day key: the client already keeps spent per (day_id, slot), which then matches the server.
+
+### DW-537: After a P0002 refusal (the pair changed) the nudge's re-read of the same day_id fails too, so the stale waiting card keeps an enabled button that fails on every tap.
+origin: spec-deferred 50678f62b2da
+location: src/stores/slices/dailyDaySlice.ts sendDailyNudge
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter).
+status: open
+
+### DW-538: Daily does not re-read at the sender's local midnight, so a page left open and visible across midnight keeps the old day and its nudge slot.
+origin: spec-deferred 300c948db47a
+location: src/hooks/useDailyDayRereads.ts
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter).
+status: open
+
+### DW-539: A nudge request that times out after the server committed it shows "Your nudge could not be sent." although the push went out.
+origin: spec-deferred 31cd9232798f
+location: src/components/DailyQuestion/DailyQuestion.tsx WaitingCard
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: requestTimeout aborts the client request; the row and its trigger post may already be committed. The card shows NUDGE_FAILED_MESSAGE, and the re-read then greys the button (spent), so the line and the state disagree. Real low defect, deferred because it needs a timeout after commit; the fix needs a rule for when the re-read overrides the line that the intent does not give (review 2026-11-26: edge-case-hunter).
+status: open
+decision: 2026-11-26 unknown-is-not-failed — the owner left the rule to standard practice: a send that times out or fails on the network is unknown, not failed. Show no line at first and re-read the day; if the re-read has the slot spent, show it as sent (button grey, no line); if not, show NUDGE_FAILED_MESSAGE and leave the button enabled (a retry cannot double-send: one nudge per slot is a unique key). A server refusal (DQ007 to DQ010, P0002) keeps today's behaviour.
+
+### DW-540: The 20:00 re-read uses the device's clock while the server's slot uses the stored zone, which differ when the same account reads Daily from a second device in another zone.
+origin: spec-deferred 24a822fb1e50
+location: src/hooks/useDailyDayRereads.ts
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+reason: get_daily_day stores the zone of whichever device read last; Daily's mount read stores this device's zone, so they agree unless another device of the same account in another zone reads in between. Then the timer fires at the wrong hour and the evening slot shows only on a return or reload (review 2026-11-26: edge-case-hunter, intent-alignment).
+status: open
+
+### DW-541: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the pick and the reload.
+origin: spec-deferred 038b11dcab84
+location: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts after the nudge send
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-app-offers-a-nudge-right-after-a-pick-plan.md`
+severity: low
+reason: The server picks the nudge slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the first test expects the waiting button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6, 8.7 and 8.8 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.9 implementation, 2026-11-26).
+status: done 2026-11-26
+resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called at the top of the `setup` fixture in `daily-question-after-pick-nudge.spec.ts`, before the pair's days are cleared.
+
+### DW-542: The live check fails on the wrong sheet when UTC midnight passes between bot A's first Daily read and its pick on a day A is the writer.
+origin: spec-deferred 04fbea10cd5f
+location: tests/live/daily-question-live.spec.ts (the `openedA.snapshot.write.mine` branch)
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-after-every-deploy-the-live-check-also-sends-a-nudge-plan.md`
+severity: low
+reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC.
 status: open

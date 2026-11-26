@@ -27,6 +27,7 @@ import {
   supabase,
 } from './supabaseClient';
 import {
+  DAILY_NUDGE_EVENT,
   DAILY_PICK_EVENT,
   DATES_CHANGED_EVENT,
   NEW_MOOD_EVENT,
@@ -51,6 +52,7 @@ export type SupabaseMoodRecord = SupabaseMood;
  * - `partner_linked`: someone just accepted this account's partner request;
  *   see PARTNER_LINKED_EVENT.
  * - `daily_pick`: the partner picked on `day_id`; re-read that day.
+ * - `daily_nudge`: the partner nudged on `day_id`; re-read that day.
  * - `new_mood`: the partner logged a mood.
  * - `dates_changed`: the partner added, edited or deleted an event or an
  *   anniversary; see DATES_CHANGED_EVENT.
@@ -701,6 +703,9 @@ class MoodSyncService {
           break;
         case DAILY_PICK_EVENT:
           s.handlers.daily_pick?.(event);
+          break;
+        case DAILY_NUDGE_EVENT:
+          s.handlers.daily_nudge?.(event);
           break;
         case NEW_MOOD_EVENT:
           s.handlers.new_mood?.(event);

@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  DAILY_NUDGE_EVENT,
   DAILY_PICK_EVENT,
   PARTNER_EVENTS,
   parseLoveNoteBroadcast,
@@ -256,9 +257,16 @@ describe('parsePartnerEvent', () => {
   const known = { partnerId: PARTNER };
   const unknown = { partnerId: null };
 
-  it('names exactly the four events the channel binds', () => {
-    expect([...PARTNER_EVENTS]).toEqual(['partner_linked', 'daily_pick', 'new_mood', 'dates_changed']);
+  it('names exactly the five events the channel binds', () => {
+    expect([...PARTNER_EVENTS]).toEqual([
+      'partner_linked',
+      'daily_pick',
+      'daily_nudge',
+      'new_mood',
+      'dates_changed',
+    ]);
     expect(DAILY_PICK_EVENT).toBe('daily_pick');
+    expect(DAILY_NUDGE_EVENT).toBe('daily_nudge');
   });
 
   it('returns partner_linked whatever the body and whoever the partner is', () => {
@@ -311,7 +319,33 @@ describe('parsePartnerEvent', () => {
     expect(parsePartnerEvent('daily_pick', raw, known)).toBeNull();
   });
 
+  it('returns a daily nudge with its day id, and strips every other key', () => {
+    expect(parsePartnerEvent('daily_nudge', { day_id: DAY_ID }, known)).toStrictEqual({
+      event: 'daily_nudge',
+      day_id: DAY_ID,
+    });
+    expect(
+      parsePartnerEvent('daily_nudge', { day_id: DAY_ID, choice: 'this', x: 1 }, known)
+    ).toStrictEqual({ event: 'daily_nudge', day_id: DAY_ID });
+  });
+
+  it('drops a daily nudge with no partner known', () => {
+    expect(parsePartnerEvent('daily_nudge', { day_id: DAY_ID }, unknown)).toBeNull();
+  });
+
+  it.each([
+    ['an empty object', {}],
+    ['a non-uuid day_id', { day_id: 'nope' }],
+    ['a numeric day_id', { day_id: 1 }],
+    ['a null day_id', { day_id: null }],
+    ['a string', 'hello'],
+    ['null', null],
+    ['undefined', undefined],
+  ])('drops a daily nudge with %s', (_label, raw) => {
+    expect(parsePartnerEvent('daily_nudge', raw, known)).toBeNull();
+  });
+
   it('drops an event it does not know', () => {
-    expect(parsePartnerEvent('daily_nudge', { day_id: DAY_ID }, known)).toBeNull();
+    expect(parsePartnerEvent('daily_poke', { day_id: DAY_ID }, known)).toBeNull();
   });
 });

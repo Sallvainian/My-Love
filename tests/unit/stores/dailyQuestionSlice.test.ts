@@ -667,7 +667,7 @@ describe('submitDailyPick', () => {
     announceDailyPick.mockRejectedValue(failure);
     submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
 
-    await expect(state().submitDailyPick('this')).resolves.toBeUndefined();
+    await expect(state().submitDailyPick('this')).resolves.toEqual(ok(waitingSnapshot('this')));
 
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
     await vi.waitFor(() =>

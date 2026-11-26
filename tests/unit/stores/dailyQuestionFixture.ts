@@ -32,6 +32,15 @@ export function waitingSnapshot(
   return dailySnapshot({ state: 'me', my_choice: myChoice, my_picked_at: pickedAt });
 }
 
+/** The viewer picked and the partner has not, with the viewer's `nudge` as given. */
+export function nudgeSnapshot(
+  slot: 'after_pick' | 'evening' | null,
+  spent: boolean,
+  overrides: Partial<DailyDaySnapshot> = {}
+): DailyDaySnapshot {
+  return { ...waitingSnapshot('this'), nudge: { slot, spent }, ...overrides };
+}
+
 /** Both picked: the reveal. */
 export function revealSnapshot(
   myChoice: 'this' | 'that',

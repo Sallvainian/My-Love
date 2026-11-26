@@ -37,6 +37,8 @@ vi.mock('../ephemeralBroadcast', () => ({
 import { AccountDataError } from '../../services/accountDataError';
 import {
   DAY_CHANGED_MESSAGE,
+  NUDGE_FAILED_MESSAGE,
+  announceDailyNudge,
   announceDailyPick,
   fetchCoupleStreak,
   fetchDailyDay,
@@ -44,6 +46,7 @@ import {
   fetchDailyHistory,
   isPickRefusal,
   pickZone,
+  sendDailyNudge,
   submitDailyPick,
   submitWrittenQuestion,
 } from '../dailyQuestionApi';
@@ -355,6 +358,120 @@ describe('announceDailyPick', () => {
     sendEphemeralBroadcast.mockRejectedValue(failure);
 
     await expect(announceDailyPick(DAY_ID)).rejects.toBe(failure);
+  });
+});
+
+describe('announceDailyNudge', () => {
+  const PARTNER = '00000000-0000-4000-8000-0000000000aa';
+
+  it("sends daily_nudge with the day id alone to the partner's mood topic", async () => {
+    getPartnerId.mockResolvedValue(PARTNER);
+    sendEphemeralBroadcast.mockResolvedValue(undefined);
+
+    await announceDailyNudge(DAY_ID);
+
+    expect(sendEphemeralBroadcast).toHaveBeenCalledTimes(1);
+    expect(sendEphemeralBroadcast).toHaveBeenCalledWith(`mood-updates:${PARTNER}`, 'daily_nudge', {
+      day_id: DAY_ID,
+    });
+  });
+
+  it('sends nothing when there is no partner', async () => {
+    getPartnerId.mockResolvedValue(null);
+
+    await expect(announceDailyNudge(DAY_ID)).resolves.toBeUndefined();
+
+    expect(sendEphemeralBroadcast).not.toHaveBeenCalled();
+  });
+
+  it('throws when the broadcast fails', async () => {
+    const failure = new Error('Unauthorized');
+    getPartnerId.mockResolvedValue(PARTNER);
+    sendEphemeralBroadcast.mockRejectedValue(failure);
+
+    await expect(announceDailyNudge(DAY_ID)).rejects.toBe(failure);
+  });
+});
+
+describe('sendDailyNudge', () => {
+  const failure = (code: string) => ({
+    data: null,
+    error: { message: 'server words', code, details: '', hint: '' },
+  });
+  const spent = () =>
+    dailySnapshot({ state: 'me', nudge: { slot: 'after_pick', spent: true } });
+
+  it('calls send_daily_nudge with the day and returns the snapshot', async () => {
+    rpc.mockResolvedValue({ data: spent(), error: null });
+
+    await expect(sendDailyNudge(DAY_ID)).resolves.toEqual(spent());
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('send_daily_nudge', { day_id: DAY_ID });
+  });
+
+  it('bounds the request with a timeout signal', async () => {
+    rpc.mockResolvedValue({ data: spent(), error: null });
+
+    await sendDailyNudge(DAY_ID);
+
+    expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+
+  it('refuses offline before any request, with the nudge sentence', async () => {
+    setOnline(false);
+
+    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({
+      code: 'offline',
+      message: 'You are offline. Your nudge needs a connection to send.',
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each(['DQ007', 'DQ008', 'DQ009', 'DQ010', 'P0002'])(
+    'maps the refusal %s to a refused error with the fixed sentence and the cause kept',
+    async (code) => {
+      rpc.mockResolvedValue(failure(code));
+
+      const caught = (await sendDailyNudge(DAY_ID).catch((error: unknown) => error)) as AccountDataError;
+
+      expect(caught).toBeInstanceOf(AccountDataError);
+      expect(caught).toMatchObject({ code: 'refused', message: NUDGE_FAILED_MESSAGE });
+      expect(caught.cause).toMatchObject({ code });
+    }
+  );
+
+  it('says the sentence the card shows', () => {
+    expect(NUDGE_FAILED_MESSAGE).toBe('Your nudge could not be sent.');
+  });
+
+  it('leaves any other server error a transport error', async () => {
+    rpc.mockResolvedValue(failure('XX000'));
+
+    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'transport' });
+  });
+
+  it('leaves a network failure a transport error', async () => {
+    rpc.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'transport' });
+  });
+
+  it('throws an invalid-response error on an answer that is not a snapshot', async () => {
+    rpc.mockResolvedValue({ data: { nope: true }, error: null });
+
+    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('parses a snapshot with and without nudge', async () => {
+    rpc.mockResolvedValue({ data: dailySnapshot(), error: null });
+    await expect(sendDailyNudge(DAY_ID)).resolves.not.toHaveProperty('nudge');
+
+    rpc.mockResolvedValue({ data: { ...dailySnapshot(), nudge: { slot: null, spent: false } }, error: null });
+    await expect(sendDailyNudge(DAY_ID)).resolves.toMatchObject({ nudge: { slot: null, spent: false } });
+
+    rpc.mockResolvedValue({ data: { ...dailySnapshot(), nudge: { slot: 'noon', spent: false } }, error: null });
+    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'invalid-response' });
   });
 });
 

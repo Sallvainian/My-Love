@@ -1,11 +1,17 @@
 /**
  * The sender's five daily kinds, over the wire against the local stack
- * (epic-daily-pushes-and-nudge, story 8.3). Nothing posts a daily push yet (the
- * triggers are stories 5 to 7), so each case posts `{kind, id}` to `send-push`
- * as a trigger will: `daily_question` and `daily_reminder` for a
- * `daily_reminders` row, `daily_nudge` for a `daily_nudges` row, and
- * `daily_partner_picked` and `daily_both_answered` for a `daily_picks` row. The
- * rows are inserted with the service role.
+ * (epic-daily-pushes-and-nudge, story 8.3). The `daily_reminders` triggers exist
+ * (story 8.5), so inserting a reminder row posts `daily_question` (morning) or
+ * `daily_reminder` (evening) to `send-push` itself and the case waits for the
+ * records; a hand post of the same `{kind, id}` is then a replay (`skipped`). The
+ * `daily_picks` triggers exist too (story 8.6), so every pick, the seed's included,
+ * posts `daily_partner_picked` or `daily_both_answered` itself and the pick case waits
+ * for the records, then hand posts the same `{kind, id}` as a replay. The `daily_nudges`
+ * trigger exists too (story 8.7), so each nudge row inserted here posts `daily_nudge`
+ * itself: the case waits for the records, and a nudge to a recipient who switched the
+ * kind off still answers `zeros` to a hand post and lists no device. The rows are
+ * inserted with the service role, which bypasses `send_daily_nudge`'s rules; the
+ * client RPC is `push-daily-nudge.spec.ts`.
  *
  * Asserted: the title, body, sound, badge, `partner-activity` thread and `kind`
  * recorded in `push_requests` (CI cannot reach APNs, so the sender records the
@@ -27,84 +33,44 @@
  * wiring (`SOURCE_COLUMN` to `daily_pick_id`, the `user_local_date` rpc and the
  * compare with `couple_days.day`).
  *
+ * A host-local midnight or 20:00 inside a test's timeout would turn the Daily day or
+ * the nudge slot between the seed and the last assertion, so each test first calls
+ * `waitClearOfDailyTurns`, which waits past the turn (DW-527).
+ *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI); the `api` project runs one worker, so this
  * file and the other push specs never run at once.
  */
-import { randomUUID } from 'node:crypto';
 import type { TypedSupabaseClient } from '../support/factories';
 import { readPairQuestionsByDay, seedPairDays } from '../support/factories/daily-question';
-import { isoDateDaysFromNow } from '../support/helpers/events';
+import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
 import { runPsql } from '../support/helpers/migration-replay';
-import { newToken, postToSender, requestsFor } from '../support/helpers/push-requests';
-import { createOutsiderClient, deleteOutsider } from '../support/helpers/rls-security';
+import {
+  awaitRequests,
+  createParty as createThrowawayParty,
+  dailyPayload,
+  link,
+  postKindToSender,
+  registerDevice,
+  requestsFor,
+  zeros,
+  type Party,
+} from '../support/helpers/push-requests';
 import { test, expect } from '../support/merged-fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
-const zeros = { sent: 0, recorded: 0, skipped: 0, failed: 0, gone: 0 };
-
-/** What a daily push records: the `partner-activity` thread, the kind, the badge (0: no love notes) and a sound or none. */
-const dailyPayload = (kind: string, title: string, body: string, sound?: 'default') => ({
-  kind,
-  aps: { alert: { title, body }, 'thread-id': 'partner-activity', badge: 0, ...(sound ? { sound } : {}) },
-});
+type Cleanup = { defer: (name: string, fn: () => Promise<unknown>) => void };
 
 test.describe('Daily push sender', () => {
-  async function createParty(
-    supabaseAdmin: TypedSupabaseClient,
-    cleanup: { defer: (name: string, fn: () => Promise<unknown>) => void },
-    role: string
-  ) {
-    const account = await createOutsiderClient(supabaseAdmin, `dailypush-${role}`);
-    cleanup.defer(`delete throwaway account ${role}`, () => deleteOutsider(account));
-    const name = `Daily ${role.toUpperCase()} ${randomUUID().slice(0, 6)}`;
-    const { error } = await account.client
-      .from('users')
-      .update({ display_name: name, updated_at: new Date().toISOString() })
-      .eq('id', account.userId);
-    expect(error, `name ${role}`).toBeNull();
-    return { ...account, name };
-  }
-
-  type Party = Awaited<ReturnType<typeof createParty>>;
-
-  async function registerDevice(party: Party, environment: 'sandbox' | 'production') {
-    const token = newToken();
-    const { error } = await party.client.rpc('register_push_device', { p_token: token, p_environment: environment });
-    expect(error).toBeNull();
-    return token;
-  }
-
-  async function link(supabaseAdmin: TypedSupabaseClient, from: Party, to: Party) {
-    const { data, error } = await from.client
-      .from('partner_requests')
-      .insert({ from_user_id: from.userId, to_user_id: to.userId, status: 'pending' })
-      .select('id')
-      .single();
-    expect(error).toBeNull();
-    expect((await to.client.rpc('accept_partner_request', { p_request_id: data!.id })).error).toBeNull();
-    const { data: users } = await supabaseAdmin
-      .from('users')
-      .select('id, partner_id')
-      .in('id', [from.userId, to.userId]);
-    expect(Object.fromEntries(users!.map((u) => [u.id, u.partner_id]))).toEqual({
-      [from.userId]: to.userId,
-      [to.userId]: from.userId,
-    });
-  }
-
-  async function post(supabaseAdmin: TypedSupabaseClient, kind: string, id: string) {
-    const response = await postToSender(supabaseAdmin, { kind, id });
-    expect(response.status, kind).toBe(200);
-    return response.json();
-  }
+  const createParty = (supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup, role: string) =>
+    createThrowawayParty(supabaseAdmin, cleanup, 'dailypush', 'Daily', role);
 
   /**
    * A linked pair with devices (Alice one, Bob two) and its days seeded: three past
    * days both picked, yesterday absent, today with Alice's pick only.
    */
-  async function setUpPair(supabaseAdmin: TypedSupabaseClient, cleanup: Parameters<typeof createParty>[1]) {
+  async function setUpPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup) {
     const alice = await createParty(supabaseAdmin, cleanup, 'a');
     const bob = await createParty(supabaseAdmin, cleanup, 'b');
     await link(supabaseAdmin, alice, bob);
@@ -136,7 +102,8 @@ test.describe('Daily push sender', () => {
   test('[P0] a morning reminder, an evening partner reminder and a nudge record their copy for the recipient\'s devices only; an off switch records nothing for that kind and person', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     const { alice, bob, aliceDevice, bobPhone, bobTablet, today, asked, dayId } = await setUpPair(
       supabaseAdmin,
       cleanup
@@ -163,8 +130,8 @@ test.describe('Daily push sender', () => {
 
     // ---- 8 AM: Bob gets the question, with no sound ----
     const morning = await addReminder(bob.userId, 'morning');
-    expect(await post(supabaseAdmin, 'daily_question', morning)).toEqual({ ...zeros, recorded: 2 });
-    const morningRows = await requestsFor(supabaseAdmin, morning, 'daily_reminder_id');
+    // The insert's trigger posts it; the sender records both of Bob's devices.
+    const morningRows = await awaitRequests(supabaseAdmin, morning, 'daily_reminder_id', 2);
     expect(morningRows.map((r) => [r.token, r.delivery]).sort()).toEqual(
       [
         [bobPhone, 'recorded'],
@@ -180,23 +147,26 @@ test.describe('Daily push sender', () => {
     // ---- 8 PM, the stored `evening_partner` kind: Alice hears Bob has not, with the default sound ----
     // The variant is the row's kind, which the sender reads and never infers from picks.
     const evening = await addReminder(alice.userId, 'evening_partner');
-    expect(await post(supabaseAdmin, 'daily_reminder', evening)).toEqual({ ...zeros, recorded: 1 });
-    const eveningRows = await requestsFor(supabaseAdmin, evening, 'daily_reminder_id');
+    const eveningRows = await awaitRequests(supabaseAdmin, evening, 'daily_reminder_id', 1);
     expect(eveningRows.map((r) => r.token)).toEqual([aliceDevice]);
     expect(eveningRows[0].payload).toEqual(
       dailyPayload('daily_reminder', `${bob.name} hasn't done their daily`, 'Nudge them before midnight.', 'default')
     );
 
+    // A hand post of what the trigger already posted is a replay for every device.
+    expect(await postKindToSender(supabaseAdmin, 'daily_question', morning)).toEqual({ ...zeros, skipped: 2 });
+    expect(await postKindToSender(supabaseAdmin, 'daily_reminder', evening)).toEqual({ ...zeros, skipped: 1 });
+
     // A reminder posted under the other reminder kind is no push and claims nothing.
-    expect(await post(supabaseAdmin, 'daily_question', evening)).toEqual(zeros);
-    expect(await post(supabaseAdmin, 'daily_reminder', morning)).toEqual(zeros);
+    expect(await postKindToSender(supabaseAdmin, 'daily_question', evening)).toEqual(zeros);
+    expect(await postKindToSender(supabaseAdmin, 'daily_reminder', morning)).toEqual(zeros);
     expect(await requestsFor(supabaseAdmin, morning, 'daily_reminder_id')).toEqual(morningRows);
     expect(await requestsFor(supabaseAdmin, evening, 'daily_reminder_id')).toEqual(eveningRows);
 
     // ---- a nudge from Alice to Bob: Bob's devices only, the default sound ----
     const nudge = await addNudge(alice, bob, 'after_pick');
-    expect(await post(supabaseAdmin, 'daily_nudge', nudge)).toEqual({ ...zeros, recorded: 2 });
-    const nudgeRows = await requestsFor(supabaseAdmin, nudge, 'daily_nudge_id');
+    // The insert's trigger posts it; the sender records both of Bob's devices.
+    const nudgeRows = await awaitRequests(supabaseAdmin, nudge, 'daily_nudge_id', 2);
     expect(nudgeRows.map((r) => r.token).sort()).toEqual([bobPhone, bobTablet].sort());
     for (const row of nudgeRows) {
       expect(row.payload).toEqual(
@@ -204,8 +174,8 @@ test.describe('Daily push sender', () => {
       );
     }
 
-    // A replayed post is skipped for every device.
-    expect(await post(supabaseAdmin, 'daily_nudge', nudge)).toEqual({ ...zeros, skipped: 2 });
+    // A hand post of what the trigger already posted is a replay, skipped for every device.
+    expect(await postKindToSender(supabaseAdmin, 'daily_nudge', nudge)).toEqual({ ...zeros, skipped: 2 });
     expect(await requestsFor(supabaseAdmin, nudge, 'daily_nudge_id')).toEqual(nudgeRows);
 
     // ---- Bob turns the nudge switch off ----
@@ -214,13 +184,12 @@ test.describe('Daily push sender', () => {
 
     // A new nudge to Bob records none and lists no device.
     const blocked = await addNudge(alice, bob, 'evening');
-    expect(await post(supabaseAdmin, 'daily_nudge', blocked)).toEqual(zeros);
+    expect(await postKindToSender(supabaseAdmin, 'daily_nudge', blocked)).toEqual(zeros);
     expect(await requestsFor(supabaseAdmin, blocked, 'daily_nudge_id')).toEqual([]);
 
     // His reminder still records (his other switches are on) ...
     const eveningSelf = await addReminder(bob.userId, 'evening_self');
-    expect(await post(supabaseAdmin, 'daily_reminder', eveningSelf)).toEqual({ ...zeros, recorded: 2 });
-    for (const row of await requestsFor(supabaseAdmin, eveningSelf, 'daily_reminder_id')) {
+    for (const row of await awaitRequests(supabaseAdmin, eveningSelf, 'daily_reminder_id', 2)) {
       expect(row.payload).toEqual(
         dailyPayload('daily_reminder', "You haven't done your daily yet", `${asked} It takes two taps.`, 'default')
       );
@@ -228,18 +197,19 @@ test.describe('Daily push sender', () => {
 
     // ... and so does the nudge he sends to Alice, whose own switch is on.
     const back = await addNudge(bob, alice, 'after_pick');
-    expect(await post(supabaseAdmin, 'daily_nudge', back)).toEqual({ ...zeros, recorded: 1 });
-    const backRows = await requestsFor(supabaseAdmin, back, 'daily_nudge_id');
+    const backRows = await awaitRequests(supabaseAdmin, back, 'daily_nudge_id', 1);
     expect(backRows.map((r) => r.token)).toEqual([aliceDevice]);
     expect(backRows[0].payload).toEqual(
       dailyPayload('daily_nudge', `${bob.name} nudged you`, 'Your 3-day streak needs your pick today.', 'default')
     );
+    expect(await postKindToSender(supabaseAdmin, 'daily_nudge', back)).toEqual({ ...zeros, skipped: 1 });
   });
 
   test('[P0] the pick kinds record under daily_pick_id for the other partner only, drop a late first pick and word a late second pick', async ({
     supabaseAdmin,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    await waitClearOfDailyTurns(testInfo);
     const { alice, bob, aliceDevice, bobPhone, bobTablet, today, dayIds } = await setUpPair(supabaseAdmin, cleanup);
     const twoDaysAgo = isoDateDaysFromNow(-2, new Date());
 
@@ -254,10 +224,10 @@ test.describe('Daily push sender', () => {
       return data!.id;
     }
 
+    // The seed's picks went in by psql with their triggers on, so the sender records them by itself.
     // ---- today's first pick (Alice): Bob's devices hear it, without a sound or a choice ----
     const alicePick = await pickOf(today, alice);
-    expect(await post(supabaseAdmin, 'daily_partner_picked', alicePick)).toEqual({ ...zeros, recorded: 2 });
-    const pickedRows = await requestsFor(supabaseAdmin, alicePick, 'daily_pick_id');
+    const pickedRows = await awaitRequests(supabaseAdmin, alicePick, 'daily_pick_id', 2);
     expect(pickedRows.map((r) => r.token).sort()).toEqual([bobPhone, bobTablet].sort());
     for (const row of pickedRows) {
       expect(row.payload).toEqual(
@@ -265,7 +235,26 @@ test.describe('Daily push sender', () => {
       );
       expect(JSON.stringify(row.payload)).not.toContain('choice');
     }
-    expect(await post(supabaseAdmin, 'daily_partner_picked', alicePick)).toEqual({ ...zeros, skipped: 2 });
+    // A hand post of what the trigger already posted is a replay for every device.
+    expect(await postKindToSender(supabaseAdmin, 'daily_partner_picked', alicePick)).toEqual({ ...zeros, skipped: 2 });
+    expect(await requestsFor(supabaseAdmin, alicePick, 'daily_pick_id')).toEqual(pickedRows);
+
+    // ---- a pick for a day that is not the recipient's date ----
+    // The first pick is dropped: nothing claimed for any device.
+    const latePick = await pickOf(twoDaysAgo, alice);
+    expect(await postKindToSender(supabaseAdmin, 'daily_partner_picked', latePick)).toEqual(zeros);
+    expect(await requestsFor(supabaseAdmin, latePick, 'daily_pick_id')).toEqual([]);
+
+    // The second still sends, with "That day counts." in place of the pick sentence. Today holds
+    // Alice's pick only, so `run` is 0 and the title has no count; wait for it before Bob's pick
+    // today changes `run`.
+    const lateSecond = await pickOf(twoDaysAgo, bob);
+    const lateRows = await awaitRequests(supabaseAdmin, lateSecond, 'daily_pick_id', 1);
+    expect(lateRows.map((r) => r.token)).toEqual([aliceDevice]);
+    expect(lateRows[0].payload).toEqual(
+      dailyPayload('daily_both_answered', 'You both answered', 'That day counts.')
+    );
+    expect(await postKindToSender(supabaseAdmin, 'daily_both_answered', lateSecond)).toEqual({ ...zeros, skipped: 1 });
 
     // ---- today's second pick (Bob): Alice hears both answered; held is 4 and run 1, so the title pins `run` ----
     const inserted = await runPsql(
@@ -275,26 +264,11 @@ test.describe('Daily push sender', () => {
     );
     expect(inserted.code, inserted.stderr).toBe(0);
     const bobPick = await pickOf(today, bob);
-    expect(await post(supabaseAdmin, 'daily_both_answered', bobPick)).toEqual({ ...zeros, recorded: 1 });
-    const bothRows = await requestsFor(supabaseAdmin, bobPick, 'daily_pick_id');
+    const bothRows = await awaitRequests(supabaseAdmin, bobPick, 'daily_pick_id', 1);
     expect(bothRows.map((r) => r.token)).toEqual([aliceDevice]);
     expect(bothRows[0].payload).toEqual(
       dailyPayload('daily_both_answered', '1 day in a row', `You both answered. See ${bob.name}'s pick.`)
     );
-
-    // ---- a pick for a day that is not the recipient's date ----
-    // The first pick is dropped: nothing claimed for any device.
-    const latePick = await pickOf(twoDaysAgo, alice);
-    expect(await post(supabaseAdmin, 'daily_partner_picked', latePick)).toEqual(zeros);
-    expect(await requestsFor(supabaseAdmin, latePick, 'daily_pick_id')).toEqual([]);
-
-    // The second still sends, with "That day counts." in place of the pick sentence.
-    const lateSecond = await pickOf(twoDaysAgo, bob);
-    expect(await post(supabaseAdmin, 'daily_both_answered', lateSecond)).toEqual({ ...zeros, recorded: 1 });
-    const lateRows = await requestsFor(supabaseAdmin, lateSecond, 'daily_pick_id');
-    expect(lateRows.map((r) => r.token)).toEqual([aliceDevice]);
-    expect(lateRows[0].payload).toEqual(
-      dailyPayload('daily_both_answered', '1 day in a row', 'You both answered. That day counts.')
-    );
+    expect(await postKindToSender(supabaseAdmin, 'daily_both_answered', bobPick)).toEqual({ ...zeros, skipped: 1 });
   });
 });

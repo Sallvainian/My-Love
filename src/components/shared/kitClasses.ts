@@ -56,6 +56,17 @@ export const DIALOG_SURFACE =
 export const DIALOG_PANEL = `${DIALOG_SURFACE} p-5`;
 export const DIALOG_TITLE = 'text-lg font-semibold text-ink';
 
+/**
+ * A bottom sheet's scrim and panel (the write-tomorrow and nudge sheets): the
+ * scrim clears the top, right and left safe-area insets, and the panel clears
+ * the bottom one, so nothing sits under the notch, the home indicator or the
+ * iPhone Duo's side column. The sheet adds no animation of its own.
+ */
+export const SHEET_SCRIM =
+  'fixed inset-0 z-50 flex items-end justify-center bg-black/50 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]';
+export const SHEET_PANEL =
+  'flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-t-[28px] bg-card px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] outline-hidden';
+
 const PILL =
   'flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-5 text-[15px] font-semibold transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50';
 export const PRIMARY_BUTTON = `${PILL} bg-fill text-white focus-visible:ring-accent`;

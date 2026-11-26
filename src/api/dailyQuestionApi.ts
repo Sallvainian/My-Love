@@ -34,9 +34,17 @@
  * oldest day in hand). `[]` means nothing to show, unlinked included. Online-only
  * and throwing, as above.
  *
+ * `sendDailyNudge` sends the caller's nudge for a day (`send_daily_nudge`, AD-17)
+ * and answers the day's snapshot, whose `nudge.spent` is then true. Online-only
+ * and throwing, as above. A refusal the server raises for good (`DQ007` to
+ * `DQ010`, `P0002`) is `AccountDataError('refused', NUDGE_FAILED_MESSAGE)`, the
+ * server error kept as `cause`; any other failure is a transport error from
+ * `toAccountDataError`, and the view shows `NUDGE_FAILED_MESSAGE` for both.
+ *
  * `announceDailyPick` tells the partner's open Daily that a day changed: a
  * `daily_pick { day_id }` broadcast on their `mood-updates:<uid>` topic, never
  * a choice. It throws when the broadcast fails; the caller decides.
+ * `announceDailyNudge` does the same with `daily_nudge { day_id }`.
  *
  * @module api/dailyQuestionApi
  */
@@ -51,7 +59,7 @@ import {
 import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { isOnline, isPostgrestError, logSupabaseError } from './errorHandlers';
 import { getPartnerId, supabase } from './supabaseClient';
-import { DAILY_PICK_EVENT } from './validation/broadcastSchemas';
+import { DAILY_NUDGE_EVENT, DAILY_PICK_EVENT } from './validation/broadcastSchemas';
 import {
   type DailyChoice,
   type DailyDayAnswer,
@@ -72,6 +80,24 @@ const WRITE_CONTEXT = 'DailyQuestionApi.submitWrittenQuestion';
 const FETCH_BY_ID_CONTEXT = 'DailyQuestionApi.fetchDailyDayById';
 const STREAK_CONTEXT = 'DailyQuestionApi.fetchCoupleStreak';
 const HISTORY_CONTEXT = 'DailyQuestionApi.fetchDailyHistory';
+const NUDGE_CONTEXT = 'DailyQuestionApi.sendDailyNudge';
+
+/** Shown when a nudge is refused by the server or fails for any reason but being offline. */
+export const NUDGE_FAILED_MESSAGE = 'Your nudge could not be sent.';
+
+/**
+ * SQLSTATEs `send_daily_nudge` raises for a nudge it refuses for good: `DQ007`
+ * (before the viewer's own pick), `DQ008` (the partner has picked), `DQ009` (not
+ * the partner's current date), `DQ010` (already sent for the slot) and `P0002`
+ * (day not found).
+ */
+const NUDGE_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  'DQ007',
+  'DQ008',
+  'DQ009',
+  'DQ010',
+  'P0002',
+]);
 
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
 const PICK_DATE_MISMATCH = 'DQ001';
@@ -241,6 +267,41 @@ export async function announceDailyPick(dayId: string): Promise<void> {
   const partnerId = await getPartnerId();
   if (!partnerId) return;
   await sendEphemeralBroadcast(`mood-updates:${partnerId}`, DAILY_PICK_EVENT, { day_id: dayId });
+}
+
+/** Tell the partner that `dayId` was nudged: `daily_nudge { day_id }`, as `announceDailyPick` does. */
+export async function announceDailyNudge(dayId: string): Promise<void> {
+  const partnerId = await getPartnerId();
+  if (!partnerId) return;
+  await sendEphemeralBroadcast(`mood-updates:${partnerId}`, DAILY_NUDGE_EVENT, { day_id: dayId });
+}
+
+/**
+ * Send the caller's nudge for `dayId` (their partner has not picked). Returns
+ * the day's snapshot. Throws on any failure; a refusal the server raises for
+ * good is `AccountDataError('refused', NUDGE_FAILED_MESSAGE)`.
+ */
+export async function sendDailyNudge(dayId: string): Promise<DailyDaySnapshot> {
+  refuseOffline('Your nudge', 'send');
+  try {
+    const { data, error } = await supabase
+      .rpc('send_daily_nudge', { day_id: dayId })
+      .abortSignal(requestTimeout());
+    if (error) throw error;
+    const parsed = DailyDaySnapshotSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AccountDataError('invalid-response', 'The daily question answer was not understood.', {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  } catch (error) {
+    if (isPostgrestError(error) && NUDGE_REFUSAL_CODES.has(error.code)) {
+      logSupabaseError(NUDGE_CONTEXT, error);
+      throw new AccountDataError('refused', NUDGE_FAILED_MESSAGE, { cause: error });
+    }
+    throw toAccountDataError(NUDGE_CONTEXT, error);
+  }
 }
 
 /**

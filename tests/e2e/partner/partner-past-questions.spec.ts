@@ -25,6 +25,7 @@ import {
 } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -80,8 +81,8 @@ test.describe('Partner page past questions', () => {
     await page.getByTestId('daily-send-pick').click();
     expect((await ownPick).status).toBe(200);
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
-    // The writer's sheet would cover the dock.
-    if (workerIsWriter) await page.getByTestId('daily-write-decline').click();
+    // The first picker's sheet (the writer's write sheet, anyone else's nudge sheet) would cover the dock.
+    await closeAfterPickSheet(page, workerIsWriter, 'decline');
 
     const questions = await readPairQuestionsByDay(supabaseAdmin, pair);
     const todayQuestion = questions.find((q) => q.day === today);

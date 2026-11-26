@@ -31,11 +31,13 @@ import { test, expect } from '../../support/merged-fixtures';
 import {
   clearPairDays,
   readPairDayIds,
+  readPairDayWriter,
   readPairQuestionTexts,
   setPairDaysCreatedAt,
 } from '../../support/factories/daily-question';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { readStore, signedInUserId } from '../../support/helpers/indexed-db';
 import { goOffline } from '../../support/helpers/offline';
 import {
@@ -175,6 +177,11 @@ test.describe('Daily question: an offline pick is sent when the connection retur
     });
     await partnerPage.getByTestId('daily-send-pick').click();
     expect((await partnerPick).status).toBe(200);
+    // The partner picked first, online: their page meets the sheet that follows.
+    await closeAfterPickSheet(
+      partnerPage,
+      (await readPairDayWriter(supabaseAdmin, pair)) === pair.partnerId
+    );
     expect((await ownReReadOne).status).toBe(200);
     await expect(page.getByTestId('daily-partner-status')).toContainText('has picked');
 

@@ -18,8 +18,9 @@
  * - the five daily kinds (story 8.3, push-copy.md): `daily_partner_picked` and
  *   `daily_both_answered` post a `daily_picks` id, `daily_nudge` a
  *   `daily_nudges` id, `daily_question` and `daily_reminder` a
- *   `daily_reminders` id. The sender knows them a deploy ahead of the triggers
- *   (stories 5 to 7), so a post for them is accepted now and nothing posts yet.
+ *   `daily_reminders` id. The sender knew them a deploy ahead of the triggers:
+ *   `daily_reminders` posts the reminder kinds since story 8.5 and `daily_picks`
+ *   the two pick kinds since story 8.6, and `daily_nudges` the nudge since story 8.7.
  *
  * Split out of `index.ts` so `deno test` can drive it with a fake database
  * and a fake APNs client.
@@ -57,7 +58,9 @@
  * The posted kind decides the copy and the sender never infers order or
  * variant: a reminder's stored `kind` picks the variant (`daily_question` needs
  * `morning`, `daily_reminder` needs `evening_self` or `evening_partner`), and a
- * posted/stored mismatch is no push, claiming nothing.
+ * posted/stored mismatch is no push, claiming nothing. A pick's stored
+ * `is_second` is held to its posted kind the same way (`daily_partner_picked`
+ * needs false, `daily_both_answered` true).
  *
  * The recipient's current date comes only from `PushDb.getUserLocalDate`
  * (`user_local_date`, 20261125000000_daily_push_sender.sql) called with the
@@ -263,6 +266,8 @@ export interface DailyPickRow {
   id: string;
   day_id: string;
   user_id: string;
+  /** True for the day's second pick: `daily_both_answered` is its kind, `daily_partner_picked` the first's. */
+  is_second: boolean;
 }
 
 export interface DailyNudgeRow {
@@ -418,6 +423,11 @@ async function resolveSource(db: PushDb, kind: PushKind, id: string, atIso: stri
     case 'daily_both_answered': {
       const pick = await db.getDailyPick(id);
       if (!pick) return null;
+      // The posted kind must be the pick's own: a first pick is `daily_partner_picked`, a second
+      // `daily_both_answered`. A mismatch is no push, claiming nothing, so the right post still records.
+      if (pick.is_second !== (kind === 'daily_both_answered')) {
+        return { kind, id, senderId: pick.user_id, recipientId: null, buildPayload: null };
+      }
       const day = await db.getCoupleDay(pick.day_id);
       if (!day) return null;
       // The pair's other member, not users.partner_id; the picker is the sender.

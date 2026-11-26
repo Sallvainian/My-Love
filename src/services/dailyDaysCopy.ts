@@ -15,8 +15,10 @@
  * whatever its tag). `readSavedDailyDay` also gives an untagged entry, so the day saved
  * before the tag still shows offline. Callers never see `partner_id`. A failed server read never
  * reaches this module; an `unlinked` answer is saved as `{}` because the server
- * said there is no day. Sign-out removes the kind with the account's other
- * copies (`deleteAccountCopies`).
+ * said there is no day. `nudge.spent` is kept the same way within one
+ * `nudge.slot` (`keepNudgeSpent`; a different slot is taken as the new answer
+ * has it). Sign-out removes the kind with the account's other copies
+ * (`deleteAccountCopies`).
  *
  * @module services/dailyDaysCopy
  */
@@ -60,6 +62,23 @@ export function keepWriteDone(
 ): DailyDaySnapshot {
   if (!other?.write.done || entry.write.done) return entry;
   return { ...entry, write: { ...entry.write, done: true } };
+}
+
+/**
+ * `entry`, with `nudge.spent` true when `other` (the same day) has it for the
+ * same non-null slot: a nudge once sent stays sent within its slot, so a read
+ * that started before the send cannot enable the button again. A different slot
+ * is taken as `entry` has it (a new slot starts unspent).
+ */
+export function keepNudgeSpent(
+  entry: DailyDaySnapshot,
+  other: DailyDaySnapshot | undefined
+): DailyDaySnapshot {
+  const slot = entry.nudge?.slot ?? null;
+  if (slot === null || entry.nudge?.spent || other?.nudge?.slot !== slot || !other.nudge.spent) {
+    return entry;
+  }
+  return { ...entry, nudge: { slot, spent: true } };
 }
 
 /**
@@ -146,8 +165,9 @@ export async function readSavedDailyHistory(
  * The one merge: `snapshots` (all from successful server answers) into the
  * saved entries, `partnerId` as their tag. Per snapshot the stored entry for
  * its `day_id` wins only when it ranks higher (never moving `write.done` back
- * to false), the tag is always the new one, and every other entry for the same
- * `day` under a different `day_id` is dropped. Returns the entries now saved
+ * to false, nor `nudge.spent` to false within the same slot), the tag is
+ * always the new one, and every other entry for the same `day` under a
+ * different `day_id` is dropped. Returns the entries now saved
  * for those `day_id`s, in order.
  */
 function mergeSnapshots(
@@ -160,9 +180,10 @@ function mergeSnapshots(
     const stored = days[snapshot.day_id]?.snapshot;
     const keepStored =
       stored !== undefined && dailyStateRank(stored.state) > dailyStateRank(snapshot.state);
-    const entry = keepStored ? keepWriteDone(stored, snapshot) : keepWriteDone(snapshot, stored);
-    for (const [dayId, other] of Object.entries(days)) {
-      if (other.snapshot.day === snapshot.day && dayId !== snapshot.day_id) delete days[dayId];
+    const [kept, other] = keepStored ? [stored, snapshot] : [snapshot, stored];
+    const entry = keepNudgeSpent(keepWriteDone(kept, other), other);
+    for (const [dayId, saved] of Object.entries(days)) {
+      if (saved.snapshot.day === snapshot.day && dayId !== snapshot.day_id) delete days[dayId];
     }
     days[snapshot.day_id] = { snapshot: entry, partnerId };
     merged.push(entry);

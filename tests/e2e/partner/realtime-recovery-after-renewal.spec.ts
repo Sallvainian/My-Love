@@ -48,8 +48,9 @@ import { test, expect } from '../../support/merged-fixtures';
 import { getWorkerPairEmails } from '../../support/auth/worker-pool';
 import { TEST_USER_PASSWORD } from '../../support/test-credentials';
 import { closeContext, type Cleanup } from '../../support/fixtures/cleanup';
-import { clearPairDays } from '../../support/factories/daily-question';
+import { clearPairDays, readPairDayWriter } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { resolveOwnPair } from '../../support/helpers/events';
 import { DAILY_DAY_BY_ID_READ, DAILY_DAY_READ, DAILY_PICK_SEND } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
@@ -339,6 +340,12 @@ test.describe('Realtime recovery after the token renews', () => {
       await sender.getByTestId('daily-send-pick').click();
       expect((await sendPick).status).toBe(200);
       expect((await dailyBroadcast).status).toBe(202);
+      // The sender is the first picker: the sheet that follows the pick is closed
+      // before the page goes on to Notes.
+      await closeAfterPickSheet(
+        sender,
+        (await readPairDayWriter(supabaseAdmin, pairIds)) === pairIds.partnerId
+      );
 
       await sender.goto('/notes');
       const messageInput = sender.getByLabel(/love note message input/i);

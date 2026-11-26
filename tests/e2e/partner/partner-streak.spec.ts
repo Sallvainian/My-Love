@@ -24,6 +24,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { clearPairDays, readPairDayWriter } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { findLightSurfaces } from '../../support/helpers/light-surfaces';
 import { navigateTo } from '../../support/helpers/navigation';
 import {
@@ -226,8 +227,9 @@ test.describe('Partner page streak', () => {
     await partnerPage.goto('/daily');
     expect((await partnerRead).status).toBe(200);
 
-    // The day's writer is asked to write tomorrow's question right after their
-    // pick, and the sheet would cover the dock: they say "No thanks".
+    // The first picker meets a sheet right after their pick that would cover the
+    // dock: the day's writer is asked to write tomorrow's question and says "No
+    // thanks"; anyone else is asked whether to nudge and says "Not now".
     const writerPage =
       (await readPairDayWriter(supabaseAdmin, pair)) === pair.userId ? page : partnerPage;
 
@@ -237,7 +239,7 @@ test.describe('Partner page streak', () => {
     await page.getByTestId('daily-send-pick').click();
     expect((await ownPick).status).toBe(200);
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
-    if (writerPage === page) await page.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(page, writerPage === page, 'decline');
 
     await partnerPage.getByTestId('daily-option-that').click();
     const partnerPick = fulfillOn({

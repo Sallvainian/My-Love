@@ -50,6 +50,11 @@
 --     "this" or "that" appears in it. After B's pick it holds one entry, state
 --     both, Different. A NULL auth.uid() is refused. The paging, pair and
 --     Same/Different cases live in 46_daily_history.sql.
+--   * Story 8.7 (20261126020000) added the client RPC send_daily_nudge (the
+--     eighth) and the internal daily_nudge_slot and record_daily_nudge, and the
+--     snapshot's `nudge {slot, spent}`. B calls send_daily_nudge before their own
+--     pick: DQ007, and no daily_nudges row is written. A NULL auth.uid() is
+--     refused. The rules and the trigger live in 50_daily_nudges.sql.
 --
 -- Helpers are declared inline: 00_helpers.sql rolls back before later files run.
 -- ============================================
@@ -59,7 +64,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(122);
+select plan(129);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -218,6 +223,15 @@ select ok(
   'DAILY-015: the seven client RPCs are not executable by anon'
 );
 
+select ok(
+  has_function_privilege('authenticated', 'public.send_daily_nudge(uuid)', 'EXECUTE'),
+  'DAILY-124: the client RPC send_daily_nudge is executable by authenticated'
+);
+select ok(
+  not has_function_privilege('anon', 'public.send_daily_nudge(uuid)', 'EXECUTE'),
+  'DAILY-125: and not by anon'
+);
+
 -- ============================================
 -- Table checks
 -- ============================================
@@ -319,6 +333,11 @@ select throws_ok(
   'Authentication required',
   'DAILY-120: get_daily_history rejects a NULL auth.uid()'
 );
+select throws_ok(
+  $$select public.send_daily_nudge(gen_random_uuid())$$,
+  'Authentication required',
+  'DAILY-126: send_daily_nudge rejects a NULL auth.uid()'
+);
 
 -- ============================================
 -- Unlinked caller
@@ -387,13 +406,18 @@ select is(
 );
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(current_setting('tests.a_res')::jsonb -> 'snapshot') k),
-  array['day', 'day_id', 'my_choice', 'my_picked_at', 'partner_choice', 'question', 'same', 'state', 'write'],
+  array['day', 'day_id', 'my_choice', 'my_picked_at', 'nudge', 'partner_choice', 'question', 'same', 'state', 'write'],
   'DAILY-038: the snapshot carries exactly the AD-16 keys this story ships'
 );
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(current_setting('tests.a_res')::jsonb #> '{snapshot,write}') k),
   array['done', 'mine', 'target_day'],
   'DAILY-039: write carries exactly mine, done and target_day'
+);
+select is(
+  (select array_agg(k order by k) from jsonb_object_keys(current_setting('tests.a_res')::jsonb #> '{snapshot,nudge}') k),
+  array['slot', 'spent'],
+  'DAILY-123: nudge carries exactly slot and spent'
 );
 select is(
   current_setting('tests.a_res')::jsonb #>> '{snapshot,write,done}',
@@ -455,12 +479,26 @@ select throws_ok(
   $$select public.reset_bot_daily_days()$$,
   '42501', null, 'DAILY-112: B is no bot, so B cannot reset the pair''s days'
 );
+select throws_ok(
+  format($$select public.send_daily_nudge(%L)$$, current_setting('tests.day')),
+  'DQ007', null, 'DAILY-127: B cannot nudge before their own pick, though A has picked'
+);
 reset role;
 
 select is(
   (select count(*)::int from public.daily_questions where source_day_id = current_setting('tests.day')::uuid),
   0,
   'DAILY-102: and no question was written from that day'
+);
+select is(
+  (select count(*)::int from public.daily_nudges where day_id = current_setting('tests.day')::uuid),
+  0,
+  'DAILY-128: and no daily_nudges row was written for that day'
+);
+select is(
+  current_setting('tests.b_before')::jsonb #> '{snapshot,nudge}',
+  '{"slot": null, "spent": false}'::jsonb,
+  'DAILY-129: and B''s own snapshot offers B no nudge slot'
 );
 
 select is(

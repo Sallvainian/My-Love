@@ -114,8 +114,12 @@ const db: PushDb = {
     return data;
   },
   async getDailyPick(pickId) {
-    // Never `choice`: the sender has no SELECT on it and no push carries it.
-    const { data, error } = await admin.from('daily_picks').select('id, day_id, user_id').eq('id', pickId).maybeSingle();
+    // Never `choice`: the sender has no SELECT on it and no push carries it. `is_second` it does read.
+    const { data, error } = await admin
+      .from('daily_picks')
+      .select('id, day_id, user_id, is_second')
+      .eq('id', pickId)
+      .maybeSingle();
     if (error) throw new Error(error.message);
     return data;
   },

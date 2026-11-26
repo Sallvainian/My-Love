@@ -1,8 +1,8 @@
 /**
  * moodSyncService.subscribePartnerEvents — the partner event registry
  *
- * One `mood-updates:<uid>` channel carries four events (`PARTNER_EVENTS`:
- * `partner_linked`, `daily_pick`, `new_mood`, `dates_changed`). Each is
+ * One `mood-updates:<uid>` channel carries five events (`PARTNER_EVENTS`:
+ * `partner_linked`, `daily_pick`, `daily_nudge`, `new_mood`, `dates_changed`). Each is
  * validated by `parsePartnerEvent` and fanned out to the subscribers' handler
  * for that event alone. The refcount, the reopen and the identity snapshot are
  * covered by the `moodSyncSubscription*` files; the Realtime fake is in
@@ -157,6 +157,21 @@ describe('subscribePartnerEvents', () => {
     unsubscribe();
   });
 
+  it('delivers daily_nudge to its handler alone, with the day id', async () => {
+    const daily_pick = vi.fn();
+    const daily_nudge = vi.fn();
+    const new_mood = vi.fn();
+    const { channel, unsubscribe } = await join({ daily_pick, daily_nudge, new_mood });
+
+    emitEvent(channel, 'daily_nudge', { day_id: DAY_ID, choice: 'this' });
+
+    expect(daily_nudge).toHaveBeenCalledTimes(1);
+    expect(daily_nudge.mock.calls[0][0]).toStrictEqual({ event: 'daily_nudge', day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+    expect(new_mood).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
   it('strips every key but day_id: a choice on the wire reaches no handler', async () => {
     const daily_pick = vi.fn();
     const { channel, unsubscribe } = await join({ daily_pick });
@@ -225,6 +240,27 @@ describe('subscribePartnerEvents', () => {
       unsubscribe();
     });
 
+    it('for a daily_nudge with a day_id that is not a uuid', async () => {
+      const daily_nudge = vi.fn();
+      const { channel, unsubscribe } = await join({ daily_nudge });
+
+      emitEvent(channel, 'daily_nudge', { day_id: 'not-a-uuid' });
+
+      expect(daily_nudge).not.toHaveBeenCalled();
+      unsubscribe();
+    });
+
+    it('for a daily_nudge while the partner snapshot is null', async () => {
+      getPartnerId.mockResolvedValue(null);
+      const daily_nudge = vi.fn();
+      const { channel, unsubscribe } = await join({ daily_nudge });
+
+      emitEvent(channel, 'daily_nudge', { day_id: DAY_ID });
+
+      expect(daily_nudge).not.toHaveBeenCalled();
+      unsubscribe();
+    });
+
     it('for a daily_pick while the partner snapshot is null', async () => {
       getPartnerId.mockResolvedValue(null);
       const daily_pick = vi.fn();
@@ -257,7 +293,7 @@ describe('subscribePartnerEvents', () => {
       const new_mood = vi.fn();
       const { channel, unsubscribe } = await join({ daily_pick, new_mood });
 
-      emitEvent(channel, 'daily_nudge', { day_id: DAY_ID });
+      emitEvent(channel, 'daily_poke', { day_id: DAY_ID });
 
       expect(daily_pick).not.toHaveBeenCalled();
       expect(new_mood).not.toHaveBeenCalled();

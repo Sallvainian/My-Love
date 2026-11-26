@@ -7,6 +7,7 @@ import {
   clockAnchorAvoidingLeapDay,
   isoBirthdayDaysFromNow,
   isoDateDaysFromNow,
+  msUntilClearOfDailyTurns,
 } from '../../support/helpers/events';
 
 describe('isoDateDaysFromNow', () => {
@@ -226,5 +227,56 @@ describe('isoBirthdayDaysFromNow', () => {
   it('refuses a 29 February birthday', () => {
     const anchor = new Date(2028, 1, 24, 12);
     expect(() => isoBirthdayDaysFromNow(5, 31, anchor)).toThrow(/29 February/);
+  });
+});
+
+// Explicit `now` values under Vitest's pinned America/New_York, as for `clockAnchor`.
+describe('msUntilClearOfDailyTurns', () => {
+  it('does not wait on a clear clock', () => {
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 14), 60_000)).toBe(0);
+  });
+
+  it('waits until 10 s past local midnight when the test could cross it', () => {
+    const ms = msUntilClearOfDailyTurns(new Date(2026, 10, 26, 23, 59, 30), 60_000);
+    expect(ms).toBe(40_000);
+    expect(new Date(new Date(2026, 10, 26, 23, 59, 30).getTime() + ms)).toEqual(
+      new Date(2026, 10, 27, 0, 0, 10)
+    );
+  });
+
+  it('waits until 10 s past 20:00 when the test could cross it', () => {
+    const now = new Date(2026, 10, 26, 19, 58, 30);
+    const ms = msUntilClearOfDailyTurns(now, 120_000);
+    expect(ms).toBe(100_000);
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(2026, 10, 26, 20, 0, 10));
+  });
+
+  it('still waits just after a turn, until the 10 s mark', () => {
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 20, 0, 4), 60_000)).toBe(6_000);
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 27, 0, 0, 4), 60_000)).toBe(6_000);
+  });
+
+  it('does not wait once 10 s past a turn', () => {
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 20, 0, 10), 60_000)).toBe(0);
+  });
+
+  it('does not wait for a turn beyond the window', () => {
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 19, 57), 60_000)).toBe(0);
+  });
+
+  it('finds the wall-clock midnight on the spring-forward day', () => {
+    // 8 March 2026: 02:00 is skipped in New York, midnight and 20:00 still exist.
+    const now = new Date(2026, 2, 7, 23, 59, 30);
+    expect(msUntilClearOfDailyTurns(now, 60_000)).toBe(40_000);
+    const evening = new Date(2026, 2, 8, 19, 59, 30);
+    expect(msUntilClearOfDailyTurns(evening, 60_000)).toBe(40_000);
+  });
+
+  it('finds the wall-clock turns on the fall-back day', () => {
+    // 1 November 2026 has 25 hours; the turns are still the wall-clock 20:00 and 00:00.
+    const evening = new Date(2026, 10, 1, 19, 59, 30);
+    expect(msUntilClearOfDailyTurns(evening, 60_000)).toBe(40_000);
+    const night = new Date(2026, 10, 1, 23, 59, 30);
+    expect(msUntilClearOfDailyTurns(night, 60_000)).toBe(40_000);
   });
 });

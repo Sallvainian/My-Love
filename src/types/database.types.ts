@@ -1172,6 +1172,10 @@ export type Database = {
         Args: { at: string; day_id: string; viewer: string }
         Returns: Json
       }
+      daily_nudge_slot: {
+        Args: { at: string; sender: string }
+        Returns: string
+      }
       decline_partner_request: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -1180,6 +1184,7 @@ export type Database = {
         Args: { time_zone: string; utc_offset_minutes: number }
         Returns: string
       }
+      enqueue_daily_reminders: { Args: { at: string }; Returns: number }
       find_partner_by_email: {
         Args: { p_email: string }
         Returns: {
@@ -1214,6 +1219,10 @@ export type Database = {
       mark_love_notes_read: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      record_daily_nudge: {
+        Args: { at: string; day_id: string; viewer: string }
+        Returns: Json
       }
       record_daily_pick: {
         Args: {
@@ -1255,6 +1264,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      send_daily_nudge: { Args: { day_id: string }; Returns: Json }
       submit_daily_pick: {
         Args: {
           choice: string

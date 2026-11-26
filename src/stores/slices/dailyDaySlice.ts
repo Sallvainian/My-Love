@@ -67,6 +67,16 @@
  * same partner clear nothing, and an identity change (`userId`/
  * `authSessionVersion`) forgets the last id.
  *
+ * A nudge (AD-13, AD-16, AD-17): `sendDailyNudge` sends it for the shown day and
+ * merges the returned snapshot (whose `nudge.spent` is then true) like
+ * `submitWrittenQuestion`, then announces it on the partner's channel
+ * (`announceDailyNudge`, fire-and-forget, a failure only logged). A refusal or
+ * any failed request throws, announces nothing and starts `refreshDailyDay` for
+ * that day, so the button follows the server; offline throws with no request
+ * and no re-read. `nudge.spent` never moves back to false within one
+ * `nudge.slot` (`keepNudgeSpent`, in `mergeAnswer` and the copy), so a read
+ * that started before the send cannot enable the button again.
+ *
  * The couple's streak and past questions live in the streak and history
  * slices; `submitDailyPick` and the queue drain re-read the streak
  * (`void loadCoupleStreak()`) after each pick the server confirmed, once the
@@ -78,6 +88,7 @@ import { AccountDataError } from '../../services/accountDataError';
 import {
   DAILY_DAYS_COPY_KIND,
   dailyStateRank,
+  keepNudgeSpent,
   keepWriteDone,
   mergeDailyDay,
   readSavedDailyDay,
@@ -99,11 +110,13 @@ import {
   type DailyChoice,
   type DailyDayAnswer,
   type DailyDaySnapshot,
+  announceDailyNudge,
   announceDailyPick,
   fetchDailyDay,
   fetchDailyDayById,
   isPickRefusal,
   pickZone,
+  sendDailyNudge as sendDailyNudgeRequest,
   submitDailyPick as submitDailyPickRequest,
   submitWrittenQuestion as submitWrittenQuestionRequest,
 } from '../../api/dailyQuestionApi';
@@ -145,8 +158,10 @@ export interface DailyDaySlice {
    * - the request's own error otherwise.
    * Without a connection it queues the pick (no request) and resolves; a queue
    * write failure throws.
+   * Resolves with the answer it stored, or `undefined` when it queued the pick
+   * or the session changed before the answer was stored.
    */
-  submitDailyPick: (choice: DailyChoice) => Promise<void>;
+  submitDailyPick: (choice: DailyChoice) => Promise<DailyDayAnswer | undefined>;
   /**
    * Send the account's pending queued picks, oldest first, under
    * `PICK_QUEUE_LOCK`. Never throws; does nothing signed out or offline.
@@ -158,6 +173,14 @@ export interface DailyDaySlice {
    * shown, and otherwise the request's own error (`AccountDataError`).
    */
   submitWrittenQuestion: (thisText: string, thatText: string) => Promise<void>;
+  /**
+   * Nudge the partner about the shown day and store the answer, then announce
+   * it. Throws a plain `Error` when signed out or with no day shown, and
+   * otherwise the request's own error (`AccountDataError`): a refusal or a
+   * failed request also starts a re-read of the day (not when offline, which
+   * sends nothing).
+   */
+  sendDailyNudge: () => Promise<void>;
   /**
    * Record that the account declined to write for `dayId` on this device.
    * Never throws: a write failure is logged, and `dailyWriteDeclined` is left
@@ -179,7 +202,8 @@ const PICK_RETRY_MAX_DELAY_MS = 60_000;
 
 /**
  * The answer to keep: `next`, unless it is the same day at an earlier state than
- * `stored`. For the same day `write.done` never goes back to false.
+ * `stored`. For the same day `write.done` never goes back to false, nor
+ * `nudge.spent` within the same `nudge.slot`.
  */
 function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): DailyDayAnswer {
   if (
@@ -191,7 +215,7 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
     const [kept, other] = keepStored
       ? [stored.snapshot, next.snapshot]
       : [next.snapshot, stored.snapshot];
-    return { status: 'ok', snapshot: keepWriteDone(kept, other) };
+    return { status: 'ok', snapshot: keepNudgeSpent(keepWriteDone(kept, other), other) };
   }
   return next;
 }
@@ -533,10 +557,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         isCurrent
       );
       if (!isCurrent()) return;
+      const stored = mergeAnswer(get().dailyDay, merged);
       set({
-        dailyDay: mergeAnswer(get().dailyDay, merged),
+        dailyDay: stored,
         dailyDayError: null,
       });
+      return stored;
     },
 
     drainQueuedPicks: () => {
@@ -597,6 +623,45 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       set({
         dailyDay: mergeAnswer(get().dailyDay, merged),
         dailyDayError: null,
+      });
+    },
+
+    sendDailyNudge: async () => {
+      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+      if (!requestedBy) throw new Error('You must be signed in to send a nudge');
+      const isCurrent = () =>
+        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+
+      const shown = get().dailyDay;
+      if (shown?.status !== 'ok') throw new Error('There is no day to nudge about yet');
+      const dayId = shown.snapshot.day_id;
+
+      let snapshot: DailyDaySnapshot;
+      try {
+        snapshot = await sendDailyNudgeRequest(dayId);
+      } catch (error) {
+        // Offline sent nothing, so there is nothing to re-read; any other
+        // failure may mean the day moved on (the partner picked): look.
+        const offline = error instanceof AccountDataError && error.code === 'offline';
+        if (!offline && isCurrent()) void get().refreshDailyDay(dayId);
+        throw error;
+      }
+      if (!isCurrent()) return;
+      const partnerId = await mergePartnerId(get, requestedBy);
+      if (!isCurrent()) return;
+      const merged = await mergeDailyDay(
+        requestedBy,
+        { status: 'ok', snapshot },
+        partnerId,
+        isCurrent
+      );
+      if (!isCurrent()) return;
+      // Only when that day is still the one on screen: a re-read may have moved on.
+      showIfOnScreen(snapshot, merged);
+      // Tell the partner's open Daily, without waiting for it: the nudge is
+      // confirmed and stays shown whatever the broadcast does.
+      void announceDailyNudge(snapshot.day_id).catch((error: unknown) => {
+        console.error('[DailyQuestion] Could not announce the nudge:', error);
       });
     },
 

@@ -55,6 +55,7 @@ describe('usePartnerStreakListener', () => {
     expect(handlers.daily_pick).toBeTypeOf('function');
     expect(handlers.partner_linked).toBeTypeOf('function');
     expect(handlers.onStatus).toBeTypeOf('function');
+    expect(handlers.daily_nudge).toBeUndefined();
     expect(handlers.new_mood).toBeUndefined();
     expect(handlers.dates_changed).toBeUndefined();
   });

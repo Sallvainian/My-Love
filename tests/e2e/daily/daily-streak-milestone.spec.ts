@@ -36,6 +36,7 @@ import {
 } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { navigateTo } from '../../support/helpers/navigation';
@@ -212,7 +213,7 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
     await log.step('The worker picks and waits; the partner picks second');
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
     await pick(partner, 'that');
 
     await log.step('The partner sees the +1 screen, held 25, then its button opens the milestone');
@@ -244,7 +245,7 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
   }) => {
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
 
     await log.step('The worker leaves Daily; the partner finishes the day');
     await navigateTo(own, 'home');
@@ -269,7 +270,7 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
   }) => {
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
     await pick(partner, 'that');
     await expectStreakUp(partner, { otherName: ownName, button: 'Continue' });
 
@@ -290,7 +291,7 @@ test.describe('Daily: every 25 days the milestone screen shows its badge', () =>
   }) => {
     await pick(own, 'this');
     await expect(own.getByTestId('daily-waiting')).toBeVisible();
-    if (ownIsWriter) await own.getByTestId('daily-write-decline').click();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
 
     await log.step('The worker leaves Daily; the partner finishes the day; the worker comes back');
     await navigateTo(own, 'home');

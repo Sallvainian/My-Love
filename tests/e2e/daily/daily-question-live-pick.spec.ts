@@ -22,10 +22,12 @@ import { log } from '@seontechnologies/playwright-utils';
 import { test, expect } from '../../support/merged-fixtures';
 import {
   clearPairDays,
+  readPairDayWriter,
   readPairQuestionTexts,
 } from '../../support/factories/daily-question';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveWorkerPairIds } from '../../support/factories/events';
+import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import {
   DAILY_DAY_BY_ID_READ,
   DAILY_DAY_READ,
@@ -141,6 +143,7 @@ test.describe('Daily question: a partner pick shows live', () => {
     await page.getByTestId('daily-send-pick').click();
     expect((await ownPick).status).toBe(200);
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
+    await closeAfterPickSheet(page, (await readPairDayWriter(supabaseAdmin, pair)) === pair.userId);
 
     expect((await partnerReReadOne).status).toBe(200);
     await expect(partnerPage.getByTestId('daily-partner-status')).toContainText('has picked');
