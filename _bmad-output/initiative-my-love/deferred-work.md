@@ -4526,6 +4526,7 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes
 severity: low
 reason: record_daily_nudge and the snapshot key the limit on (from_user, sender_local_date, slot) and require only user_local_date(partner, at) = the day (AD-17 as written). With A on UTC and B in New York, at 2030-09-11 02:00 UTC A (picked 09-10, B not) gets slot after_pick for 09-10, unspent, so a third nudge about 09-10 lands and A's 09-11 after_pick slot is spent before 09-11's question. Real low defect, deferred because it needs partners in different zones and a nudge after the sender's midnight, and the fix (also requiring the sender's own date to be the day, or keying on day_id) changes AD-17's rule, which is the architect's or owner's call (review 2026-11-26: blind-hunter, edge-case-hunter, intent-alignment).
 status: open
+progress: 2026-11-26 the owner superseded this entry's decision: backlog story 6 keys the limit as one nudge per sender per daily question and removes the two slots. Do not build the per-question-day migration from the decision line; story 6 closes this entry.
 decision: 2026-11-26 per-question-day — the owner chose the standard practice: key the nudge limit on the day being nudged about, (from_user, day_id, slot), instead of (from_user, sender_local_date, slot), so crossing the sender's midnight neither adds a nudge about the old day nor spends the new day's slot. A migration changes record_daily_nudge, the unique key and the snapshot's spent read; AD-17 is updated to match.
 
 ### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the
@@ -4561,6 +4562,7 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-scre
 severity: low
 reason: keepNudgeSpent keeps a stored {after_pick, spent: true} over a later {after_pick, spent: false} for the same day_id. With the sender far ahead of the partner (UTC+9 against UTC-5) and the day still on screen after the sender's midnight, the server opens a fresh after_pick slot on the sender's new date for the same day, and the button stays greyed. Same root cause as story 8.7's deferred sender-date crossing (AD-17 keys the limit on the sender's date); the snapshot carries no date to tell the two slots apart (review 2026-11-26: blind-hunter).
 status: open
+progress: 2026-11-26 superseded with DW-532: backlog story 6 removes the slots, so the client's per-slot spent rule goes with them; story 6 closes this entry.
 decision: 2026-11-26 follows-DW-532 — fixed by DW-532's per-question-day key: the client already keeps spent per (day_id, slot), which then matches the server.
 
 ### DW-537: After a P0002 refusal (the pair changed) the nudge's re-read of the same day_id fails too, so the stale waiting card keeps an enabled button that fails on every tap.
@@ -4587,6 +4589,7 @@ source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-scre
 severity: low
 reason: requestTimeout aborts the client request; the row and its trigger post may already be committed. The card shows NUDGE_FAILED_MESSAGE, and the re-read then greys the button (spent), so the line and the state disagree. Real low defect, deferred because it needs a timeout after commit; the fix needs a rule for when the re-read overrides the line that the intent does not give (review 2026-11-26: edge-case-hunter).
 status: open
+progress: 2026-11-26 the owner put this rule into backlog story 6 (criterion 12), on the after-answer prompt, since the waiting card loses its button; story 6 closes this entry.
 decision: 2026-11-26 unknown-is-not-failed — the owner left the rule to standard practice: a send that times out or fails on the network is unknown, not failed. Show no line at first and re-read the day; if the re-read has the slot spent, show it as sent (button grey, no line); if not, show NUDGE_FAILED_MESSAGE and leave the button enabled (a retry cannot double-send: one nudge per slot is a unique key). A server refusal (DQ007 to DQ010, P0002) keeps today's behaviour.
 
 ### DW-540: The 20:00 re-read uses the device's clock while the server's slot uses the stored zone, which differ when the same account reads Daily from a second device in another zone.
