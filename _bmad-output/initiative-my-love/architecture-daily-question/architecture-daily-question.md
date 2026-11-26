@@ -9,7 +9,7 @@ status: final
 created: '2026-11-05'
 updated: '2026-11-25'
 binds: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, C1, C2, C3, C4]
-sources: ['_bmad-output/initiative-my-love/initiative-my-love.md', '_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md', 'AGENTS.md', 'https://claude.ai/artifact/8wnGn8SjpqJwSckSUVBaEh (notifications screen)', '_bmad-output/initiative-my-love/tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md']
+sources: ['_bmad-output/initiative-my-love/initiative-my-love.md', '_bmad-output/initiative-my-love/brainstorm-mood-partner-reasons-to-open/brainstorm-mood-partner-reasons-to-open.md', 'AGENTS.md', 'https://claude.ai/artifact/8wnGn8SjpqJwSckSUVBaEh (notifications screen)', '_bmad-output/initiative-my-love/tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md', '_bmad-output/initiative-my-love/tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge.md', '_bmad-output/initiative-my-love/tickets/epic-daily-pushes-and-nudge/push-copy.md']
 ---
 
 # Architecture Spine: Daily Question
@@ -21,7 +21,7 @@ sources: ['_bmad-output/initiative-my-love/initiative-my-love.md', '_bmad-output
 | Layer | Lives in | Holds |
 | --- | --- | --- |
 | View | `src/components/DailyQuestion/`, the rebuilt Partner page (new folder, epic 7) | Renders slice state; no Supabase calls |
-| State | `src/stores/slices/dailyQuestionSlice.ts` | Day snapshots, own queued pick, streak snapshot, queue drain |
+| State | `src/stores/slices/dailyDaySlice.ts`, `dailyStreakSlice.ts`, `dailyHistorySlice.ts` (epic 8 story 1 splits `dailyQuestionSlice.ts`) | Day: day snapshots, own queued pick, queue drain, write prompt, nudge. Streak: streak snapshot, celebration claims. History: past questions and their paging |
 | Client services | `src/api/dailyQuestionApi.ts`, `src/services/pickQueue.ts`, `localCopy` kinds | Client RPC calls, outbox, cached projections |
 | Server projections | SQL functions in `supabase/migrations/` | Assignment, pick gate, snapshot, streak, due reminders |
 | Facts | Tables in `public` with RLS | Questions, days, picks, nudges, reminders, zones |
@@ -31,8 +31,12 @@ None of this touches Home's bundled daily message (`DailyMessage/`, `messagesSli
 
 ```mermaid
 flowchart TD
-  V[Views] --> S[dailyQuestionSlice]
-  S --> A[api + pickQueue]
+  V[Views] --> SD[dailyDaySlice]
+  V --> SS[dailyStreakSlice]
+  V --> SH[dailyHistorySlice]
+  SD --> A[api + pickQueue]
+  SS --> A
+  SH --> A
   A --> R[client RPCs]
   A --> B[broadcast registry]
   R --> I[internal functions]
@@ -66,7 +70,7 @@ Arrows point the only way a dependency may run. Views never call the API directl
 
 - **Binds:** epics 6, 7, 8
 - **Prevents:** pushes and day closure each inventing their own idea of a partner's clock
-- **Rule:** `user_time_zones (user_id pk, time_zone, utc_offset_minutes, effective_zone, reported_at)` holds each user's zone. Only `get_daily_day` writes it, and only when its `reported_at` is newer than the stored one; a `reported_at` later than `now() + 5 min` is clamped to `now()`. A pick never writes it. Only the cron job (AD-9), the streak (AD-7) and the nudge slot (AD-17) read the stored zone; a fetch dates itself with the zone it sends. Closing day `d` uses each partner's zone from their own pick of `d` when that pick exists, and the stored zone otherwise. A user with no row gets no scheduled push, and their days close on UTC.
+- **Rule:** `user_time_zones (user_id pk, time_zone, utc_offset_minutes, effective_zone, reported_at)` holds each user's zone. Only `get_daily_day` writes it, and only when its `reported_at` is newer than the stored one; a `reported_at` later than `now() + 5 min` is clamped to `now()`. A pick never writes it. Only the cron job (AD-9), the streak (AD-7), the nudge slot (AD-17) and `user_local_date` (AD-10, AD-17) read the stored zone; a fetch dates itself with the zone it sends. Closing day `d` uses each partner's zone from their own pick of `d` when that pick exists, and the stored zone otherwise. A user with no row gets no scheduled push, and their days close on UTC.
 
 ### AD-4: One function assigns the day's question
 
@@ -124,8 +128,9 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Prevents:** phone-scheduled notifications that the date reminders' cancel-all deletes, and conditions on the partner's pick that the phone cannot see
 - **Rule:**
   - A named `pg_cron` job, `*/5 * * * *`, calls `enqueue_daily_reminders(at)`. Epic 8's migration creates the extension on hosted, where it is available but not installed, and re-schedules the job by name, which is idempotent. A second named job deletes `cron.job_run_details` rows older than 7 days. Any removal guards `cron.unschedule` with an existence check.
-  - The function considers only users with a linked partner and at least one `push_devices` row. It handles each user in its own exception block, as `notify_push` does. It inserts into `daily_reminders (user_id, kind, local_date, day_id, unique (user_id, local_date, slot))`, where `kind` is `morning | evening_self | evening_partner` and `slot` is `morning` or `evening`.
-  - `morning` is due 08:00–08:30 local while the recipient has not picked. It calls AD-4, so the push can quote the question.
+  - The function considers only users with a linked partner and at least one `push_devices` row. It handles each user in its own exception block, as `notify_push` does. It inserts into `daily_reminders (user_id, kind, local_date, day_id, unique (user_id, local_date, slot))`, where `kind` is `morning | evening_self | evening_partner`, `slot` is `morning` or `evening`, and `day_id` is `not null` and cascades with `couple_days`, so `reset_bot_daily_days` still clears a pair.
+  - Both slots call `assign_couple_day` (AD-4) for the recipient's local date before inserting, so every row has a day: the morning push and `evening_self` quote its question, and the evening's who-has-picked test reads that day's picks.
+  - `morning` is due 08:00–08:30 local while the recipient has not picked.
   - The evening reminder is due 20:00–20:30 local unless both have picked, and the variant is decided per recipient when the row is inserted. `evening_self` ("you haven't done your daily yet", opens Daily) goes when the recipient has not picked. `evening_partner` ("your partner hasn't done their daily", opens Daily's waiting screen to nudge) goes when only the recipient has, and is skipped when the recipient's `evening` nudge slot is already spent (AD-17).
   - A missed window sends nothing. A failed post is not retried (accepted; the signal is `net._http_response` and `cron.job_run_details`).
   - The phone never schedules a daily push, so `reminderIdsToCancel` stays as it is.
@@ -146,7 +151,8 @@ Arrows point the only way a dependency may run. Views never call the API directl
     | `daily_reminders` | `new.kind <> 'morning'` | `daily_reminder` | `daily_reminder_id` | `user_id` |
 
   - The FKs are `on delete cascade`, each `unique` with `token`. The source check names the full column list.
-  - `send-push` never infers order or variant: it reads the posted kind and, for a reminder, the stored `kind`. It drops a `daily_partner_picked` push whose `day` is not the recipient's current date. It sends `daily_both_answered` whenever the day was not closed (AD-7) at the second pick's `picked_at`.
+  - `send-push` never infers order or variant: it reads the posted kind and, for a reminder, the stored `kind`. It drops a `daily_partner_picked` push whose `day` is not the recipient's current date. It sends `daily_both_answered` on every second pick, an offline pick that lands after its day included; a pick is refused unless its own local date is the day (AD-6), so no closed-day test could ever drop one. When the day is not the recipient's current date, the body says "That day counts." in place of "See {Partner}'s pick." (`push-copy.md`). Both rules read the recipient's current date from `user_local_date(user_id, at)` (AD-15), the stored zone or UTC with no row (AD-3), never from a zone worked out in Deno.
+  - `daily_nudge` and `daily_reminder` (both variants) set `aps.sound` to `default`, the sound date reminders play (`REMINDER_SOUND`). `daily_question`, `daily_partner_picked` and `daily_both_answered` carry no `sound`, like every existing push.
   - Each kind has one `push_preferences` column, `boolean not null default true`, named after the kind and mapped in `PREFERENCE_FOR_KIND`. One switch covers both evening variants.
   - Epic 8 ships the sender's new kinds one deploy before the triggers, because the old `POSTED_KINDS` rejects unknown kinds.
   - Epic 10 removes the mood and interaction columns from `push_requests`, the source check and `push_preferences` in two steps: stop reading them and ship, then drop them in a later migration, as `20261104000000_drop_push_preferences_dates.sql` did. Epics 8 and 9 never select a column epic 10 drops.
@@ -163,17 +169,17 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Prevents:** a queued pick overwritten by a refresh, shown as revealed, picked twice, or silently dropped
 - **Rule:**
   - An unsent pick is a row in a new `pick-queue` IndexedDB store, added through `dbSchema.ts` under the IndexedDB rules in AGENTS.md. Each row holds `user_id`, `day_id`, `choice`, `picked_at`, `time_zone`, `utc_offset_minutes` and `failed`, keyed `[user_id, day_id]`, with a `by-user` index, as `note-queue` is.
-  - `dailyQuestionSlice` drains only the signed-in account's rows, oldest first, under `withSyncLock`, on `online` and at start.
+  - `dailyDaySlice` drains only the signed-in account's rows, oldest first, under `withSyncLock`, on `online` and at start.
   - The own pick shown is the server's pick, else the queued row. The pick control is disabled while either exists. A queued pick never goes into a local copy, and the reveal shows only from a server snapshot.
   - The client refuses a pick when the device date is not the shown day's `day`, and re-fetches. A device with no day for today shows that it needs a connection.
   - A server rejection marks the row failed, and the failure is shown. The queue survives sign-out.
 
 ### AD-13: Cached projections are local-copy kinds that only a success overwrites
 
-- **Binds:** R8, R9, R18; epics 6, 7
+- **Binds:** R8, R9, R18, R13; epics 6, 7, 8
 - **Prevents:** an unlinked answer and a failed read both blanking Daily, a feature-private cache, and celebration state clobbered by a refresh
 - **Rule:**
-  - Day snapshots are one `localCopy` kind, a map keyed by `day_id`; today is one entry of it, never a second copy, and the past-question pages merge into it with no cap. Every write of a snapshot to the map goes through one merge rule under a lock. An entry's `state` never moves back (`none` → `me` or `partner` → `both`), nor its `write.done`, so a slow read cannot undo a reveal or reopen the prompt. A server answer for a date drops every other `day_id` saved for that date, whichever partner it was read with, because a relink or `reset_bot_daily_days` gives the date a new day. The streak snapshot is a second kind.
+  - Day snapshots are one `localCopy` kind, a map keyed by `day_id`; today is one entry of it, never a second copy, and the past-question pages merge into it with no cap. Every write of a snapshot to the map goes through one merge rule under a lock. An entry's `state` never moves back (`none` → `me` or `partner` → `both`), nor its `write.done`, nor its `nudge.spent` while `nudge.slot` is unchanged (a new slot starts unspent, and an entry saved without `nudge` reads as no slot), so a slow read cannot undo a reveal, reopen the prompt or re-enable a spent Nudge button. A server answer for a date drops every other `day_id` saved for that date, whichever partner it was read with, because a relink or `reset_bot_daily_days` gives the date a new day. The streak snapshot is a second kind.
   - Both kinds are tagged with the partner they were read with: `partner_id`, on each entry of the map and once on the streak, and `null` when no partner is known. Reading a copy gives only what carries the current partner's tag, so a day or streak tagged with an old partner stays hidden. The one exception is Daily's saved day for the device's date, which also shows an entry tagged `null` or not tagged, so a day saved before tags existed still shows offline. Past questions and the streak hide such data once a partner is known.
   - `get_daily_day(time_zone, utc_offset_minutes, reported_at)` answers `{ status: 'ok', snapshot } | { status: 'unlinked' }` and throws on failure. Only a successful answer writes a copy. `unlinked` shows the invitation to link (R18) and empties the map; `get_couple_streak`'s `unlinked` deletes the streak copy.
   - Celebration state is its own kind, `daily-celebrated { held, milestones }`, written only by the animation. A first read with none stored seeds it from the current snapshot without playing. The +1 animation (R8) and the milestone screen (R9) play only when the snapshot exceeds it, never because a realtime event arrived.
@@ -190,7 +196,7 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Binds:** all new SQL in epics 6–9
 - **Prevents:** a client RPC that takes any pair's ids, an internal function reachable on hosted through its default EXECUTE grant, and a direct PostgREST insert that skips the checks
 - **Rule:**
-  - Internal functions (`effective_zone`, `assign_couple_day`, `visible_daily_picks`, `daily_day_snapshot`, `couple_streak`, `enqueue_daily_reminders`) take the pair, viewer and `at`. Each is `revoke execute … from public, anon, authenticated`; `service_role` keeps EXECUTE, which `send-push` uses.
+  - Internal functions (`effective_zone`, `assign_couple_day`, `visible_daily_picks`, `daily_day_snapshot`, `couple_streak`, `enqueue_daily_reminders`, `user_local_date`) take the pair, viewer and `at`. Each is `revoke execute … from public, anon, authenticated`; `service_role` keeps EXECUTE, which `send-push` uses.
   - Client RPCs (`get_daily_day`, `get_daily_day_by_id`, `get_daily_history`, `submit_daily_pick`, `submit_written_question`, `send_daily_nudge`, `get_couple_streak`, `reset_bot_daily_days`) are `security definer` with `set search_path = ''`. They take no pair, viewer or `at`, and derive the pair from `auth.uid()` and `get_my_partner_id()`. They and `couple_day_in_pair` (AD-14) are the only new entries in FN-GRANT-008.
   - `reset_bot_daily_days()` exists only for the live-site check (epic 6). It deletes the calling user's couple's `couple_days` rows, their picks cascading, and refuses unless the caller's email is `test_email` or `partner_email` in `claude_bot_config`. It is the one path that deletes a pick, and no client code calls it; the check never uses the Supabase secret key.
   - No daily table (`daily_questions`, `couple_days`, `daily_picks`, `daily_nudges`, `daily_reminders`, `user_time_zones`) grants `anon` or `authenticated` any privilege, SELECT included. Every read and write goes through a client RPC. So question text reaches a client only inside a snapshot, and a pending written question stays hidden until its day is assigned.
@@ -207,8 +213,8 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Binds:** R13; epic 8
 - **Prevents:** nudge spam, and a client-only limit that a retry gets around
 - **Rule:**
-  - `send_daily_nudge(day_id)` inserts into `daily_nudges (from_user, to_user, day_id, sender_local_date, slot, unique (from_user, sender_local_date, slot))`.
-  - `slot` is `after_pick` before 20:00 on the sender's clock (stored zone, AD-3) and `evening` from 20:00. A nudge needs the sender's own pick for the day to exist, the partner's not to, and the day to be the recipient's current date.
+  - `send_daily_nudge(day_id)` inserts into `daily_nudges (from_user, to_user, day_id, sender_local_date, slot, unique (from_user, sender_local_date, slot))`; `day_id` is `not null` and cascades with `couple_days`.
+  - `slot` is `after_pick` before 20:00 on the sender's clock (stored zone, AD-3) and `evening` from 20:00. A nudge needs the sender's own pick for the day to exist, the partner's not to, and the day to be the recipient's current date (`user_local_date`, AD-15).
   - Only a tap inserts a nudge: on the after-pick prompt ("Do you want to nudge your partner?") or on the waiting screen's Nudge button. The 8 PM `evening_partner` push only opens the waiting screen. The button greys out once the snapshot's `nudge.spent` is true.
   - The 8 AM push carries no nudge.
 
@@ -249,7 +255,7 @@ erDiagram
   daily_questions ||--o{ couple_days : "asked on"
   couple_days ||--o{ daily_picks : "picked on"
   couple_days ||--o{ daily_nudges : "nudged on"
-  couple_days |o--o{ daily_reminders : "reminds of"
+  couple_days ||--o{ daily_reminders : "reminds of"
   couple_days |o--o{ love_notes : "replied to"
   daily_picks ||--o{ push_requests : source
   daily_nudges ||--o{ push_requests : source
@@ -297,7 +303,7 @@ Deployment does not change. `deploy.yml` applies the migrations (tables, functio
 
 ## Deferred
 
-- **Push copy and badge rules** (epic 8): owned by `send-push/payload.ts`, using the mock-up's notifications screen and AD-7's naming.
+- **Push copy and badge rules** (epic 8): settled in the epic's `push-copy.md` (AD-7's naming, the mock-up's notifications screen, the owner's 2026-11-25 wording) and built in `send-push/payload.ts`.
 - **Renaming `mood-updates:` and `moodSyncService`** (after epic 10): needs a policy change and both partners' clients updated together.
 - **Pool authoring and the size check** (epic 6): content work, with "about 500" checked by a count.
 - **Moving `formatDateKey` out of `calendarHelpers.ts`** (epic 6, before epic 10 deletes the mood calendar).
