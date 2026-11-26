@@ -139,6 +139,29 @@ describe('addDeclinedWriteDay', () => {
     await expect(addDeclinedWriteDay(A, 'd1', current)).rejects.toBe(failure);
   });
 
+  it('throws and writes nothing when the saved list cannot be read', async () => {
+    await writeLocalCopy(A, DAILY_WRITE_DECLINED_KIND, ['d1', 'd2']);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeSpy = vi.spyOn(localCopy, 'writeLocalCopy');
+    const failure = new Error('read failed');
+    vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    await expect(addDeclinedWriteDay(A, 'd3', current)).rejects.toThrow(
+      'The declined write days could not be read'
+    );
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[localCopy] Failed to read daily-write-declined copy:',
+      failure
+    );
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await readDeclinedWriteDays(A)).toEqual(['d1', 'd2']);
+
+    await expect(addDeclinedWriteDay(A, 'd3', current)).resolves.toEqual(['d1', 'd2', 'd3']);
+  });
+
   it('does not wedge the lock after a failed write', async () => {
     const write = vi.spyOn(localCopy, 'writeLocalCopy').mockRejectedValueOnce(new Error('nope'));
     await expect(addDeclinedWriteDay(A, 'd1', current)).rejects.toThrow('nope');

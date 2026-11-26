@@ -19,7 +19,7 @@
 
 import { z } from 'zod/v4';
 import type { CoupleStreak } from '../api/dailyQuestionApi';
-import { readLocalCopy, writeLocalCopy } from './localCopy';
+import { readLocalCopy, readLocalCopyStatus, writeLocalCopy } from './localCopy';
 import { DAILY_CELEBRATED_LOCK, withWaitingLock } from './syncLock';
 
 export const DAILY_CELEBRATED_KIND = 'daily-celebrated';
@@ -46,7 +46,10 @@ export const NO_CELEBRATION: CelebrationClaim = { play: false, previous: null, m
 
 /** The stored value, or `null` when nothing is stored, the read failed or the value is malformed. */
 export async function readCelebrated(userId: string): Promise<Celebrated | null> {
-  const saved = await readLocalCopy<unknown>(userId, DAILY_CELEBRATED_KIND);
+  return parseCelebrated(await readLocalCopy<unknown>(userId, DAILY_CELEBRATED_KIND));
+}
+
+function parseCelebrated(saved: unknown): Celebrated | null {
   const parsed = CelebratedSchema.safeParse(saved);
   return parsed.success ? parsed.data : null;
 }
@@ -61,7 +64,8 @@ export async function readCelebrated(userId: string): Promise<Celebrated | null>
  * the stored held itself with a higher milestone count, a milestone whose +1 was
  * cut short (a lower held is an older answer). Writes only while `isCurrent()`
  * holds (a sign-out in between must not recreate the outgoing account's kind),
- * and answers `NO_CELEBRATION` when it does not. Throws when the write fails.
+ * and answers `NO_CELEBRATION` when it does not, and when the saved value cannot
+ * be read (nothing is written). Throws when the write fails.
  */
 export async function claimCelebration(
   userId: string,
@@ -69,7 +73,9 @@ export async function claimCelebration(
   isCurrent: () => boolean
 ): Promise<CelebrationClaim> {
   return withWaitingLock(DAILY_CELEBRATED_LOCK, async () => {
-    const stored = await readCelebrated(userId);
+    const read = await readLocalCopyStatus<unknown>(userId, DAILY_CELEBRATED_KIND);
+    if (read.status === 'failed') return NO_CELEBRATION;
+    const stored = parseCelebrated(read.status === 'found' ? read.value : null);
     if (!isCurrent()) return NO_CELEBRATION;
     if (stored === null) {
       await writeLocalCopy(userId, DAILY_CELEBRATED_KIND, {
@@ -98,10 +104,10 @@ export async function claimCelebration(
  * Claim the milestone screen for `streak`, under the same lock, just before it
  * shows: `true`, with the streak's count stored as the highest shown, when that
  * count is above the stored one; `false`, with nothing written, when it has been
- * shown already (another tab), nothing is stored, or `isCurrent()` no longer
- * holds (a sign-out, or the view that would show it is gone). So a milestone
- * that showed never shows again, even on a reload at once, and one that cannot
- * show stays owed. Throws when the write fails.
+ * shown already (another tab), nothing is stored, the saved value cannot be read,
+ * or `isCurrent()` no longer holds (a sign-out, or the view that would show it is
+ * gone). So a milestone that showed never shows again, even on a reload at once,
+ * and one that cannot show stays owed. Throws when the write fails.
  */
 export async function claimMilestone(
   userId: string,
@@ -109,7 +115,9 @@ export async function claimMilestone(
   isCurrent: () => boolean
 ): Promise<boolean> {
   return withWaitingLock(DAILY_CELEBRATED_LOCK, async () => {
-    const stored = await readCelebrated(userId);
+    const read = await readLocalCopyStatus<unknown>(userId, DAILY_CELEBRATED_KIND);
+    if (read.status === 'failed') return false;
+    const stored = parseCelebrated(read.status === 'found' ? read.value : null);
     if (!isCurrent()) return false;
     if (stored === null || streak.milestones <= stored.milestones) return false;
     await writeLocalCopy(userId, DAILY_CELEBRATED_KIND, {

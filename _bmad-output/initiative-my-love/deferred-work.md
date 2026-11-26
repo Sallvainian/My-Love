@@ -4151,7 +4151,8 @@ location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/dailyWri
 source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-day-offline-and-invites-an-unlinked-ac-plan.md`
 severity: low
 reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined. The same weakness is in `addDeclinedWriteDay` (`src/services/dailyWriteDeclined.ts:41-53`, story 6.8): `readDeclinedWriteDays` answers `[]` on a failed read (`:27-31`) and the add then writes a list holding only the new day, so earlier "No thanks" days are lost and the write prompt comes back for them (epic 6 retrospective, A2, 2026-11-06). Story 7.9 added a third, `mergeDailyDays`, and removed the 31-day cap: one failed read while a history page is merged now rewrites the whole copy with that page, so every other saved day is gone until its page is read online again. DW-509 is the same root in `claimCelebration`; one `readLocalCopy` variant that tells "absent" from "failed", used by all four merges, closes both (epic 7 retrospective, G2, 2026-11-07).
-status: open
+resolution: `localCopy.ts` gains `readLocalCopyStatus`, which answers `found`, `absent` or `failed` (`readLocalCopy` delegates to it and keeps its behaviour). `mergeDailyDay` and `mergeDailyDays` write nothing on `failed` (`mergeDailyDay` returns the answer as it is); `addDeclinedWriteDay` throws and writes nothing, so the slice's catch leaves the declined list as it was. Unit: `localCopy.test.ts` (`readLocalCopyStatus`), `dailyDaysCopy.test.ts` (both merges) and `dailyWriteDeclined.test.ts`, each failing the IndexedDB read once.
+status: done 2026-11-25
 
 ### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
 origin: spec-deferred b8c1506b047a
@@ -4333,7 +4334,8 @@ location: src/services/dailyCelebrated.ts (claimCelebration)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
 reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it. Story 6 did not add it. Same root as DW-487: one `readLocalCopy` variant closes both (epic 7 retrospective, G2, 2026-11-07).
-status: open
+resolution: `claimCelebration` and `claimMilestone` read through `readLocalCopyStatus` (DW-487's read): on `failed` they write nothing, answering `NO_CELEBRATION` and `false`; absent and malformed values behave as before. Unit: `dailyCelebrated.test.ts`, failing the IndexedDB read once in each claim.
+status: done 2026-11-25
 
 ### DW-510: After an in-session unlink and relink to a different partner, the Partner page shows the previous pair's past questions under the new partner's name until the new history read lands, or indefinitely
 origin: spec-deferred 744eb5a8fd58

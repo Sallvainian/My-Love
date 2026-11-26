@@ -12,7 +12,7 @@
  * @module services/dailyWriteDeclined
  */
 
-import { readLocalCopy, writeLocalCopy } from './localCopy';
+import { readLocalCopy, readLocalCopyStatus, writeLocalCopy } from './localCopy';
 import { DAILY_WRITE_DECLINED_LOCK, withWaitingLock } from './syncLock';
 
 export const DAILY_WRITE_DECLINED_KIND = 'daily-write-declined';
@@ -25,7 +25,10 @@ export const MAX_DECLINED_WRITE_DAYS = 31;
  * is not an array of strings.
  */
 export async function readDeclinedWriteDays(userId: string): Promise<string[]> {
-  const saved = await readLocalCopy<unknown>(userId, DAILY_WRITE_DECLINED_KIND);
+  return parseDeclinedWriteDays(await readLocalCopy<unknown>(userId, DAILY_WRITE_DECLINED_KIND));
+}
+
+function parseDeclinedWriteDays(saved: unknown): string[] {
   if (!Array.isArray(saved)) return [];
   return saved.filter((entry): entry is string => typeof entry === 'string');
 }
@@ -36,7 +39,8 @@ export async function readDeclinedWriteDays(userId: string): Promise<string[]> {
  * keeps the newest `MAX_DECLINED_WRITE_DAYS`. Writes only while `isCurrent()`
  * holds (a sign-out in between must not recreate the outgoing account's kind
  * after `deleteAccountCopies`); otherwise it returns the list it read. Throws
- * when the write fails.
+ * when the write fails, and when the saved list cannot be read (nothing is
+ * written, so a good list is never replaced by this one day).
  */
 export async function addDeclinedWriteDay(
   userId: string,
@@ -44,7 +48,9 @@ export async function addDeclinedWriteDay(
   isCurrent: () => boolean
 ): Promise<string[]> {
   return withWaitingLock(DAILY_WRITE_DECLINED_LOCK, async () => {
-    const days = await readDeclinedWriteDays(userId);
+    const read = await readLocalCopyStatus<unknown>(userId, DAILY_WRITE_DECLINED_KIND);
+    if (read.status === 'failed') throw new Error('The declined write days could not be read');
+    const days = parseDeclinedWriteDays(read.status === 'found' ? read.value : null);
     if (!isCurrent()) return days;
     const next = [...days.filter((id) => id !== dayId), dayId].slice(-MAX_DECLINED_WRITE_DAYS);
     await writeLocalCopy(userId, DAILY_WRITE_DECLINED_KIND, next);
