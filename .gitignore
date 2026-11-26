@@ -166,6 +166,7 @@ _bmad/custom/*
 # `_bmad/custom/.gitignore` for this -- it is not itself tracked.
 _bmad/custom/*.user.toml
 .bmad-loop/policy.toml
+.bmad-loop/profiles/
 
 # Grok CLI (bmad-loop review adapter). Untracked, like .claude/ and _bmad/.
 # `.grok/` holds only hooks/bmad-loop.json, which `bmad-loop init --cli grok`
