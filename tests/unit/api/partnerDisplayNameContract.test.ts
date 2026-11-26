@@ -77,10 +77,14 @@ vi.mock('@supabase/supabase-js', () => ({
       select: (columns: string) => {
         selectedColumns.push(columns);
         return {
-          eq: () => ({
-            single: () => answerRead('single'),
-            maybeSingle: () => answerRead('maybeSingle'),
-          }),
+          eq: () => {
+            const read = {
+              single: () => answerRead('single'),
+              maybeSingle: () => answerRead('maybeSingle'),
+              abortSignal: () => read,
+            };
+            return read;
+          },
         };
       },
     }),

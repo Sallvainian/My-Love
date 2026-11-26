@@ -36,7 +36,6 @@ import {
   dailySnapshot,
   revealSnapshot,
   waitingSnapshot,
-  writerSnapshot,
   DAY_ID,
   KNOWN_PARTNER_ID,
   knownPartnerState,
@@ -130,7 +129,7 @@ describe('loadDailyDay', () => {
     const failure = new AccountDataError('transport', 'boom');
     fetchDailyDay.mockRejectedValue(failure);
 
-    await expect(state().loadDailyDay()).resolves.toBe(false);
+    await state().loadDailyDay();
 
     expect(state().dailyDay).toBeNull();
     expect(state().dailyDayError).toBe('boom');
@@ -291,90 +290,6 @@ describe('loadDailyDay', () => {
 
       expect(state().dailyDayError).toBeNull();
     });
-  });
-});
-
-describe('what loadDailyDay resolves (DW-491)', () => {
-  const saved = (snapshot: ReturnType<typeof dailySnapshot>) => ({
-    [snapshot.day_id]: { ...snapshot, partner_id: null },
-  });
-
-  it('true when the server answered with a day', async () => {
-    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
-
-    await expect(state().loadDailyDay()).resolves.toBe(true);
-  });
-
-  it('true when the server answered unlinked', async () => {
-    fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
-
-    await expect(state().loadDailyDay()).resolves.toBe(true);
-  });
-
-  it('false signed out, with no request', async () => {
-    state().clearAuth();
-
-    await expect(state().loadDailyDay()).resolves.toBe(false);
-    expect(fetchDailyDay).not.toHaveBeenCalled();
-  });
-
-  it('false when the read failed online, though a saved day is shown', async () => {
-    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(writerSnapshot('this')));
-    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
-
-    await expect(state().loadDailyDay()).resolves.toBe(false);
-
-    expect(state().dailyDay).toEqual(ok(writerSnapshot('this')));
-  });
-
-  it('false when the read ran offline and the saved day is shown', async () => {
-    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, saved(writerSnapshot('this')));
-    setOnline(false);
-    fetchDailyDay.mockRejectedValue(
-      new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
-    );
-
-    await expect(state().loadDailyDay()).resolves.toBe(false);
-
-    expect(state().dailyDay).toEqual(ok(writerSnapshot('this')));
-    expect(state().dailyDayError).toBeNull();
-  });
-
-  it('false when the session changed while the request was open', async () => {
-    const request = deferred<ReturnType<typeof ok>>();
-    fetchDailyDay.mockReturnValueOnce(request.promise);
-
-    const load = state().loadDailyDay();
-    state().clearAuth();
-    request.settle(ok(dailySnapshot()));
-
-    await expect(load).resolves.toBe(false);
-  });
-
-  it('a call that joined a running read gets true when the trailing pass stored the answer', async () => {
-    const running = deferred<ReturnType<typeof ok>>();
-    fetchDailyDay.mockReturnValueOnce(running.promise).mockResolvedValueOnce(ok(dailySnapshot()));
-
-    const first = state().loadDailyDay();
-    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
-    const second = state().loadDailyDay();
-    running.fail(new AccountDataError('transport', 'boom'));
-
-    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
-  });
-
-  it('a call that joined a running read gets false when no pass stored an answer', async () => {
-    const running = deferred<ReturnType<typeof ok>>();
-    fetchDailyDay
-      .mockReturnValueOnce(running.promise)
-      .mockRejectedValueOnce(new AccountDataError('transport', 'boom again'));
-
-    const first = state().loadDailyDay();
-    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
-    const second = state().loadDailyDay();
-    running.fail(new AccountDataError('transport', 'boom'));
-
-    await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
   });
 });
 

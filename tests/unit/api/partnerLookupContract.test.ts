@@ -32,6 +32,10 @@ const LONG_AFTER_EVERY_BACKOFF_MS = 5 * PAST_EVERY_BACKOFF_MS;
 /** Queue of answers the stubbed users read returns, one per call. */
 let singleResults: Array<{ data: unknown; error: unknown }> = [];
 let singleCalls = 0;
+/** The signal each users read carried through `.abortSignal(...)`. */
+let abortSignals: AbortSignal[] = [];
+/** When set, a users read stays open until its signal aborts, like a stalled request. */
+let hangUntilAborted = false;
 let sessionResult: { data: { session: unknown }; error: unknown };
 /** Runs as each users read is answered, so a test can end the session mid-read. */
 let onRead: (() => void) | null = null;
@@ -42,6 +46,14 @@ let onRead: (() => void) | null = null;
  * that into PGRST116 (a 406 on the wire), `.maybeSingle()` into a null row.
  */
 async function answerRead(kind: 'single' | 'maybeSingle') {
+  if (hangUntilAborted) {
+    const signal = abortSignals.at(-1);
+    await new Promise<void>((resolve) => {
+      if (signal?.aborted) resolve();
+      signal?.addEventListener('abort', () => resolve());
+    });
+    return { data: null, error: { code: '', message: 'AbortError: signal timed out' } };
+  }
   const result = singleResults[singleCalls] ?? singleResults.at(-1);
   singleCalls += 1;
   onRead?.();
@@ -63,10 +75,18 @@ vi.mock('@supabase/supabase-js', () => ({
     },
     from: () => ({
       select: () => ({
-        eq: () => ({
-          single: () => answerRead('single'),
-          maybeSingle: () => answerRead('maybeSingle'),
-        }),
+        eq: () => {
+          const read = {
+            single: () => answerRead('single'),
+            maybeSingle: () => answerRead('maybeSingle'),
+            // The lookup bounds its read with `.abortSignal(requestTimeout())`.
+            abortSignal: (signal: AbortSignal) => {
+              abortSignals.push(signal);
+              return read;
+            },
+          };
+          return read;
+        },
       }),
     }),
     channel: () => ({ on: () => ({ subscribe: () => {} }) }),
@@ -92,11 +112,14 @@ describe('partner lookup contract', () => {
     vi.useFakeTimers();
     singleResults = [];
     singleCalls = 0;
+    abortSignals = [];
+    hangUntilAborted = false;
     sessionResult = signedIn;
     onRead = null;
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -129,6 +152,41 @@ describe('partner lookup contract', () => {
         status: 'error',
         reason: 'upstream request timeout',
       });
+    });
+  });
+
+  // Every Daily read waits behind one pass per identity, and a pass calls this
+  // lookup, so an unbounded lookup would hold the slot for every later read.
+  describe('lookupPartnerId bounds its read', () => {
+    it('sends the users read with an abort signal', async () => {
+      singleResults = [linked];
+      const { lookupPartnerId } = await import('@/api/supabaseClient');
+
+      await lookupPartnerId();
+
+      expect(abortSignals).toHaveLength(1);
+      expect(abortSignals[0]).toBeInstanceOf(AbortSignal);
+      expect(abortSignals[0].aborted).toBe(false);
+    });
+
+    it('resolves a stalled read as an error once the timeout aborts it', async () => {
+      const timeout = new AbortController();
+      vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+      hangUntilAborted = true;
+      const { lookupPartnerId } = await import('@/api/supabaseClient');
+
+      let settled = false;
+      const pending = lookupPartnerId().then((answer) => {
+        settled = true;
+        return answer;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(false);
+
+      timeout.abort();
+
+      await expect(pending).resolves.toMatchObject({ status: 'error' });
+      expect(AbortSignal.timeout).toHaveBeenCalledWith(30_000);
     });
   });
 

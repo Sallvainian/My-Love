@@ -14,6 +14,7 @@ import {
 } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types';
 import { logger } from '../utils/logger';
+import { requestTimeout } from '../services/accountDataError';
 import { AUTH_STORAGE_KEY, createSessionGuardedFetch } from './authStorage';
 
 // Re-export Database type for convenience
@@ -380,11 +381,14 @@ export const lookupPartnerId = async (): Promise<PartnerLookup> => {
 
     if (knownOffline()) return { status: 'error', reason: 'offline', offline: true };
 
-    // Query current user's partner_id from users table
+    // Query current user's partner_id from users table. Bounded like every
+    // Daily request: a stalled read ends as an error, so the single-flight
+    // pass waiting on it (`loadDailyDay`, `loadCoupleStreak`) frees its slot.
     const { data, error } = await supabase
       .from('users')
       .select('partner_id')
       .eq('id', currentUserId)
+      .abortSignal(requestTimeout())
       .maybeSingle();
 
     const mismatch = await sessionMismatch(currentUserId);

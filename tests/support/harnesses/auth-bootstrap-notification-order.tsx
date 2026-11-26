@@ -253,9 +253,7 @@ export function createAuthBootstrapHarness(): AuthBootstrapBridge {
       registerLocalCopy(PUSH_PREFERENCES_COPY_KIND, () =>
         hasNativeReminders() ? useAppStore.getState().loadPushPreferences() : Promise.resolve()
       );
-      registerLocalCopy(DAILY_DAYS_COPY_KIND, async () => {
-        await useAppStore.getState().loadDailyDay();
-      });
+      registerLocalCopy(DAILY_DAYS_COPY_KIND, () => useAppStore.getState().loadDailyDay());
       registerLocalCopy(DAILY_STREAK_COPY_KIND, () => useAppStore.getState().loadCoupleStreak());
       registerLocalCopy(MOOD_HISTORY_KIND, () => useAppStore.getState().loadMoodHistoryFromServer());
       registerLocalCopy(INTERACTIONS_COPY_KIND, async () => {
