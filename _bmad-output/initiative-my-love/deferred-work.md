@@ -2091,2143 +2091,1908 @@ severity: low
 archived: 2026-09-25
 
 ### DW-247: planImport's own "Unsupported export version" check is unreachable because the import schema accepts only version 1.0.
+
+status: done 2026-09-26
 origin: spec-deferred fb06d3399a77
-location: src/services/customMessageService.ts:313
 source_spec: `1-make-every-test-able-to-fail.md`
 severity: low
-reason: src/validation/schemas.ts:139 is z.literal('1.0'), so a 2.0 file is refused by the schema ("Invalid version. Please select a valid option.") before src/services/customMessageService.ts:313-315 runs; no test reaches that message. Pre-existing, not caused by this story.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): the unreachable version branch in customMessageService.planImport is deleted; CustomMessagesExportSchema's z.literal('1.0') is the one check.
+archived: 2026-11-26
 
 ### DW-248: authServices tests restore their console.error spy only at the end of each test, so a failing test leaves console.error silenced for later tests.
+
+status: done 2026-09-26
 origin: spec-deferred c286f2f5216b
-location: src/api/auth/__tests__/authServices.test.ts
 source_spec: `1-make-every-test-able-to-fail.md`
 severity: low
-reason: src/api/auth/__tests__/authServices.test.ts calls errorLog.mockRestore() as the last statement (pattern predates this story); vitest.config.ts sets no restoreMocks. Cleanup-on-failure belongs to story 4 (H4).
-status: done 2026-09-26
-resolution: already fixed in c2933427 (PR #375): authServices.test.ts:127-131 restores every spy in afterEach(vi.restoreAllMocks); no inline mockRestore remains.
+archived: 2026-11-26
 
 ### DW-249: The stale playwright-utils deviation comment in events-persistence.spec.ts survives in the submitNewEvent docblock.
+
+status: done 2026-09-26
 origin: spec-deferred 4ba33866b90d
-location: tests/e2e/settings/events-persistence.spec.ts:122
 source_spec: `1-make-every-test-able-to-fail.md`
 severity: low
-reason: corrections.md lists it (real waitForResponse calls are at 135/177/208/338); it is a recorded-deviation (M9) item owned by story 6, not a story-1 category.
-status: done 2026-09-26
-resolution: already fixed in c2933427 (story 6, 9e4b271f): the submitNewEvent docblock at events-persistence.spec.ts:123-129 no longer names a deviation or waitForResponse.
+archived: 2026-11-26
 
 ### DW-250: interactionsSubscription.test.ts drains a fixed 2-3 microtasks before asserting, which may pass vacuously if the async chain is longer.
-origin: spec-deferred 64dd49e27fb0
-location: tests/unit/stores/interactionsSubscription.test.ts:394
-source_spec: `1-make-every-test-able-to-fail.md`
-reason: Unit advisory marks it UNVERIFIED (lines ~394-401, 439-443, 498-508). Settle by lengthening the chain in the SUT locally and checking the negative assertions still fail. Timing work is owned by story 2.
+
 status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): the three one-step `await partnerLookups.at(-1)` waits are macrotask flushes; mutation (bug + one extra await in the slice) now fails the test the old wait let pass.
+origin: spec-deferred 64dd49e27fb0
+source_spec: `1-make-every-test-able-to-fail.md`
+archived: 2026-11-26
 
 ### DW-251: getDateLabel counts elapsed ms / 86400000 from local midnight, so just after spring-forward it labels yesterday "Today".
+
+status: done 2026-09-26
 origin: spec-deferred b2f5f39a2d35
-location: src/utils/moodGrouping.ts:66
 source_spec: `1-make-every-test-able-to-fail.md`
 severity: medium
-reason: src/utils/moodGrouping.ts:66; found during planning (now = 2026-03-09 00:30 EDT gives diff 0 for Mar 8). Story 1's rewritten tests avoid DST; story 2 owns the DST row at src/utils/__tests__/moodGrouping.test.ts:8.
-status: done 2026-09-26
-resolution: already fixed in c2933427 (G6): moodGrouping.ts:71-75 compares Date.UTC stamps of the local dates with Math.round; DST rows in moodGrouping.test.ts:64-78; reproduced under TZ=America/New_York at 2026-03-09 00:30 -> Mar 8 'Yesterday'.
+archived: 2026-11-26
 
 ### DW-252: Fixed `await Promise.resolve()` hop counts remain in realtimeLeaveContract and moodSyncSubscription (fireReopen / replacement-SUBSCRIBED).
+
+status: done 2026-09-26
 origin: spec-deferred 74ecfb5c4a83
-location: tests/unit/api/realtimeLeaveContract.test.ts:200; tests/unit/api/moodSyncSubscription.test.ts:947
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: low
-reason: Same fragility as the interactionsSubscription advisory fixed here; no catalog row names them. Found during implementation.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): drains directly after advanceTimersByTimeAsync removed (it already yields a native macrotask); the realtimeLeaveContract negative case waits a macrotask.
+archived: 2026-11-26
 
 ### DW-253: dateUtils getDaysSince and formatMessageTimestamp share the elapsed-ms / 24 h DST flaw fixed in moodGrouping (G6).
+
+status: done 2026-09-26
 origin: spec-deferred d4bd7164a9b7
-location: src/utils/dateUtils.ts:61
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: medium
-reason: Both floor (todayMidnight - dayMidnight) / 86400000; the day after spring-forward that is 23 h, so yesterday's items read as today. No row's test exposes them; fixing needs new coverage (SPEC non-goal).
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): calendarDaysBetween in dateUtils.ts (Date.UTC of local components, Math.round) now backs getDaysSince, formatMessageTimestamp, moodGrouping.getDateLabel and getCalendarDaysDiff; six DST rows failed before the fix.
+archived: 2026-11-26
 
 ### DW-254: e2e waitForLoadState('networkidle') gates on pages with an open Realtime socket.
+
+status: done 2026-09-26
 origin: spec-deferred 1fe048f751f0
-location: tests/e2e/notes/love-notes-realtime.spec.ts:152; tests/e2e/partner/partner-mood-realtime.spec.ts:152
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: low
-reason: Advisory timing item; it is a readiness gate owned by story 3 (M1/readiness).
-status: done 2026-09-26
-resolution: already fixed in c2933427 (story 3, 193537b5): no waitForLoadState('networkidle') remains outside tests/e2e-archive; the two sites now await the specific read's 200. Premise also wrong: Playwright's network-idle counts frame._inflightRequests only, and WebSockets are tracked separately, so an open Realtime socket never blocked it.
+archived: 2026-11-26
 
 ### DW-255: dbSchema.test.ts fails about 1 run in 4 under --sequence.shuffle, also before this story.
+
+status: done 2026-09-26
 origin: spec-deferred 301cde1beb10
-location: tests/unit/services/dbSchema.test.ts
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: medium
-reason: An earlier case leaves happy-dom window.location invalid, so importing src/api/supabaseClient.ts throws Invalid URL. Test isolation, owned by story 4 (H4).
-status: done 2026-09-26
-resolution: already fixed in c2933427: afterEach vi.unstubAllGlobals() in dbSchema.test.ts and the split files; pre-PR copy failed 8/20 shuffled seeds, current files 0/20.
+archived: 2026-11-26
 
 ### DW-256: useRealtimeMessages keeps one real setImmediate as its unhandled-rejection checkpoint.
+
+status: done 2026-09-26
 origin: spec-deferred 59c6de880162
-location: src/hooks/__tests__/useRealtimeMessages.test.ts:1181
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: low
-reason: It is the only signal Node gives before reporting an unhandled rejection; not a catalog row. Pre-existing.
-status: done 2026-09-26
-resolution: accepted, not a sleep: Node emits unhandledRejection only after a macrotask boundary and vitest fakes setImmediate by default, so the real setImmediate (now useRealtimeMessages.retriedJoin.test.ts:449) is a safety net for the rejection checkpoint; mutation (catch rethrows) still fails both checkpoint tests. Kept.
+archived: 2026-11-26
 
 ### DW-257: interceptNetworkCall routes in partner-kit / partner-mood are still registered asynchronously and may race page.goto.
+
+status: done 2026-09-26
 origin: spec-deferred a98e5c01b508
-location: tests/e2e/partner/partner-kit.spec.ts:91; tests/e2e/partner/partner-mood.spec.ts:55
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: low
-reason: Pre-existing: playwright-utils registers the route inside an async test.step. This story made a miss fail loudly (awaited with a 15 s timeout) instead of silently; guaranteeing registration before goto needs an awaited page.route (M9, story 6) or a library hook.
-status: done 2026-09-26
-resolution: accepted: fulfillOn is an alias of interceptNetworkCall, whose route registration runs inside test.step, but every matched URL is a REST read sent after HTML, modules and auth bootstrap, and a miss throws after the awaited 15 s timeout rather than passing silently. An awaited page.route with a deviation comment remains available if a hard guarantee is ever wanted.
+archived: 2026-11-26
 
 ### DW-258: Review: dateUtils formatMessageTimestamp / getDaysSince DST mislabel (same as the earlier dateUtils item).
+
+status: done 2026-09-26
 origin: spec-deferred e2f980c69ff1
-location: src/utils/dateUtils.ts:204
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: medium
-reason: Blind Hunter re-raised it; pre-existing app bug not exposed by any row test.
-status: done 2026-09-26
-resolution: duplicate of DW-253 (same functions, same flaw); resolved with it.
+archived: 2026-11-26
 
 ### DW-259: Review: the remaining real setImmediate in useRealtimeMessages contradicts the literal AC 'no setImmediate waits remain'.
+
+status: done 2026-09-26
 origin: spec-deferred 35aa4b255079
-location: src/hooks/__tests__/useRealtimeMessages.test.ts:1181
 source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
 severity: low
-reason: Edge Case Hunter claim finding; pre-existing test design, not a catalog row.
-status: done 2026-09-26
-resolution: duplicate of DW-256; closed with it.
+archived: 2026-11-26
 
 ### DW-260: Same-class timing sites with no catalog row may still be scored by a re-review (hop-count drains, fixed act loops, live-clock start dates, lastWelcomeView stamps).
-origin: spec-deferred 4c7cadc73a15
-location: n/a
-source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
-reason: UNVERIFIED. Intent auditor listed realtimeLeaveContract, photoImageCache, EventsSettings hop counts; PhotoGridItem.recovery and usePhotoImage act loops; couple-start-date.spec.ts:89 and couple-settings-offline.spec.ts:110,161 start dates; lastWelcomeView = Date.now() in 33 e2e files. The e2e advisories mark the last two 'not fired'. Settle by running bmad-testarch-test-review on each folder.
+
 status: done 2026-10-29
-resolution: settled 2026-10-29 by the fresh bmad-tea-test-review runs (tests/e2e and tests/api + tests/integration on 2026-10-28, src and tests/unit on 2026-10-29): none of the four reports has an H1, H2, M1 or M6 row (epic retrospective A6).
+origin: spec-deferred 4c7cadc73a15
+source_spec: `2-remove-clock-timing-and-async-nondeterminism.md`
+archived: 2026-11-26
 
 ### DW-261: Returning to Settings mid-test by dock click is not gated on Settings' own mount read.
+
+status: done 2026-09-26
 origin: spec-deferred 766cc171c57d
-location: tests/e2e/settings/events-crud.spec.ts; tests/e2e/settings/events-persistence.spec.ts
 source_spec: `3-wait-for-data-before-interacting-in-e2e-specs.md`
 severity: low
-reason: events-crud (~164, ~201) and events-persistence (~324) click a row control right after navigateTo(settings) while the mount GET is in flight. Pre-existing and not an M1 row; row ids are stable, so the click still lands.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): returnToSettings() in tests/support/helpers/settings-screen.ts gates the dock return on Settings' own mount read (after Home's read settles); used in events-crud and events-persistence.
+archived: 2026-11-26
 
 ### DW-262: Non-retrying reads remain in touched specs outside the M1 rows.
+
+status: done 2026-09-26
 origin: spec-deferred 5fb54d78dc27
-location: tests/e2e/settings/events-history-pagination.spec.ts; tests/e2e/offline/love-notes-offline-send.spec.ts; tests/e2e/account-data/cross-device.spec.ts
 source_spec: `3-wait-for-data-before-interacting-in-e2e-specs.md`
 severity: low
-reason: events-history-pagination one-shot evaluateAll order check (~196-198) and hand-rolled waitForResponse; love-notes-offline-send allTextContents()/queuedContents (~143-148); cross-device textContent() (~85). None is named by an M1 row; they fall under M9 or other rows.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): recurseUntil around the events-history-pagination order check and the love-notes-offline-send queue reads; cross-device reads the favorite text after the 'Remove from favorites' assertion.
+archived: 2026-11-26
 
 ### DW-263: Navigating e2e specs with no M1 row were not audited, so a fresh re-review may still score M1 somewhere.
-origin: spec-deferred 3454ff3c90a8
-location: tests/e2e/
-source_spec: `3-wait-for-data-before-interacting-in-e2e-specs.md`
-reason: About 25 navigating spec files carry no M1 row and are untouched. Settle by running bmad-testarch-test-review on tests/e2e/.
+
 status: done 2026-10-29
-resolution: settled 2026-10-29: the fresh 2026-10-28 bmad-tea-test-review run on tests/e2e has no M1 row (epic retrospective A6).
+origin: spec-deferred 3454ff3c90a8
+source_spec: `3-wait-for-data-before-interacting-in-e2e-specs.md`
+archived: 2026-11-26
 
 ### DW-264: account-data.spec.ts A/B/A favorites fails about 1 run in 6 on a 406 partner-record read during sign-out/sign-in switching.
+
+status: done 2026-09-26
 origin: spec-deferred a50ae7184099
-location: tests/e2e/account-data/account-data.spec.ts; src/api/partnerService.ts
 source_spec: `3-wait-for-data-before-interacting-in-e2e-specs.md`
 severity: medium
-reason: Reproduced on the unchanged baseline spec (git show ad5115cd copy, --repeat-each=6: 1 failed with the same GET 406 users?select=id,email,display_name,birthday). Looks like the partner lookup (single()) racing a sign-out; app-side, not caused by this story.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): getPartner(userId), lookupPartnerId and lookupOwnDisplayName read with maybeSingle and re-check the session after each read through a shared sessionMismatch helper, answering error (never unlinked/unset) when the session ended or changed; the partner display-name read uses maybeSingle; the users?select=partner network-monitor exclusion is removed and the fake-token specs stub the partner reads.
+archived: 2026-11-26
 
 ### DW-265: Catch-then-cleanup teardown is skipped when Playwright times the test out.
+
+status: done 2026-09-26
 origin: spec-deferred 7cc3807d2e26
-location: tests/api/*.spec.ts; tests/e2e/auth/display-name-setup.spec.ts
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: A timeout abandons the test body, so cleanup placed after a catch never runs (the display-name-setup `renamed` docblock explains this). Affected sites: display-name-setup nameless accounts (~102, ~164); couple-broadcast-authorization outsiders; interaction-authorization; interaction-record-ownership (~64/~97); profile-name-email-ownership; events-write-wire-shape `runWithPairCleanup`. Fixing it means moving each cleanup to `test.afterEach`. No H4 row or corrections item names these; found by a planning audit.
-status: done 2026-09-26
-resolution: fixed in PR #377 (squash 6be94f31): tests/support/fixtures/cleanup.ts adds cleanup.defer(label, fn), torn down LIFO in its own 60 s slot with a 15 s limit per fn, depending on page/apiRequest/supabaseAdmin so order can't be wrong; every body cleanup in tests/api and tests/e2e moved onto it. Proof: an injected hang left the throwaway account and row on the old code and removed both on the new.
+archived: 2026-11-26
 
 ### DW-266: Seeding helpers leak what they already created when a later step of the seed fails.
+
+status: done 2026-09-26
 origin: spec-deferred 5b4d24474152
-location: tests/e2e/offline/photos-offline.spec.ts; tests/e2e/offline/birthdays-wedding-offline.spec.ts; tests/e2e/auth/implicit-fragment-rejection.spec.ts
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: photos-offline `seedPhotos` (~111-143) leaks objects and rows because `seeded` is assigned only once the helper returns. birthdays-wedding-offline `setValues` (~118, ~180) makes three writes before its `try`. implicit-fragment-rejection `createForeignSession` (~40-43) throws after creating the account. Found by a planning audit; no row names them.
-status: done 2026-09-26
-resolution: fixed in PR #377 (squash 6be94f31): seedPhotos, birthdays-wedding-offline setValues and implicit-fragment-rejection createForeignSession defer each undo before or right after the step that creates it.
+archived: 2026-11-26
 
 ### DW-267: birthdays-wedding resets the pair to null instead of restoring its prior values, and leaves the couple_settings row in place.
+
+status: done 2026-09-26
 origin: spec-deferred f41bef60c847
-location: tests/e2e/settings/birthdays-wedding.spec.ts:33
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: `resetPair` (~33-52) sets both birthdays and wedding_date to null. The couple_settings row is the pair's one shared settings row, and couple-start-date also upserts it, so the row is not an entity created by the test. It is left in a neutral state.
-status: done 2026-09-26
-resolution: false premise: global setup never writes birthdays or wedding_date (global-setup.ts:83/117/123), the spec resets to null at start and asserts 'Not set yet', and home-kit asserts 'Date TBD'; null IS the untouched state, and restoring prior values would re-plant a failed run's leak. couple-start-date and couple-settings-offline delete the couple_settings row before use.
+archived: 2026-11-26
 
 ### DW-268: love-notes-offline-send teardown deletes while the page is back online, so a queued note can still flush after the delete.
+
+status: done 2026-09-26
 origin: spec-deferred c7445457a073
-location: tests/e2e/offline/love-notes-offline-send.spec.ts:205
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: The `finally` block runs `setOffline(false)` before `deleteNotes`. This only happens when the test fails partway through the flush. The fix would close the page, or keep it offline, before deleting. Found by a planning audit.
-status: done 2026-09-26
-resolution: fixed in PR #377 (squash 6be94f31): the deferred teardown closes the page's context first (guarding unrouteAll on a closed page), deletes by stamp, re-queries after 2 s and asserts nothing remains.
+archived: 2026-11-26
 
 ### DW-269: The shuffled-order guarantee is checked only by hand; no CI or npm script runs vitest shuffled.
+
+status: done 2026-09-26
 origin: spec-deferred bc655d22f0e1
-location: .github/workflows/test.yml; package.json
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: medium
-reason: Found by the verification-gap review. `test:unit` and CI's `test:unit:coverage` run in declaration order, which passed even before this story. Reverting `resetAllMocks` or `unstubAllGlobals` would pass CI again. The fix is a fixed-seed `vitest run --sequence.shuffle --sequence.seed=1` step in `test.yml` or `scripts/ci-local.sh`. This story's spec forbids config changes.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): test:unit:coverage runs --sequence.shuffle with the seed from SEED (github.run_number in CI, printed and replayable, default 1); ci-local.sh adds a shuffled run. restoreMocks: true in vitest.config.ts prevents the spy-leak class outright.
+archived: 2026-11-26
 
 ### DW-270: The G6 e2e teardowns still sit in `finally` blocks, which a Playwright timeout skips.
+
+status: done 2026-09-26
 origin: spec-deferred 20515cd268c8
-location: tests/e2e/account-data/cross-device.spec.ts; tests/e2e/account-data/account-data.spec.ts; tests/e2e/offline/account-data-offline-copy.spec.ts; tests/e2e/offline/love-notes-offline-send.spec.ts
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: Found in review. The `finally` teardowns in cross-device, the account-data mood test, the three account-data-offline-copy tests and love-notes-offline-send run only when the body throws, not when it times out. G5 moved note deletion to `test.afterEach` for this reason; these were not moved. The first deferred entry names this same class for the api specs.
-status: done 2026-09-26
-resolution: closed with DW-265 in PR #377 (squash 6be94f31) (duplicate class).
+archived: 2026-11-26
 
 ### DW-271: The account-data mood teardown checks the delete's error but not how many rows it deleted.
+
+status: done 2026-09-26
 origin: spec-deferred cb54a952fffc
-location: tests/e2e/account-data/account-data.spec.ts:292
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: This predates the story. The delete, keyed on `user_id` plus `created_at`, would also answer `error: null` if its filter matched nothing. G5's note teardown checks the count for this reason.
-status: done 2026-09-26
-resolution: fixed in PR #377 (squash 6be94f31): the account-data mood delete selects ids and soft-checks exactly one row when the save committed; sibling by-id deletes use the count-checked deleteRowById (tests/support/helpers/teardown.ts).
+archived: 2026-11-26
 
 ### DW-272: Isolation advisories that carry no rule id are fixed by no story.
+
+status: done 2026-09-26
 origin: spec-deferred 3d5f22cdb7d6
-location: tests/unit/services/customMessageService.ownership.test.ts:82; tests/api/check-constraint-error-mapping.spec.ts:241
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: Found by the intent audit. None has an H4 id: - unit: `customMessageService.ownership.test.ts:82` replaces `globalThis.indexedDB` and never restores it; `accountDataSlices.test.ts` has console.error spies. - api: the `check-constraint-error-mapping.spec.ts:241-280` fixed-per-worker leak advisory. - e2e: the "readers that rely on other tests' try/finally restores" advisory (home-kit, mood-kit, persisted-events-strip, photos-offline). Story 4's intent is H4 rows plus the corrections items.
-status: done 2026-09-26
-resolution: fixed: unit part in PR #376 (restoreMocks: true; indexedDB via vi.stubGlobal), api/e2e part in PR #377 (squash 6be94f31) (per-run probe ids and labels plus an exact-row deferred delete in check-constraint-error-mapping; writer cleanup survives timeouts; mood-kit comment corrected).
+archived: 2026-11-26
 
 ### DW-273: Two specs outside this diff still throw a bare `AggregateError`, which hides the assertion it wraps in Playwright reports.
+
+status: done 2026-09-26
 origin: spec-deferred fe232ea2e183
-location: tests/api/interaction-record-ownership.spec.ts:108; tests/e2e/auth/display-name-setup.spec.ts:154
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: low
-reason: `interaction-record-ownership.spec.ts` (~108) and `display-name-setup.spec.ts` (~154, ~229) predate this story and are outside its sites. The new `throwCollected` helper (`tests/support/helpers/collected-failures.ts`) is the fix.
-status: done 2026-09-26
-resolution: false premise on the installed Playwright 1.63.0: TestInfo records each AggregateError child as its own error (workerProcessEntry.js visit(child) over error.errors, since 1.61), and every configured reporter reads errors. Stale rationale comments in collected-failures.ts and rls-security.ts are corrected with DW-265.
+archived: 2026-11-26
 
 ### DW-274: A LoveNoteMessage image-cache session test failed once under full-suite load.
+
+status: done 2026-09-26
 origin: spec-deferred 05ac70a1571d
-location: src/components/love-notes/__tests__/LoveNoteMessage.test.tsx:452
 source_spec: `4-isolate-tests-and-make-cleanup-failure-proof.md`
 severity: medium
-reason: Seen during this story's verification. "drops a cache read that resolves after a sign-out and back in (new session)" reported that `createObjectURL` was called once. It then passed 8 of 8 runs alone, a full `test:unit` rerun, and 15 shuffled seeds. The file is untouched by this story; this is timing nondeterminism, story 2's class.
-status: done 2026-09-26
-resolution: already fixed in c2933427: the test waits for the image spinner before switching session and pins mockReadCachedImage to one call; 0/30 idle, 0/30 under load. The leftover .animate-spin lookup is switched to love-note-image-loading with the DW fixes PR.
+archived: 2026-11-26
 
 ### DW-275: LoginScreen's empty-fields check cannot be reached from the UI, so its kit test covers it only through a raw form submit.
+
+status: done 2026-09-26
 origin: spec-deferred 2ff2ecdd08c8
-location: src/components/LoginScreen/LoginScreen.tsx:107
 source_spec: `5-drive-component-tests-through-user-event.md`
 severity: low
-reason: The submit button is disabled while either field is empty (src/components/LoginScreen/LoginScreen.tsx:276), and a browser refuses implicit submission when the default button is disabled. The "Please enter both email and password" branch (LoginScreen.tsx:107-110) runs only under a synthetic submit event, which LoginScreen.kit.test.tsx:97 keeps with a same-line reason. Pre-existing: either the branch is dead code or the test premise needs a product decision.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): the unreachable empty-fields branch in LoginScreen is deleted; the kit error-surface test reaches its error through user-event with no synthetic submit.
+archived: 2026-11-26
 
 ### DW-276: The 2026-10-29 src re-review scored two of the commented raw submits this story kept as M5 rows.
-origin: spec-deferred 2b1d4cbb8c95
-location: src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx:90; src/components/shared/__tests__/kitSurfaces.test.tsx:409
-source_spec: `5-drive-component-tests-through-user-event.md`
-reason: The registry's M5 rule (criteria-registry.md:169) has no exemption mechanism. The folder-run workers did not score fireEvent.submit past native validation, click-without-focus cases, img error or window online (test-review-target-src.md:398), which covers most kept lines, but the same-batch refresh.click() pairs in EventsSettings.test.tsx were scored (folder row at :1422 at 92f1c517). Settle by running bmad-testarch-test-review on src/ and tests/unit/ and reading the M5 rows. Rescoped 2026-10-29 (epic retrospective A6): the fresh src run scores exactly two M5 rows, both `fireEvent.submit` calls that get past native `minLength` so the component's own length rule runs; tests/unit has none. Both are Medium, outside the epic's Boundaries. The reviewer's fix for each: prefill or type a name that passes native `minLength={3}` but fails the component's trimmed 3-30 rule (for example `'ab '`), then submit with `user.click`.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-component-test-assertion-hardening
 resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
+origin: spec-deferred 2b1d4cbb8c95
+source_spec: `5-drive-component-tests-through-user-event.md`
+archived: 2026-11-26
 
 ### DW-277: AGENTS.md does not record that user-event hangs under Vitest fake setTimeout without both advanceTimers and a jest-global shim.
+
+status: done 2026-09-26
 origin: spec-deferred 4656b1984f27
-location: AGENTS.md
 source_spec: `5-drive-component-tests-through-user-event.md`
 severity: low
-reason: Testing Library only recognises Jest fake timers (jestFakeTimersAreEnabled checks a `jest` global plus setTimeout.clock, which vi's faked setTimeout carries). PhotoUpload.autoClose.test.tsx needed userEvent.setup({ advanceTimers }) and vi.stubGlobal('jest', …); the next file that fakes setTimeout will hit the same hang. The fix edits an agent-context file.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): AGENTS.md 'Maintained by hand' records the user-event hang under a faked setTimeout and both remedies.
+archived: 2026-11-26
 
 ### DW-278: The two offline reconnect-read waits now resolve on the first matching GET, so a failed read in that window would throw where waitForResponse skipped it.
-origin: spec-deferred 45ba081d0688
-location: tests/e2e/offline/interactions-offline-copy.spec.ts:164; tests/e2e/offline/love-notes-offline-copy.spec.ts:252
-source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
-reason: interceptNetworkCall observe mode resolves on the first matching request and throws "No response received" when that request fails. page.waitForResponse ignored failed requests. The arm is set while offline, just before goOffline(false). To settle it, confirm the app sends no interactions or love_notes_visible GET between the arm and the reconnect (it passed 3 runs). If one can fail there, keep waitForResponse with a deviation comment.
+
 status: done 2026-09-26
-resolution: fixed in PR #377 (squash 6be94f31) (25c9db41): a fetchNotes started by the page load can still be in its partner lookup when the device goes offline, so its love_notes_visible read goes out offline and fails inside the arm window (logged 2/30 locally). Both reconnect waits (love-notes-offline-copy, interactions-offline-copy) now use page.waitForResponse on method, URL and ok() with a deviation comment; forced race: old wait 10/10 failed, new 30/30 passed; 120/120 clean.
-reopened: 2026-09-26 -- the "false premise" closure was wrong: PR #377 burn-in shard 3 (run 36234555916) failed love-notes-offline-copy.spec.ts:222 with "NetworkInterceptError: No response received for the request" on the Observe GET **/rest/v1/love_notes_visible?* wait.
+origin: spec-deferred 45ba081d0688
+source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
+archived: 2026-11-26
 
 ### DW-279: No fresh TEA re-review has confirmed the M9 fixes: recurseUntil call sites never name recurse, the deviation comments sit on the line above, and one reason repeats about 30 times.
-origin: spec-deferred d55a2645e7e9
-location: tests/support/helpers/recurse.ts; tests/e2e/; tests/api/
-source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
-reason: The registry row says the comment must be "on the line"; the mandate's Deviation Protocol says "a one-line comment above the code", and the diff follows the mandate. CAP-5's gate is a fresh bmad-testarch-test-review run on tests/e2e and tests/api reporting zero M9 and L9 rows. Running it settles this.
+
 status: done 2026-10-29
-resolution: settled 2026-10-29: the fresh 2026-10-28 bmad-tea-test-review runs on tests/e2e and on tests/api + tests/integration have no M9 or L9 row (epic retrospective A6).
+origin: spec-deferred d55a2645e7e9
+source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
+archived: 2026-11-26
 
 ### DW-280: The favorites waits in account-data-offline-copy now resolve on the first matching GET, so a failed or cancelled read in the arm window would throw where waitForResponse skipped it.
-origin: spec-deferred bc6e87ea2a2b
-location: tests/e2e/offline/account-data-offline-copy.spec.ts:209; tests/e2e/offline/account-data-offline-copy.spec.ts:231; tests/e2e/offline/account-data-offline-copy.spec.ts:268
-source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
-reason: Same mechanism as the reconnect-read entry above, at two more sites. At ~231 the arm is set while offline, just before goOffline(false). At ~209 and ~268 the arm is set just before page.reload(), so a favorites refresh from the first load that is sent after the arm would be cancelled by the reload. Observe mode then gets a null response() and throws "No response received". To settle it, confirm that no FAVORITES_READ can be sent inside either window. If one can, keep waitForResponse with a deviation comment, or await the first-load read before arming. The spec passed in this run.
+
 status: done 2026-09-26
-resolution: reload sites already fixed in c2933427 (87d8ce25): the cold-start FAVORITES_READ is awaited before arming, and a cold start sends exactly one (messagesSlice.ts refresher waits for seeding; authSessionVersion changes only with the user). Reconnect site is a false premise: fetchFavoriteKeys requireOnline() and messagesSlice isOnline() guards.
+origin: spec-deferred bc6e87ea2a2b
+source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
+archived: 2026-11-26
 
 ### DW-281: Hand-rolled page.on request/response listeners and a page.waitForEvent('requestfailed') have no deviation comment, and the acceptance grep does not look for them.
-origin: spec-deferred c7c485ff65ff
-location: tests/e2e/ (page.on('request'|'response'|'requestfinished'|'requestfailed') sites); tests/e2e/settings/events-history-pagination.spec.ts:241
-source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
-reason: These are pre-existing and none of the 50 M9 rows names them, but a fresh bmad-testarch-test-review might flag them as M9. Sites: display-name-setup ~173, partner-mood-realtime ~152-159, love-notes-realtime ~144-151, needs-a-connection ~95, account-data-offline-copy ~312, photos-offline ~328, and events-history-pagination ~241 (waitForEvent). The mandate lists page.on('response') under the network-error-monitor row. To settle it, run the CAP-5 re-review and check whether it reports any of these sites.
+
 status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): a `// playwright-utils deviation:` comment sits on the line above every hand-rolled page.on / waitForEvent network listener (12 lines, 8 files) and the auth-bootstrap fixture's stub.
+origin: spec-deferred c7c485ff65ff
+source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
+archived: 2026-11-26
 
 ### DW-282: account-data.spec still asserts response.ok() on the body-matched mood save wait instead of the exact status.
+
+status: done 2026-09-26
 origin: spec-deferred c53bfe914423
-location: tests/e2e/account-data/account-data.spec.ts:299
 source_spec: `6-adopt-playwright-utils-in-playwright-specs.md`
 severity: low
-reason: This is pre-existing: line 262 at the baseline, and the story only added a deviation comment above the wait. The story's exact-status rule was applied only to converted waits. `.ok()` accepts any 2xx, so the test proves slightly less than an exact 201 would. The fix is to assert the status the run returns (expected 201 for the POST upsert; confirm it on a run).
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): the mood repair save asserts status 201 (a 200 control failed with 'Received: 201').
+archived: 2026-11-26
 
 ### DW-283: A fresh TEA re-review may flag M2/L6 instances that no catalog row names, such as the couple-settings server answer built about seven times in tests/unit/stores/coupleSettings.test.ts.
-origin: spec-deferred 99dfd8ac8662
-location: tests/unit/stores/coupleSettings.test.ts
-source_spec: `7-build-test-data-through-factories-and-name-magic-values.md`
-reason: This story fixed every catalog row. It did not sweep the files for repeated shapes or literals that no row names. The implementer noted the coupleSettings server answer, `{ relationshipStart, weddingDate }`, as one such repeat. To settle it, run bmad-testarch-test-review on tests/unit, src, tests/e2e and tests/api + tests/integration, and count the M2/L6 rows it reports.
+
 status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): serverAnswer() beside linked() in coupleSettings.test.ts replaces the seven repeated answers.
+origin: spec-deferred 99dfd8ac8662
+source_spec: `7-build-test-data-through-factories-and-name-magic-values.md`
+archived: 2026-11-26
 
 ### DW-284: Lines that no catalog row names still carry the story's defect kinds in files this story edited, so a fresh TEA re-review may flag them.
-origin: spec-deferred af8d5ee23b56
-location: src/components/LoginScreen/__tests__/LoginScreen.kit.test.tsx, tests/unit/App.eventsSession.test.tsx, and the other files listed
-source_spec: `8-fix-names-selectors-markers-and-test-structure.md`
-reason: This story fixed catalog rows only; its spec forbids sweeping unnamed lines. Reviewers found these leftovers: - LoginScreen.kit.test.tsx finds the wordmark and tagline with getByText, although login-wordmark and login-tagline now exist. - App.eventsSession.test.tsx still has 8 getByText('Loading...') lookups. - Several "should ..." test names remain in MessageInput, LoveNoteMessage, useNetworkStatus, backgroundSync, ImagePreview and FullScreenImageViewer. - Some e2e selectors still use structure: h3 + div, h3 ~ span, firstElementChild and [data-testid^=...] prefixes. - Other lookups: dbSchema getBlockedDialog uses querySelector, AnniversarySettings.writes uses queryByText, FullScreenImageViewer finds its overlay by tagName, and LoveNotes.realtimeStatus uses getByText('Connected'). - photoDialogsA11y has two tests with the same name, and a PhotoImageStates if (confirm) step can silently not run. - Names that state constants, such as "names the database 'my-love-db'", might count as L5.
+
 status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): countdown parts, panels and tiles found by test id (17 sibling selectors, 3 firstElementChild), 8 'Loading...' lookups by auth-loading-screen, wordmark/tagline by test id, dbSchema dialog by role, the PhotoImageStates `if (confirm)` step is an assertion (the Delete button is provably gone), implementation-named tests renamed. Kept: LoveNotes.realtimeStatus getByText('Connected') (the line deliberately has no role or id), `.locator('h3')` card labels and data-testid prefix selectors; the photoDialogsA11y duplicate-name item was false (different describes). The e2e checker run (DW-263/279) judges what remains.
+origin: spec-deferred af8d5ee23b56
+source_spec: `8-fix-names-selectors-markers-and-test-structure.md`
+archived: 2026-11-26
 
 ### DW-285: PhotoViewer.focus resets deletePhotoMock inline at the end of each pending-delete test, so a failed assertion leaves a pending mockReturnValue for later tests.
+
+status: done 2026-09-26
 origin: spec-deferred e4f57b3211b4
-location: src/components/PhotoGallery/__tests__/PhotoViewer.focus.test.tsx
 source_spec: `8-fix-names-selectors-markers-and-test-structure.md`
 severity: low
-reason: The original single test used the same inline mockReset. Splitting it into two tests doubled the number of places this can happen. It matters only after a test has already failed, where it can cause cascading failures. The fix is an afterEach(() => deletePhotoMock.mockReset()) in that describe.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): one afterEach resets deletePhotoMock in PhotoViewer.focus; the ten inline resets are gone.
+archived: 2026-11-26
 
 ### DW-286: src/stores/slices/authSlice.ts:98 still names loaderIdentityGuards.test.ts, which this story split into loaderIdentityGuards.*.test.ts; the comment is app code, which this story may not touch.
+
+status: done 2026-09-26
 origin: spec-deferred 088b893a1578
-location: src/stores/slices/authSlice.ts:98
 source_spec: `9-split-oversize-test-files.md`
 severity: low
-reason: The comment reads "are covered by `loaderIdentityGuards.test.ts`". That file no longer exists; its tests are in the seven loaderIdentityGuards.*.test.ts files. SPEC.md limits app-code changes to test hooks and bug fixes, so the comment was left as is.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): the authSlice comment names tests/unit/stores/loaderIdentityGuards.*.test.ts.
+archived: 2026-11-26
 
 ### DW-287: EventsSettings.errorIsolation, .focus, .lifetime and .pagination still keep their own copies of helpers that eventsSettingsKit.tsx now exports (makeEvent, renderSection, fillForm and others).
+
+status: done 2026-09-26
 origin: spec-deferred 2c4526a62b93
-location: src/components/Settings/__tests__/EventsSettings.{errorIsolation,focus,lifetime,pagination}.test.tsx
 source_spec: `9-split-oversize-test-files.md`
 severity: low
-reason: The duplication predates this story: each sibling hand-copied the harness from EventsSettings.test.tsx. This story created the shared kit, but its spec forbade editing the siblings. The copies differ in places (the setStore behaviour, and makeEvent signatures in lifetime and pagination), so consolidating them is a separate change.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): the .focus and .errorIsolation suites import the byte-equivalent helpers from eventsSettingsKit.tsx; lifetime/pagination and each suite's setStore keep their differing variants.
+archived: 2026-11-26
 
 ### DW-288: Coverage counts non-test helper modules under src/**/__tests__/ as app source, and this story adds two (eventsSettingsKit.tsx, realtimeMessagesKit.ts).
+
+status: done 2026-09-26
 origin: spec-deferred df7482a0823c
-location: vitest.config.ts coverage.exclude
 source_spec: `9-split-oversize-test-files.md`
 severity: low
-reason: vitest.config.ts coverage.exclude lists only src/**/*.test.ts(x), so a helper in a __tests__ folder counts toward coverage as covered app code. src/components/PhotoGallery/__tests__/fakePhotoStore.ts already did this before this story. The fix is a config change: add 'src/**/__tests__/**' to coverage.exclude.
-status: done 2026-09-26
-resolution: fixed in PR #376 (squash 273fbf2c): coverage.exclude adds src/**/__tests__/**; the three harness files no longer appear in coverage-final.json and thresholds hold.
+archived: 2026-11-26
 
 ### DW-289: InteractionHistory labels a poke "Yesterday" by elapsed hours, not calendar days.
+
+status: done 2026-09-26
 origin: orchestrator triage 2026-09-26
-location: src/components/InteractionHistory/InteractionHistory.tsx:69
 source_spec: n/a
 severity: low
-reason: formatTimestamp floors (now - date) / 86400000, so "Yesterday" means 24-48 hours ago: a poke from 23:00 yesterday reads as "Xh ago" at 08:00, while love-note and mood timestamps use calendar days (dateUtils). Found during the DW-253 investigation; it is an elapsed-time label by design, so whether it should switch to calendar days is a consistency choice, not a DST bug.
-status: done 2026-09-26
-resolution: fixed in PR #378 (squash): InteractionHistory day labels count calendar days via calendarDaysBetween; minutes stay elapsed and hours show only within today. Tests failed 5/9 before.
+archived: 2026-11-26
 
 ### DW-290: LoginScreen's "Password must be at least 6 characters" branch is probably unreachable for typed input.
+
+status: done 2026-09-26
 origin: orchestrator triage 2026-09-26
-location: src/components/LoginScreen/LoginScreen.tsx:118
 source_spec: n/a
 severity: low
-reason: The password input carries minLength={6} (:285) and the form has no noValidate, so native constraint validation should block a typed short password before the submit handler runs, the same way `required` made the empty-fields branch dead (DW-275). UNVERIFIED: tooShort applies only to user-edited values, so confirm in a browser before deleting.
-status: done 2026-09-26
-resolution: kept, not dead: a Playwright check showed typed, pasted and fill() values are blocked by native tooShort, but a value set by script (as a password manager or autofill can) skips it and reaches the branch, which then shows the message. The branch stays.
+archived: 2026-11-26
 
 ### DW-291: playwright-utils' interceptNetworkCall fixture drops the timeout option.
+
+status: done 2026-09-26
 origin: orchestrator triage 2026-09-26
-location: node_modules/@seontechnologies/playwright-utils/dist/esm/intercept-network-call/intercept-network-call-fixture.js
 source_spec: n/a
 severity: low
-reason: The fixture forwards only { method, url, fulfillResponse, handler } to interceptNetworkCall, so a timeout passed through the fixture is silently ignored; specs that need one call the standalone function (fulfillOn in tests/support). Upstream library issue; nothing in this repo is broken while specs use fulfillOn.
-status: done 2026-09-26
-resolution: won't fix here -- upstream library behaviour. Nothing in this repo is affected: specs needing a timeout call the standalone function through fulfillOn (tests/support), and the fixture's dropped option is documented there. Raise with @seontechnologies/playwright-utils if it matters again.
+archived: 2026-11-26
 
 ### DW-292: sendPartnerRequest's "This user already has a partner" check can never fire, because RLS hides the target's row.
+
+status: done 2026-09-26
 origin: orchestrator review 2026-09-26
-location: src/api/partnerService.ts:222-231
 source_spec: n/a
 severity: low
-reason: The read `users.select('partner_id').eq('id', toUserId).single()` targets a user who is neither the caller nor their partner; the users SELECT policy returns own and partner rows only, so the answer is always PGRST116 (HTTP 406), targetUserRecord is null, and the message is unreachable. Whether a partnered target is refused server-side (partner_requests policy or accept_partner_request) was not checked. With the users?select=partner monitor exclusion gone, a future e2e that sends a real request without skipNetworkMonitoring will trip on the 406.
-status: done 2026-09-26
-resolution: fixed in PR #378 (squash): the target-row read (always hidden by RLS, always 406) is removed; accept_partner_request already refuses the link ('One or both users already have a partner', confirmed locally), and acceptPartnerRequest now shows that as a readable message. The own-row read uses maybeSingle plus the sessionMismatch re-check.
+archived: 2026-11-26
 
 ### DW-293: partnerService.hasPartner has no callers.
+
+status: done 2026-09-26
 origin: orchestrator review 2026-09-26
-location: src/api/partnerService.ts (hasPartner)
 source_spec: n/a
 severity: low
-reason: Nothing in src or tests calls it; partnerSlice has its own hasPartner() over store state. The DW-264 fix had to add a userId parameter only to keep it compiling. Dead code to delete.
-status: done 2026-09-26
-resolution: fixed in PR #378 (squash): partnerService.hasPartner deleted.
+archived: 2026-11-26
 
 ### DW-294: Partner search cannot find anyone, because the users SELECT policy hides every row but the caller's own and their partner's.
+
+status: done 2026-09-26
 origin: orchestrator review 2026-09-26
-location: src/api/partnerService.ts searchUsers (~:152-194); users SELECT policy "Users can view self and partner profiles"
 source_spec: n/a
 severity: high
-reason: searchUsers queries users directly with email/display_name ilike, and its comment says "RLS policy allows authenticated users to search", but the only SELECT policy (local and hosted, read from pg_policies 2026-09-26) is id = auth.uid() OR id = get_my_partner_id() OR partner_id = auth.uid(). An unlinked user's search therefore returns nothing, so a new couple cannot connect through the app. E2E specs stub the search response, which is why nothing caught it. The fix is a SECURITY DEFINER search RPC (a migration), which needs a product decision on what a search may reveal about other accounts (exact-email match only vs substring on email/name).
-status: done 2026-09-26
-resolution: fixed in PR #379 (squash 35cbd323): searchUsers calls the new SECURITY DEFINER find_partner_by_email, which matches the exact sign-in email only (case-insensitive, trimmed) and returns no row, an unlinked account's id and name, or is_taken with no id or name. The unstubbed E2E tests/e2e/partner/partner-connect.spec.ts covers found, taken, missing and self.
+archived: 2026-11-26
 
 ### DW-295: A partner request to someone already partnered is accepted at insert and stays pending forever.
+
+status: done 2026-09-26
 origin: orchestrator review 2026-09-26
-location: supabase partner_requests INSERT policy; src/api/partnerService.ts sendPartnerRequest
 source_spec: n/a
 severity: low
-reason: The partner_requests INSERT policy checks only the sender (WITH CHECK auth.uid() = from_user_id), and the client cannot see the target's partner_id (DW-292), so the request is inserted. The recipient never sees it (the connect UI is hidden once linked) and the sender sees it pending indefinitely; accept_partner_request would refuse it. Refusing at insert needs a migration (a check on the target's partner_id inside a SECURITY DEFINER function or trigger).
-status: done 2026-09-26
-resolution: fixed in the app by PR #379 (squash 35cbd323), not at insert: find_partner_by_email returns no id for an account that already has a partner, so the Connect screen can no longer send it a request, and accept_partner_request already declines every other pending request of both users when a couple links, so a request sent before its target linked elsewhere does not stay pending either. The INSERT policy is unchanged, so only a request inserted outside the app, with a partnered user's id, still stays pending, in the sender's own list.
+archived: 2026-11-26
 
 ### DW-296: A received partner request shows only the name the sender chose, and one tap on Accept links the accounts for good, so a stranger can pose as the partner.
+
+status: done 2026-10-28
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
-location: src/components/PartnerMoodView/PartnerMoodView.tsx:586 (name) and :595 (Accept)
 source_spec: n/a
 severity: medium
-reason: The card renders `other_display_name ?? other_email`, so once a sender sets a display name their email is never shown, and Accept calls acceptPartnerRequest with no confirmation. The link cannot be undone: the client cannot update partner_id and there is no unlink RPC. Since #379 any signed-in account that knows the recipient's email can send a request, so a stranger who names themselves after the partner gets the couple's notes, moods and photos after one tap. Fix: always show other_email on received (and sent) requests, and confirm before Accept, naming that email.
-status: done 2026-10-28
-resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and a received request is shown and accepted only while the recipient has no partner (accept_partner_request refuses a link to anyone who already has one), so no stranger can reach either account. Reopen if other couples are ever invited to use the app.
+archived: 2026-11-26
 
 ### DW-297: Partner search matches an email address nobody proved they own, so an account registered with the partner's address before they sign up is offered as the partner.
+
+status: done 2026-10-28
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
-location: supabase/migrations/20260926000000_find_partner_by_email.sql (the users.email match); hosted Auth email-confirmation setting
 source_spec: n/a
 severity: medium
-reason: find_partner_by_email matches public.users.email with no check of auth.users.email_confirmed_at. Local supabase/config.toml has enable_confirmations = false; the hosted setting is UNVERIFIED, though the hosted auth users' aggregate fits auto-confirm. The fix has two parts in order: the owner turns on email confirmations for the hosted project in the Supabase dashboard, then a migration filters on email_confirmed_at IS NOT NULL (under auto-confirm the filter alone changes nothing).
-status: done 2026-10-28
-resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and the partner already has an account under their own address, so it can no longer be claimed first; the hosted email-confirmation setting stays as it is. Reopen if other couples are ever invited to use the app.
+archived: 2026-11-26
 
 ### DW-298: The "request accepted" broadcast can be missed, and the sender then sees the link only after a reload.
-origin: security review of PR #379 2026-09-26, recorded 2026-10-28
-location: src/hooks/usePartnerLinkListener.ts:30-37 (gate) and :49-58 (subscribe); src/api/moodSyncService.ts subscribeMoodUpdates
-source_spec: n/a
-severity: medium
-reason: The partner_linked broadcast is ephemeral and never replayed, and three paths leave the listener's channel unjoined when it arrives. (1) It joins only after loadPartner answers unlinked, and subscribeMoodUpdates awaits the session, the partner lookup, setAuth and the socket first. (2) Every loadPartner sets isLoadingPartner, which turns settledUnlinked false and releases the subscriber, so on Home and Love Notes the channel is torn down and re-joined on every start, reconnect and Partner-tab mount, while the Partner tab's own subscriber passes no onPartnerLinked. (3) It passes no onStatusChange, so a Realtime reconnect never re-reads the partner. Fix: on each SUBSCRIBED call lookupPartnerId() and loadPartner() only when it answers linked (calling loadPartner directly loops through the gate), and gate on partner === null && !partnerLoadError once the first load has settled.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-partner-link-listener-rearm
 resolution-undo: 557e899a12936f0cb7f42633f9a2e20bad2908fd238445bf694e1a34e5e9c84b 2026-10-29 7374617475733a206f70656e
+origin: security review of PR #379 2026-09-26, recorded 2026-10-28
+source_spec: n/a
+severity: medium
+archived: 2026-11-26
 
 ### DW-299: get_my_pending_partner_requests returns the name and email of the other side even when that account already has a partner.
+
+status: done 2026-10-28
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
-location: supabase/migrations/20260926010000_my_pending_partner_requests.sql (the select); partner_requests INSERT policy
 source_spec: n/a
 severity: low
-reason: The reviewer's rolled-back probe inserted a pending request to a linked user's id (the INSERT policy checks only auth.uid() = from_user_id, the gap DW-295 leaves at the database), and the RPC then returned that user's name and email, undoing the is_taken redaction in find_partner_by_email. The linked target never sees the request, so the sender can keep it pending and keep reading the target's current name. Fix: null both columns when the other side has partner_id IS NOT NULL, or refuse at insert a request to a partnered account or from a partnered caller, through a SECURITY DEFINER helper.
-status: done 2026-10-28
-resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and find_partner_by_email never returns the id of an account that already has a partner, so reading either one's name and email this way needs their internal id from elsewhere. Reopen if other couples are ever invited to use the app.
+archived: 2026-11-26
 
 ### DW-300: Partner search tells any signed-in caller whether an email has an account and whether its owner has a partner, with no rate limit.
+
+status: done 2026-10-28
 origin: security review of PR #379 2026-09-26, recorded 2026-10-28
-location: supabase/migrations/20260926000000_find_partner_by_email.sql (is_taken)
 source_spec: n/a
 severity: low
-reason: A documented design choice in #379, not a defect: find_partner_by_email answers is_taken to any authenticated caller, and PostgREST does not rate-limit the call, so with open signup anyone can bulk-check addresses for an account and a relationship. Needs an owner decision: rate-limit the call, or report a taken account the same way as a missing one.
-status: done 2026-10-28
-resolution: won't fix -- accepted 2026-10-28 by the owner: the owner and their partner are the app's only users and are already linked to each other, and the search is kept as #379 designed it, because its "already connected with a partner" answer is the one that would reveal an unexpected link. Reopen if other couples are ever invited to use the app.
+archived: 2026-11-26
 
 ### DW-301: Two OfflineError tests in offlineErrorHandler.test.ts assert the same default fields, so "creates an error with default message" proves nothing that "is an instance of Error" does not.
+
+status: done 2026-10-28
 origin: spec-deferred b4fe790b514f
-location: tests/unit/utils/offlineErrorHandler.test.ts:15
 source_spec: `tickets/epic-test-review-remediation/tickets/story-fix-the-2026-10-03-tests-unit-findings-plan.md`
 severity: low
-reason: At the baseline both tests already asserted name, isRetryable and the default message (per-field toBe at :17-20, toMatchObject at :32-37); only the operation string differs, and only the second adds toBeInstanceOf(Error). The L7 conversion made the overlap visible but did not create it.
-status: done 2026-10-28
-resolution: fixed 2026-10-28: "is an instance of Error" now asserts only toBeInstanceOf(Error), and "creates an error with default message" keeps the name, operation, isRetryable and default-message checks; removing `extends Error` from OfflineError fails only the instanceof test. 2026-10-29: the epic retrospective (R1, A2) found the same overlap in the withOfflineCheck describe, where 'includes operation name in thrown error' was a subset of 'throws OfflineError when offline'; it is now a second operation inside that test, and the file's two hand-typed offline messages use OFFLINE_RETRY_MESSAGE.
+archived: 2026-11-26
 
 ### DW-302: AdminPanel's failed-delete test checks that an alert appears, not what it says.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
-location: tests/unit/components/AdminPanel.accountData.test.tsx:264
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: 'reports a failed delete accessibly and leaves cancel enabled' asserts only getByRole('alert') toBeInTheDocument, so an empty alert or one with the wrong message passes. Fix: assert the alert's text.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-component-test-assertion-hardening
 resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-303: upload-love-note-image-limits checks x-ratelimit-remaining only against the limit, which holds by construction.
+
+status: done 2026-10-29
+resolution: resolved by sweep bundle dw-e2e-assertion-precision
+resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
 origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
-location: tests/api/upload-love-note-image-limits.spec.ts:134
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: medium
-reason: After one accepted upload the case asserts Number(remaining) < RATE_LIMIT_MAX_UPLOADS and that the header equals the body's count, because other cases in the worker share the minute window. A counter that never decrements still passes. Fix: read the count before and after a second upload in the same case and assert it fell by exactly one.
-status: done 2026-10-29
-resolution: resolved by sweep bundle dw-e2e-assertion-precision
-resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
+archived: 2026-11-26
 
 ### DW-304: LoveNoteMessage's retry test cannot see the forceRefresh argument.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4); plan 1.13 Residual risks (A6)
-location: src/components/love-notes/__tests__/LoveNoteMessage.test.tsx (the image-service mock); src/services/loveNoteImageService.ts:235
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: The file's mock of the image service forwards only the path, so a retry that reused the cached signed URL instead of passing forceRefresh = true would pass. Fix: let the mock record its second argument and assert true on the retry.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-component-test-assertion-hardening
 resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4); plan 1.13 Residual risks (A6)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-305: PokeKissInterface's useState setter spy has no positive control while the component is mounted.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
-location: src/components/PokeKissInterface/__tests__/PokeKissInterface.test.tsx:7-25
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: stateSetterCalls observes every useState setter so the unmount cases can assert no late update. No case shows the spy records a set while mounted, so a spy that recorded nothing would pass the same negative checks. Fix: assert at least one recorded set before unmount.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-component-test-assertion-hardening
 resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-306: The loaderIdentityGuards.events leak checks use JSON.stringify(state), which cannot see inside an Error, Map or Set.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
-location: tests/unit/stores/loaderIdentityGuards.events.test.ts:414,476,495,513,529
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: JSON.stringify writes an Error, a Map and a Set as {}, so the previous account's label or failure text held in one of those shapes would not be found. Fix: serialize with a replacer that expands them, or assert the specific fields.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-store-service-test-determinism
 resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
-
-### DW-307: events.spec.ts hard-codes the plural "days" in the expected countdown.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
-location: tests/e2e/home/events.spec.ts:142-144
+origin: epic-test-review-remediation retrospective 2026-10-29 (R3, A4)
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
-reason: The expected text is `${FUTURE_MEETUP.daysFromNow - 1} days`, while eventCountdownHelpers.ts:60 writes "1 day" for one, so setting daysFromNow to 2 fails against correct output. Fix: build the expected text with the same singular rule.
+archived: 2026-11-26
+
+### DW-307: events.spec.ts hard-codes the plural "days" in the expected countdown.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-e2e-assertion-precision
 resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-308: notesSlice.idempotency takes a note's tempId before the queue drain settles.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
-location: tests/unit/stores/notesSlice.idempotency.test.ts:287,308,339,360
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: The retries read store.getState().notes[0].tempId without first waiting for the drain, so the cases depend on that row not having been replaced yet. Fix: wait for the drain to settle, then read the key.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-store-service-test-determinism
 resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-309: usePhotoImage.test.ts shares one hoisted PHOTO object across tests.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
-location: tests/unit/hooks/usePhotoImage.test.ts:20-22
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: The store mock and every beforeEach put the same object in photos, so a test or hook that mutated it would leak into the tests after it in shuffled order. Fix: put a fresh copy in the store in beforeEach.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-store-service-test-determinism
 resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-310: photoImageCache.test.ts settles a fill by joining a second run, which relies on the module's private coalescing.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4); plan 1.13 Residual risks (A4)
-location: tests/unit/services/photoImageCache.test.ts:598,649
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: "Joining the run settles any fill a wrong resume started" holds only while requestPhotoImageFill coalesces overlapping calls into one run, an internal detail; and plan 1.13 notes that a resume deferred by two or more microtasks starts after the join and goes uncaught. Fix: settle on an observable signal, such as the cached notice or the download mock's settled calls.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-store-service-test-determinism
 resolution-undo: 586fbb89547b50ef9f599adfac8aedcbd188d1801c992d99e3d69d0854f5440b 2026-10-29 7374617475733a206f70656e
-
-### DW-311: settleNameLookups never settles when the own-name lookup rejects.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
-location: src/components/love-notes/__tests__/OwnDisplayName.test.tsx:87; src/components/love-notes/__tests__/LoveNotes.realtimeStatus.test.tsx:94
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4); plan 1.13 Residual risks (A4)
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
-reason: The helper waits for getPartnerDisplayName, which LoveNotes asks only after the own-name branch, so a case whose own-name lookup rejects fails on a waitFor timeout that names the wrong lookup. The helper is also pasted into both files (DW-313). Fix: wait on both lookups' settled results.
+archived: 2026-11-26
+
+### DW-311: settleNameLookups never settles when the own-name lookup rejects.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-component-test-assertion-hardening
 resolution-undo: 3da91037a69193af16a9360685d3c0a3dde510dd5ca9044c03deebc356ece734 2026-10-29 7374617475733a206f70656e
-
-### DW-312: Two auth specs pin "the login screen is gone" in two different ways.
-origin: epic-test-review-remediation retrospective 2026-10-29 (R5, A4)
-location: tests/e2e/auth/login.spec.ts:135; tests/e2e/auth/bootstrap-notification-order.spec.ts:188,218
+origin: epic-test-review-remediation retrospective 2026-10-29 (R4, A4)
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
-reason: login.spec asserts toHaveCount(0) on the login-screen test id, while bootstrap-notification-order asserts not.toBeVisible(), which also passes when the screen is still mounted but hidden. Fix: use one form for the one contract in both specs.
+archived: 2026-11-26
+
+### DW-312: Two auth specs pin "the login screen is gone" in two different ways.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-e2e-assertion-precision
 resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
-
-### DW-313: Shared test fixtures and constants were invented file by file during the epic; one refactor story should consolidate them.
-origin: epic-test-review-remediation retrospective 2026-10-29 (D-dup1 to D-dup7, P-div1, A5)
-location: see reason
+origin: epic-test-review-remediation retrospective 2026-10-29 (R5, A4)
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
-reason: (1) Three photo-row builder patterns: six src files spread createPhotoInsert with an unexplained file_size: 68, photosSlice.localCopy.test.ts casts as SupabasePhoto, loaderIdentityGuards.photos uses a third. (2) Four copies of the hoisted vi.mock('react') useState observer (EventsSettings.pagination, EventsSettings.lifetime, PokeKissInterface, LoveNoteMessage). (3) SQLSTATE constants declared per file (CHECK_VIOLATION_CODE, NOT_NULL_VIOLATION, INSUFFICIENT_PRIVILEGE, CONNECTION_FAILURE), with '23514' and '08006' still literal in places. (4) loadFailure() adopted in three EventsSettings files; five siblings build { status: 'failure', error } by hand. (5) settleNameLookups pasted into OwnDisplayName.test.tsx and LoveNotes.realtimeStatus.test.tsx. (6) dbSchema.v15MessageData.test.ts hard-codes the store list storageSchema.test.ts holds as ALL_STORES. (7) Ten hand-rolled IndexedDB opens across nine e2e specs read stores savedLocalCopy cannot; logout.spec.ts:28, love-notes-offline-send.spec.ts:52 and photos-offline.spec.ts:61 skip the indexedDB.databases() guard. (8) stalePersistedMood() still defaults anchor to new Date() (tests/support/helpers/persisted-blob.ts:180), relied on by persisted-events-strip.spec.ts:214. Fix as one story: shared photo-row factories, a react-state-spy module, a SQLSTATE constants module, loadFailure everywhere, a love-notes test kit, one ALL_STORES, a guarded generic IndexedDB store reader, and a required anchor.
+archived: 2026-11-26
+
+### DW-313: Shared test fixtures and constants were invented file by file during the epic; one refactor story should consolidate them.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-shared-test-fixture-consolidation
 resolution-undo: 22822117b68bd746577b22173040aca409577ba4671f1daaa8fc98c208919c3b 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (D-dup1 to D-dup7, P-div1, A5)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-314: No audit checks that a full e2e run leaves behind no rows it created.
-origin: epic-test-review-remediation retrospective 2026-10-29 (S4, A8)
-location: tests/support/auth/worker-pool.ts; tests/e2e/
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: medium
-reason: R3's success clause "a full e2e run leaves behind no rows it created" was verified only for three love_notes content prefixes across the specs story 1.4 changed (plan 1.4 Verification). PR #377 moved cleanup into fixture teardown, but no full run has been audited across tables. Fix: a post-run check that counts the rows the worker-pool accounts own in each seeded table before and after a full run.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-e2e-leftover-row-audit
 resolution-undo: e8079d4aacc37483c3f121fc445fe62d877dd171df3ac0b5b397ab71b1b36ac0 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (S4, A8)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: medium
+archived: 2026-11-26
 
 ### DW-315: A history read that started before a poke was marked as seen can undo the mark when it answers, so the badge comes back.
-origin: investigation of the partner-connect poke flake 2026-10-29
-location: src/stores/slices/interactionsSlice.ts (markInteractionViewed; loadInteractionHistory)
-source_spec: n/a
-severity: low
-reason: markInteractionViewed sets viewed: true only after the server confirms, but loadInteractionHistory replaces the whole list with its answer, so an answer read before the mark carries viewed: false and puts the poke back in the unviewed count until the next read. Reads run on signed-in start, on reconnect, when History opens and, since the poke catch-up fix, each time the Partner tab's subscription is confirmed; the mark is written when the poke animation completes (PokeKissInterface.tsx:289). Read from the code, not reproduced. Fix: note the ids marked viewed while a read is in flight, as readsInFlight does for accepted rows, and keep viewed: true for them when the answer lands.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-interaction-viewed-read-race
 resolution-undo: 72a6b01666ede192297badccb8fbc90e19ec25f8443762e8246c2745fddcfa79 2026-10-29 7374617475733a206f70656e
+origin: investigation of the partner-connect poke flake 2026-10-29
+source_spec: n/a
+severity: low
+archived: 2026-11-26
 
 ### DW-316: About ten corrections.md items were never re-checked against the code, so Done when 2 is unproven for them.
+
+status: done 2026-10-29
 origin: epic-test-review-remediation retrospective 2026-10-29 (S2)
-location: _bmad-output/initiative-my-love/tickets/epic-test-review-remediation/corrections.md
 source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
 severity: low
-reason: The retrospective checked about 30 of the file's roughly 40 items against HEAD and found every one resolved, but it does not list which ones it checked. It names the items it did not re-check one by one: the four false positives (notesSlice.offlineQueue.test.ts:312 M3, coupleSettingsService.test.ts:157 L7, DisplayNameSetup.test.tsx:183 L5, MoodHistoryTimeline.test.tsx:68 L3), EventsSettings.test.tsx:1493, EventsSettings.focus.test.tsx:363 and useNetworkStatus.test.ts:321-341. Settle by checking every item in corrections.md against HEAD, locating each by content because its line numbers predate the epic, and recording each as resolved or still open with its location. Fix what is still open under the epic's Constraints: a fix keeps or strengthens what the test proves, and a verified false positive gets a harmless change so the rule stops firing.
-status: done 2026-10-29
-resolution: already resolved: All seven items the retrospective left unchecked are resolved at HEAD, located by content: notesSlice.offlineQueue.test.ts:147-189 split the M3 reconnect test into five single-subject tests (254dbd93); coupleSettingsService.test.ts:155-162 uses one rejects style and keeps toBeInstanceOf(AccountDataError); DisplayNameSetup.test.tsx:187 is named for behaviour ('offline: refuses before reading the session or writing...'); MoodHistoryTimeline.test.tsx:76 reads notes via the mood-note test id; EventsSettings :1493 moved to EventsSettings.reconciliation.test.tsx:346 asserting the loadingDuringRetry column; EventsSettings.focus.test.tsx:412-418 asserts openerSurvives and loadingAfterRefresh unconditionally; useNetworkStatus.test.ts:332,338 asserts vi.getTimerCount() 1 then 0. Spot re-checks of the rest also hold (login.spec.ts:138-163 signs in and checks the stored session across reload; token-persistence-overlap.spec.ts:238-239 pins the action-started list; love-notes.spec.ts:27 deletes sent notes; moodGrouping.test.ts has no 86400000; updateCurrentMessageStaleCache.test.ts pins NOW).
+archived: 2026-11-26
 
 ### DW-317: Decision record D1 (e2e page clocks anchor at the live day, never a fixed date) is only half written down where agents read it.
-origin: epic-test-review-remediation retrospective 2026-10-29 (S6, D1)
-location: tests/support/helpers/events.ts:190-205 (clockAnchor)
-source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
-severity: low
-reason: clockAnchor's JSDoc already records that the anchor is the latest local noon at or before now, so it sits behind real time and never ahead, because a page clock ahead of the session's mint time makes supabase-js refresh the token. It does not record why a fixed calendar date was rejected: plan 1.2's Review Triage Log (story-remove-clock-timing-and-async-nondeterminism-plan.md:235) says a fixed date "would put the page clock arbitrarily far behind server timestamps" and collide unique created_at rows across reruns. The retrospective proposed a separate adr-e2e-page-clock-anchors-at-the-live-day.md beside the helper, but AGENTS.md keeps durable agent-facing prose in AGENTS.md and forbids generated documentation files. So add the missing reason to clockAnchor's JSDoc, and, if every e2e spec that seeds calendar-day rows must use clockAnchor, say so in one AGENTS.md line, rather than adding a new file.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-e2e-assertion-precision
 resolution-undo: bae70ce172193d022d55f6da23bc5231d7981439422286568aefcb7168984175 2026-10-29 7374617475733a206f70656e
+origin: epic-test-review-remediation retrospective 2026-10-29 (S6, D1)
+source_spec: `tickets/epic-test-review-remediation/epic-test-review-remediation-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-318: Sign-out leaves the outgoing account's synced mood rows on the device.
-origin: AGENTS.md context refresh 2026-10-29
-location: src/stores/slices/authSlice.ts:47-67 (deleteAccountData); src/services/moodService.ts
-source_spec: n/a
-severity: low
-reason: deleteAccountData() deletes the outgoing account's local copies and cached images and nothing else. Its JSDoc keeps "unsynced `moods` rows" for their owner to send on the next sign-in, and AGENTS.md ("Maintained by hand", sign-out rule) allows only a queue of unsent writes to stay. But the `moods` store holds synced rows (`synced: true`) beside the queue, and those stay too. The app never shows them to the next account, because every read is scoped by userId (moodService.getAllForUser), but they remain in the device's IndexedDB, unlike every other per-account copy. Nothing records keeping them on purpose: 771a93b7 says sign-out "keeps queued moods", and DW-5 (archived) proposed clearing the store before its fix scoped the reads instead. Fix: in deleteAccountData, also delete the outgoing user's `moods` rows whose `synced` is true, and keep every `synced: false` row. Nothing is lost, because the signed-in backfill (moodSlice.ts:575-590) pages through the whole server history and refills the store. Cover the boot with no session that the `my-love-account-owner` marker drives, and decide what to do with a row whose sync finishes after sign-out and marks it synced.
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-synced-moods-signout-delete
 resolution-undo: bec72ab16700c1eded375e3e02307c506b8c273be1c6fcc7faa6ebc0a5a14733 2026-10-29 7374617475733a206f70656e
+origin: AGENTS.md context refresh 2026-10-29
+source_spec: n/a
+severity: low
+archived: 2026-11-26
 
 ### DW-319: A mood row the service worker's background sync marks synced after sign-out stays on the device until that account's next sign-out there.
+
+status: done 2026-10-29
 origin: spec-deferred 77375ef75a5a
-location: src/sw-db.ts:97 (markMoodSynced); src/stores/slices/authSlice.ts (deleteAccountData)
 source_spec: `plan-dw-synced-moods-signout-delete.md`
 severity: low
-reason: sw-db.ts markMoodSynced has no session check, and discardAccountState clears the my-love-account-owner marker on sign-out, so when another account signs in next, nothing deletes the row. Reads stay scoped by userId, so the row is never shown to that account. The intent accepted "the row is left for the next deletion"; recording it so a sweep sees it.
-status: done 2026-10-29
-resolution: closed by human decision: Accepted residual: the row is never read by another account and is deleted at its owner's next sign-out on the device.
-decision: 2026-10-29 Close: accept the residual row as the approved intent did — Accepted residual: the row is never read by another account and is deleted at its owner's next sign-out on the device.
+archived: 2026-11-26
 
 ### DW-320: The same JSON.stringify(state) leak check, blind to Error/Map/Set, is used outside the events file.
+
+status: done 2026-10-29
 origin: spec-deferred b8c7828c1182
-location: tests/unit/stores/loaderIdentityGuards.moods.test.ts:214
 source_spec: `plan-dw-store-service-test-determinism.md`
 severity: low
-reason: grep finds it at tests/unit/stores/loaderIdentityGuards.moods.test.ts:214,242, loaderIdentityGuards.partner.test.ts:225,251,322,395 and signOutClearsAccountState.test.ts:340,479,555,563; DW-306 names only the events file. They can adopt serializedStore() from loaderIdentityGuardsFixture.ts.
-status: done 2026-10-29
-resolution: duplicate of DW-321, which lists every location here and more; tracked there.
+archived: 2026-11-26
 
 ### DW-321: Complete list of the leak checks outside the events file that still use plain JSON.stringify on store state (it supersedes the incomplete item above).
-origin: spec-deferred a4946ac45884
-location: tests/unit/stores/loaderIdentityGuards.customMessages.test.ts:284
-source_spec: `plan-dw-store-service-test-determinism.md`
-severity: low
-reason: These are blind to an Error, Map or Set, as DW-306 was. Found with `grep -rn "JSON.stringify(" tests/unit` on 2026-10-29. On useAppStore, so they can adopt serializedStore() from loaderIdentityGuardsFixture.ts: - loaderIdentityGuards.moods.test.ts:214,242 - loaderIdentityGuards.partner.test.ts:225,251,322,395 - loaderIdentityGuards.customMessages.test.ts:284,326,395 - loaderIdentityGuards.notes.test.ts:232,271 - loaderIdentityGuards.photos.test.ts:277,341,472 - loaderIdentityGuards.messages.test.ts:251,559 - signOutClearsAccountState.test.ts:340,479,555,563,646 On a local store or a slice of state, so they need the replacer to take a value: - interactionsSubscription.test.ts:634,656 - notesSlice.localCopy.test.ts:517 - partnerSlice.localCopy.test.ts:213 - notesSlice.sessionGuard.test.ts:216 - settingsSlice.initializeApp.test.ts:307,392,447,470 - notesSlice.localCopyWrites.test.ts:174
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-leak-check-serialized-store
 resolution-undo: 80c135a45c09b0270df5e1f44af4223ebd5ce9cde626d4c69b7c9b5915e434ba 2026-10-29 7374617475733a206f70656e
+origin: spec-deferred a4946ac45884
+source_spec: `plan-dw-store-service-test-determinism.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-322: upload-love-note-image's 10-per-minute-per-user rate limit is kept in isolate memory, so it is not enforced once one user's requests spread across isolates.
-origin: spec-deferred cdcdf5b24fcb
-location: supabase/functions/upload-love-note-image/handler.ts:113-115
-source_spec: `plan-dw-e2e-assertion-precision.md`
-severity: medium
-reason: rateLimitStore is a module-level Map; two consecutive uploads over the wire failed a decrement assertion 9 of 9 serial runs locally (edge-runtime 1.77.8, policy = "per_worker"). Whether hosted functions spread one user's requests the same way is UNVERIFIED. Fix needs an owner decision on a shared store (DB table or RPC).
+
 status: done 2026-10-29
 resolution: resolved by sweep bundle dw-love-note-upload-shared-rate-limit
 resolution-undo: 45d6f6c51380300a04d0a207ec090ed080e768bd967ac55b5520acba78842457 2026-10-29 7374617475733a206f70656e
-decision: 2026-10-29 build: shared database counter — keep each user's upload count in a database table, checked and incremented atomically by one RPC the function calls, so every isolate enforces the same 10-per-minute limit.
+origin: spec-deferred cdcdf5b24fcb
+source_spec: `plan-dw-e2e-assertion-precision.md`
+severity: medium
+archived: 2026-11-26
 
 ### DW-323: Google sign-in cannot work inside the native iOS shell.
-origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
-location: src/api/auth/actionService.ts:116-125
-severity: medium
-reason: signInWithGoogle runs Supabase's OAuth redirect inside the page, and in the shell the page is a WKWebView on capacitor://localhost. Google refuses sign-in from embedded web views (from memory, UNVERIFIED on iOS 27), and redirectTo is built from window.location.origin, which is capacitor://localhost there, so the callback could not return to the app either. Fix: in the shell, open the provider in the system browser (ASWebAuthenticationSession, e.g. via @capacitor/browser) and return through a custom URL scheme or Universal Link that hands the session to supabase-js. Email and password sign-in is unaffected.
+
 status: done 2026-10-29
-resolution: fixed on fix/native-google-sign-in: in the shell, signInWithGoogle (src/api/auth/nativeGoogleSignIn.ts) opens the provider in ASWebAuthenticationSession through the app-local NativeAuth plugin (ios/App/App/NativeAuth.swift) and exchanges the returned code in the web view; dev.sallvain.mylove://auth-callback was added to the hosted redirect allow list on 2026-10-29.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+severity: medium
+archived: 2026-11-26
 
 ### DW-324: Password-reset emails sent from the native shell link to capacitor://localhost.
-origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
-location: src/api/auth/actionService.ts:96-98
-severity: medium
-reason: resetPasswordForEmail builds redirectTo from window.location.origin, which is capacitor://localhost in the shell, so the emailed link points nowhere a mail app can open. Fix: in the shell, use the site's https origin (the reset then completes on the website), or add a Universal Link that opens the app's reset-password view.
+
 status: done 2026-10-29
-resolution: unreachable: resetPassword has no caller in the UI (only actionService.ts and the re-export in authService.ts), and the app has no reset-password view, so the shell never sends a reset email. Revisit when a reset UI is added: the redirect must then return to the app, like Google sign-in's dev.sallvain.mylove://auth-callback.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+severity: medium
+archived: 2026-11-26
 
 ### DW-325: Haptics do nothing on iPhone, in the PWA and in the native shell alike.
-origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
-location: src/utils/haptics.ts; src/hooks/useVibration.ts
-severity: low
-reason: Both call navigator.vibrate, which Safari on iOS does not implement (from memory, UNVERIFIED on iOS 27), so the mood-save and love-note vibrations never fire on iPhone. The shell can fix it with @capacitor/haptics behind a check that the installed shell has the plugin (an older shell installed before the plugin was added will not).
+
 status: done 2026-10-29
-resolution: fixed 2026-10-29 on fix/native-haptics. Every buzz now goes through playHaptic in src/utils/haptics.ts, which in the native shell plays Apple's haptics through @capacitor/haptics (success and error as notification haptics, a selection as a light impact, an arriving love note as a medium one) and elsewhere keeps navigator.vibrate. useVibration and the incoming-note buzz in useRealtimeMessages route through it. The home-screen PWA on iPhone is unchanged (still no navigator.vibrate).
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+severity: low
+archived: 2026-11-26
 
 ### DW-326: The native shell still shows Capacitor's default splash screen.
-origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
-location: src/components/Navigation/AppNavigation.tsx; ios/App/App
-severity: low
-reason: The shell exists so the five DESTINATIONS can move into iOS's right-hand system column on iPhone Duo (folded and inner landscape), as Instagram, Netflix and others do; iOS keeps web content out of that column, so only a native UITabBar/TabView gets there. Research: _bmad-output/initiative-my-love/research-iphone-duo-pwa-support/. Not yet proven that a native tab bar around one shared WKWebView lands in the column; prove that first. The shell also still has Capacitor's default app icon and splash. 2026-10-30: the owner's Duo shows the current shell drawing web content into the column (index.html has set viewport-fit=cover since 2026-08-18), so the premise that only a native tab bar reaches it no longer holds; the dock half is now epic-iphone-duo-native-tab-bar (retitled iPhone Duo Side-Column Dock), which moves the app's own HTML dock into the column. Open here: the default app icon and splash. 2026-10-31: the app icon is now the Two Hearts mark (public/icons/icon.svg rendered at 1024, fix/ios-app-icon); only Capacitor's default splash remains open. 2026-11-02: fix/ios-splash replaces the splash with the mark centred on the SplashBackground colour set (the --kit-page light and dark values). It is unseen: on the iPhone Duo simulator iOS draws no launch screen for this app at all, before or after the change (splashboardd: "Estimated size (29900800) is over limit (25000000)", the same figure for both images, so it does not depend on the image), and the launch shows black. Close this once the owner has seen the mark on their phone after the next reinstall; if the phone shows black too, the cause is that limit, not the image.
+
 status: done 2026-11-02
-resolution: fix/ios-splash (#445) put the Two Hearts mark on the launch screen, centred on the SplashBackground colour set. Owner, 2026-11-02, after a reinstall from main: the phone shows the hearts. The simulator's black launch is the simulator's own limit, not seen on the phone. The app loads fast enough that the hearts show for under a second; the owner is fine with that.
-decision: 2026-11-02 build-outside-loop — the splash becomes the Two Hearts mark (public/icons/icon.svg, as fix/ios-app-icon made the icon) on the app's light and dark background colours; done interactively, because the launch screen shows only after a reinstall and a person has to look at it.
+origin: raised 2026-10-29 while adding the Capacitor shell (feature/capacitor-shell)
+severity: low
+archived: 2026-11-26
 
 ### DW-327: The dock's unseen-count badges are never fed, so the dock never shows one.
-origin: raised 2026-10-29 while slicing epic-iphone-duo-native-tab-bar
-location: src/App.tsx (`<AppNavigation>`); src/components/Navigation/AppNavigation.tsx (`badgeCounts`)
-severity: low
-reason: AppNavigation renders a badge per destination from its `badgeCounts` prop, but its only caller in App.tsx passes none, so no badge has ever shown. The owner parked badges until a feature supplies real counts; when it does, the column dock from epic-iphone-duo-native-tab-bar shows them too.
+
 status: done 2026-11-02
-resolution: moved to the backlog story `_bmad-output/backlog/story-dock-shows-unread-counts.md`: the owner wants unread counts on the dock buttons, which is a feature, not a defect.
-decision: 2026-11-02 move-to-backlog — owner, 2026-11-02.
+origin: raised 2026-10-29 while slicing epic-iphone-duo-native-tab-bar
+severity: low
+archived: 2026-11-26
 
 ### DW-328: The column rule's "both side insets non-zero means no column" case is unmeasured on a non-Duo iPhone.
-origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 7 (the side-column detection spike)
-location: _bmad-output/initiative-my-love/tickets/epic-iphone-duo-native-tab-bar/tickets/story-find-how-the-web-code-learns-the-side-column-s-position-and-plan.md (Findings, detection method)
-severity: medium (unverified)
-reason: Story 7's rule gives the page a column only when exactly one of env(safe-area-inset-left/right) is non-zero, because a notched or Dynamic Island iPhone in landscape is expected to inset both sides; the shell allows landscape on iPhone (Info.plist) and index.html sets viewport-fit=cover. The iPhone 18 Pro simulator rendered the readout build blank on iOS 27.0 and 27.2, so no non-Duo iPhone was measured. If such an iPhone inset only one side, story 2 would draw a column dock there. Proven by reading both side insets in the shell on a non-Duo iPhone simulator in each landscape direction; story 2's verify names a non-Duo iPhone simulator but not landscape.
+
 status: done 2026-10-30
-resolution: measured 2026-10-30 by epic-iphone-duo-native-tab-bar story 9 through scripts/sim-driver/sim with story 7's readout, in the shell on the iPhone 17 simulator (iOS 27.2), which renders it: portrait 62/0/34/0 (T/R/B/L, page 402x874), landscape-primary (device landscapeLeft) 0/62/20/62 and landscape-secondary (device landscapeRight) 0/62/20/62 (page 874x402). Both side insets are non-zero in each landscape, so the exactly-one-side rule gives this iPhone no column and story 2 keeps its bottom dock there.
+origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 7 (the side-column detection spike)
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-329: The sim driver's work dir is shared, so two runs on simulator clones would clobber each other.
-origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (the simulator driver)
-location: scripts/sim-driver/sim (WORK, sync_stage, ensure_runner, drive, SERVE_PID); AGENTS.md, Maintained by hand (the sim driver line)
-severity: medium
-reason: AGENTS.md says to run one Duo story at a time "or each on its own xcrun simctl clone", but every sim invocation defaults to the one $SIM_DRIVER_WORK: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, every drive step writes and then parses $WORK/logs/drive.log, and serve.pid is a single file. Two stories driving two clones at once would wipe each other's stage and runner and read each other's drive output. Fix by keying the work dir's per-run parts on the device UDID, or by having the AGENTS.md line and the sim header require a separate SIM_DRIVER_WORK per clone; deferred because the review workflow routes agent-context edits to the ledger.
+
 status: done 2026-10-31
-resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): scripts/sim-driver/sim's default work dir is now ~/Library/Caches/my-love-sim-driver/<checkout name>-<8 hex of the checkout's path hash>, so two stories in two worktrees, each on its own simulator clone, never share a stage, runner, derived data, log or serve.pid, and a worktree no longer runs a runner another worktree built; SIM_DRIVER_WORK still overrides it. AGENTS.md's sim-driver line says so, and that each concurrent story needs its own clone and serve-update port. Checked on the iPhone Duo simulator: build, the runner build and every drive step ran in the worktree's own folder.
+origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (the simulator driver)
+severity: medium
+archived: 2026-11-26
 
 ### DW-330: The sim driver's default work dir is shared by every run, so two stories driving two simulator clones at once (which AGENTS.md now allows) would clobber each other's stage, runner, drive log and
+
+status: done 2026-10-31
 origin: spec-deferred 9ebb86d180dd
-location: scripts/sim-driver/sim (WORK, sync_stage, ensure_runner, drive, SERVE_PID); AGENTS.md Maintained by hand
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-simulator-driver-is-a-repo-tool-plan.md`
 severity: medium
-reason: sync_stage empties $WORK/stage/tree, ensure_runner removes $WORK/runner/src, the app's derived data is always $WORK/derived/app, drive writes and parses $WORK/logs/drive.log, and serve.pid is one file; none is keyed on the device. The fix edits AGENTS.md (or keys the work dir on the UDID), so it is deferred; recorded as DW-329 in the deferred-work ledger.
-status: done 2026-10-31
-resolution: duplicate of DW-329 (the same review finding, carried in from story 9's plan frontmatter); fixed by the same change: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): scripts/sim-driver/sim's default work dir is now ~/Library/Caches/my-love-sim-driver/<checkout name>-<8 hex of the checkout's path hash>, so two stories in two worktrees, each on its own simulator clone, never share a stage, runner, derived data, log or serve.pid, and a worktree no longer runs a runner another worktree built; SIM_DRIVER_WORK still overrides it. AGENTS.md's sim-driver line says so, and that each concurrent story needs its own clone and serve-update port. Checked on the iPhone Duo simulator: build, the runner build and every drive step ran in the worktree's own folder.
+archived: 2026-11-26
 
 ### DW-331: A browser that reports one small side inset (likely Android Chrome in landscape with a one-sided display cutout, under viewport-fit=cover) would get the column form, with 44 px buttons spilling out of
+
+status: done 2026-11-02
 origin: spec-deferred a700fe97b803
-location: src/hooks/useSideColumn.ts (sideColumnFromInsets); src/components/Navigation/AppNavigation.tsx (column capsule width)
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-the-dock-becomes-a-capsule-in-the-side-column-without-coveri-plan.md`
 severity: medium
-reason: sideColumnFromInsets switches to the column form for any single non-zero side inset, and the capsule is exactly w-[env(safe-area-inset-left|right)] while each button is w-11 (44 px); index.html sets viewport-fit=cover. Unverified: no Android device or emulator was measured. Settle it by reading env(safe-area-inset-left/right) in Android Chrome in landscape on a punch-hole phone; if one side is non-zero and small, add a minimum column width (for example a button's 44 px) to the rule, which the ticket's "exactly one non-zero" wording does not settle. (declared severity: medium (unverified))
-status: done 2026-11-02
-resolution: already resolved by ab3b0abb (2026-10-30): sideColumnFromInsets takes the column form only from a 44 px inset, and since ee0edd39 the capsule is 40 px, so a small one-sided Android cutout keeps the bottom dock; found by the 2026-11-02 ledger triage.
+archived: 2026-11-26
 
 ### DW-332: The sim driver's signin appends to whatever the login fields already hold, so a retry after a failed first attempt types onto the leftover email and is refused.
+
+status: done 2026-10-31
 origin: spec-deferred 45d95a4edb9e
-location: scripts/sim-driver/RunnerUITests/Drive.swift:59
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-settings-is-the-sixth-button-in-the-column-dock-plan.md`
 severity: medium
-reason: scripts/sim-driver/RunnerUITests/Drive.swift signIn taps the first web text field and calls typeText(email) with no clear first. In story 8's run `sim signin` exited 1 on its first try right after `sim build` on both the Duo and the iPhone 17 simulators (no assertion message in the drive log); on the iPhone 17 the retry produced `…comsest.example.com` and "Invalid email or password", and only `xcrun simctl terminate` plus `sim launch` recovered. The first-try failure itself is not yet explained.
-status: done 2026-10-31
-resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): Drive.swift's signIn relaunches the shell (terminate, activate) when either login field holds text other than its placeholder, so a retry types into an empty form; clearing by keystrokes was tried and failed, because the leftover email overflows the field and no tap puts the cursor at its end. sim's drive prints the log's last 15 lines when a failed step has no error: or XCTAssert line, so a first-try failure like story 8's is no longer silent; it did not recur on the iPhone Duo simulator, where each of four sign-in attempts made straight after `sim build` reached and filled the form. Checked there: a wrong-password sign-in, then sim signin, exited 0 after relaunching, while the same sequence with the previous Drive.swift ended in "Invalid email or password".
+archived: 2026-11-26
 
 ### DW-333: Story 8's column-form clause on AGENTS.md's "A new view is registered in five hand-maintained places" line sits inside the bmad:context managed block, so a context refresh may drop it.
+
+status: done 2026-10-31
 origin: spec-deferred 4aaacfef0310
-location: AGENTS.md:27
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-settings-is-the-sixth-button-in-the-column-dock-plan.md`
 severity: low
-reason: AGENTS.md lines 1-2 open the managed block ("edits inside this block are replaced on refresh") and it closes at line 90; the edited bullet is line 27. The Maintained-by-hand dock paragraph carries the same fact outside the block, so the rule survives there, but a refresh that rewrites line 27 from older wording would again say Settings is never a dock item. Fix by having the next refresh keep the column-form exception, or by dropping the clause from line 27 and relying on the hand-maintained paragraph; deferred because the fix edits agent-context files.
-status: done 2026-10-31
-resolution: fixed 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep): AGENTS.md's view-registration line no longer states where Settings sits; it points to the dock paragraph under Maintained by hand, outside the managed block, which carries both forms. A refresh that rewrites the line has no Settings fact to get wrong.
+archived: 2026-11-26
 
 ### DW-334: The sim driver cannot switch Device Hub's window, so `ax` reaches a non-Duo simulator only after someone selects it there.
-origin: raised 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), from story 9's and story 2's residual risks
-location: scripts/sim-driver/sim (cmd_rotate, the pose and state commands, every `ax` call)
-severity: low
-reason: `ax` drives the device whose window Device Hub shows, and sim takes --device but never selects that device in Device Hub, so on an iPhone 17 beside the Duo, `sim rotate` and `sim state` act on whichever phone the window shows. Story 2 switched the window with System Events selecting the sidebar row for its iPhone 17 rotations and switched it back to the Duo afterwards, by hand; story 8 used the iPhone 17 in portrait only and recorded no switch. Fix by having sim select --device's row in Device Hub before an `ax` call (and saying so in its help), or by refusing when `ax state`'s device is not --device. 2026-11-02 triage: `ax` 0.2.2's help and error strings suggest that with --device it looks up that device's window and exits 4 ("No Device Hub window shows X") rather than acting on another phone, and that Device Hub can hold several device windows; neither is checked on a simulator. Absorbs DW-337: settle both with one hand test (boot a clone beside the Duo, open both in Device Hub, run `sim --device <clone> rotate` with the Duo in front); if ax refuses or drives the right window, the fix is wording only (AGENTS.md's sim-driver line says each clone needs its own Device Hub window, plus a clearer sim error), else sim selects --device's row first. Outside the loop: needs a simulator and edits AGENTS.md.
+
 status: done 2026-11-02
-resolution: checked on the simulators 2026-11-02, no driver change needed. With the iPhone Duo and an iPhone 17 (iOS 27.2) booted and Device Hub showing one window per device (File > New Window, then the device selected in that window's sidebar), `sim --device <iPhone 17> rotate` with the Duo's window in front turned only the iPhone 17 (unknown to landscapeLeft) and left the Duo in portrait. With no window showing the iPhone 17, `ax` refused it ("No Device Hub window shows iPhone 17 …") instead of acting on the Duo. AGENTS.md's sim-driver line now says each concurrent device needs its own Device Hub window.
+origin: raised 2026-10-31 by epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), from story 9's and story 2's residual risks
+severity: low
+archived: 2026-11-26
 
 ### DW-335: AGENTS.md's "never write an email address into `_bmad-output/`" rule cannot be followed as written: fictional fixture addresses and the required commit trailer already break it.
-origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (rejected there, because the fix edits that build's own plan); recorded 2026-10-31 by story 4 (the refactor sweep)
-location: AGENTS.md (Policy, the public-repo line; inside the generated block)
-severity: low
-reason: AGENTS.md Policy says never to write an email address into `_bmad-output/`. The two addresses are fictional (`test.example.com`, local stack only) and also appear in scripts/sim-driver/sim, provision.ts and AGENTS.md itself, and other epics' plans and findings files in `_bmad-output/` already hold fictional test addresses, so whether the rule covers fictional fixture addresses is the owner's call. The line sits inside the plan's `<intent-contract>`, which only a person may change; if the rule covers them, replace the addresses there with "the sim driver's two fixture accounts", or reword the Policy line to exempt fictional `test.example.com` fixtures. 2026-11-02 triage: the cited line in story 9's plan was already reworded by 31eafa9b; 19 addresses remain in 10 tracked _bmad-output files (7 at test.example.com, 8 at example.com, 4 noreply@anthropic.com), and every commit carries the required noreply@anthropic.com trailer.
+
 status: done 2026-11-02
-resolution: AGENTS.md's public-repo Policy line now forbids real addresses only: addresses at RFC 2606 reserved names (example.com, example.org, example.net and their subdomains, *.test, *.example, *.invalid) and the commit trailer's noreply@anthropic.com are allowed, any other address counts as real. Edited in place in the generated block, as the owner decided; the fixture addresses in _bmad-output need no change.
-decision: 2026-11-02 reword-rule — owner, 2026-11-02: the Policy line forbids real addresses only; addresses at reserved domains (example.com, example.org, *.test, *.invalid, RFC 2606) and the commit trailer noreply@anthropic.com are allowed, any other address counts as real. The line sits in AGENTS.md's generated block, so the edit goes through bmad-project-context, outside the loop; with it, the fixture addresses in story-partner-requests-push-plan.md:49 and elsewhere need no change.
+origin: raised 2026-10-30 by the quick review of epic-iphone-duo-native-tab-bar story 9 (rejected there, because the fix edits that build's own plan); recorded 2026-10-31 by story 4 (the refactor sweep)
+severity: low
+archived: 2026-11-26
 
 ### DW-336: The sim driver's old shared folders at the cache root are orphaned since the work dir became per checkout.
-origin: raised 2026-10-31 by the quick review of epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), which moved the default work dir (DW-329)
-location: ~/Library/Caches/my-love-sim-driver (stage/, runner/, derived/, logs/, serve/, serve.pid at its root)
-severity: low
-reason: Before story 4 every checkout used ~/Library/Caches/my-love-sim-driver itself; it now uses a <checkout>-<hash> folder inside it, so the root-level stage/, runner/, derived/, logs/ and serve/ (about 1.6 GB on 2026-10-31, mostly the stage's node_modules and derived data) are read by no code path. Story 4 ran unattended and left them, since deleting is the owner's call. Fix: once no update server started by the old driver runs (`pgrep -fl ThreadingHTTPServer` prints nothing), delete those five folders and serve.pid from the cache root, keeping every <checkout>-<hash> folder and any folder another session made there.
+
 status: done 2026-11-02
-resolution: already resolved: on 2026-11-02 the cache root holds only per-checkout folders (no stage/, runner/, derived/, logs/, serve/ or serve.pid) and `pgrep -fl ThreadingHTTPServer` prints nothing; found by the 2026-11-02 ledger triage.
+origin: raised 2026-10-31 by the quick review of epic-iphone-duo-native-tab-bar story 4 (the refactor sweep), which moved the default work dir (DW-329)
+severity: low
+archived: 2026-11-26
 
 ### DW-337: AGENTS.md's sim-driver line says concurrent Duo stories may each run in their own worktree on their own simulator clone, but the driver's `ax` commands may reach only the device Device Hub's window
+
+status: done 2026-11-02
 origin: spec-deferred f5609f6c2d08
-location: AGENTS.md, Maintained by hand (the sim-driver line); scripts/sim-driver/sim (cmd_rotate and the ax calls)
 source_spec: `tickets/epic-iphone-duo-native-tab-bar/tickets/story-refactor-sweep-plan.md`
 severity: medium
-reason: Story 9's residual risks say a non-Duo phone is reachable by ax only while Device Hub's window shows it, and sim never selects --device's window (DW-334); pose, rotate, state, background and screenshot all go through ax. The "each on its own xcrun simctl clone" wording predates this change (story 9); story 4 split the work dir per checkout, which removes the shared-files clash only. Unverified: whether Device Hub can show two device windows at once and ax then drives each by --device. Settle it by booting a clone beside the Duo, opening both in Device Hub, and running `sim --device <clone> rotate` while the Duo's window is in front; if the clone does not rotate, AGENTS.md's line must say one Duo story at a time until DW-334 is fixed. The fix edits AGENTS.md, so it is deferred. (declared severity: medium (unverified))
-status: done 2026-11-02
-resolution: duplicate of DW-334, which now carries both the driver fix and the AGENTS.md wording; one cause (sim never selects --device in Device Hub).
+archived: 2026-11-26
 
 ### DW-338: The sim driver's `center` reads Notification Center past one screen unreliably: its scroll-and-merge code is unproven and can merge, split or cut short groups
-origin: spec-deferred story-3.12 review
-location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
-source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
-severity: medium
-reason: Story 12's review found, by reading the code, that the multi-screen path has four faults. The read-and-scroll loop stops after 30 screens and still exits 0 with partial groups. Groups on different screens count as one when they share any notification text, so two threads with identical wording merge, and duplicates collapse. A stacked cell that is never reachable is reported as one notification. `merge`'s return value is unused, although the plan said to scroll "until none is new". center is unchanged since 4c089033 and story 3.14's 8-group runs used that code, but the multi-screen path has never run. The owner moved the multi-group case to story 3.14 on 2026-10-31; 3.14 reads up to 8 groups unfolded in portrait, on one screen, so these faults stay open past 8 groups. Settle it with a run of more groups than fit on the unfolded inner display, plus one thread whose expanded group is taller than a drag step.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sim-center-one-screen
 resolution-undo: 2ecb451ec71336ba2dd3eb5040fb949b8b3ed6d86f65b7e6cff0c86cc597792d 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 one-screen-limit — owner, 2026-11-02: `center` reads one screen only and exits non-zero with a clear message when Notification Center holds more than fits (no ticket needs more than 8 groups); remove the multi-screen scroll-and-merge path, update `sim help` and test-center-exit.zsh, then close this and DW-345.
+origin: spec-deferred story-3.12 review
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
+severity: medium
+archived: 2026-11-26
 
 ### DW-339: sim center's multi-screen read (scroll and merge) is unproven and can cut groups short, merge two threads with identical text, collapse duplicates, or count an unreachable stack as one notification.
+
+status: done 2026-10-31
 origin: spec-deferred cbe0cc5a3421
-location: scripts/sim-driver/RunnerUITests/Notify.swift (center, merge, screenGroups)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-and-taps-notifications-plan.md`
 severity: medium
-reason: By reading Notify.swift: the read-and-scroll loop stops at 30 screens and exits 0; cross-screen merge matches any shared text; an unreachable stacked cell is reported with count 1; merge's return value is unused. The scrolling code changed after its only 8-group run. The owner moved the multi-group case to story 3.14 (2026-10-31), which reads up to 8 groups on one unfolded screen, so these stay open past 8 groups. Recorded as DW-338. Settle with a run of more groups than fit on the unfolded inner display, including one group taller than a drag step.
-status: done 2026-10-31
-resolution: duplicate of DW-338 (the same review finding, carried in from story 3.12's plan frontmatter); tracked there.
+archived: 2026-11-26
 
 ### DW-340: send-push claims a (note, device) row before the APNs call, so a sender killed mid-send drops that push and nothing retries
+
+status: done 2026-11-02
 origin: spec-deferred story-3.1 review
-location: supabase/functions/send-push/handler.ts
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium
-reason: The handler inserts the push_requests row, then sends. If the isolate dies or times out between the two, the row blocks every later call for that note and device, and pg_net calls the sender once per insert, so no retry exists. A failed APNs answer releases its claim, but nothing calls again. Settle it with story 13's real APNs run and a choice between a pending state that a later call may retake and a retrier.
-status: done 2026-11-02
-resolution: accepted by the owner: a push lost when send-push dies between its claim and the APNs call loses only the banner; the note itself still arrives in the app, and no failure has been seen.
-decision: 2026-11-02 accept-and-close — owner, after the 2026-11-02 triage; no retrier and no pending state.
+archived: 2026-11-26
 
 ### DW-341: send-push treats a picture-only note as one with an image and blank text, but the real stand-in text is unverified
+
+status: done 2026-11-01
 origin: spec-deferred story-3.1 review
-location: supabase/functions/send-push/payload.ts (hasCaption)
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium (unverified)
-reason: MessageInput.tsx sends '' for a picture-only note, while love_notes_content_check needs at least one character, and no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as the note's text instead of "Sent you a picture". Settle it by sending a picture-only note from the app against the local stack and reading the stored content.
-status: done 2026-11-01
-resolution: settled by story 3.10's sweep from the code and the local database rather than a send from the app: no stand-in exists. `MessageInput.tsx` (`handleSend`) passes '' for a picture-only note, `notesSlice.sendNote` inserts it unchanged, and a rolled-back local insert of '' with an `image_url` fails `love_notes_content_check` (23514). So no picture-only note reaches `love_notes` from the app, and send-push's picture-only branch is reached only by rows a test inserts with ' '. The refused send is DW-363.
+archived: 2026-11-26
 
 ### DW-342: A send-push claim is inserted before the APNs call, so an isolate killed between claim and send drops that push for good, and nothing re-calls the sender for a released claim.
+
+status: done 2026-10-31
 origin: spec-deferred a15d99cc6689
-location: supabase/functions/send-push/handler.ts
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium
-reason: handler.ts claims (note, token) before sending; pg_net fires once per insert and nothing retries. Settles with a real APNs run (story 13) and a decision on a pending state or a retrier.
-status: done 2026-10-31
-resolution: duplicate of DW-340 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
+archived: 2026-11-26
 
 ### DW-343: Picture-only detection assumes the stand-in text is blank; the composer sends an empty string and love_notes_content_check needs at least one character, so the real stand-in is unverified.
+
+status: done 2026-10-31
 origin: spec-deferred 431bc8339dd8
-location: supabase/functions/send-push/payload.ts (hasCaption)
 source_spec: `tickets/epic-push-notifications/tickets/story-a-love-note-pushes-to-the-partner-s-iphone-plan.md`
 severity: medium
-reason: MessageInput.tsx sends '' for a picture-only note; the table check requires char_length(content) >= 1; no substitute was found in notesSlice.ts. A non-blank stand-in would be pushed as text. Settle by sending a picture-only note from the app against the local stack and reading the row. (declared severity: medium (unverified))
-status: done 2026-10-31
-resolution: duplicate of DW-341 (the same review finding, carried in from story 3.1's plan frontmatter); tracked there.
+archived: 2026-11-26
 
 ### DW-344: sim banner --tap cold on the unfolded Duo can miss once: the banner is gone before the tap reaches it
+
+status: done 2026-11-02
 origin: spec-deferred story-3.14 review
-location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium
-reason: In unfolded portrait, the first `sim banner FILE --host --tap cold` read the banner's label, printed `before tap: notRunning`, then failed with "Failed to tap NotificationShortLookView … No matches found": the banner had gone before the tap. The next three cold runs and the background run passed. `banner` was not changed by story 3.14, so this is pre-existing timing between the read, the state check and the tap, and a later story's unattended check could fail once on it. Settle it by running `--tap cold` ten times unfolded and folded; if misses recur, tap the element found at read time immediately, or re-wait for the banner before tapping.
-status: done 2026-11-02
-resolution: not reproduced. `sim banner FILE --host --tap cold` ran 10 times folded and 10 times unfolded on the iPhone Duo simulator on 2026-11-02 and passed all 20; the driver is left as it is. Reopen if a cold tap misses again.
+archived: 2026-11-26
 
 ### DW-345: sim center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups that are not listed, undercounting silently
-origin: spec-deferred story-3.14 review
-location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary)
-source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
-severity: medium (unverified)
-reason: Story 3.14 found that on the first opening after a delivery Notification Center keeps a summary cell (body `phraseThatEnumeratesAllRemainingNotificationsInSection`, "+6 from Runner") beside the 8 expanded groups, and `center` printed it as a 9th group; `screenGroups` now ignores such cells unless they are stacked "Grouped" cells. With 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (the DW-338 multi-screen case) a summary might stand for notifications never listed, and dropping it would undercount with no warning. Settle it with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the notifications pushed.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sim-center-one-screen
 resolution-undo: 2ecb451ec71336ba2dd3eb5040fb949b8b3ed6d86f65b7e6cff0c86cc597792d 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 one-screen-limit — owner, 2026-11-02: settled with DW-338's one-screen limit; when a summary cell ("+N from <app>") is present, `center` reports it rather than dropping it silently, so an undercount is never quiet.
+origin: spec-deferred story-3.14 review
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-346: sim banner --tap cold on the unfolded Duo can miss once because the banner is gone before the tap reaches it.
+
+status: done 2026-10-31
 origin: spec-deferred 4e4a0337de4b
-location: scripts/sim-driver/RunnerUITests/Notify.swift (banner)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium
-reason: First cold run in unfolded portrait: banner label read, before tap: notRunning, then "Failed to tap NotificationShortLookView ... No matches found"; the next three cold runs passed. banner is unchanged by this story, so the timing is pre-existing. Recorded as DW-344. Settle with ten cold runs unfolded and folded.
-status: done 2026-10-31
-resolution: duplicate of DW-344 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
+archived: 2026-11-26
 
 ### DW-347: center drops "+N from <app>" summary cells; past 8 groups a summary may stand for groups never listed, undercounting silently.
+
+status: done 2026-10-31
 origin: spec-deferred 2e36cea7cace
-location: scripts/sim-driver/RunnerUITests/Notify.swift (screenGroups, isSummary)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: medium
-reason: At 8 groups every notification the summary stood for was also read as its own cell. Past 8 groups (DW-338) this is untested. Recorded as DW-345. Settle with the DW-338 run of more groups than fit the unfolded inner display, comparing the total count with the pushes. (declared severity: medium (unverified))
-status: done 2026-10-31
-resolution: duplicate of DW-345 (the same review finding, carried in from story 3.14's plan frontmatter); tracked there.
+archived: 2026-11-26
 
 ### DW-348: center's coordinate-tap fallback logs nothing, and test-center-exit.zsh never stubs a phone with only Rotate Left, so neither path can be shown to work.
-origin: spec-deferred c0f2e3e5b8e2
-location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
-source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
-severity: medium (unverified)
-reason: No run so far has used either path. The 8-group runs passed, but nobody observed whether any tap went through displayInUse()'s coordinate fallback. The restore's rotate_to path through cmd_rotate on a phone with only Rotate Left (iPhone 17) was not run. If either is wrong, a read past a shrunk cell misses, or a phone is left turned. Settle it with one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (log whether the fallback ran), and one center --host started in landscape on an iPhone 17 simulator, comparing ax state before and after. 2026-11-02 triage: the coordinate fallback (Notify.swift tap) logs nothing, so no run can show whether it was used, and test-center-exit.zsh never stubs a phone with only Rotate Left and no fold. This entry is the code half: log a line when the fallback taps, and add the Rotate-Left-only stub to test-center-exit.zsh. The two simulator runs move to DW-403.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sim-center-one-screen
 resolution-undo: 2ecb451ec71336ba2dd3eb5040fb949b8b3ed6d86f65b7e6cff0c86cc597792d 2026-11-02 7374617475733a206f70656e
+origin: spec-deferred c0f2e3e5b8e2
+source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-349: AGENTS.md's sim-driver clause says center puts the pose and orientation back, without sim help's exception for a folded landscape.
+
+status: done 2026-11-01
 origin: spec-deferred 5cff3711aeb0
-location: AGENTS.md (Maintained by hand, sim-driver paragraph)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: low
-reason: sim help says a folded landscape comes back only when the shell, the host app, Settings or Safari was in front. With another app in front, center exits 1 after a good read and says why. The AGENTS.md clause states the restore with no exception, so an agent that reads only AGENTS.md expects the folded landscape back. The fix edits an agent-context file, so it is deferred rather than patched.
-status: done 2026-11-01
-resolution: AGENTS.md's sim-driver clause now states the folded-landscape exception (story 3.10).
+archived: 2026-11-26
 
 ### DW-350: center leaves the Home Screen in front after a folded-portrait or unfolded start; only a folded-landscape start brings its front app back.
+
+status: done 2026-11-01
 origin: spec-deferred 14bd1d434eba
-location: scripts/sim-driver/sim (cmd_center, center_restore)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: low
-reason: center presses Home before its read and again after it, as story 12's center already did at the baseline (sim:641 and sim:648 at c9bf63ec), so the shell or host app that was in front is not brought back. The new restore relaunches the front app only for a folded landscape, because only there is it needed for the orientation. Neither sim help nor AGENTS.md says the front app is not restored. A check that expects the shell in front after center finds the Home Screen.
-status: done 2026-11-01
-resolution: documented in `sim help`'s center line and AGENTS.md's sim-driver clause (story 3.10). Behavior kept: only a folded-landscape start relaunches the front app, because only there does the orientation need it, and asking for the front app costs a runner step.
+archived: 2026-11-26
 
 ### DW-351: sim banner exits 130 on TERM as well as INT, while center now exits 143 on TERM.
+
+status: done 2026-11-01
 origin: spec-deferred 05678d9d50dc
-location: scripts/sim-driver/sim:600 (cmd_banner)
 source_spec: `tickets/epic-push-notifications/tickets/story-the-simulator-driver-reads-notification-center-on-the-unfold-plan.md`
 severity: low
-reason: banner's trap is `trap '[[ -n $STEP_PID ]] && kill $STEP_PID 2>/dev/null; exit 130' INT TERM` (sim:600), unchanged since the baseline c9bf63ec. center's traps set 130 for INT and 143 for TERM. A caller telling the two signals apart by exit code gets 130 from banner for both.
-status: done 2026-11-01
-resolution: banner's trap is split: INT exits 130 and TERM 143, as center does (story 3.10).
+archived: 2026-11-26
 
 ### DW-352: Sign-out leaves the outgoing account's delivered notifications (love-note pushes and date reminders) in Notification Center, so the next person on a shared device can read them.
-origin: spec-deferred story-3.2 plan
-location: src/services/pushNotifications.ts (stopDevicePushes)
-source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
-severity: low
-reason: Sign-out now removes the device's registration, unregisters from APNs and clears the badge, but the ticket does not ask for delivered notifications to go, and stopDevicePushes deliberately avoids the push plugin's removeAllDeliveredNotifications(), which rejects unless register() ran this launch. Each banner already delivered keeps its sender's name and note text in Notification Center after sign-out. Settle it in a later story with a native removal (UNUserNotificationCenter removeAllDeliveredNotifications) gated on its own plugin check, and a decision on whether a sign-out should empty the app's whole Notification Center group.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sign-out-clears-notifications
 resolution-undo: b04da7f46545fbcaa346ae11efa04b980a6f5b208f9ab1392bb4755eae75bae2 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 clear-whole-group — owner, 2026-11-02: sign-out removes every delivered notification of the app, pushes and date reminders alike (retro L7), using @capacitor/local-notifications' removeAllDeliveredNotifications(), which needs no register() this launch, behind its own Capacitor.isPluginAvailable check; web-only, no new Swift. A simulator check of the shell is a follow-up outside the loop.
-
-### DW-353: A push_devices row outlives the install or session that registered it (reinstall, offline sign-out, or a session ended elsewhere), and only an APNs 410 removes it, which may never come.
-origin: review story-3.2
-location: supabase/functions/send-push/handler.ts (410 branch, row selection); supabase/migrations/20261031000000_push_devices.sql (register_push_device); src/services/pushNotifications.ts (removePushRegistration); src/api/auth/actionService.ts (signOut everywhere); scripts/sim-driver (provision)
+origin: spec-deferred story-3.2 plan
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
-reason: Sign-out removes only the row for the token this install stored. An uninstall and reinstall gets a new APNs token, so the old row stays registered to the account. With a real APNs key the next send to it answers 410 and the sender deletes it; on the local stack there is no key, so the stale row stays, and every `sim build` (which uninstalls first) leaves one. Story 3.2's simulator check deleted one such row by hand before it ran. Settle it with a decision: either the driver clears the fixture accounts' push_devices rows when it provisions or reinstalls, or registration drops the account's other rows for this device (which needs a device identity APNs does not give). Absorbs DW-356 (an offline sign-out's old token: APNs answered 200 for about 30 minutes, never 410) and DW-384 (a session ended by the SDK or a global sign-out elsewhere leaves the row). Registration bumps updated_at on every online signed-in start with permission (App.tsx:443-449 -> register_push_device), not on a foreground return. "Sign out of all devices" removes only the calling device's row, so a lost phone keeps receiving love-note pushes until its app runs again (from the code; not checked on a device).
+archived: 2026-11-26
+
+### DW-353: A push_devices row outlives the install or session that registered it (reinstall, offline sign-out, or a session ended elsewhere), and only an APNs 410 removes it, which may never come.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sign-out-everywhere
 resolution-undo: 051accdf846088fbef5b51bd6f3357876d3a16d827d043cb8100d2787d2fb8df 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 prune-and-sign-out-everywhere — owner, 2026-11-02, after Firebase's token-management guidance (timestamp each registration, prune stale ones, delete on an invalid-token answer): (1) send-push skips and deletes any push_devices row whose updated_at is older than one month; (2) "Sign out of all devices" deletes every push_devices row of the account through a SECURITY DEFINER RPC before the global sign-out (pgTAP for the RPC and its grants); (3) on the local stack, `sim provision` deletes the fixture accounts' push_devices rows so each `sim build` reinstall starts clean.
-
-### DW-354: A reinstalled shell leaves its old token's push_devices row on the account; only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
-origin: spec-deferred 24a607eba37a
-location: src/services/pushNotifications.ts (removePushRegistration); supabase/functions/send-push/handler.ts (410 branch)
+origin: review story-3.2
 source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
 severity: low
-reason: Sign-out removes only the stored token's row; a reinstall gets a new APNs token. The story's simulator check found one such stale row from story 1's install and deleted it by hand. Ledger DW-353.
+archived: 2026-11-26
+
+### DW-354: A reinstalled shell leaves its old token's push_devices row on the account; only the sender's APNs 410 cleanup removes it, which never runs on the local stack.
+
 status: done 2026-11-01
-resolution: duplicate of DW-353 (the same review finding, carried in from story 3.2's plan frontmatter); tracked there.
+origin: spec-deferred 24a607eba37a
+source_spec: `tickets/epic-push-notifications/tickets/story-sign-out-stops-a-device-s-pushes-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-355: Every push to main now rebuilds both Edge Functions from the unpinned esm.sh import, so production functions can change with no reviewed change, and an esm.sh outage blocks a frontend-only site deploy.
-origin: review story-3.3
-location: .github/workflows/deploy.yml (functions job); supabase/functions/send-push/index.ts:19; supabase/functions/upload-love-note-image/index.ts:22
-source_spec: `tickets/epic-push-notifications/tickets/story-every-edge-function-deploys-from-deploy-yml-plan.md`
-severity: medium (unverified)
-reason: Both entrypoints import `https://esm.sh/@supabase/supabase-js@2`, and `supabase functions deploy --use-api` resolves that on Supabase's side at every deploy. Story 3.3's ticket asks for every function on every run, and for `build` to need the function deploy, so a newer 2.x on esm.sh reaches production on the next frontend-only push, and an esm.sh or bundler outage stops the site deploy. test.yml leaves `index.ts` out of `deno test` to avoid exactly this CDN dependency. That the resolved version drifts between deploys is unverified; compare the deployed bundle's supabase-js version across two runs to settle it. To fix, decide between pinning the import to an exact version in both functions and deploying functions only when `supabase/functions/**` or `supabase/config.toml` changed (which needs the owner to amend the "every run" decision).
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-pin-edge-supabase-js
 resolution-undo: c5ac684b11adaf4e0287144b8d69060bbd70dab23125f5b61f135345802238d2 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 pin-and-keep-every-run — owner, 2026-11-02: pin `https://esm.sh/@supabase/supabase-js@2` to one exact 2.x version in both entrypoints (the version package-lock.json resolves for the app is the natural choice); keep deploying every function on every run, so the deploy.yml job stays ungated.
+origin: review story-3.3
+source_spec: `tickets/epic-push-notifications/tickets/story-every-edge-function-deploys-from-deploy-yml-plan.md`
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-356: A device that signs out offline leaves its old token's push_devices row, APNs keeps accepting pushes to that unregistered token with 200 instead of 410, so the sender never deletes it and sends to it on every note.
+
+status: done 2026-11-02
 origin: story-3.13
-location: supabase/functions/send-push/handler.ts (410 branch); src/services/pushNotifications.ts (removePushRegistration)
 source_spec: `tickets/epic-push-notifications/tickets/story-pushes-arrive-through-apns-on-a-device-and-from-the-hosted-p-plan.md`
 severity: low
-reason: Story 3.13's device run on 2026-11-01: after two offline sign-outs, the iPhone got a new APNs token on each sign-in, and the fixture account kept both old rows. For about 30 minutes, APNs answered 200 to every push for them, never 410, while the phone showed nothing for them, so nothing leaked on screen. Each stale row costs one APNs request per note, and any further rows a reinstall leaves (DW-353) add to that. A row deleted only on a 410 may never be deleted. Settle it with a decision: prune a registration not re-registered within some age (registration bumps `updated_at` on every signed-in start), or have the client remove its previous token's row on the next online sign-in (it would need to keep that token across sign-out). Whether APNs ever answers 410 for these tokens is unverified; re-read the fixture rows' send results after a day.
-status: done 2026-11-02
-resolution: merged into DW-353 (one stale push_devices problem with three causes: reinstall, offline sign-out, a session ended elsewhere); the owner chose one fix for all three there.
+archived: 2026-11-26
 
 ### DW-357: `src/types/database.types.ts` is not what AGENTS.md's regeneration command writes: since story 3.1 each regeneration has been reformatted to the file's style with the CLI's `ComputedFields: never` lines dropped, so the documented command now rewrites the whole file.
+
+status: done 2026-11-01
 origin: review story-3.4
-location: src/types/database.types.ts; AGENTS.md (Policy, the regeneration command)
 source_spec: `tickets/epic-push-notifications/tickets/story-moods-photos-pokes-and-kisses-push-plan.md`
 severity: low
-reason: On 2026-10-31 with CLI 2.122, `supabase gen types typescript --local | grep -v '^Connecting to'` differed from the committed file by 1268 diff lines, both at the story's baseline (74897fd9) and after it. Story 3.4's diff to the file is only the `push_requests` columns and relationships, matching the migration. Stories 3.1, 3.2 and 3.4 all reformatted the output by hand, against "never hand-edit" and the Prettier rule against reformatting untouched code, because the raw output would rewrite the whole file. Settle it with a decision: commit the raw output once, as its own commit, and keep it raw from then on; or document the formatting step in AGENTS.md beside the command.
-status: done 2026-11-01
-resolution: the CLI prints its types unformatted by design (it says to run oxfmt). `npm run db:types` now formats them with the pinned oxfmt (no semicolons, 80 columns), which reproduces the file's layout; the file was regenerated once with it, restoring the CLI 2.122 `ComputedFields: never` lines. CI's Database Tests job regenerates and fails on any difference, and the CI CLI pins moved to 2.122.0 to match.
+archived: 2026-11-26
 
 ### DW-361: A push that arrives while Love Notes is in front can leave its badge showing on a real iPhone, because the second badge clear waits a fixed 1 s that was measured only on the simulator.
+
+status: done 2026-11-01
 origin: review story-3.8
-location: src/hooks/useLoveNotesReadMarker.ts (FOREGROUND_BADGE_RECLEAR_MS)
 source_spec: `tickets/epic-push-notifications/tickets/story-love-notes-stack-apart-and-the-badge-counts-unread-notes-plan.md`
 severity: medium (unverified)
-reason: The push plugin's willPresent tells the web view about the push and then returns the badge option, and iOS applies the payload's badge after the first clear. On the iPhone Duo simulator a second `AppBadge.clear()` 1 s later left the badge clear on every run. No device has been checked, and a slower one could apply the badge after the second clear; the badge would then show until Love Notes is next opened or brought to the front. Settle it on the owner's iPhone in story 3.11: with Love Notes in front, a note from the partner must leave the badge clear. If it does not, clear the badge natively (for example in a willPresent wrapper told by the web view that Love Notes is on screen) rather than lengthening the wait.
-status: done 2026-11-01
-resolution: settled on the owner's iPhone in story 3.11: with Love Notes in front, a partner note showed no banner and left no badge, so the 1 s second clear held (story-push-ships-to-the-owner-s-iphone-plan.md, Result).
+archived: 2026-11-26
 
 ### DW-363: A picture-only love note sent from the app is refused by love_notes_content_check: the composer clears as if it sent, the note shows as failed, and Retry fails the same way
+
+status: done 2026-11-02
 origin: story-3.10
-location: src/components/love-notes/MessageInput.tsx (handleSend); src/stores/slices/notesSlice.ts (sendNote, picture path); supabase/migrations/20251206024345_remote_schema.sql (love_notes_content_check)
 source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
 severity: medium
-reason: Found while settling DW-341. With no text, `handleSend` passes '' as the content beside the picture, and `sendNote` uploads the picture and then inserts '' unchanged. `love_notes_content_check` requires `char_length(content) >= 1`, so the insert fails with 23514. `sendNote` removes the uploaded object, sets `notesError` to `CHECK_CONSTRAINT_MESSAGE` ("Some values are not allowed - check length and format limits"), marks the note failed and returns without throwing, so `handleSend` fires the success vibration and clears the text and the picture as if the note had gone; the message shows only in Love Notes' page banner (`notes-error-banner`). `retryFailedMessage` re-inserts the same '' and fails the same way, so the note can never be sent. A rolled-back insert of '' with an `image_url` on the local stack, run on 2026-11-01, failed the constraint. No E2E or api spec sends a picture-only note through the app: the push spec inserts ' '. That the hosted constraint is the same is UNVERIFIED; read `pg_get_constraintdef` for `love_notes_content_check` read-only to settle it. Fixing it is a behavior change, outside a cleanup sweep, and needs a choice: allow empty content when `image_url` is set (a migration, plus `love_notes_visible` and every reader of `content`), or have the client send a stand-in, which send-push's `hasCaption` would then push as text.
-status: done 2026-11-02
-resolution: moved to the P1 backlog bug `_bmad-output/backlog/bug-a-picture-only-love-note-never-sends.md`, which carries the reproduction and acceptance criteria; the hosted `love_notes_content_check` was read on 2026-11-02 and matches the migration (`char_length(content) >= 1 AND <= 1000`).
+archived: 2026-11-26
 
 ### DW-364: sim help and AGENTS.md say center "ends on the Home Screen, except that a folded-landscape start gets its front app back", which misses a landscape start on a phone with no pose and a front step that found no app.
+
+status: done 2026-11-02
 origin: spec-deferred 608c912c1e07
-location: scripts/sim-driver/sim (help, center line; cmd_center; center_restore); AGENTS.md (Maintained by hand, sim-driver paragraph)
 source_spec: `tickets/epic-push-notifications/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: cmd_center asks for the front app whenever `$CENTER_POSE != unfolded && $CENTER_ORIENT != portrait`, which includes an empty pose (a phone with no pose, such as an iPhone 17). center_restore relaunches only when CENTER_FRONT is set and not `none`, so when `notify front` fails nothing is relaunched; center only says the folded landscape may not come back. Found by story 3.10's review. The fix edits AGENTS.md, so it is deferred: reword both to "a landscape start that is not unfolded gets back the shell, the host app, Settings or Safari when the front step found one".
-status: done 2026-11-02
-resolution: `sim help` (center) and AGENTS.md's sim-driver paragraph now say a landscape start that is not unfolded (a folded Duo, or a phone with no pose) comes back only when the shell, the host app, Settings or Safari was in front, and that such a start gets that app back; behaviour unchanged.
+archived: 2026-11-26
 
 ### DW-365: `scripts/sim-driver/pending.py` checks no record-level schema marker, so an iOS release that keeps the pending archive's key names but changes their meaning would decode without error
-origin: story-4.7
-location: scripts/sim-driver/pending.py (pending, trigger_of)
-source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
-severity: medium (unverified)
-reason: Found by story 4.7's review. Each record in the fixture `PendingNotifications.plist` carries about 60 keys, `SchemaVersion` 11 and `TriggerRepeatInterval` 0 among them, but the mapper reads only the identifier, text, thread and trigger keys and fails loudly only when one of those is missing or holds an unknown shape. Whether an iOS release changes a key's meaning while keeping its name is UNVERIFIED. To settle it, decode a pending archive from a later simulator runtime (`python3 -I scripts/sim-driver/pending.py --raw FILE`) and compare it with the fixture. If it is real, the fix is to require the measured `SchemaVersion` and `TriggerRepeatInterval` 0.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sim-pending-schema-markers
 resolution-undo: 29c914fde9708340ccb345f20f477c926e50327447685d7ef04c2cee1d2d3ad4 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 Require the markers now — In scripts/sim-driver/pending.py, require each record's SchemaVersion to equal the measured 11 and TriggerRepeatInterval to be 0, failing loudly (exit 1 with the record's identifier and the found value) otherwise, matching the decoder's existing fail-loudly rule; extend scripts/sim-driver/test-pending.zsh with fixtures for a changed SchemaVersion and a non-zero TriggerRepeatInterval.
+origin: story-4.7
+source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-366: AGENTS.md's sentence on `sim schedule`/`sim unschedule` omits two side effects: both launch the host app and bring it to the front, and `sim permission reset --host` uninstalls the host and so wipes its pending requests
+
+status: done 2026-11-01
 origin: story-4.7
-location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (host_apply, cmd_permission)
 source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
 severity: low
-reason: Found by story 4.7's review. `host_apply` runs `xcrun simctl launch --terminate-running-process` on the host, which leaves the host in front where a check may expect the shell, and `permission reset` runs `simctl uninstall`. Both appear in `sim help`, not in AGENTS.md. The fix edits AGENTS.md, so it is deferred: add both to the sim-driver paragraph.
-status: done 2026-11-01
-resolution: story 4.4: AGENTS.md's sim-driver paragraph now says `schedule` and `unschedule` launch the host, leaving it in front of the shell, and that `sim permission reset --host` uninstalls the host and wipes its pending requests.
+archived: 2026-11-26
 
 ### DW-369: The AGENTS.md sentence on `sim schedule` does not say the host needs `sim permission allow --host` first, so a later story's first schedule exits 1 and has to be rerun.
+
+status: done 2026-11-01
 origin: spec-deferred e0029a1bba77
-location: AGENTS.md (Maintained by hand, sim-driver paragraph)
 source_spec: `tickets/epic-date-reminders/tickets/story-the-simulator-driver-lists-an-app-s-scheduled-reminders-plan.md`
 severity: low
-reason: host_apply dies with "the host has no notification permission: run sim permission allow --host" when the host's result file reads "not authorized", and `sim help` says so, but AGENTS.md's sim-driver paragraph does not. The fix edits AGENTS.md, so it is deferred.
-status: done 2026-11-01
-resolution: story 4.4: AGENTS.md's sim-driver paragraph now says `schedule` needs `sim permission allow --host` first.
+archived: 2026-11-26
 
 ### DW-370: On a first sign-in the launch plan can find notification permission not yet granted, and nothing re-plans once the person taps Allow until the next launch.
+
+status: done 2026-11-01
 origin: spec-deferred ec751e5258fa
-location: src/App.tsx:418-424, src/services/dateReminders.ts scheduleDateReminders
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
-reason: dateReminders.ts schedules only when checkPermissions().display is 'granted' and never prompts; story 3.1's alert is often still up when refreshLocalCopies() resolves on the first signed-in start. Story 4.6 owns the re-plan triggers (foreground, sign-in, date change). Whether its foreground trigger fires when the system permission alert closes is unverified; story 4.6 should check a re-plan after the first-sign-in permission answer.
-status: done 2026-11-01
-resolution: story 4.6: App's push effect re-plans the date reminders, with the start's captured identity, when `startPushRegistration()` resolves 'registering' (the permission is granted), covered by `tests/unit/App.localCopyRefresh.test.tsx`.
+archived: 2026-11-26
 
 ### DW-371: The `sim help` text and the AGENTS.md sim-driver sentence say `sim dates kinds|many` replace only the seeded events, but they first clear both people's anniversaries, the pair's couple_settings row
+
+status: done 2026-11-01
 origin: spec-deferred 356b1422e4d3
-location: scripts/sim-driver/sim:67-75, AGENTS.md (sim-driver paragraph)
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
-reason: scripts/sim-driver/sim:71-72 reads "kinds and many first remove the seeded events"; AGENTS.md's sim-driver paragraph reads "replacing the seeded events"; scripts/sim-driver/dates.ts runs clearDates before kinds and many, as its own header states. The fix edits AGENTS.md, an agent-context file.
-status: done 2026-11-01
-resolution: story 4.4: `sim help` and AGENTS.md now say `kinds` and `many` first do what `clear` does (both people's events and anniversaries, the pair's couple settings, both birthdays), and that their event and birthday writes send the other person date-change pushes (story 4.1's residual risk).
+archived: 2026-11-26
 
 ### DW-372: `sim pending` can report "nothing has been scheduled since ... installed" (and []) while requests are pending, because the simulator writes PendingNotifications.plist some time after `schedule`
+
+status: done 2026-11-01
 origin: spec-deferred 533ac45bf375
-location: scripts/sim-driver/sim cmd_pending
 source_spec: `tickets/epic-date-reminders/tickets/story-the-planner-schedules-every-date-s-day-before-and-on-the-day-plan.md`
 severity: low
-reason: Found during this pass's simulator verification, not by a review lens. After the first sign-in and a network-off relaunch, `sim pending` 15 s after launch said the plist did not exist; the next launch's console showed LocalNotifications.getPending returning 11 pending requests. Later launches rewrote the plist within 25 s. A check that reads the list right after the first schedule on a fresh install can see a false empty list. Story 7's reader (scripts/sim-driver) could wait for the plist's mtime to pass the launch, as the previous pass did by hand.
-status: done 2026-11-01
-resolution: story 4.4: documented, behaviour kept. `sim help`, pending.py's missing-file note and AGENTS.md say iOS writes PendingNotifications.plist some time after a schedule, after a fresh install's first one sometimes not until the app's next launch, so an empty or stale list read right after one is not proof (the earlier "up to about 25 s" bound was dropped by DW-382). A wait would need the schedule's time, which `sim pending` does not know.
+archived: 2026-11-26
 
 ### DW-373: A re-plan cancels only the ids `getPending` reports, so if a follow-up re-plan's `getPending` misses requests the previous run just scheduled, ids above the new N stay pending.
+
+status: done 2026-11-01
 origin: spec-deferred 4cdc45753d6d
-location: src/services/dateReminders.ts scheduleDateReminders
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-re-plan-on-every-change-stop-at-sign-out-stack-wit-plan.md`
 severity: medium
-reason: Quick review finding, verdict maybe-false. The plugin's `schedule` calls `center.add` and resolves without waiting for its completion (LocalNotificationsPlugin.swift:211-227), and this story makes back-to-back re-plans routine (single-flight follow-up, copy-write bursts). Whether a `getPendingNotificationRequests` issued right after can miss an `add` still in flight is undocumented. On the simulator in this pass, a delete took the list from 12 to 10 and both stale ids were cancelled, but a single run does not settle the race. To settle it, schedule N and then immediately run getPending in a loop on a device or simulator and check whether it ever lists fewer than N. The fix, if needed, is the sign-out cancel's id union (1..64 plus pending) in scheduleDateReminders' cancel step. (declared severity: medium (unverified))
-status: done 2026-11-01
-resolution: `scheduleDateReminders` now cancels the same id union as `cancelDateReminders` (ids 1..64 plus every pending id, through `reminderIdsToCancel`), so a re-plan, and the story 4.3 Settings switch turned off, also cancels a fresh schedule the pending list has not caught up with. Whether iOS's `getPending` can lag an `add` stays unmeasured; the re-plan no longer depends on the pending list, though like the sign-out cancel it still assumes iOS applies a removal after an `add` already in flight (unverified).
+archived: 2026-11-26
 
 ### DW-374: `src/types/database.types.ts` gets each new table's block inserted in the committed file's style, because `supabase gen types typescript --local` on CLI 2.122.0 no longer reproduces the committed
+
+status: done 2026-11-02
 origin: spec-deferred 8482db9d6aac
-location: src/types/database.types.ts, AGENTS.md (Policy, database.types.ts)
 source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
 severity: low
-reason: Quick review finding. On CLI 2.122.0 the command prints unformatted output, 621 lines against the committed 977, with `ComputedFields: never` in all 22 tables. A whole-file regeneration would rewrite every table's lines. Story 3.8 (b430cde6) and this story both inserted only their own table's block, which matches the generator's Row/Insert/Update shape. Settling it is a decision for the owner: either commit one full regeneration on the current CLI and run Prettier on that generated file, or amend the AGENTS.md rule. The rule edit touches an agent-context file.
-status: done 2026-11-02
-resolution: duplicate of DW-357, fixed by 9717aa5d (`npm run db:types` formats with the pinned oxfmt and CI checks the committed file) and 5cc03752 (the missing ComputedFields line); story 4.3 then regenerated on the pinned CLI and changed only its own lines, and the types check passes on main.
+archived: 2026-11-26
 
 ### DW-375: The iOS simulator ignores a host clock jump until it is rebooted, and the sim driver has no step for it, so a check that moves the Mac clock to make a reminder fire sees nothing fire.
+
+status: done 2026-11-02
 origin: story 4.8 simulator checks, 2026-11-01
-location: scripts/sim-driver/sim
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
-reason: Observed in story 4.8's first pass: with the Mac clock set to 11-02 08:58:30 by `sudo /bin/date`, the 8 reminders due at 09:00 stayed pending; after a simulator reboot at 08:57 all 8 fired at 09:00. Every firing check in that story rebooted the simulator by hand after each clock jump. A `sim` command that reboots the simulator (or sets the clock and reboots) would make the step repeatable. The device check in story 5 is unaffected.
-status: done 2026-11-02
-resolution: `sim reboot` shuts the simulator down and boots it again (`simctl shutdown`, then `simctl bootstatus -b`), returning once it has booted; run it after each `sudo /bin/date` (plan-dw-375-376-sim-reboot-and-watch.md).
+archived: 2026-11-26
 
 ### DW-376: A date reminder firing while the shell is in the foreground was never observed; the plugin's default `willPresent` should show a banner, but no check confirms it.
+
+status: done 2026-11-02
 origin: story 4.8 simulator checks, 2026-11-01
-location: src/services/dateReminders.ts, @capacitor/local-notifications (willPresent presentation options)
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
-reason: In every story 4.8 firing run the shell was backgrounded or terminated at 9:00, so only background delivery, the stacking in the one My Love group and the tap to Home were seen. Whether a reminder due while the shell is in front shows a banner (the plugin's default presentation) is unverified. A check needs the shell in front across 9:00, after the simulator reboot DW-375 describes: set the clock, `sim reboot`, `sim launch`, then `sim watch --front --for 180` started by 8:58, since the runner takes 6-12 s to start and first waits up to 20 s for any earlier banner to clear. `sim banner FILE --front` does not fit, because it pushes FILE and watches only 20 s.
-status: done 2026-11-02
-resolution: observed on the iPhone Duo simulator 2026-11-02, after DW-390 shipped: with the shell (built from main at 646facdf) in front and the Mac clock set to 2026-11-04 08:55 followed by `sim reboot`, `sim watch --front` saw the banner at 09:00:02 ("MY LOVE, now, Tomorrow: Lake weekend"). The plugin's default presentation shows the banner in front. The sound was not heard: the simulator's audio is not checked.
-decision: 2026-11-02 observe-with-sound — owner, 2026-11-02: keep the plugin's banner when the shell is in front, and give reminders a sound (DW-390); check both together in one device or simulator run after DW-390 ships and the shell is reinstalled. Outside the loop: the run moves the Mac clock with sudo.
+archived: 2026-11-26
 
 ### DW-377: An offline sign-out leaves the account's refresh token valid on the server indefinitely, because nothing revokes it once the device is back online and no session timebox is set.
+
+status: done 2026-11-02
 origin: story 4.8 thorough review, 2026-11-01
-location: src/api/auth/actionService.ts (signOut, retryable fallback); supabase/config.toml ([auth.sessions] commented out)
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
-reason: The owner chose a device-only sign-out when the server is unreachable (story 4.8 decisions). The device deletes its stored session, so the token is gone from that phone; the server session stays usable by anyone who already holds the refresh token. Settling it means either a revoke of the previous refresh token at the next online start (the token would have to be kept somewhere after sign-out) or an `[auth.sessions]` timebox/inactivity timeout in the hosted project; the hosted setting is unverified.
-status: done 2026-11-02
-resolution: accepted by the owner: the hosted project offers no session timebox or inactivity timeout on its plan (Auth settings show only access-token expiry 3600 s, refresh-token reuse interval 10 s and compromised-token detection on), and "Sign out of all devices" (d47ea7c5) revokes an orphaned session from any signed-in device.
-decision: 2026-11-02 accept-and-close — owner, 2026-11-02; keeping the old refresh token after sign-out to revoke it later was rejected, because it leaves a credential on a shared device.
+archived: 2026-11-26
 
 ### DW-378: While the app runs on a stored session the SDK cannot use, Realtime channels may join with the publishable key and stay muted after the token renews.
-origin: story 4.8 thorough review, 2026-11-01
-location: src/api/interactionService.ts and src/stores/slices/interactionsSlice.ts (partner check after renewal, about :451-520); src/hooks/usePartnerMood.ts:89-96 (error never cleared); src/api/supabaseClient.ts (guard covers HTTP fetch only)
-source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
-severity: low
-reason: The session guard wraps global.fetch, which the Realtime WebSocket never uses, so with a null INITIAL_SESSION channels join as anon until TOKEN_REFRESHED calls realtime.setAuth. 2026-11-02 triage: supabase-js re-sends the new token to joined channels and rejoins refused private ones, and a local-stack probe saw both the private mood channel and the interactions postgres_changes recover about 5 s after the token arrived. Mood (3f551b1b) and love notes (b64ceb38, ccf6ab2d) were since fixed. Two gaps remain, from reading the code: (1) pokes and kisses: the partner check stays empty after renewal because no second SUBSCRIBED fires, so live interactions are dropped as from no partner (interactionsSlice.ts:451-520); (2) usePartnerMood sets "Real-time connection lost. Refresh to reconnect." on CHANNEL_ERROR and never clears it on a later SUBSCRIBED, so the card stays on its error after delivery recovers. Fix both, with a local-stack E2E that blocks the token endpoint, lets the token renew, and sees a partner mood, note and poke arrive live.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-realtime-recovery-after-renewal
 resolution-undo: db00046158db0bae449549e28442c6371d4363a2028fc0fa225a0e94cabb8016 2026-11-02 7374617475733a206f70656e
-
-### DW-379: AGENTS.md does not yet state the session rules story 4.8 introduced.
 origin: story 4.8 thorough review, 2026-11-01
-location: AGENTS.md (Known pitfalls)
 source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
 severity: low
-reason: Three rules a later agent needs are only in code comments: only an empty SDK session store means signed out (`readStoredSession`, `src/api/authStorage.ts`); `getSession` can return a stored session whose access token has expired while the server is unreachable, so code that sends `session.access_token` itself must expect a 401; and the session guard fails a data request with a synthetic `TypeError('Failed to fetch')` even when the network is up (the SDK's 60 s refresh cooldown, or GoTrue down). The edit touches an agent-context file, so it is deferred.
+archived: 2026-11-26
+
+### DW-379: AGENTS.md does not yet state the session rules story 4.8 introduced.
+
 status: done 2026-11-01
-resolution: story 4.4: the three session rules are a Maintained-by-hand bullet in AGENTS.md (outside the generated block, so a context refresh keeps them).
+origin: story 4.8 thorough review, 2026-11-01
+source_spec: `tickets/epic-date-reminders/tickets/story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-380: A countdown mark on the partner's birthday is keyed `partner-birthday`, not by the partner, so after an unlink and a link to someone else it marks the new partner's birthday.
+
+status: done 2026-11-02
 origin: story 4.2 residual risk, carried in by story 4.4, 2026-11-01
-location: src/services/dateReminders.ts (MARK_KEYS); the countdown marks table and its local copy (story 4.2)
 source_spec: `tickets/epic-date-reminders/tickets/story-dates-marked-for-the-countdown-remind-a-month-and-a-week-bef-plan.md`
 severity: low
-reason: Story 4.2 keys the fixed dates `relationship-start`, `wedding`, `own-birthday` and `partner-birthday`, so a mark outlives the link it was made under; the same holds for `relationship-start` and `wedding`, which are the couple settings of whichever pair the person is in. Whether a mark should carry over to a new partner is an owner decision; a fix would key the partner-scoped marks by the partner's id (or clear them in `accept_partner_request`) and needs a migration. Recorded only in the plan's residual risks until now.
-status: done 2026-11-02
-resolution: closed as unreachable: the app has no unlink, and accept_partner_request refuses when either person already has a partner, so a role-keyed mark (partner-birthday, and equally relationship-start and wedding, retro finding L13) can never meet a second partner; reopen if an unlink is ever built.
-decision: 2026-11-02 close-unreachable — owner, 2026-11-02; covers retro L13 too.
+archived: 2026-11-26
 
 ### DW-381: Offline, or after a failed read, Settings shows the "Date reminders" switch on (disabled) while the saved copy says off, because nothing seeds the store's push preferences from the `push-preferences` local copy.
-origin: story 4.3 review (rejected there under its unchanged-load-behaviour rule), carried in by story 4.4, 2026-11-01
-location: src/components/Settings/CountdownMarks.tsx (the switch's `?? true` default; PushSettings.tsx's six rows the same); src/stores/slices/settingsSlice.ts `loadPushPreferences`
-source_spec: `tickets/epic-date-reminders/tickets/story-a-settings-switch-turns-date-reminders-off-plan.md`
-severity: low
-reason: `loadPushPreferences` returns early offline and the row renders `?? true`, the same as story 3.7's six push rows. Planning is unaffected, because the re-plan reads the copy, so no reminder is scheduled; only the switch's shown state is wrong. A fix seeds the store from the copy before the online read, for all seven rows, which is a load-behaviour change and not cleanup.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-push-preferences-saved-copy
 resolution-undo: 56a0a8b609c0d775e125b17c47bb18a344e21e1a0204ed542d96495a1d8e50d6 2026-11-02 7374617475733a206f70656e
+origin: story 4.3 review (rejected there under its unchanged-load-behaviour rule), carried in by story 4.4, 2026-11-01
+source_spec: `tickets/epic-date-reminders/tickets/story-a-settings-switch-turns-date-reminders-off-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-382: The docs this sweep added for DW-372 say iOS writes PendingNotifications.plist "up to about 25 s after a schedule", but no measurement bounds the lag on a fresh install's first schedule.
+
+status: done 2026-11-02
 origin: spec-deferred 8a19bda4005c
-location: AGENTS.md (Maintained by hand, sim-driver paragraph); scripts/sim-driver/sim (help, pending); scripts/sim-driver/pending.py (missing-file comment); _bmad-output/initiative-my-love/deferred-work.md
 source_spec: `tickets/epic-date-reminders/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: DW-372 and story 4.1's plan record the only measurements: on the first schedule after a fresh install the plist still did not exist 15 s after launch and appeared only by the next launch; "within 25 s" was seen on later launches, timed from launch, not from the schedule. So a later agent can wait 25 s and still read a false empty list. Found by story 4.4's quick review. The fix rewords `sim help` (pending), the comment in scripts/sim-driver/pending.py, AGENTS.md's sim-driver paragraph and DW-372's resolution to drop the bound: "iOS writes the file some time after a schedule, on a first install sometimes not until the next launch, so an empty or stale list right after one is not proof". It edits AGENTS.md, so it is deferred. 2026-11-02 triage: rewording DW-372's resolution line is an orchestrator edit, so do it in the same interactive docs commit as the AGENTS.md change, not in a loop session.
-status: done 2026-11-02
-resolution: `sim help` (pending), pending.py's missing-file note, AGENTS.md's sim-driver paragraph and DW-372's resolution drop the 25 s bound: iOS writes the file some time after a schedule, after a fresh install's first one sometimes not until the app's next launch.
+archived: 2026-11-26
 
 ### DW-383: A device clock far ahead of real time, online, makes supabase-js refresh the session in a loop until GoTrue answers 429, and the SDK then signs the device out.
-origin: spec-deferred story-4-5-ship
-location: src/api/auth/sessionService.ts; node_modules/@supabase/auth-js (GoTrueClient `_callRefreshToken`)
-source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
-severity: low
-reason: Seen on the owner's iPhone on 2026-11-02 against production: with the clock five days ahead and Wi-Fi still on, every token the server issued already looked expired to the device, so it refreshed about 30 times in 3 s (06:11:49-52 UTC, all 200), then GoTrue answered 429 `over_request_rate_limit`. A 429 is not an `AuthRetryableFetchError`, and with the access token expired by the device's clock `_callRefreshToken` calls `_removeSession()`, which emits SIGNED_OUT. Only a wrong device clock reaches it, and iOS sets the clock itself unless the person turns that off. Settle it with a decision: accept it, or treat a 429 refresh like an unreachable server (keep the stored session) in the app's auth layer.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-session-device-relative-expiry
 resolution-undo: ce31c7258ea1b5ae305ceb0e442d53638df4b42816fb54983de29c8dfd29184f 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 fix-device-relative-expiry — owner, 2026-11-02 (well-built clients tolerate a wrong device clock): in the app's session-guarded fetch wrapper (supabaseClient.ts createSessionGuardedFetch), strip expires_at from GoTrue token responses so auth-js computes expiry from expires_in on the device's own clock (@supabase/auth-js 2.118.0 lib/fetch.js:140); the server still checks expiry with its own clock. Unit-test a token response with expires_at days in the past and a clock days ahead; no refresh loop and no SIGNED_OUT.
-
-### DW-384: A session that ends without the app's Sign out (a refresh the SDK gives up on, or a sign-out of all devices from elsewhere) leaves the device's push_devices row on the account.
 origin: spec-deferred story-4-5-ship
-location: src/services/pushNotifications.ts (removePushRegistration); src/api/auth/actionService.ts (signOut)
 source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
 severity: low
-reason: Only the app's own Sign out calls `removePushRegistration()` while the session still exists. On 2026-11-02 two Claude Bot rows were left on production by sessions that ended otherwise (the DW-383 sign-out, and a global sign-out from the simulator); story 4.5's cleanup deleted them. The rows keep pushing to a device that is signed out of the account until APNs answers 410. Related to DW-353 (a reinstall's old row). Settle it with DW-353's decision on who removes a device's stale rows.
+archived: 2026-11-26
+
+### DW-384: A session that ends without the app's Sign out (a refresh the SDK gives up on, or a sign-out of all devices from elsewhere) leaves the device's push_devices row on the account.
+
 status: done 2026-11-02
-resolution: merged into DW-353 (one stale push_devices problem with three causes); the owner chose one fix for all three there.
+origin: spec-deferred story-4-5-ship
+source_spec: `tickets/epic-date-reminders/tickets/story-date-reminders-ship-to-the-owner-s-iphone-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-385: AGENTS.md's sim-driver paragraph does not name `sim reboot` or `sim watch`.
+
+status: done 2026-11-02
 origin: plan-dw-375-376-sim-reboot-and-watch review, 2026-11-02
-location: AGENTS.md (Maintained by hand, the sim-driver paragraph)
 source_spec: `plan-dw-375-376-sim-reboot-and-watch.md`
 severity: low
-reason: The paragraph lists the driver's notification commands and names `banner FILE --front` for watching while the shell is in front, which covers a push only. It does not say that a Mac clock jump needs `sim reboot` before a scheduled notification fires, or that `sim watch [--front] [--for SECONDS]` watches for a banner with nothing pushed. `sim help` lists both. The edit touches an agent-context file, so it is deferred. 2026-11-02: the same paragraph's `sim dates` sentence must also say that clear removes both people's countdown marks and resets the date-reminders switch once DW-397 lands.
-status: done 2026-11-02
-resolution: AGENTS.md's sim-driver paragraph now names `sim watch [--front] [--for SECONDS]` (a banner with nothing pushed) and `sim reboot` (needed after each `sudo /bin/date` before a scheduled notification fires), and its `sim dates` sentence says clear also deletes both people's countdown marks and turns both people's date reminders back on.
+archived: 2026-11-26
 
 ### DW-386: "Sign out of all devices" reports success when only this device was signed out.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L1, 2026-11-02
-location: src/api/auth/actionService.ts:99-109 (signOut, retryable fallback); src/components/Settings/Settings.tsx:548
-severity: medium
-reason: Settings refuses the row only when isOnline() is false. With the browser online but the auth server unreachable, signOut({ everywhere: true }) turns the AuthRetryableFetchError into error = null, or falls back to a local sign-out, and Settings reports success although the other devices stay signed in. The only test of { everywhere: true } uses error: null. It is in d47ea7c5, pushed without review.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sign-out-everywhere
 resolution-undo: 051accdf846088fbef5b51bd6f3357876d3a16d827d043cb8100d2787d2fb8df 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 report-partial — owner, 2026-11-02: when the global sign-out meets a retryable error, sign this device out as now but tell the person the other devices could not be signed out and to try again online; add a test with a retryable error on { everywhere: true }. Fits one bundle with DW-353 and DW-387.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L1, 2026-11-02
+severity: medium
+archived: 2026-11-26
 
 ### DW-387: "Sign out of all devices" acts on one tap, with no confirmation.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L16, 2026-11-02
-location: src/components/Settings/Settings.tsx (the row, d47ea7c5)
-severity: low
-reason: The row sits directly under Sign out, so one wrong tap signs the account out on every phone, simulator and browser.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sign-out-everywhere
 resolution-undo: 051accdf846088fbef5b51bd6f3357876d3a16d827d043cb8100d2787d2fb8df 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 confirm-first — owner, 2026-11-02: a confirmation dialog, "Sign out on every device? You'll need to sign in again on each one.", with Cancel and Sign out everywhere.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L16, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-388: App.tsx's auth-check comment says a present session means the callback outcome is null, which is false for an implicit-grant error redirect.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L17, verified 2026-11-02
-location: src/App.tsx:262-266; src/api/supabaseClient.ts:200-206 (getAuthCallbackOutcome)
-severity: low
-reason: getAuthCallbackOutcome returns 'provider-error' or 'cancelled' for an AuthImplicitGrantRedirectError before it reads the session, so a signed-in person landing on an error redirect gets a notice, contrary to the comment. Decide while fixing whether a signed-in person should see that notice (getAuthCallbackOutcome already returns null for a code callback with a session); then make the code and the comment agree, with a unit test.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-auth-callback-comment
 resolution-undo: e6ab390a78d48124a9fdc780e475154c434db77610befa807d870188423dccbc 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L17, verified 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-389: A device that is only resumed keeps planning date reminders from stale copies: a mark, switch or partner birthday changed elsewhere arrives only after a full restart or reconnect.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A6/L3, 2026-11-02
-location: src/services/dateRemindersAtLaunch.ts:179-182 (visibilitychange re-plan); src/App.tsx:434 and :500 (copy refreshes); src/hooks/useRealtimeMessages.ts:711 (only TOKEN_REFRESHED listener)
-severity: medium
-reason: The epic defines open as every launch and every return to the foreground, but story 4.6's frozen intent says no server refresh on foreground, so visibilitychange re-plans from unchanged copies; copies refresh only on a signed-in start, on online, and when a view loads, and nothing refreshes after TOKEN_REFRESHED. So the partner changing their birthday, or the person marking a date on another device, reaches a resumed phone only at its next cold start.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-date-reminders-replan-timing
 resolution-undo: bef106d32d6d3e89afddaca578b91d4c6b34a9a99e40b6aa110e3f7db7e29975 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 refresh-on-foreground — owner, 2026-11-02 (supersedes story 4.6's "no server refresh on foreground" for this purpose): on a return to the foreground while online, and after TOKEN_REFRESHED, refresh the seven date-reminder copies (throttled to at most once every few minutes) and then re-plan; offline it keeps planning from the saved copies.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A6/L3, 2026-11-02
+severity: medium
+archived: 2026-11-26
 
 ### DW-390: Date reminders fire with no sound.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L2, 2026-11-02
-location: src/services/dateReminders.ts (scheduleDateReminders); capacitor.config.ts (LocalNotifications); node_modules/@capacitor/local-notifications ios LocalNotificationsPlugin.swift:472-473, LocalNotificationsHandler.swift:35
-severity: medium (unverified)
-reason: scheduleDateReminders passes no sound, and the plugin sets content.sound only for a non-empty string, so reminders are most likely silent; story 4.5's device run did not record sound. In front, reminders use the plugin's default [.badge, .sound, .banner, .list] while pushes use presentationOptions ['badge'].
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-date-reminders-default-sound
 resolution-undo: 4c116e065311b4a915de0daf0a0c2bc8378770ff6ce0121464318a44c7512fe7 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 default-sound-keep-banner — owner, 2026-11-02: reminders play the default notification sound (the plugin's supported way to request it), and a reminder due while the shell is in front keeps showing a banner. Unit-test the scheduled payload; the audible check on a device after a reinstall belongs to DW-376's run, outside the loop.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L2, 2026-11-02
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-391: The love-notes re-arm can get stuck reconnecting when its openChannel rejects.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L4, 2026-11-02
-location: src/hooks/useRealtimeMessages.ts:685-701 (rearm)
-severity: low
-reason: rearm() sets gaveUp = false and reports 'reconnecting' before openChannel; if that rejects, the catch only logs, so every later rearm() sees gaveUp false with a zero retry count and returns, and the feed stays reconnecting with no channel until Love Notes remounts. Fix: in the catch, restore gaveUp = true and report disconnected, with a test for a rejected openChannel. Fits one bundle with DW-378.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-realtime-recovery-after-renewal
 resolution-undo: db00046158db0bae449549e28442c6371d4363a2028fc0fa225a0e94cabb8016 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L4, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-392: Turning date reminders off cancels nothing while any other saved copy is missing.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A7, 2026-11-02
-location: src/services/dateRemindersAtLaunch.ts:96 (planOnce)
-severity: low
-reason: planOnce returns before anything when any of the seven copies is null, so switching the reminders off while another copy is missing or malformed leaves every pending reminder scheduled, against R6 ("off cancels every scheduled reminder"). Fix: when the push-preferences copy says off, cancel without needing the other copies; unit-test it.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-date-reminders-off-cancels-alone
 resolution-undo: ac06a2ca4ec8837963f0ec6925b2f1334207ebbcd80800986a1e27e7948e4d78 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A7, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-393: A failed background refresh of the push settings disables an open Settings section.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L5, 2026-11-02
-location: src/stores/slices/settingsSlice.ts:1024-1031 (loadPushPreferences catch)
-severity: low
-reason: Story 4.3 made loadPushPreferences the push-preferences refresher, so it runs on every signed-in start and reconnect; a failed read sets pushPreferences: null and pushPreferencesLoadFailed: true, and an open Settings section then shows its load failure and disables all seven rows although the saved copy is fine. Same function as DW-381: fix together, so a failed read falls back to the saved copy and only a missing copy shows the failure.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-push-preferences-saved-copy
 resolution-undo: 56a0a8b609c0d775e125b17c47bb18a344e21e1a0204ed542d96495a1d8e50d6 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L5, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-394: PushSettings.test.tsx asserts only that console.error was called.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A5, 2026-11-02
-location: src/components/Settings/__tests__/PushSettings.test.tsx:357
-severity: low
-reason: The bare expect(console.error).toHaveBeenCalled() has passed vacuously twice when a newly mounted native module logged an unrelated error (4.6's local-notifications mock, 4.2's countdown-marks mock). Assert the expected message instead. Fits the DW-381 bundle.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-push-preferences-saved-copy
 resolution-undo: 56a0a8b609c0d775e125b17c47bb18a344e21e1a0204ed542d96495a1d8e50d6 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A5, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-395: The countdown marks list offers dates that can never schedule a reminder.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A4/L10, 2026-11-02
-location: src/components/Settings/CountdownMarks.tsx:75-87; src/services/dateRemindersAtLaunch.ts:79-117 (planOnce); src/services/dateReminders.ts:193-285 (reminderDateEntries, planDateReminders, :263)
-severity: low
-reason: Two builders of the planner's input diverge: planOnce builds ReminderDates from the saved copies, CountdownMarks from the store, and each kind has its own eligibility rule, so the list offers rows the planner skips (an event tomorrow after 9:00 today, a relationship start dated today or later). Fix: one shared builder and eligibility rule for both, so the list shows only dates that can remind; unit-test the two examples.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-countdown-marks-list-matches-plan
 resolution-undo: 96b338e4fac679710e3c04d2e8768cec101b1f4fe642204ed96b1344e5dcdbae 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A4/L10, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-396: The date reminders switch says "At 9:00 before each date.", but birthdays and anniversaries also remind on the day.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L11, 2026-11-02
-location: src/components/Settings/CountdownMarks.tsx:40 (REMINDERS_HELPER)
-severity: low
-reason: The helper text describes only the day-before reminder.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-countdown-marks-list-matches-plan
 resolution-undo: 96b338e4fac679710e3c04d2e8768cec101b1f4fe642204ed96b1344e5dcdbae 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 reword — owner, 2026-11-02: "At 9:00 the day before, and on the day for birthdays and anniversaries." Update any test that pins the old text.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L11, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-397: `sim dates kinds|many|clear` leaves countdown marks and the date-reminders switch behind.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L6, 2026-11-02
-location: scripts/sim-driver/dates.ts:53-63 (clearDates); scripts/sim-driver/sim (help, dates)
-severity: low
-reason: clearDates deletes events, anniversaries, couple_settings and birthdays but not countdown_marks or push_preferences.date_reminders, so leftovers from a 4.2 or 4.3 check change later seeds. Fix: delete both people's countdown_marks and reset date_reminders to true, and update `sim help`. The AGENTS.md sentence is DW-385's, outside the loop.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sim-dates-clear-marks
 resolution-undo: bc6330b9d88371af0a1a8d44a6c0475988b2b4ec8826a2b408f3f7723e3dd3c7 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L6, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-398: AGENTS.md does not warn that every date-reminder re-plan cancels every pending local notification.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L14, 2026-11-02
-location: src/services/dateReminders.ts (reminderIdsToCancel); AGENTS.md (Known pitfalls)
-severity: low
-reason: reminderIdsToCancel adds every pending id, which is correct today because the shell schedules no other local notification (story 4.1's review), but a future local-notification feature would have its notifications cancelled on every re-plan. Accepted as design; the remedy is a pitfall line telling such a feature to reserve an id range or tag and narrow the cancel. Outside the loop: it edits AGENTS.md.
 status: done 2026-11-02
-resolution: AGENTS.md (Maintained by hand) now warns that every re-plan cancels ids 1 to MAX_SCHEDULED_REMINDERS and every pending local notification, and that a new local-notification feature must reserve an id range or tag and narrow that cancel in the same change. Placed outside the generated block so a context refresh keeps it.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L14, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-399: settingsSlice.ts has grown to 1116 lines with six registerLocalCopy kinds.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A2, 2026-11-02
-location: src/stores/slices/settingsSlice.ts
-severity: low
-reason: It grew from 930 lines at 58da06ce as stories 4.2, 4.3 and 4.6 added the countdown-marks and push-preferences copies, readers, refreshers and setters. A split candidate (copy kinds and readers by domain), not broken; a refactor story if ever, not a sweep bundle.
 status: done 2026-11-03
-resolution: story 5.3: settingsSlice.ts split into datesSlice, profileSlice and notificationsSlice; settingsSlice keeps start-up, device settings and onboarding; the anniversaries mirror's residue is DW-426.
-decision: 2026-11-02 hold-for-settings-rework — owner, 2026-11-02: not a sweep bundle. Keep it open as an input to the owner's planned Settings page rework, which will decide how the slice splits; a sweep should leave it untouched until that work is planned.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding A2, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-400: The launch re-plan of date reminders waits for the slowest copy refresher, and the partner lookup has no request timeout.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L9, 2026-11-02
-location: src/App.tsx:434; src/stores/slices/settingsSlice.ts:836-837
-severity: low (unverified)
-reason: The re-plan is chained onto refreshLocalCopies(), so a stalled connection the browser reports as online can hold the launch plan until a foreground return. Plausible from the code, not reproduced. Settle it with a unit test that stalls one refresher and checks when the re-plan runs; if it waits, plan from the saved copies first and re-plan after the refresh.
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-date-reminders-replan-timing
 resolution-undo: bef106d32d6d3e89afddaca578b91d4c6b34a9a99e40b6aa110e3f7db7e29975 2026-11-02 7374617475733a206f70656e
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L9, 2026-11-02
+severity: low (unverified)
+archived: 2026-11-26
 
 ### DW-401: Date reminders may never fire on a device set to a non-Gregorian calendar.
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L12, 2026-11-02
-location: node_modules/@capacitor/local-notifications ios LocalNotificationsPlugin.swift:576-579 (DateComponents with no calendar)
-severity: low (unverified)
-reason: The plugin builds DateComponents with no calendar, so a device on a Buddhist or Japanese calendar might read year 2026 in that calendar and the reminders never fire. Settle it on a simulator set to another calendar with `sim pending` after a schedule; outside the loop.
 status: done 2026-11-02
-resolution: won't fix -- owner, 2026-11-02: neither the owner's nor the partner's phone uses a non-Gregorian calendar, so the case does not apply. Not checked on a simulator. Reopen if anyone using the app sets their phone to another calendar.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L12, 2026-11-02
+severity: low (unverified)
+archived: 2026-11-26
 
 ### DW-402: A lost phone keeps its scheduled date reminders after "Sign out of all devices".
 
-origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L8, 2026-11-02
-location: src/services/dateReminders.ts (cancel on sign-out)
-severity: low
-reason: Reminders are local to the phone and are cancelled only by its own JavaScript after it sees the sign-out, so up to 64 stay scheduled on a lost phone.
 status: done 2026-11-02
-resolution: accepted by the owner; recorded so later retros stop re-flagging it.
-decision: 2026-11-02 accept-and-close — owner, 2026-11-02: apps do not normally reach a lost phone's local notifications (a silent push is not reliably delivered); the remedy is Find My's Erase iPhone, and DW-353 stops new pushes.
+origin: epic-date-reminders retrospective (tickets/epic-date-reminders/epic-date-reminders-retrospective.md), finding L8, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-403: center's restore on a Rotate-Left-only phone and tap(_:)'s coordinate fallback on the inner display have never been observed on a simulator.
 
-origin: split from DW-348 by the 2026-11-02 ledger triage
-location: scripts/sim-driver/sim (rotate_to, center_restore); scripts/sim-driver/RunnerUITests/Notify.swift (tap)
-severity: medium (unverified)
-reason: Needs two runs after DW-348 lands its fallback log line: one center run that taps a shrunk cell at the list's bottom edge on the unfolded Duo (read whether the fallback ran), and one `center --host` started in landscape on an iPhone 17 simulator, comparing `ax state` before and after (the iPhone 17 needs selecting in Device Hub, DW-334). Outside the loop.
 status: done 2026-11-02
-resolution: checked on the simulators 2026-11-02. The restore on a Rotate-Left-only phone first failed: `ax state` says "pose: n/a" on the iPhone 17, so center tried to unfold it and died ("could not unfold"); test-center-exit.zsh's stub printed no pose line and so passed. Fixed at 646facdf (center treats n/a as no pose; the stub prints "pose: n/a" and fails without the fix). After the fix a `center --host` started in landscapeLeft with Settings in front ended in landscapeLeft. The coordinate fallback was never needed: in 10 runs with a stacked group placed 7th to 11th, XCUITest called the stack hittable every time and tapped it directly, so no fallback note was printed. The fallback stays as it is, unobserved.
+origin: split from DW-348 by the 2026-11-02 ledger triage
+severity: medium (unverified)
+archived: 2026-11-26
 
 ### DW-404: A failed center's restore skips its "could not restore" report: when die's exit (nested below cmd_center) runs center's EXIT trap, zsh 5.9 ends the trap as soon as a function it calls directly
-origin: spec-deferred 9f0d4541ec07
-location: scripts/sim-driver/sim (center_restore, die); scripts/sim-driver/test-center-exit.zsh
-source_spec: `plan-dw-sim-center-one-screen.md`
-severity: low
-reason: Reproduced in plain zsh 5.9: with `f() { trap restore EXIT; die; }` and `die() { exit 1; }`, `restore() { inner || print report; print after; exit 7; }` runs inner's whole body, then stops (exit 1, no "report", no "after"); with `exit 1` called in f directly it prints both and exits 7. In sim, center_restore's only direct function call is `rotate_to` (sim:824), so a failed read still turns the device back, but a restore failure on that path is never reported and CENTER_DONE is never set. In test-center-exit.zsh ax, xcrun and sleep are stub functions, so a failed read's restore stops at its first stubbed call; a phone read-fails case starting in landscape ended in portrait for that reason and was left out. Fix: call rotate_to in a subshell, `( rotate_to $CENTER_ORIENT )`, and make the stubbed restore checkable.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-sim-center-restore-subshell
 resolution-undo: 52a3cbe47b39286c8cb6953e0f685f3409c738a1713e9c550f0323a99e5e80c8 2026-11-02 7374617475733a206f70656e
-
-### DW-405: center's one-screen check (no stacked cell left, and neither a drag nor a swipe down the list moves a cell) has not been run on a simulator.
-origin: spec-deferred f1809e113bbf
-location: scripts/sim-driver/RunnerUITests/Notify.swift (center)
+origin: spec-deferred 9f0d4541ec07
 source_spec: `plan-dw-sim-center-one-screen.md`
 severity: low
-reason: The drag-then-swipe sequence is the one every passing 8-group run ended on, and those runs printed no extra stacked-cell group, so neither check should fire at 8 groups; a run with 8 groups (exit 0) and one with more than fit (exit 1 with the message) would prove it. Needs the Duo simulator, like DW-403.
+archived: 2026-11-26
+
+### DW-405: center's one-screen check (no stacked cell left, and neither a drag nor a swipe down the list moves a cell) has not been run on a simulator.
+
 status: done 2026-11-02
-resolution: run on the iPhone Duo simulator 2026-11-02, after two faults the first runs found were fixed at 646facdf (displayInUse() read SpringBoard's windows one query at a time and failed on a vanished index right after a burst of pushes; a fresh Notification Center at times opened with the new notifications in the bottom pile, so center read too few). Then: 7 groups with one stack of 2 exit 0 twice (the stack counted 2); 8 single groups exit 0; 14 groups exit 1 with "a drag down the list moved it (13 cells before, 14 after)". The Duo was put back folded and in portrait each time. The check counts every app's cells, not only the app's: DW-414.
+origin: spec-deferred f1809e113bbf
+source_spec: `plan-dw-sim-center-one-screen.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-406: After "Sign out everywhere", another device whose access token has not yet expired can re-register its push_devices row, so a lost phone opened within about an hour keeps receiving pushes until an
-origin: spec-deferred 15f1bfb60d36
-location: supabase/migrations/20261031000000_push_devices.sql (register_push_device); src/api/auth/actionService.ts (signOut, everywhere)
-source_spec: `plan-dw-sign-out-everywhere.md`
-severity: medium
-reason: Global sign-out revokes refresh tokens, but access tokens stay valid until they expire (supabase/config.toml jwt_expiry = 3600). register_push_device checks only auth.uid() (20261031000000_push_devices.sql), and App.tsx re-registers on every signed-in start with permission. The same happens if a registration lands in the up-to-3 s gap between unregister_all_push_devices() and the global sign-out. Pre-existing: register_push_device never checked whether the caller's session was revoked. Settling it needs a server-side check that the JWT's session_id still exists in auth.sessions, or an owner decision to accept the window.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-push-register-session-check
 resolution-undo: 0a5864b1b6284bf808388361b35ec0695f3ddb78b43e86ad46388a30fc0f93fb 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 server-session-check — owner, 2026-11-02: register_push_device refuses a caller whose JWT session_id no longer exists in auth.sessions, so a device signed out by "Sign out of all devices" cannot re-register while its access token is still valid; this also covers a registration landing between unregister_all_push_devices() and the global sign-out. Keep jwt_expiry as is. Scope is push registration only: a still-valid access token reading app data until it expires is accepted.
+origin: spec-deferred 15f1bfb60d36
+source_spec: `plan-dw-sign-out-everywhere.md`
+severity: medium
+archived: 2026-11-26
 
 ### DW-407: DW-352's native removal is unverified on a shell: no simulator check yet shows sign-out emptying Notification Center of delivered pushes and date reminders.
+
+status: done 2026-11-02
 origin: spec-deferred e63b7bcda168
-location: src/services/pushNotifications.ts (stopDevicePushes)
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
-reason: The intent names a simulator check of the shell as a follow-up outside the loop. Unit tests mock the plugin, so they cannot show that `Capacitor.isPluginAvailable('LocalNotifications')` is true in the installed shell or that the plugin's iOS method (`UNUserNotificationCenter.removeAllDeliveredNotifications()`, LocalNotificationsPlugin.swift:879-888) removes delivered APNs pushes there. Settle it with `scripts/sim-driver/sim`: push a love note and let a date reminder fire, sign out, then `sim center` shows no group for the app.
-status: done 2026-11-02
-resolution: observed on the iPhone Duo simulator 2026-11-02 with the shell built from main at 646facdf, signed in as Casey: a pushed love note showed as a banner, `sim center` then read {"groups":[{"count":1,"text":"Jessie, New love note"}]}; after `sim signout`, `sim center` read {"groups":[]} and `sim badge` none. A date reminder delivered at 09:00 in the DW-376 run was also gone after sign-out, but only the after-read covers it (the before-read was blocked by another app's notifications, DW-414).
+archived: 2026-11-26
 
 ### DW-408: An account switch without a sign-out (in place, or a fresh sign-in whose owner marker names another account) leaves the outgoing account's delivered notifications in Notification Center.
-origin: spec-deferred ff783ef05e40
-location: src/stores/slices/authSlice.ts:331-336, 456-459
-source_spec: `plan-dw-sign-out-clears-notifications.md`
-severity: low
-reason: `discardAccountState` calls `stopPushesForSignOut()` only when `identity.userId === null` (src/stores/slices/authSlice.ts:336), and the fresh-sign-in leftover path calls `deleteAccountData(leftover)` alone (authSlice.ts:457-459). `deleteAccountData` cancels pending date reminders but does not remove delivered ones, so delivered pushes and reminders stay for the incoming account on those paths. This predates DW-352, and the owner's decision covers sign-out only. Reachability is unverified: a device normally goes through signed out, which now runs the removal. The fix would be a removal call on those paths (not the APNs unregister, which would race `startPushRegistration`), plus a decision that a switch should empty Notification Center too.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-account-switch-clears-delivered
 resolution-undo: 92e0c22e3cba748ed6298bc6f8c758ca82890213e08ffd6f0f26614b21af443f 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 switch-clears-too — owner, 2026-11-02: any account switch empties the app's delivered notifications from Notification Center, as sign-out does (DW-352): add the delivered-notification removal on the in-place switch and the fresh-sign-in leftover paths, without the APNs unregister, which would race startPushRegistration.
-
-### DW-409: PartnerMoodView.kit.test.tsx "enables refresh when online" failed once under the full unit suite with the refresh button still `aria-busy` and disabled, and passed on 3 isolated reruns and 2 later
-origin: spec-deferred 5bd4d01176e8
-location: src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166
+origin: spec-deferred ff783ef05e40
 source_spec: `plan-dw-sign-out-clears-notifications.md`
 severity: low
-reason: First `npm run test:unit` of this run: 1 failed of 3759, `expect(element).toBeEnabled()` at src/components/PartnerMoodView/__tests__/PartnerMoodView.kit.test.tsx:166, with the button rendered `aria-busy="true" disabled`. `findByTestId` resolves on presence, not enablement, so an in-flight refresh still busy under load fails it. Unrelated to this change, which touches no PartnerMoodView code. Settle by asserting through `waitFor(() => expect(...).toBeEnabled())` after confirming what keeps it busy.
+archived: 2026-11-26
+
+### DW-409: PartnerMoodView.kit.test.tsx "enables refresh when online" failed once under the full unit suite with the refresh button still `aria-busy` and disabled, and passed on 3 isolated reruns and 2 later
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-partner-mood-refresh-test-flake
 resolution-undo: 4e6874687b678d5b27c3d7d79dc252b4e1195449554a010f7c0cbdc6540fa67a 2026-11-02 7374617475733a206f70656e
+origin: spec-deferred 5bd4d01176e8
+source_spec: `plan-dw-sign-out-clears-notifications.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-410: The pinned esm.sh supabase-js 2.118.0 bundle still floats one transitive dependency: storage-js 2.118.0 imports iceberg-js through the range ^0.8.1.
-origin: spec-deferred 3f3158bf60a9
-location: supabase/functions/send-push/index.ts:19; supabase/functions/upload-love-note-image/index.ts:22
-source_spec: `plan-dw-pin-edge-supabase-js.md`
-severity: medium
-reason: package-lock.json declares @supabase/storage-js 2.118.0 dependency "iceberg-js": "^0.8.1" (every other sub-package dependency is exact: tslib 2.8.1, @supabase/phoenix 0.4.5). esm.sh's built https://esm.sh/@supabase/storage-js@2.118.0/es2022/storage-js.mjs imports "/iceberg-js@^0.8.1?target=es2022", a range esm.sh resolves per request, so a new iceberg-js 0.8.x can reach both Edge Functions on the next deploy with no reviewed change. Pre-existing and outside the owner's 2026-11-02 decision, which pins supabase-js only. A fix would add ?deps=iceberg-js@0.8.1 to both import URLs (or vendor the import), which needs an owner call.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-edge-pin-iceberg-js
 resolution-undo: 3e3cad4e23563016d63b082448d5ee7a9cc230415fc6fd9d1dcd33e84bbd304e 2026-11-02 7374617475733a206f70656e
-decision: 2026-11-02 pin-iceberg — owner, 2026-11-02: pin iceberg-js to 0.8.1 exactly by adding `deps=iceberg-js@0.8.1` to both Edge Function supabase-js import URLs (send-push, upload-love-note-image), finishing the DW-355 pin.
+origin: spec-deferred 3f3158bf60a9
+source_spec: `plan-dw-pin-edge-supabase-js.md`
+severity: medium
+archived: 2026-11-26
 
 ### DW-411: After a stale-session boot the Mood screen never mounts the partner card, so a later renewal cannot bring it back until the screen is re-entered; the usePartnerMood realtime-lost error is therefore
-origin: spec-deferred 22a6050e1943
-location: src/components/MoodTracker/MoodTracker.tsx (loadPartnerId effect)
-source_spec: `plan-dw-realtime-recovery-after-renewal.md`
-severity: low
-reason: MoodTracker looks its partner up through lookupPartnerId on mount and again only when store.partner.id changes; on a boot whose stored session the SDK cannot use that lookup fails and nothing re-runs it on TOKEN_REFRESHED. Observed in tests/e2e/partner/realtime-recovery-after-renewal.spec.ts on the local stack: no card and no error card after TOKEN_REFRESHED; Home then Mood mounts it.
+
 status: done 2026-11-02
 resolution: resolved by sweep bundle dw-mood-partner-lookup-on-renewal
 resolution-undo: 1fef8da71dc9785856aad71f8c8803d5481f487b98c3027a7d1736d3769aa159 2026-11-02 7374617475733a206f70656e
+origin: spec-deferred 22a6050e1943
+source_spec: `plan-dw-realtime-recovery-after-renewal.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-412: A register_push_device call that lands between unregister_all_push_devices() and the global sign-out still has a live session, so the session check accepts it and its push_devices row outlives "Sign
+
+status: done 2026-11-02
 origin: spec-deferred 716063194f07
-location: supabase/migrations/20261102010000_register_push_device_session_check.sql (register_push_device); src/api/auth/actionService.ts (signOut, everywhere)
 source_spec: `plan-dw-push-register-session-check.md`
 severity: medium
-reason: src/api/auth/actionService.ts signOut({ everywhere }) awaits removeAllPushRegistrations() before supabase.auth.signOut({ scope: 'global' }). In that window the other device's auth.sessions row still exists, so the new check in 20261102010000 passes and the insert commits; the later session delete does not touch push_devices, and send-push reads only push_devices. The 2026-11-02 owner decision expected the session check to cover this window, but it closes only registrations after the sign-out. Closing the window needs new state, for example an account-level fence written by unregister_all_push_devices() that refuses sessions created before it, or the registering session id stored on each push_devices row and checked or pruned by send-push. Either needs an owner decision, because the intent limited this change to replacing the function.
-status: done 2026-11-02
-resolution: owner, 2026-11-02: fix it. "Sign out of all devices" now signs out with scope=global first and calls unregister_all_push_devices() after it, sending the access token read before the sign-out (src/api/auth/actionService.ts signOut, src/services/pushNotifications.ts removeAllPushRegistrations). A registration before the sign-out is removed by that call, and one after it is refused by DW-406's session check, so no row outlives the sign-out. No new state.
+archived: 2026-11-26
 
 ### DW-413: On an account switch without a sign-out, a love-note push sent to the outgoing account between the Notification Center clear and the incoming account's `register_push_device` still lands, so it stays
+
+status: done 2026-11-02
 origin: spec-deferred 3168721c2825
-location: src/stores/slices/authSlice.ts (clearDeliveredForSwitch callers); src/services/pushNotifications.ts (recordDevice)
 source_spec: `plan-dw-account-switch-clears-delivered.md`
 severity: low
-reason: On the in-place switch and the fresh-sign-in leftover paths nothing deletes this device's `push_devices` row first (only `actionService.signOut` calls `removePushRegistration`, src/api/auth/actionService.ts:100). The token moves to the incoming account only when `register_push_device` upserts it (supabase/migrations/20261102010000_register_push_device_session_check.sql:64-69), after App.tsx's effect re-runs `startPushRegistration()`, APNs answers and `recordDevice` sends the RPC. That is normally seconds. If the RPC fails, `recordDevice` only logs it (src/services/pushNotifications.ts:216-218), and the token stays with the outgoing account until the next signed-in start or the 12-hour foreground renewal. The gap predates DW-408, and the intent rules out the APNs unregister on these paths. Options: a second `clearDeliveredNotifications()` once `recordDevice` succeeds after a switch, or have the switch delete the outgoing row server-side while the outgoing session still exists, which the
-status: done 2026-11-02
-resolution: owner, 2026-11-02: fix it on PR #444. An account switch's Notification Center clear now passes untilReregistered (src/stores/slices/authSlice.ts clearDeliveredForSwitch), which saves a device flag holding an id unique to that switch (localStorage my-love-push-clear-after-record); the next successful register_push_device record, which moves this device's row to the incoming account, clears Notification Center and the badge once more and drops the flag (src/services/pushNotifications.ts recordDevice). A refused record keeps the flag: every return to the foreground then records again instead of once every 12 hours, and a restart's record still clears because the flag is on disk. A record clears only when the id it read before its request is still the saved one, so a record sent before a switch, including the previous account's still in flight during a second switch, cannot take that switch's clear. Any other clear, sign-out's included, drops the flag. Left as it is: while the app stays open after a refused record, nothing retries until the next return or start.
+archived: 2026-11-26
 
 ### DW-414: sim center's one-screen check counts every app's notifications, so another app's pile fails a read and the message blames the app read.
-origin: raised 2026-11-02 by the DW-407 simulator check (owner-run session)
-location: scripts/sim-driver/RunnerUITests/Notify.swift (center, cellFrames)
-severity: low
-reason: `cellFrames()` collects every ListCell in Notification Center's combined list, whichever app it belongs to, and the drag and swipe checks compare those. After DW-344's 20 cold taps left 20 Runner notifications, `sim center` for the shell failed with "Notification Center holds more My Love notifications than fit on one screen … (12 cells before, 12 after)" though the shell had none; once the Runner's notifications were wiped (`sim permission reset --host`), the same read gave {"groups":[]}. So any app's leftover notifications block a read, and the message names the wrong app. Options: say "more notifications than fit" without the app's name, or clear other apps first; filtering by app does not work, since an overfull list hides the app's own cells too. Separately, on the iPhone 17 a fresh read with 3 Runner notifications failed the drag check before 646facdf; not re-run after it, so whether center reads on the iPhone 17 at all is unchecked.
+
 status: done 2026-11-02
-resolution: the overfull message now says what the check measures and whose cells are there: "Notification Center holds more notifications, from every app together, than fit on one screen … (13 cells before, 14 after; by app: RUNNER 14)" (Notify.swift cellsByApp), and `sim help center` says every app counts and that the runner's go with `permission reset --host`. Checked on the Duo simulator 2026-11-02: 14 Runner notifications with the shell signed out gave that message; after `permission reset --host` the same read gave {"groups":[]}. The iPhone 17 read stays unchecked.
+origin: raised 2026-11-02 by the DW-407 simulator check (owner-run session)
+severity: low
+archived: 2026-11-26
 
 ### DW-415: sim signout fails whenever the shell shows its welcome screen.
-origin: raised 2026-11-02 by the DW-407 simulator check (owner-run session)
-location: scripts/sim-driver/RunnerUITests/Drive.swift (signout); scripts/sim-driver/sim (cmd_signout)
-severity: low
-reason: `sim signin` dismisses the welcome splash, but the shell shows it again when it opens an hour or more after it last showed (after a clock move, say), and `sim signout` then fails with "no Settings button: signed out already, or the page did not load" (Drive.swift:133), because the splash covers the dock. Tapping the splash's Continue (found with `sim dump`, tapped with `sim tap`) let `sim signout` pass. A check that restarts the simulator before signing out (any clock change does) fails at sign-out. Fix by having signout dismiss the splash the way signin does.
+
 status: done 2026-11-02
-resolution: `sim signout` now gets past the splash as `sim signin` does (Drive.swift pastWelcome, shared by both). The splash shows when the app opens an hour or more after it last showed (App.tsx WELCOME_DISPLAY_INTERVAL), not after every restart: the clock moves made that happen. Checked on the Duo simulator 2026-11-02 by setting the shell's lastWelcomeView to 0 while it was closed: the splash showed, and `sim signout` printed "dismissed the welcome splash" and "signed out" (18 s).
+origin: raised 2026-11-02 by the DW-407 simulator check (owner-run session)
+severity: low
+archived: 2026-11-26
 
 ### DW-416: Remove the push sent to a partner when a date is added or changed.
-origin: owner decision 2026-11-02 during the Settings rework UX run (_bmad-output/initiative-my-love/ux-settings-page/.memlog.md, override entry)
-location: supabase/migrations/20261031030000_push_date_changes.sql (notify_date_change, five triggers, date_changes, push_requests.date_change_id); supabase/functions/send-push (the 'date' kind in handler.ts and payload.ts, handler.test.ts); src/services/pushPreferencesService.ts and src/stores/slices/settingsSlice.ts (the 'dates' push preference); src/components/Settings/PushSettings.tsx (the Dates switch); supabase/tests/database/35_push_devices.sql
-severity: medium
-reason: The owner wants no notification when an event, the wedding date, together-since or a birthday is added or changed; the only date notifications should be epic-date-reminders' upcoming-date reminders. This reverses the date part of epic-push-notifications R1 (owner request 2026-10-29, story 3.5). The rework's Notifications page drops the Dates switch, and with tap-a-row-to-edit each field save would otherwise send its own push. Needs a new migration that drops the triggers and function (and decides whether date_changes and the push_preferences.dates column go), the send-push date kind removed, and the pgTAP pins updated in the same change. Not a sweep bundle: it belongs with the Settings rework's tickets.
+
 status: done 2026-11-04
-decision: 2026-11-02 remove — owner, 2026-11-02: "I don't want a notification at all to be pushed when something is added or changed. The only notifications that come from dates should be from like when the date is upcoming."
-progress: 2026-11-03 story 5.4 removed the triggers, `notify_date_change()`, `date_changes`, `push_requests.date_change_id`, send-push's `date` kind and the client's use of `dates` (migration `20261103000000_remove_date_change_push.sql`). `push_preferences.dates` and its `36_push_preferences.sql` pins remain for story 18, because installed shells still select and upsert it.
-resolution: story 5.18's migration `20261104000000_drop_push_preferences_dates.sql` dropped `push_preferences.dates`, the last part of the date push; the pgTAP pins (`35_push_devices.sql` PUSH-DB-063, `36_push_preferences.sql`) assert its absence and `database.types.ts` was regenerated without it.
-progress: 2026-11-05 the "added" half is reversed by owner decision ("I just want notifications for when a date is added, either an event or anniversary"): migration `20261105010000_push_added_dates.sql` adds AFTER INSERT `notify_push` triggers on `events` and `anniversaries`, `push_requests.event_id`/`anniversary_id` and `push_preferences.dates` back; send-push has `event` and `anniversary` kinds and the Notifications page a Dates switch. A change to any date still sends no push. The 2026-11-02 answer that led here (session a81de247) was a typed reply to a question about edit bursts; the option "Push only on new dates" was offered then.
+origin: owner decision 2026-11-02 during the Settings rework UX run (_bmad-output/initiative-my-love/ux-settings-page/.memlog.md, override entry)
+severity: medium
+archived: 2026-11-26
 
 ### DW-417: `npm run test:ci-local` skips the send-push Edge Function tests that CI runs.
-origin: bmad-project-context refresh, 2026-11-02
-location: scripts/ci-local.sh:50; .github/workflows/test.yml:208-209
-severity: low
-reason: CI runs `deno test --no-lock` on both `supabase/functions/upload-love-note-image/` and `supabase/functions/send-push/` (the second added with 08e8b562), but `scripts/ci-local.sh` still runs only the first, so a local CI pass says nothing about send-push. AGENTS.md's Deno line states the gap until it is fixed; drop that clause in the same change. Triage 2026-11-04: still present (`scripts/ci-local.sh:50-51`); send-push's 89 tests pass run the CI way, with no env or `--allow-*` flags. Outside the loop: one sitting adds send-push to ci-local and drops the `AGENTS.md:42` clause together, since a loop review would refile the AGENTS.md half.
+
 status: done 2026-11-04
-resolution: `scripts/ci-local.sh` now runs `deno test --no-lock supabase/functions/send-push/` after the upload-handler tests, as `test.yml` does (89 passed), and AGENTS.md's Deno line no longer says `test:ci-local` runs only the first.
-decision: 2026-11-04 outside-the-loop — done in the owner's docs sitting together with the AGENTS.md:42 clause.
+origin: bmad-project-context refresh, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-418: Enforce the eslint-disable reason rule with a lint rule.
-origin: bmad-project-context refresh, 2026-11-02
-location: eslint.config.js; package.json (devDependencies); AGENTS.md (Known pitfalls, eslint-disable line)
-severity: low
-reason: AGENTS.md requires every `eslint-disable` directive to carry its reason after ` -- ` and says no lint rule enforces it; `eslint.config.js` sets only `reportUnusedDisableDirectives`. `@eslint-community/eslint-plugin-eslint-comments`' `require-description` would fail a directive without one (all 18 current directives comply). Needs the owner's yes for the new devDependency; once the rule is live, the AGENTS.md line goes. Triage 2026-11-04: there are 15 directives, not 18 (14 `eslint-disable-next-line`, 1 block `eslint-disable`), all with a ` -- ` reason; the plugin (4.8.1) supports ESLint 10 and flat config and is not installed yet.
+
 status: done 2026-11-04
-resolution: added `@eslint-community/eslint-plugin-eslint-comments` 4.8.1 as a devDependency; `eslint.config.js` sets `require-description` to error for the disable directives (all 15 in the tree pass, and a probe directive without ` -- ` fails), and AGENTS.md's eslint-disable line no longer says no lint rule enforces it.
-decision: 2026-11-04 add-plugin — the owner approved `@eslint-community/eslint-plugin-eslint-comments` with `require-description` as a devDependency; done outside the loop in the owner's docs sitting, which also drops the AGENTS.md:91 clause.
+origin: bmad-project-context refresh, 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-419: The Settings page stack's column-dock form has no end-to-end check.
-origin: story 5.1 review (epic-settings-rework), 2026-11-02
-location: tests/e2e/settings/settings-stack.spec.ts; src/components/Settings/stack/SettingsStack.tsx (top-page back arrow); src/hooks/useSideColumn.ts
-severity: low
-reason: The column form (iPhone Duo capsule) is chosen from `env(safe-area-inset-left/right)`, which a desktop Playwright browser cannot set, so the stack's column-form behaviour (no top-page back arrow, a subpage arrow, bar and cards ending at the column's edge) is proven only by unit tests that mock `useSideColumn`. The same holds for every column-form feature. Close it with a sim-driver check on the Duo simulator, or by the ship story's hand run of the Key Flows on the owner's Duo.
+
 status: done 2026-11-04
-resolution: sim-driver check on the iPhone Duo simulator, 2026-11-04, shell built from main `210442c0`: folded portrait (capsule on the right, x 404-444 of 466) and folded landscapeLeft (capsule on the left, x 22-62 of 678). In both, the Settings top page has no back arrow, Profile has one, and the bar and cards stop 16pt short of the 84pt column (right form: content ends at 366, column starts at 382; left form: Back starts at 94 and cards at 113, column ends at 84).
+origin: story 5.1 review (epic-settings-rework), 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-420: No test pins that sign-out keeps the device's photo-download choice.
-origin: story 5.1 review (epic-settings-rework), 2026-11-02
-location: src/stores/slices/authSlice.ts (deleteAccountData); src/services/photoDownloadPreference.ts (PHOTOS_OVER_MOBILE_DATA_KEY)
-severity: low
-reason: Epic-settings-rework R12 says the Photos choice survives sign-out, and AGENTS.md says sign-out must not reset it, but no unit or E2E test signs out and then reads `my-love-photos-over-mobile-data`. A future addition to `deleteAccountData()` that clears localStorage wholesale would pass every suite. Add an assertion to the sign-out clearing tests (`signOutClearsAccountState.test.ts`) that the key keeps its value.
+
 status: done 2026-11-03
-resolution: story 5.16 added two sign-out tests in signOutClearsAccountState.test.ts: with `my-love-photos-over-mobile-data` at `'true'`, `clearAuth()` and a no-session boot with the owner marker both delete the outgoing account's data and leave the key at `'true'`.
+origin: story 5.1 review (epic-settings-rework), 2026-11-02
+severity: low
+archived: 2026-11-26
 
 ### DW-421: The Settings page stack's column-dock form has no end-to-end check (ledger DW-419).
+
+status: done 2026-11-03
 origin: spec-deferred b9cb78c93e32
-location: tests/e2e/settings/settings-stack.spec.ts
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
 severity: low
-reason: The column form is chosen from env(safe-area-inset-*), which desktop Playwright cannot set; settings-stack.spec.ts runs the bottom dock only and SettingsStack.test.tsx mocks useSideColumn. Pre-existing limitation shared by every column-form feature.
-status: done 2026-11-03
-resolution: duplicate of DW-419 (the same gap, filed twice by story 5.1); tracked there.
+archived: 2026-11-26
 
 ### DW-422: No test pins that sign-out keeps the device's photo-download choice (ledger DW-420).
+
+status: done 2026-11-03
 origin: spec-deferred ab598e369099
-location: src/stores/slices/authSlice.ts (deleteAccountData)
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
 severity: low
-reason: grep finds my-love-photos-over-mobile-data only in photoDownloadPreference.test.ts and this story's tests; none signs out first. Behaviour unchanged by this story.
-status: done 2026-11-03
-resolution: duplicate of DW-420 (the same gap, filed twice by story 5.1); tracked there.
+archived: 2026-11-26
 
 ### DW-423: Nothing ties a subpage row's visibility to its page's `available`, and the AGENTS.md subpage rule does not say to gate the row.
+
+status: done 2026-11-03
 origin: spec-deferred 445948d64bee
-location: AGENTS.md (Where things are, Settings subpage rule); src/components/Settings/Settings.tsx (SUBPAGES)
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-opens-as-a-stack-of-pages-with-the-new-top-page-plan.md`
 severity: low
-reason: The Photos row checks canTellMobileData() by hand (Settings.tsx, Preferences group) while its page is gated by `available: canTellMobileData` in SUBPAGES. A later subpage with `available` whose row is not gated shows a row that pushes /settings/<page>, then the stack's redirect replaces that entry with /settings, leaving two top-page entries and one extra Back. The fix is a sentence in the AGENTS.md "Settings subpage" rule (gate the row on the same check), or deriving row visibility from the spec.
-status: done 2026-11-03
-resolution: story 5.16 added `subpageAvailable(path)` in Settings.tsx, which reads `available` from `SUBPAGES`; the Notifications and Photos rows are gated with it, and the AGENTS.md subpage rule now says to gate such a row that way.
+archived: 2026-11-26
 
 ### DW-424: After a live update, the native edge swipe on the first page may reload the app instead of doing nothing.
+
+status: done 2026-11-03
 origin: investigation (spike 5.2, 2026-11-02)
-location: ios/App/App/NativeAuth.swift (MainViewController); src/services/nativeUpdates.ts
 source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: medium (unverified)
-reason: Spike 5.2 chose WKWebView's back-forward gesture, which follows the web view's whole back list, not only this document's pushState entries. The live updater loads each new bundle as a new document, so the old document's entries may stay in that list, and a swipe on the first page after an update would then navigate to the old bundle's URL. The trial never applied an update. Story 15 settles it with `sim build --update-port` and `sim serve-update`: apply an update, then `sim swipe back` on the first page; if the page reloads, cancel cross-document back navigations in the shell.
-status: done 2026-11-03
-resolution: confirmed, then fixed in story 5.15. On the Duo simulator with the gesture alone, Settings → Profile, Refresh in the update toast, then a swipe on the new Home opened the old bundle's Profile. The updater's swap is `webView.load` of the server URL (`CapacitorUpdater.applyCurrentBundleToBridge`), which keeps the old document's entries. `MainViewController` (ios/App/App/NativeAuth.swift) now records the entry that was current when each main-frame `.other` load of an app URL starts (the launch load and every bundle swap, seen through `.capacitorDecidePolicyForNavigationAction`). It turns the gesture off while the back item is that entry or a load is still running, and re-decides on `url`, `canGoBack` and `isLoading`. A reload records nothing, so back across one still works. Rather than cancelling cross-document back navigations, it does not offer the swipe there: cancelling would also block the in-app back arrow after a reload. Checked on the simulator: after an update, 16 pans on the new Home did nothing, and pages pushed in the new bundle swiped back one level each. Re-checked on 2026-11-04 after the shell's own swipe replaced WebKit's (`e1ba2117`) and after `69dfb58c`. The run used the iPhone Duo simulator folded with the column dock, a shell built from main `49006f72`, and `sim serve-update`. With the update applied on Profile, 8 swipes on the new Home did nothing, Profile → Settings → Home went back one level per swipe, and a swipe on Home did nothing. With the update applied on Home (the `69dfb58c` case), the same: 8 swipes on the new Home did nothing, Profile → Settings → Home went back one level per swipe, and a swipe on Home did nothing.
+archived: 2026-11-26
 
 ### DW-425: Three native edge-swipe cases no device has checked: the first entry, the column on the left edge, and Home's message card.
+
+status: done 2026-11-04
 origin: review (spike 5.2, 2026-11-02)
-location: ios/App/App/NativeAuth.swift (MainViewController); src/components/DailyMessage/DailyMessage.tsx (drag="x"); src/hooks/useSideColumn.ts
 source_spec: `tickets/epic-settings-rework/tickets/spike-find-how-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: medium (unverified)
-reason: The Duo trial covered Settings pushes and dock views in the bottom dock and folded with the column, side not recorded. The simulator's first-entry result rests on synthesized pans that register about one time in four. Unchecked: (1) a real swipe on the session's first entry stays on the page; (2) with the column on the left edge (one folded landscape, the left pane side by side) the swipe still goes back and the capsule still taps; (3) an edge swipe that starts over Home's message card, which turns to the next message on a right drag, goes back without also turning the card. Story 15 checks all three by hand on the Duo once the Swift line is in.
-progress: 2026-11-04 Duo simulator, shell built from main `210442c0` (after story 15's `isLoading` patch, which its plan says was not re-run for cases 2 and 3): (1) on Home, the first entry after a fresh launch, `sim swipe back` exited 1 after 8 pans and Home stayed; (2) folded landscapeLeft with the capsule on the left, Settings > Profile, the swipe returned to Settings in one level (registered on the second pan) and each of the six capsule buttons opened its view; (3) the case as written no longer arises: the dock's Home now walks back to the first history entry (AGENTS.md, Home is the bottom of the history), so a swipe on Home has nothing to go back to and 8 pans starting over the message card left Home showing and the card on the same message. Still owed under a real finger on the Duo: cases 1 and 2, and whether a real edge swipe over the card on Home turns it; these are story 15's plan `operator_actions`.
-status: done 2026-11-04
-resolution: the owner ran cases 1 and 2 on the iPhone Duo with a real finger on 2026-11-04 and both passed: a swipe on Home, the first entry after a launch, stayed put; with the capsule on the left edge, Settings > Profile went back one level to Settings and every capsule button opened its view. Case 3 as written no longer arises (the dock's Home walks back to the first history entry, so a swipe on Home has nothing to go back to); on the simulator, 8 edge pans over the message card left it on the same message, and no real-finger result for the card was reported.
+archived: 2026-11-26
 
 ### DW-426: The anniversaries mirror still sits inside the persisted `settings` object that `settingsSlice` owns, though `datesSlice` now writes it.
+
+status: done 2026-11-04
 origin: spec-deferred (story 5.3, 2026-11-03)
-location: src/stores/slices/datesSlice.ts (withAnniversaries and the anniversary actions); src/stores/slices/settingsSlice.ts (`settings`); src/stores/useAppStore.ts (`partialize`, `getItem` blanking); src/stores/slices/authSlice.ts (`discardAccountState`)
 source_spec: `tickets/epic-settings-rework/tickets/story-settings-state-splits-into-dates-profile-and-notifications-s-plan.md`
 severity: low
-reason: Story 5.3 moved the anniversaries kind, reader, refresher and actions into `datesSlice` but left the in-memory list at `settings.relationship.anniversaries`. Giving it a field of its own would change `partialize`, the `getItem` blanking, `discardAccountState` and every test that reads the mirror, which a code-moving refactor that changes only import paths rules out. Until then one slice writes a field inside another slice's persisted object.
-status: done 2026-11-04
-resolution: closed at the owner's decision: the list is never persisted (`partialize` saves `[]`, `getItem` blanks it, useAppStore.ts:222-232, 269-279) and no user sees a difference, while a move runs through the sign-out state code; `Settings` now holds only this list and `setSettings`/`updateSettings` have no callers outside their slice, so if the cleanup is ever wanted, remove the whole `settings` object rather than move the list.
-decision: 2026-11-04 close — not worth touching the sign-out state code for an invisible change.
+archived: 2026-11-26
 
 ### DW-427: `DisplayNameSetup`'s `edit` mode, `onCancel` and `initialName` are unused, and its name rules duplicate `profileService.saveDisplayName`.
+
+status: done 2026-11-03
 origin: spec-deferred (story 5.7, 2026-11-03)
-location: src/components/DisplayNameSetup/DisplayNameSetup.tsx; src/services/profileService.ts (`saveDisplayName`); src/components/DisplayNameSetup/__tests__/DisplayNameSetup.test.tsx
 source_spec: `tickets/epic-settings-rework/tickets/story-profile-edits-name-and-birthday-on-one-field-pages-plan.md`
 severity: low
-reason: Story 5.7 moved the Settings name edit onto the Name page, which writes through `profileSlice.setDisplayName` and `profileService.saveDisplayName`. The signup gate in `App.tsx` is the only caller left, and it passes neither `initialName` nor `onCancel` and stays in `setup` mode, so the `edit` copy, the Cancel control, the Escape handler and the `initialName` prop are dead code. The gate also still holds its own copy of the 3-30 length rule, the account-email and `Unknown` refusals and the `users` update, now the same as `saveDisplayName`'s. The story's "Never" list kept `DisplayNameSetup` and the gate unchanged. The sweep (story 16) removes the dead props and mode, then either points the gate at `setDisplayName` or leaves it with a comment naming `saveDisplayName` as the twin.
-status: done 2026-11-03
-resolution: story 5.16 removed `initialName`, `onCancel`, `mode`, the Escape handler and the Cancel row from `DisplayNameSetup`, with their tests; the gate keeps its own name rules, and its header now names `profileService.saveDisplayName` as their twin.
+archived: 2026-11-26
 
 ### DW-428: `PartnerMoodView` shows the Connect UI for one render before `loadPartner` raises `isLoadingPartner`, because it cannot tell "unanswered" from "unlinked".
+
+status: done 2026-11-03
 origin: spec-deferred (story 5.8, 2026-11-03)
-location: src/components/PartnerMoodView/PartnerMoodView.tsx (the `!partner && !isLoadingPartner && !partnerLoadError` branch); src/stores/slices/partnerSlice.ts (`loadPartner`, `partnerKnown`)
 source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
 severity: low
-reason: The view renders the Connect UI whenever `partner` is null, no load is running and no error is set; on first open that holds for the render before `loadPartner` sets `isLoadingPartner`. Story 5.8 added `partnerKnown` to `partnerSlice` (true only once a saved copy or a server answer is applied), which separates the two states, but its "Never" list left the Partner view's behaviour unchanged. Gating the Connect UI on `partnerKnown` (and showing the loading state until then) removes the flash; check `PartnerMoodView.*.test.tsx`, which mock the store wholesale and would need the field.
-status: done 2026-11-03
-resolution: false premise: PartnerMoodView.tsx:123-125 calls loadPartner from a useLayoutEffect, and partnerSlice.ts:168 sets isLoadingPartner before its first await, so the first render is replaced before the browser paints and the Connect UI never shows over a linked user (771a93b7). Closed at the owner's request.
+archived: 2026-11-26
 
 ### DW-429: `partnerService.getPartner` still selects `users.updated_at`, now unused.
-origin: spec-deferred (story 5.8, 2026-11-03)
-location: src/api/partnerService.ts:116 (`getPartner`, `select('partner_id, updated_at')`); tests/e2e/partner/partner-connect.spec.ts:60 (the one route matching `%2Cupdated_at`); tests/unit/api/partnerServiceDisplayName.test.ts:357
-source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
-severity: low
-reason: The link date moved to the accepted `partner_requests` row (`PartnerInfo.linkedSince`), so nothing reads `updated_at` from the first `users` read any more. It stays in the select because E2E routes match the URL `select=partner_id%2Cupdated_at`, and the story's "Never" list forbade changing the `users` read columns. A later change drops the column from the select together with those routes and the fixtures that fulfil `updated_at`. Triage 2026-11-04: `needs-a-connection.spec.ts` does not depend on the column; `partner-connect.spec.ts:60` is the only route that matches `%2Cupdated_at`, and without the column the Partner lookup's URL is the same as `lookupPartnerId`'s, so that spec needs another signal to wait on. The 11 fixtures that return `updated_at` are harmless after the drop; `partnerServiceDisplayName.test.ts:357` then tests nothing and changes or goes.
+
 status: done 2026-11-04
 resolution: resolved by sweep bundle dw-partner-lookup-drop-updated-at
 resolution-undo: 8308f83db6e5b35a306d1b0a75cb3a3ed5018f44d31442e24e30013160d3ab0d 2026-11-04 7374617475733a206f70656e
+origin: spec-deferred (story 5.8, 2026-11-03)
+source_spec: `tickets/epic-settings-rework/tickets/story-partner-page-shows-who-you-are-linked-to-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-430: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker.
-origin: story 5.11 build (epic-settings-rework), 2026-11-03
-location: src/components/Settings/EventPages.tsx (EventPage Icon row, EventFieldPage `icon`)
-severity: low
-reason: DESIGN.md (Components, List row) says "An Icon field row shows the event's glyph in accent in place of a text value", and (One-field edit page) "The icon field is the three-option picker used on the Form page": three equal 48px tiles, glyph and name, the selected one tint-filled with an accent label and 2px accent ring. Story 5.11's plan specified the text value (`Calendar`/`Ring`/`Plane`) and check rows instead, so R18 is not met for the Icon row and page. Story 5.13 builds the Form page's picker; reuse it on the Icon page there and give `SettingsRow` a glyph value for the Icon row.
+
 status: done 2026-11-03
-resolution: fixed at the owner's request: the event's Icon row shows its glyph in accent in place of the text value (`SettingsRow` `valueIcon`), as a partner's read-only Icon row does (`ReadOnlyRow` `valueIcon`, the name kept as hidden text), and the Icon page is `IconPicker`, the New event form's three tiles, moved into EventPages.tsx beside `ICON_OPTIONS`.
+origin: story 5.11 build (epic-settings-rework), 2026-11-03
+severity: low
+archived: 2026-11-26
 
 ### DW-431: An event's Icon row shows a text value and its Icon page uses check rows, where DESIGN.md asks for the glyph and the Form page's three-tile picker (ledger DW-430).
+
+status: done 2026-11-03
 origin: spec-deferred 6be699f2d039
-location: src/components/Settings/EventPages.tsx
 source_spec: `tickets/epic-settings-rework/tickets/story-every-event-has-its-own-page-plan.md`
 severity: low
-reason: DESIGN.md Components: "An Icon field row shows the event's glyph in accent in place of a text value" and "The icon field is the three-option picker used on the Form page". This plan's matrix specified text values and check rows; the implementer flagged the mismatch. Story 5.13 builds the picker.
-status: done 2026-11-03
-resolution: duplicate of DW-430 (the same finding, filed twice by story 5.11); fixed with it.
+archived: 2026-11-26
 
 ### DW-432: No E2E axe coverage of the new Settings pages since `events-accessibility` was deleted.
+
+status: done 2026-11-04
 origin: story 5.13 build (epic-settings-rework), 2026-11-03
-location: tests/e2e/settings/ (deleted `events-accessibility.spec.ts`); tests/unit/a11y/whiteOnColorContrast.test.ts (header)
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
-reason: `@axe-core/playwright` ran in exactly one spec, which scanned the events modal and form that the Countdowns section drew. That section is gone, so the spec was deleted, and nothing scans the Settings stack pages (the top page, the Dates list, the date and event pages, the Form pages and the Kind chooser). The plan forbids new axe scans in this story (the owner and partner use no screen reader or keyboard), so the gap is recorded rather than filled; whether a scan is wanted at all is a decision for the owner. The `@axe-core/playwright` dependency (and its `axe-core`) was removed with the spec, since nothing else used it; it comes back if a scan is wanted.
-progress: 2026-11-04 the epic-settings-rework retrospective's diff review found the same gap again (its V6). No new entry was filed.
-status: done 2026-11-04
-resolution: merged into DW-451: a contrast-only axe scan of the same Settings pages rides with the Touch Floor and token spec.
-decision: 2026-11-04 merge-into-DW-451 — axe limited to the `color-contrast` rule.
+archived: 2026-11-26
 
 ### DW-433: `reminderDateEntries` has no production caller now that `CountdownMarks` is gone.
+
+status: done 2026-11-03
 origin: story 5.13 build (epic-settings-rework), 2026-11-03
-location: src/services/dateReminders.ts (`reminderDateEntries`), src/services/__tests__/dateReminders.test.ts (`describe('reminderDateEntries')`)
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
-reason: `CountdownMarks` was the only production caller of `reminderDateEntries`, which listed the dates a person could mark for the per-date reminder list. Each date's own page now holds its Remind me switch (`RemindMe`), so the function and its unit tests are dead code. A later change deletes it with its tests, after a check that `planReminders` and its doc comments no longer lean on it.
-status: done 2026-11-03
-resolution: story 5.16 deleted `reminderDateEntries` and `ReminderDateItem.name` with their tests; the planner's all-marks check is kept as a `planDateReminders` case.
+archived: 2026-11-26
 
 ### DW-434: Returning to the Dates list reloads its first window, so rows reached through `Load more`, or a date just added beyond that window, drop out of the list.
+
+status: done 2026-11-03
 origin: story 5.13 build (epic-settings-rework), 2026-11-03
-location: src/components/Settings/DatesPage.tsx (the mount effect calling `loadEvents()`); src/components/Settings/stack/SettingsStack.tsx (one page in the DOM, keyed by path, so a pop remounts the page)
 source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
 severity: low
-reason: The Dates list loads events on every mount, and a back from an event page or a Form page remounts it, so the store's paged window is replaced by the server's first page. Since story 5.9 this drops every row reached through `Load more`. Since story 5.13 it also drops a past date added beyond the first window: it shows on the list after Add and vanishes when the reload answers. `events-history-pagination.spec.ts` waits for that reload and pages to the row. A fix keeps the loaded window across a return (for example, load only on a push or a fresh mount, not on a pop), as `EventPage` already skips its load when it holds its event.
-status: done 2026-11-03
-resolution: fixed at the owner's request: coming back to the Dates list (`arrivedBack`, a pop, from `SettingsPageContext`) no longer reloads its first window while the store holds a server page (`eventsPagination`), so rows reached through `Load more` and a date just added stay listed; a fresh mount, a push and any later connectivity change still load. A refresh skipped while Settings showed (a reconnect on an event page) marks the list stale (`eventsStale`, cleared by the next first page from the server), and a return then loads; a mark set while the list itself shows (the iPhone shell's return to the foreground) loads at once, and a return after the list's own failed load (`eventsError`) loads too. `events-history-pagination.spec.ts` now checks that the return starts no load. A refresh while the list shows still drops `Load more` rows (DW-440).
+archived: 2026-11-26
 
 ### DW-435: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh.
+
+status: done 2026-11-03
 origin: story 5.14 build (epic-settings-rework), 2026-11-03
-location: src/components/Settings/stack/SettingsStack.tsx (`trail`'s initial `direction: null`; the commit effect returns early while `shownPath` is null)
 source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
 severity: low
-reason: EXPERIENCE.md Flow 1 step 2 says the event page "slides in from the right" when Casey taps the Home card. Settings is not mounted while Home shows, so a Home card or Add mounts `SettingsStack` on the date page. Its first render has no direction, so it gets no slide class, and its commit effect skips the scroll-to-top and title focus that a push within the stack gets. The page appears at once, at Home's scroll position until the shorter page clamps it. Opening Settings from the gear has always behaved the same way. A fix starts `trail` as `push`, and runs the push branch on the first commit, when `settingsPushedPath` equals the mounted path, as story 5.14 already does for the reload check.
-status: done 2026-11-03
-resolution: fixed at the owner's request: a push that mounts the Settings stack on a subpage (`settingsPushedPath` equals the mounted path) starts as a push, so a date page or New event opened from Home slides in, scrolls to the top and focuses its title. The top page opened from the gear or the dock still appears without a slide, as a view switch does.
+archived: 2026-11-26
 
 ### DW-436: A date page or New event opened from Home neither slides in nor starts at the top, because the tap mounts the Settings stack fresh (DW-435).
+
+status: done 2026-11-03
 origin: spec-deferred 70fea21d81f5
-location: src/components/Settings/stack/SettingsStack.tsx
 source_spec: `tickets/epic-settings-rework/tickets/story-home-s-date-cards-and-add-button-open-the-date-pages-plan.md`
 severity: low
-reason: SettingsStack's trail starts with direction null and its commit effect returns early while shownPath is null, so a first mount gets no slide class, scroll reset or title focus; EXPERIENCE.md Flow 1 step 2 says the event page slides in.
-status: done 2026-11-03
-resolution: duplicate of DW-435 (the same finding, filed twice by story 5.14); fixed with it.
+archived: 2026-11-26
 
 ### DW-437: DW-425 still names story 15 as the one that checks its three cases by hand on the Duo, and it does not hold this story's simulator results; the ledger reserves that entry's text for the orchestrator.
+
+status: done 2026-11-04
 origin: spec-deferred f577620c7c17
-location: _bmad-output/initiative-my-love/deferred-work.md DW-425
 source_spec: `tickets/epic-settings-rework/tickets/story-the-edge-swipe-returns-one-level-in-the-shell-plan.md`
 severity: low
-reason: Story 15 ran the three cases on the Duo simulator: the first entry (exit 1), the column on the left edge (one level, after 17 failed synthesized pans), and Home's message card (one level). It cannot run them under a real finger, and the shell with the Swift line is not on the Duo yet. The hand checks are this plan's operator_actions. The deferred-work.md header leaves another entry's reason to the orchestrator.
-status: done 2026-11-04
-resolution: DW-425's progress line now holds the 2026-11-04 simulator results for all three cases and names story 15's plan `operator_actions` as the hand checks still owed.
+archived: 2026-11-26
 
 ### DW-438: The AGENTS.md Settings subpage rule names `subpageAvailable(path)` for any parent page's row, but the helper is local to `Settings.tsx`, and it overclaims that the row and the page "cannot disagree".
+
+status: done 2026-11-04
 origin: spec-deferred (story 5.16 review, 2026-11-03)
-location: AGENTS.md (Where things are, Settings subpage rule); src/components/Settings/Settings.tsx (`subpageAvailable`)
 source_spec: `tickets/epic-settings-rework/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: Story 5.16 added `subpageAvailable(path)`, a non-exported function in `Settings.tsx`, and an AGENTS.md clause telling a subpage's row on its parent page to use it. Parent pages other than the top page live in their own files (`DatesPage.tsx`, `NotificationsPage.tsx` and others), so a row there cannot follow the rule without exporting the helper. Today only top-page rows have pages with `available`, so nothing is wrong yet. The clause also says the row and page "cannot disagree", but a path missing from `SUBPAGES` counts as available and the path string is separate from the row's `target`; the code comment was corrected in story 5.16, the AGENTS.md wording was not, because the review routes agent-context edits to the orchestrator. Fix: say "a top-page row" (or export the helper) and drop "cannot disagree". Absorbs DW-439 (the same story 5.16 deferral, re-filed by the engine). Triage 2026-11-04: still present (`AGENTS.md:28` says "cannot disagree"; `subpageAvailable` is unexported at `Settings.tsx:312`; only the top page's `notifications` and `photos` have `available`). Replacement clause: "a top-page row whose page has `available` is gated with `subpageAvailable(path)`, which reads that page's own `available` from `SUBPAGES` (the helper is local to `Settings.tsx`, so a row on another parent page needs it exported first, and it counts a path missing from `SUBPAGES` as available and never checks the path against the row's `target`)".
-status: done 2026-11-04
-resolution: AGENTS.md's Settings subpage rule now carries the recorded replacement clause: it gates a top-page row with `subpageAvailable(path)`, says the helper is local to `Settings.tsx` and must be exported for a row on another parent page, and drops "cannot disagree" for what the helper does not check.
-decision: 2026-11-04 outside-the-loop — the owner's docs sitting rewords AGENTS.md:28 with the replacement clause.
+archived: 2026-11-26
 
 ### DW-439: The AGENTS.md Settings subpage rule names `subpageAvailable(path)` for any parent page's row, but the helper is local to `Settings.tsx`, and it overclaims that the row and the page "cannot disagree"
+
+status: done 2026-11-04
 origin: spec-deferred d7c5c24911d5
-location: AGENTS.md (Where things are, Settings subpage rule)
 source_spec: `tickets/epic-settings-rework/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: `subpageAvailable` is a non-exported function in src/components/Settings/Settings.tsx; parent pages other than the top page live in their own files, so a row there cannot call it. A path missing from SUBPAGES counts as available. Today only top-page rows have pages with `available`. The fix edits AGENTS.md, which review routes to the orchestrator.
-status: done 2026-11-04
-resolution: merged into DW-438 (the same finding, filed twice by story 5.16).
+archived: 2026-11-26
 
 ### DW-440: A refresh while the Dates list shows, or a return after a refresh was skipped, replaces it with the server's first window, so rows reached through `Load more` drop out until it is tapped again.
-origin: settings follow-up fixes on PR #449 (epic-settings-rework), 2026-11-03
-location: src/components/Settings/DatesPage.tsx (the connectivity load and the `eventsStale` load); src/stores/slices/eventsSlice.ts (`loadEvents` replaces the list with the first page)
-source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
-severity: low
-reason: The list asks the server again on a reconnect, and on the iPhone shell when the app comes back to the foreground (the events refresher marks it `eventsStale`). `loadEvents` answers with the first window only and replaces the list, so the older past dates `Load more` added are hidden until it is tapped again. Nothing is lost on the server. The owner chose an up-to-date list over keeping those rows (2026-11-03). It shows only with more than one window of past dates. A fix re-reads as many windows as were loaded, keeping the cursors' depth. Triage 2026-11-04: the same drop follows a return to the list after a refresh skipped while Settings showed (`DatesPage.tsx:124-128`, the `eventsStale` load). Re-reading as many rows as were loaded keeps the owner's 2026-11-03 choice of an up-to-date list and keeps the rows. It shows only past 50 past or 50 upcoming events (`eventsService.ts:267`). Build with DW-445: both change `eventsSlice`'s paging, `eventsService` and `events-history-pagination.spec.ts`.
+
 status: done 2026-11-04
 resolution: resolved by sweep bundle dw-events-paging-keeps-loaded-rows
 resolution-undo: e37c31e4934a00a75715488978216525ae72a53a2c0007265b77f8a977cd922a 2026-11-04 7374617475733a206f70656e
+origin: settings follow-up fixes on PR #449 (epic-settings-rework), 2026-11-03
+source_spec: `tickets/epic-settings-rework/tickets/story-new-events-and-anniversaries-are-added-from-the-dates-list-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-441: The dock's walk back to Home has no way out if the browser never reports the back, which can leave every dock tap doing nothing.
-origin: epic-settings-rework retrospective (diff review, findings V1 and V2), 2026-11-04
-location: src/stores/slices/navigationSlice.ts (`setView`, the `walkingDown` walk); tests/unit/stores/navigationSlice.settingsStack.test.ts
-source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
-severity: medium
-reason: A dock pick above the first history entry sets `walkingDown`, adds a one-shot `popstate` listener and calls `history.go(-depth)`. Only that `popstate` clears `walkingDown`. If it never arrives, every later `setView` just overwrites `pendingView`, so the dock stops working until a reload. That happens when the stored `depth` is larger than the real history, or when the walk crosses a reload such as the live updater's swap. The code path is confirmed; neither trigger has been reproduced. No test covers a second dock tap while a walk is under way: every `setView` test taps once and waits for it to land, so removing either `walkingDown` check fails nothing. Fix: clear the walk on a fallback (a timer, or a `depth` checked against `history.length`) and land the pending view; then test a second tap mid-walk and a walk whose `popstate` never comes. Triage 2026-11-04: `walkingDown` and `pendingView` are module variables (`navigationSlice.ts:72-73`), so any reload, the live updater's swap included, clears them, and that trigger is moot; `history.go()` past the start fires no `popstate`, and neither does a back/forward-cache restore; no normal sequence was found where the stored `depth` exceeds the real history, and any back gesture also frees a stuck walk. Widened: a dock tap just after a reload probably loses the picked view and lands on Home (reasoned from the spec, not run), which the shell meets after iOS kills the page in the background. Fix all three together: reset the walk on `pageshow` with `persisted`, clamp `depth` against `history.length`, and add a timer as the safety net. Test it in a unit test (isolate the module with `vi.resetModules()`, so a stuck walk does not leak into later tests: set a large `depth` with `replaceState`, then tap twice) and in Playwright (the same, plus a reload followed by a dock tap).
+
 status: done 2026-11-04
 resolution: resolved by sweep bundle dw-dock-walk-recovery
 resolution-undo: 0f35935022d8844b5fb144652561e964626cfcfa86b6a96dda3ba9a24ffcc438 2026-11-04 7374617475733a206f70656e
-decision: 2026-11-04 widen, keep medium — severity stays medium until the sweep's new test settles it; the lost pick after a reload is fixed in the same change.
-
-### DW-442: The backlog live-update prompt story still has `hitl: true` and hands its check to a person on the owner's iPhone, though the simulator can run it.
-origin: epic-settings-rework retrospective (P1), 2026-11-04
-location: _bmad-output/backlog/story-native-shell-live-update-prompt.md (frontmatter `hitl`; Description; the 2026-10-30 risk Decision)
+origin: epic-settings-rework retrospective (diff review, findings V1 and V2), 2026-11-04
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: medium
-reason: AGENTS.md (Maintained by hand, hand checks) orders checks Playwright, then the simulator, then a real phone, and forbids `hitl` for a check a machine can run. This story says "A person checks the flow on the owner's iPhone after a deploy" and asks for two deploys in a row on that phone. `sim build --update-port` and `sim serve-update` already apply a downloaded update on the simulator, and the DW-424 re-check of 2026-11-04 used them. Fix: set `hitl: false`, move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the simulator, and keep a phone step only for something the simulator cannot show, saying why. Triage 2026-11-04: still `hitl: true` (line 9) with the phone check at lines 17 and 100; nothing in it needs a phone (`sim build --update-port`, `sim serve-update`, `sim background` and `sim launch`). `52b71747` already shipped the update toast ("Downloading update…", then a Refresh button), so the story's requirements 1-4 describe a different design, and the refine may close it as superseded.
+archived: 2026-11-26
+
+### DW-442: The backlog live-update prompt story still has `hitl: true` and hands its check to a person on the owner's iPhone, though the simulator can run it.
+
 status: done 2026-11-04
-resolution: the backlog story now has `hitl: false`; its Description and the 2026-10-30 risk Decision move the check (the toast, Yes applying the update, the next update still arriving by the background swap) to the Duo simulator through `sim build --update-port`, `sim serve-update`, `sim background` and `sim launch`, with no phone step, since nothing in it needs one. Whether `52b71747`'s shipped toast supersedes the story is left to its refine.
-decision: 2026-11-04 po-refine — outside the loop: the PO refines the backlog story (a ticket edit).
+origin: epic-settings-rework retrospective (P1), 2026-11-04
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: medium
+archived: 2026-11-26
 
 ### DW-443: The simulator driver tells the reader to run `sudo /bin/date`, which moves the Mac's clock.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (diff review, finding V3), 2026-11-04
-location: scripts/sim-driver/README.md:5 (the `sudo /bin/date` and `sim reboot` steps); scripts/sim-driver/sim:97-101 (`sim help`, the `reboot` entry), :832-839 (`cmd_reboot`), :1189 (its dispatch); scripts/sim-driver/RunnerUITests/Notify.swift:464-466 (comment assuming a clock jump)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: high
-reason: An iOS simulator has no clock of its own: it reads the Mac's clock. So the README's step, `sudo /bin/date` followed by `sim reboot` so the simulator sees the change, moves the Mac's clock. AGENTS.md forbids changing the date or time on any of the owner's devices, the Mac included, and forbids writing a step that asks for it (corrected on main in `5013b869`, "a simulator has no clock of its own to move"). Moving the iPhone's clock already broke its Watch pairing. Fix: remove the `sudo /bin/date` and `sim reboot` steps from scripts/sim-driver/README.md, and the matching text in `sim help`. Test time-based behaviour three ways instead: fake time in unit tests for the reminder planning; `sim pending` for what the shell has scheduled and when; a notification scheduled a minute or two ahead with `sim watch`, for delivery. History, not templates: these date-reminders files still move a clock, and each now carries a note saying so: `tickets/epic-date-reminders/epic-date-reminders.md` (Done when 1, the 2026-10-30 story 8 decision); its `tickets/tickets.toml` (stories 8 and 5); `story-reminders-fire-at-9-00-and-a-tap-opens-home-plan.md` (`sudo date` on the Mac); `story-date-reminders-ship-to-the-owner-s-iphone-plan.md` (the iPhone's clock, Set Automatically); `plan-dw-375-376-sim-reboot-and-watch.md` (the reboot after a Mac clock jump). Triage 2026-11-04: `cmd_reboot` itself (it prints "the Mac clock reads"), its dispatch and the `Notify.swift` comment carry the same assumption; nothing else calls `sim reboot`, which existed only for the clock jump, so the command goes too. The app's reminders fire only at 9:00, so delivery is proven with a host-app notification scheduled a minute ahead (`sim schedule`, then `sim watch --host`), as AGENTS.md says since `32b748e9`. All five history notes are present (`6014a0a8`). The close supersedes DW-375 and DW-385, which added the reboot step. Build with DW-449 (same script).
-status: done 2026-11-04
-resolution: removed `sim reboot` (its `sim help` entry, `cmd_reboot` and its dispatch), the README's `sudo /bin/date` and `sim reboot` advice and the clock-jump comment in `Notify.swift`; the README now says a simulator reads the Mac's clock and points time checks at `sim pending` and at `sim schedule` with `sim watch --host`. Supersedes the reboot step DW-375 and DW-385 added.
-decision: 2026-11-04 remove-sim-reboot — remove the command, not only its clock advice.
+archived: 2026-11-26
 
 ### DW-444: A failed Linked since read fails the whole partner lookup.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (diff review, finding V4), 2026-11-04
-location: src/api/partnerService.ts (`getPartner`, the `partner_requests` read)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: `getPartner` returns `{ status: 'error' }` when the accepted-request read for Linked since fails, though the partner's own row loaded. Every reader of `getPartner` then treats the partner as unknown, for one optional date. The strict form may be deliberate: AGENTS.md lets only a successful read overwrite a snapshot. Decide: continue with `linkedSince: null`, or record why the whole lookup must fail.
-status: done 2026-11-04
-resolution: closed as deliberate: story 5.8's plan (failure table, line 130) specifies `{ status: 'error' }` when the request read fails; the only caller (`partnerSlice.ts:213-223`) then keeps the shown partner and the saved copy, so the error shows only on a device's first load; continuing with `linkedSince: null` would overwrite a saved Linked since, against AGENTS.md's rule that only a successful read overwrites a snapshot.
-decision: 2026-11-04 close — the strict lookup is by design.
+archived: 2026-11-26
 
 ### DW-445: Reloading the page of an event beyond the first loaded window sends the reader to the Dates list as if the event were deleted.
-origin: epic-settings-rework retrospective (diff review, finding V5), 2026-11-04
-location: src/components/Settings/EventPages.tsx (the load effect and `useFallBackToDates`)
-source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
-severity: low
-reason: On a reload the event page holds no event, so it calls `loadEvents`, which returns the first window only. An older past event reached through `Load more` is not in it, so `answered && event === undefined` falls back to the Dates list. The code path was read but not reproduced. Fix: read the one event by id before falling back. Triage 2026-11-04: lines confirmed (`EventPages.tsx:194-206`, the fallback at 206); `eventsService` has no read by id, so the fix adds one. Anniversaries are read unpaged (`anniversariesService.ts:62-77`) and the other date pages fall back on couple or partner data, so only event pages are affected. Build with DW-440.
+
 status: done 2026-11-04
 resolution: resolved by sweep bundle dw-events-paging-keeps-loaded-rows
 resolution-undo: e37c31e4934a00a75715488978216525ae72a53a2c0007265b77f8a977cd922a 2026-11-04 7374617475733a206f70656e
+origin: epic-settings-rework retrospective (diff review, finding V5), 2026-11-04
+source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-446: No check has scheduled a reminder through a date page's Remind me switch.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (S3), 2026-11-04
-location: src/components/Settings/RemindMe.tsx; scripts/sim-driver (`sim pending`)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: Stories 5.10 to 5.12's verify lines ask for Remind me to schedule the month and week reminders on the simulator, and each plan lists that as not run. Flow 2 on the simulator checked the footnote and that the setting survived a relaunch, not what was scheduled. Fix: on the simulator, turn on Remind me on a date page and confirm with `sim pending` that the month and week reminders are scheduled. Triage 2026-11-04: each link is unit-tested (the date pages' switch calls `setCountdownMark`; `countdownMarks.test.ts:222` writes the saved copy; `dateRemindersAtLaunch.test.ts:829` schedules In a month and In a week through the LocalNotifications mock), and story 4.2 passed the chain on the simulator through the old switch, so only the new `RemindMe` in the real shell is unchecked. `sim dates kinds` sets dates 3-8 days out, so the check needs a date more than a month ahead.
-status: done 2026-11-04
-resolution: checked on the iPhone Duo simulator on 2026-11-04 (shell built from this branch): turning on Remind me on the Cooking class event page (Tue 22 Dec, 48 days out) added two requests to `sim pending`, "In a month: Cooking class" at 2026-11-22 09:00 and "In a week: Cooking class" at 2026-12-15 09:00, beside the six "Tomorrow" ones already there.
-decision: 2026-11-04 sim-check-in-DW-448-session — outside the loop: run `sim pending` after turning on Remind me on a date page in the DW-448 simulator session, then close.
+archived: 2026-11-26
 
 ### DW-447: The Settings rework solved the same problems several ways across its pages and test files.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (duplication map and test kits), 2026-11-04
-location: src/components/Settings/ (ConfirmDialog.tsx, Settings.tsx `SignOutEverywhereConfirmation` and Error box, NewDatePages.tsx `KindChooser`, EventPages.tsx, AnniversaryPages.tsx, DatePages.tsx, ProfilePage.tsx, settingsFields.ts); src/components/DisplayNameSetup/DisplayNameSetup.tsx; src/stores/slices/datesSlice.ts, profileSlice.ts, notificationsSlice.ts; src/components/Settings/__tests__/
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: Dialogs: three confirmation-dialog implementations (`ConfirmDialog`, `SignOutEverywhereConfirmation`, and `KindChooser`, which copies the focus trap and backdrop). Error box: six inline copies, one a hand-typed copy of `FAILURE_BOX` in Settings.tsx. Copied constants: `FIELD_CLASS` identical in 5 files, and `NOT_SET` defined twice. Delete flow: the same shape in EventPages and AnniversaryPages. Display-name rule: in `settingsFields.ts` and `DisplayNameSetup.tsx`. `isOnline()`: a private copy in three new slices, while `api/errorHandlers.ts` exports one. One birthday, two formats: the Profile row shows the long date and the Your birthday page shows "4 Apr". This one is user-visible. Test kits: `setOnline` is reimplemented in `NotificationsPage.test.tsx` and `Settings.profile.test.tsx`, though `tests/unit/stores/accountDataFixtures.ts` exports it. That breaks AGENTS.md's shared-helper rule. `renderAt` is identical in 4 test files, and `setConnection` and `makeEvent` are each copied twice. Fix: one cleanup story: one dialog, one Error box, shared field constants and rules, one birthday format, and the test helpers imported from shared kits.
-status: done 2026-11-04
-resolution: split at triage into DW-453 (dialogs and the delete flow), DW-454 (Error box, field constants, name rule, `isOnline`), DW-455 (test kits) and DW-456 (date formats), each small enough for one story's budget.
-decision: 2026-11-04 split — four entries; the date-format part follows the mock (DW-456) and the name rule is shared (DW-454).
+archived: 2026-11-26
 
 ### DW-448: Only the Settings stack has ever been checked in the Duo's column form; every other view is unchecked.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (P5, S4), 2026-11-04
-location: every view in src/components (Home, Love Notes, Mood, Photos and the photo viewer, Partner, Settings); scripts/sim-driver
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: medium
-reason: In story 5.17's checks the owner found Love Notes not opening at the bottom and the photo viewer's buttons under the column icons. Both were from before this epic (`db5bfb2b`, `0ffa2caf`), and neither view had a column-form test. DW-419's simulator check covered the Settings stack alone, and its own text says the same holds for every column-form feature. Desktop Playwright cannot set `env(safe-area-inset-*)`. Fix: one simulator sweep of every view in both column forms (capsule left and right), with a screenshot of each, fixing what it finds. After that, each epic sweeps the views it changes. Triage 2026-11-04: outside the loop: about 22 screens in both capsule positions (about 44 screenshots to judge), an unmeasured estimate of 2-3 hours plus fixes; only the dock, the Settings stack, `UpdateToast` and `useSideColumn` have column-form tests. DW-446's `sim pending` check runs in the same session, and DW-457 (the love-note picture viewer's Close) is one likely escape already filed.
-status: done 2026-11-04
-resolution: swept on the iPhone Duo simulator on 2026-11-04, 46 screenshots: capsule on the right (folded portrait) and on the left (folded landscapeLeft) across Home, Mood (Log, Timeline, Calendar, mood detail), Love Notes and its picture viewer, Photos (grid, viewer, delete confirm, upload), Partner and Interaction History, and Settings (top page, Dates, an event page, a field page, Add a date, Log out of all devices). Fixed what it showed, each its own commit: the note picture viewer covered only its message row (`99519f9f`, rendered into `document.body`); the photo upload modal put Close under the status capsule, and centred dialogs spread across the column (`c70bce9a`, every safe-area inset padded); a view opened at the scroll the last one left (`ce22c999`, reproduced in Chromium); and DW-457's Close (`372d39f7`). Rechecked after a rebuild with the capsule on the right; the left-capsule pass ran on that build.
-decision: 2026-11-04 outside-the-loop — one simulator session after the sweep, with DW-446.
+archived: 2026-11-26
 
 ### DW-449: The simulator driver checks none of its prerequisites up front.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (P6), 2026-11-04
-location: scripts/sim-driver/sim (header needs at lines 24-25; `resolve_device`, `require_booted`, `require_window`, `require_stack`)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: During the epic, non-interactive shells got Homebrew's Supabase CLI 3.0.0, which rejects the repo's config, and stories 5.1 and 5.4 worked around it with a shim. The fix then made mise refuse the driver's staged copy until `trusted_config_paths` covered it. `sim` lists its needs but checks them only inside each command, so a wrong environment fails partway through a build. Fix: a `sim doctor` preflight, run before `sim build`. It checks the Supabase CLI on PATH against the `.mise.toml` pin, that mise trusts the staged path, Xcode and Device Hub, and the local stack's health. Triage 2026-11-04: the real cost was a misleading message: with the wrong Supabase CLI the driver says "run supabase start" (`sim:585`). Buildable and testable with stub scripts, no simulator. Build with DW-443.
-status: done 2026-11-04
-resolution: `sim build`, `sim provision` and `sim dates` now run `require_supabase_cli`, which compares `supabase --version` in the repo with `.mise.toml`'s pin and stops naming both versions (or no working CLI) instead of "run supabase start"; `zsh scripts/sim-driver/test-supabase-pin.zsh` covers pinned, 3.0.0, older and broken CLIs with a stub. No full `sim doctor`, per the decision.
-decision: 2026-11-04 narrow-version-check — check the Supabase CLI on PATH against the `.mise.toml` pin before `sim build` and name the mismatch; no full `sim doctor`.
+archived: 2026-11-26
 
 ### DW-450: The simulator driver cannot hold a back swipe halfway, so it cannot see the picture that slides in.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (P3), 2026-11-04
-location: scripts/sim-driver/sim (the `swipe` command takes only `back`); RunnerUITests/Drive.swift (the pan holds for 0 s); scripts/sim-driver/README.md
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: `sim swipe back` compares the page text after the pan, so it checks where a swipe lands, not what it shows. Two of story 5.15's later bugs were in the picture: WebKit's dark or white page three levels deep (`e1ba2117`), and the Add a date chooser still in the picture (`a9906618`). An agent caught the second only with an ad hoc halfway-hold probe that never entered the driver. Fix: a swipe step that stops halfway and takes a screenshot (for example `sim swipe back --hold PATH`), documented in the README. Triage 2026-11-04: confirmed (`sim:1196-1198` and `Drive.swift:59` accept only `back`; the pan holds 0 s at `Drive.swift:75`). The loop has driven the simulator before (run 20261102-215408-6a69, story 5.15); checking that the screenshot shows the page mid-slide needs the Mac unlocked, Device Hub open and `supabase start`.
-status: done 2026-11-04
-resolution: added `sim swipe back --hold PATH`: the runner's new `swipe back hold` step pans from the left edge to the web view's middle and holds 3 s, printing "holding" (now flushed) before the press, and the shell saves the active display to PATH 1.2 s into the hold, repeating up to 8 tries until that picture differs from one taken just before the pan; `sim help` and the README describe it. Checked on the Duo simulator on 2026-11-04 from a Settings event page with the capsule on the left: try 1 held, and the picture shows the Dates list sliding in beside the event page.
+archived: 2026-11-26
 
 ### DW-451: The Settings Touch Floor and design-token measurement of 2026-11-04 was done once by hand and kept as no test.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (P2), 2026-11-04
-location: tests/e2e/settings/ (no spec measures hit areas, field font size or colours)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: R16 (44pt targets, 16px fields) and R18 (DESIGN.md tokens) were "delivered by each story" according to tickets.toml, but no story measured them. The measurement recorded in the epic's Notes on 2026-11-04 walked 25 pages in Playwright, light and dark, and passed, but nothing keeps it. Fix: an E2E spec that walks those pages and asserts every target's hit area is at least 44pt, every field is 16px, and every colour is a DESIGN.md token. Absorbs DW-432 (no E2E axe scan of the Settings pages since `events-accessibility.spec.ts` was deleted): add an axe scan limited to the `color-contrast` rule over the same pages, bringing back `@axe-core/playwright`, because `whiteOnColorContrast.test.ts` covers only white text on colour and the token check proves which colours appear, not which pairs sit together. Triage 2026-11-04: the measurement's scripts are kept outside the repo at `~/.local/share/my-love/r16-probe/` (`measure.mjs`, `analyse.py`, and `seed-extra.mjs`, which seeds the partner event and the past event that `measure.mjs` opens, after `sim provision`). DESIGN.md's front matter lists every colour, type style, radius and the 44px size, so the spec can read them at run time (`js-yaml` is only an `overrides` pin: declare it or parse the front matter directly). Traps: a sr-only radio's hit area is its label, not the 1x1 input; the dialog scrim's colour comes back as `oklab(0 0 0 / 0.5)` and must be read as the 50% black scrim; sr-only text reads as black and must be skipped; Photos shows only when `navigator.connection.type` is stubbed (for example `'wifi'`); Notifications exists only in the shell, so measure it on the simulator.
-status: done 2026-11-04
-resolution: new `tests/e2e/settings/settings-touch-floor.spec.ts` walks 25 Settings states (the top page, Log out of all devices, Profile with Name and Birthday, Partner, Photos with `navigator.connection.type` stubbed to `wifi`, Dates, the Kind chooser, New event, New anniversary, an own event with its Date, Note and Icon pages and Delete confirm, a partner's event, a past event, an anniversary, Together since and its Date page, Wedding, Your birthday and the partner's birthday), each in light and dark, and asserts every target outside the dock hits 44px both ways (a sr-only radio counts its label), every field is at least 16px, and every colour is a DESIGN.md token read from its front matter at run time (or the 50% black scrim, which reads as `oklab(0 0 0 / 0.5)`); `@axe-core/playwright` is back as a devDependency for a `color-contrast`-only scan of the same states (DW-432). It passes on the local stack in 37 s, and fails as it should on an injected 20px button, a 12px field and an off-palette, low-contrast colour. Notifications (shell only) is left out.
-decision: 2026-11-04 build — keep the measurement as a spec, with DW-432's contrast-only axe scan.
+archived: 2026-11-26
 
 ### DW-452: A unit test still asserts a bare `console.error` call.
+
+status: done 2026-11-04
 origin: epic-settings-rework retrospective (Date Reminders follow-through, item 6), 2026-11-04
-location: tests/unit/stores/moodSlice.historyBackfill.test.ts:221; src/services/__tests__/pushNotifications.test.ts:175, :185, :268
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: AGENTS.md forbids a bare `expect(console.error).toHaveBeenCalled()`, since the bare form passed twice on an unrelated error in epic-date-reminders. `497e2515` fixed 13 such asserts and `2b5f27e7` fixed the one in PushSettings.test.tsx, but this one, `expect(errorSpy).toHaveBeenCalled()`, was missed. Fix: assert the message the code under test logs. Triage 2026-11-04: three more bare asserts on a `console.error` spy sit in `pushNotifications.test.ts` (`errorLog` at :175, :185 and :268); fix all four.
-status: done 2026-11-04
-resolution: all four asserts now name what the code under test logs: `[MoodSlice] Error loading mood history from the server:` with the read's error in moodSlice.historyBackfill.test.ts, and `[Push] Could not record the device:` with `nope` (twice) and `[Push] Registration did not start:` with the plugin's error in pushNotifications.test.ts; a scan of every `console.error` spy in `src` and `tests` finds no other bare assert.
+archived: 2026-11-26
 
 ### DW-453: The Settings rework has three confirmation dialogs and two copies of the date delete flow.
+
+status: done 2026-11-04
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
-location: src/components/Settings/ConfirmDialog.tsx; src/components/Settings/Settings.tsx (`SignOutEverywhereConfirmation`, :100-160); src/components/Settings/NewDatePages.tsx (`KindChooser`); src/components/Settings/EventPages.tsx (:218-250); src/components/Settings/AnniversaryPages.tsx (:127-158)
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: `ConfirmDialog`, `SignOutEverywhereConfirmation` and `KindChooser` each draw a dialog, and `KindChooser` copies the focus trap and backdrop; the event and anniversary pages repeat the same delete flow. Fix: one dialog component the three use, and one delete flow both pages call. Split from DW-447 at triage so each part fits one story's budget.
-status: done 2026-11-04
-resolution: `KitDialog` (ConfirmDialog.tsx) is the one dialog frame: the kit scrim and panel, the focus trap starting on Cancel, Escape and a scrim tap cancelling, and the stable cancel. `ConfirmDialog` and the Kind chooser draw on it, and Log out of all devices is now a `ConfirmDialog` (its buttons' test ids became `settings-sign-out-everywhere-confirmation-cancel`/`-confirm`; nothing read the old ones). The event and anniversary pages' delete runs through one hook, `useDateDelete`, with the same refusals, messages and test ids. Settings unit tests (442) pass unchanged.
+archived: 2026-11-26
 
 ### DW-454: The Settings pages copy the Error box, the field constants, the display-name rule and the online check.
+
+status: done 2026-11-04
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
-location: src/components/Settings/ (six inline Error box copies; the hand-typed `FAILURE_BOX` copy in Settings.tsx:432-440; `FIELD_CLASS` in 5 files, `NOTE_FIELD_CLASS` in 3, `NOT_SET` in 2); src/components/Settings/settingsFields.ts:125 and src/components/DisplayNameSetup/DisplayNameSetup.tsx:56 (name rule); src/stores/slices/datesSlice.ts, profileSlice.ts, notificationsSlice.ts, partnerSlice.ts:96 (private `isOnline`); src/api/errorHandlers.ts:46
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: Six inline Error box copies, one hand-typed and drawn slightly differently; `FIELD_CLASS` identical in 5 files, `NOTE_FIELD_CLASS` in 3 and `NOT_SET` twice; the display-name rule in two places; four private `isOnline` copies in slices while `api/errorHandlers.ts` exports one. Fix: one Error box component, shared field constants, one name rule used by both the Name page and the signup gate (this replaces DW-427's documented-twin choice), and the slices calling the exported `isOnline()`. Split from DW-447 at triage.
-status: done 2026-11-04
-resolution: one `ErrorBox` (src/components/Settings/ErrorBox.tsx) replaces the six Settings copies, the hand-typed top-page one included; `FIELD_CLASS`, `NOTE_FIELD_CLASS` and `NOT_SET` are exported once from settingsFields.ts; the display-name rule is `displayNameRefusal` and `isDisplayNameLength` in profileService.ts, used by `saveDisplayName`, the Name page and the signup gate (`DisplayNameSetup`), replacing DW-427's documented twin; and the dates, profile, notifications and partner slices call `isOnline()` from api/errorHandlers.ts, which now answers online with no `navigator`, as their copies did. The two non-Settings boxes (LoginScreen, DisplayNameSetup) keep their own markup: they carry `aria-live` and icon test ids.
-decision: 2026-11-04 share-name-rule — one name rule in one place, replacing DW-427's documented twin.
+archived: 2026-11-26
 
 ### DW-455: The Settings test files copy shared helpers instead of importing them.
+
+status: done 2026-11-04
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
-location: src/components/Settings/__tests__/ (`renderAt` in 4 files, `setConnection` in 5, `makeEvent` in 2); src/components/Settings/__tests__/NotificationsPage.test.tsx:83 and Settings.profile.test.tsx:106 (`setOnline`); tests/unit/stores/accountDataFixtures.ts:33
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: `setOnline` is reimplemented in `NotificationsPage.test.tsx` and `Settings.profile.test.tsx` though `tests/unit/stores/accountDataFixtures.ts` exports it, which breaks AGENTS.md's shared-helper rule (the retro's fix-now item, never done); `renderAt` is identical in 4 test files, `setConnection` in 5 and `makeEvent` in 2. Fix: a shared Settings test kit (a `__tests__/*Kit.ts(x)` file) for `renderAt`, `setConnection` and `makeEvent`, and `setOnline` imported from `accountDataFixtures.ts`. Split from DW-447 at triage.
-status: done 2026-11-04
-resolution: a new kit, `src/components/Settings/__tests__/settingsPageKit.tsx`, holds `renderAt` (from the 4 page test files), `makeEvent` and `daysFromToday` (the two `makeEvent` copies now keep only their file's defaults); `setConnection` moved beside `setOnline` into a new import-free `tests/unit/stores/navigatorFixtures.ts` (re-exported `setOnline` from accountDataFixtures.ts), and all five `setConnection` copies (2 in Settings, PhotoGridItem.recovery, photoDownloadPreference and photoImageCache) and the two Settings `setOnline` copies import it. The 14 `setOnline` copies outside Settings are filed as DW-459.
+archived: 2026-11-26
 
 ### DW-456: The birthday and Linked since dates do not use the mock's format.
+
+status: done 2026-11-04
 origin: triage split of DW-447 (epic-settings-rework retrospective), 2026-11-04
-location: src/components/Settings/ProfilePage.tsx:125 (birthday row); src/components/Settings/DatePages.tsx:279 (Your birthday page); src/components/Settings/PartnerPage.tsx:85 (Linked since); _bmad-output/initiative-my-love/ux-settings-page/mockups/key-settings-v2.html:416; _bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md:230-231
 source_spec: `tickets/epic-settings-rework/epic-settings-rework-retrospective.md`
 severity: low
-reason: The Profile row shows the birthday as the long local date, the Your birthday page shows "4 Apr", and Linked since shows "February 3, 2022". The mock that EXPERIENCE.md:75 links specifies `4 Apr 1995` on the Profile row (key-settings-v2.html:416), `4 Apr` on the birthday pages (EXPERIENCE.md:230-231) and `3 Feb 2022` for Linked since. Fix: follow the mock. Split from DW-447 at triage, whose "one birthday format" would have contradicted the mock.
-status: done 2026-11-04
-resolution: followed the mock: a new `formatDayMonthYear` ("3 Feb 2022") in settingsFields.ts backs `formatDateOnly` (the Profile birthday row, now `4 Apr 1995`), `formatInstantDate` (Linked since, now `3 Feb 2022`) and `formatListDate`'s other-year form; the birthday pages already read `4 Apr` through `yearlyValue`. Unit tests pin both forms, and partner-page.spec.ts reads `[34] Feb 2022`.
-decision: 2026-11-04 follow-the-mock — Profile row `4 Apr 1995`, birthday pages `4 Apr`, Linked since `3 Feb 2022`.
+archived: 2026-11-26
 
 ### DW-457: The love-note picture viewer's Close button probably sits under the side column on the Duo.
-origin: triage of epic-settings-rework deferred work (DW-448 code read), 2026-11-04
-location: src/components/love-notes/FullScreenImageViewer.tsx:100
-severity: medium
-reason: The Close button is placed at `right-4` with no `--dock-right` clearance, the layout `b243a7ce` fixed in the photo viewer (`PhotoGallery/PhotoViewer.tsx`), so in the column form with the capsule on the right it probably sits under the capsule. Found by reading the code, not seen on a screen. Fix: clear the column as `b243a7ce` does for the photo viewer.
+
 status: done 2026-11-04
-resolution: Close now sits at `right-[calc(1rem+env(safe-area-inset-right))]`, as `b243a7ce` placed the photo viewer's controls. Checked in the DW-448 simulator sweep with the capsule on the right: Close sits left of the side column, clear of the status capsule. The sweep also found the viewer covering only its message row, fixed in the same branch by rendering it into `document.body`.
-decision: 2026-11-04 file-and-sweep.
+origin: triage of epic-settings-rework deferred work (DW-448 code read), 2026-11-04
+severity: medium
+archived: 2026-11-26
 
 ### DW-458: The partner-mood.spec.ts comment on loadPartner's reads is stale beyond the column this change fixed.
+
+status: done 2026-11-04
 origin: spec-deferred 4c682ad027bb
-location: tests/e2e/partner/partner-mood.spec.ts:46
 source_spec: `plan-dw-partner-lookup-drop-updated-at.md`
 severity: low
-reason: tests/e2e/partner/partner-mood.spec.ts:46-48 says loadPartner makes 2 sequential GET /rest/v1/users calls and names the second select=id,email,display_name; getPartner also reads partner_requests (src/api/partnerService.ts:151-160) and the second users read selects id, email, display_name, birthday (src/api/partnerService.ts:137). Predates this change.
-status: done 2026-11-04
-resolution: the comment now lists getPartner's three reads: the `partner_id` read, the partner's row with `id,email,display_name,birthday`, and the accepted `partner_requests` read for Linked since, which the spec leaves to the local stack.
+archived: 2026-11-26
 
 ### DW-459: Fourteen unit test files outside Settings still define their own `setOnline`.
-origin: DW-455 fix (chore/resolve-open-dw), 2026-11-04
-location: tests/unit/stores/ (interactionsSlice.localCopy, eventsSlice.localCopy, photosSlice.localCopy, birthdaysWedding, coupleSettings, partnerSlice.localCopy, pushPreferences); tests/unit/hooks/usePhotoImage.test.ts; tests/unit/api/interactionService.test.ts; tests/unit/services/ (pushPreferencesService, photoImageCache, accountDataApis, profileService, coupleSettingsService); tests/unit/stores/navigatorFixtures.ts
-severity: low
-reason: DW-455 moved the `navigator` stubs into `tests/unit/stores/navigatorFixtures.ts` (`setOnline`, `setConnection`) and switched the Settings tests and every `setConnection` copy to it, but these 14 files each keep a local `setOnline`, against AGENTS.md's shared-helper rule. They are not all the same stub: some set `navigator.onLine` with `Object.defineProperty`, some with `vi.spyOn(navigator, 'onLine', 'get')`, so a switch must check each file's teardown. `notesSliceQueueFixture.ts` and `fakeEventsBackend.ts` export their own `setOnline` for their suites. Fix: import `setOnline` from `navigatorFixtures.ts` wherever the stub is the `defineProperty` form, and give the spy form one shared helper too if more than one file needs it.
+
 status: done 2026-11-04
-resolution: all 14 files import `setOnline` from `navigatorFixtures.ts`, and `fakeEventsBackend.ts` re-exports it the way `accountDataFixtures.ts` does. The four spy-form files (`pushPreferencesService`, `accountDataApis`, `profileService`, `coupleSettingsService`) moved to the shared `defineProperty` stub, so no spy helper was needed: each resets to online in `beforeEach`, and no other code in them spies on `onLine`. `notesSliceQueueFixture.ts` keeps its own `setOnline`, which drives the stateful getter `stubOnline` installs. Plan: `plan-dw-459-shared-set-online.md`.
+origin: DW-455 fix (chore/resolve-open-dw), 2026-11-04
+severity: low
+archived: 2026-11-26
 
 ### DW-460: The Edge Functions, the site build and the admin scripts sign in with the legacy keys Supabase is retiring.
+
+status: done 2026-11-05
 origin: bmad-architecture review of the Daily Question spine (currency lens), 2026-11-05
-location: supabase/functions/send-push/index.ts:34; supabase/functions/upload-love-note-image/index.ts:30; .github/workflows/deploy.yml and bundle-size.yml (`secrets.VITE_SUPABASE_ANON_KEY`); fnox.toml `SUPABASE_SERVICE_KEY` (scripts/provision-claude-bot.mjs, scripts/provision-push-fixtures.mjs)
 source_spec: `architecture-daily-question/architecture-daily-question.md` (Deferred)
 severity: medium
-reason: Supabase's API-keys guide (https://supabase.com/docs/guides/api/api-keys, read 2026-11-05) deprecates the `anon` and `service_role` keys "by the end of 2026"; legacy keys "stay valid until you disable them" under Settings > API Keys. Four things still used them: `send-push` read `SUPABASE_SERVICE_ROLE_KEY`; `upload-love-note-image` read `SUPABASE_ANON_KEY`; the live site bundle shipped the legacy anon JWT, because the deploy's `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` came from the GitHub secret `VITE_SUPABASE_ANON_KEY`, which held it; and fnox's `SUPABASE_SERVICE_KEY` held the legacy service-role JWT. Disabling the legacy keys would have stopped every push, every love-note picture upload, the whole site and the provisioning scripts. The hosted project already has a `default` publishable and a `default` secret key (Management API listing).
-status: done 2026-11-05
-resolution: both Edge Functions read their key through `supabase/functions/_shared/apiKeys.ts`: the `default` entry of `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` (hosted injects them), falling back to the legacy variable with a logged warning, because the local CLI 2.122.0 injects only the legacy ones (measured on its edge runtime container); `test.yml` runs the new `_shared` Deno tests. A new GitHub secret `VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY` holds the `sb_publishable_` key and `deploy.yml` and `bundle-size.yml` read it; against hosted the publishable key answers exactly as the legacy anon key did (auth settings 200; the same 42501 on a revoked table). fnox's `SUPABASE_SERVICE_KEY` now holds the `default` `sb_secret_` key, which the auth admin API accepts in both the `apikey` and the `Authorization: Bearer` header the scripts send. After the deploy, 2026-11-05/06: both functions' fresh boots on hosted logged no fallback warning, and the edge logs showed `send-push` under the `sb_secret_` key; the old `VITE_SUPABASE_ANON_KEY` GitHub secret was deleted (`gh secret delete`); the owner's iPhone shell switched to the `sb_publishable_` key once the live update applied (edge logs, grouped by `request.sb.apikey.apikey.prefix`); then the legacy keys were disabled through the Management API (`PUT /v1/projects/{ref}/api-keys/legacy?enabled=false`, 00:51 UTC on 2026-11-06; `enabled=true` reverts it). Checked after: the publishable key answers auth health and a table read with 200, the secret key an admin read with 200, the legacy anon key 401 "Legacy API keys are disabled", the site 200. The partner's shell was still on the pre-deploy build; its first open after the switch can sign it out once before the update applies, which the owner accepted.
+archived: 2026-11-26
 
 ### DW-461: E2E workers will share one coach pool, which clearPairDays cannot clear and NO ACTION keeps from being deleted while any day uses a row.
+
+status: done 2026-11-05
 origin: spec-deferred 0cf81e0eb41d
-location: tests/support/factories/daily-question.ts; supabase/migrations/20261105010000_daily_question_days_and_picks.sql:102
 source_spec: `tickets/epic-daily-question/tickets/story-the-server-assigns-today-s-question-and-releases-a-pick-s-ch-plan.md`
 severity: medium
-reason: Coach rows have a null pair (daily_questions_coach_or_written), so a question one worker inserts is drawn by every worker's pair. clearPairDays deletes only the worker pair's couple_days rows. couple_days.question_id is NO ACTION, so deleting a test coach row raises 23503 while another worker's day still asks it. The row audit cannot see coach rows, which have no user column. Story 12's ticket says "Tests insert their own questions", so its specs meet this under parallel workers and burn-in: flaky question text or a failing teardown. The intent hands test-pool seeding to story 12, so this story ships no seeding helper.
-resolution: `tests/support/factories/daily-question.ts` now exports `ensureTestCoachQuestions(supabaseAdmin)`, which upserts three fixed-uuid coach rows with `ignoreDuplicates` and never deletes them, so no teardown meets the NO ACTION 23503 and every worker's pair draws from the same idempotent pool; a spec asserts that its pages agree with the question read through the admin client (`readPairQuestionTexts`), never a specific text. Used by `tests/e2e/daily/daily-question-pick-and-reveal.spec.ts` (story 6.12), which passed twice in a row on a local stack.
-status: done 2026-11-05
+archived: 2026-11-26
 
 ### DW-462: AGENTS.md says useAppStore.ts composes 14 slices; with dailyQuestionSlice it composes 15.
+
+status: done 2026-11-06
 origin: spec-deferred a1bf1d8a5ceb
-location: AGENTS.md:26
 source_spec: `tickets/epic-daily-question/tickets/story-both-partners-pick-today-s-question-and-see-the-reveal-plan.md`
 severity: low
-reason: `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15 after this change; AGENTS.md line 26 still reads "composes 14 slices". The fix edits an agent-context file, so it is deferred rather than patched.
-resolution: AGENTS.md now reads "composes 15 slices"; `grep -c "create[A-Za-z]*Slice(set, get, api)" src/stores/useAppStore.ts` gives 15. Fixed in the epic 6 refactor sweep (story 6.10).
-status: done 2026-11-06
+archived: 2026-11-26
 
 ### DW-463: origin/main and this epic each hold a migration at version 20261105010000, so once both reach main the hosted deploy skips one of them.
+
+status: done 2026-11-06
 origin: spec-deferred f2b78a48ca13
-location: supabase/migrations/20261105010000_daily_question_days_and_picks.sql
 source_spec: `tickets/epic-daily-question/tickets/story-each-partner-s-day-runs-on-their-own-clock-plan.md`
 severity: high
-reason: `git ls-tree --name-only origin/main supabase/migrations/` lists `20261105010000_push_added_dates.sql` (and `20261105020000_remind_me_on_by_default.sql`); this epic's story 6.1 added `20261105010000_daily_question_days_and_picks.sql`. The migration history keys on the version alone, so whichever lands second is recorded as applied without running. Renaming an applied migration is outside this story; the epic PR must renumber the daily one past every main version before merging.
-status: done 2026-11-06
-resolution: renumbered to `20261105030000_daily_question_days_and_picks.sql`, after main's `20261105020000` and before this epic's `20261105210000_daily_question_own_clocks.sql`, which builds on it; the two pgTAP header comments that named the version follow, and the shared local stack's `schema_migrations` row was renamed to match. Done on `loop/integration` between stories 6.2 and the next, with the run stopped.
+archived: 2026-11-26
 
 ### DW-464: The partner-connect poke test failed once while the realtime-recovery spec ran beside it.
+
+status: done 2026-11-06
 origin: spec-deferred d403f1340407
-location: tests/e2e/partner/partner-connect.spec.ts ("a poke reaches each linked partner live")
 source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
 severity: medium (unverified)
-reason: During story 6.6 the implementing agent's first combined run of `tests/e2e/daily/`, `partner-connect.spec.ts`, `realtime-recovery-after-renewal.spec.ts` and `login.spec.ts` (chromium, local stack) failed this test once: no `notification-badge` appeared. It passed in two reruns, and in the parent session's two full runs of the same set. The poke path (`interactionService`'s `postgres_changes` subscription) is not touched by that story, and the test was not run on the baseline, so whether it is a load-dependent flake or something else is unverified. To settle it, run `partner-connect.spec.ts` with `--repeat-each=10` next to the recovery spec on the baseline and on this branch. If it does fail, check whether the poke is inserted before the `postgres_changes` confirmation (the AGENTS.md pitfall), the way the recovery spec guards with POKES_ARMED_LOG.
-resolution: Not reproduced. In story 6.10, `npx playwright test tests/e2e/partner/partner-connect.spec.ts tests/e2e/partner/realtime-recovery-after-renewal.spec.ts --project=chromium --repeat-each=10` on the local stack passed 60 of 60, so "a poke reaches each linked partner live" passed 10 times beside the recovery spec. With no failure on the branch, the baseline comparison was not run. If it fails again, start from the `postgres_changes` confirmation check named above. DW-465 is the same finding.
-status: done 2026-11-06
+archived: 2026-11-26
 
 ### DW-465: The partner-connect poke test failed once while the realtime-recovery spec ran beside it (ledger DW-464).
+
+status: done 2026-11-06
 origin: spec-deferred 1e1c7fb40342
-location: tests/e2e/partner/partner-connect.spec.ts
 source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
 severity: medium
-reason: The implementing agent's first combined Playwright run failed "a poke reaches each linked partner live" once (no notification-badge); two reruns and the parent's two full runs passed. The poke path (interactionService postgres_changes) is untouched by this change and the baseline was not run, so it is unverified. Settle it with partner-connect.spec.ts --repeat-each=10 beside the recovery spec on the baseline and on this branch. (declared severity: medium (unverified))
-resolution: Same finding as DW-464, closed with it: not reproduced in 10 repeats beside the recovery spec (story 6.10).
-status: done 2026-11-06
+archived: 2026-11-26
 
 ### DW-466: 24 existing test-file violations of TEA's write-time hook rules.
-origin: installing TEA's write-time enforcement hook (`.claude/hooks/tea-enforce.cjs`, TEA 4.0.0), 2026-11-06
-location: H1 hard waits (`await new Promise((resolve) => setTimeout(resolve, N))`): src/components/MoodTracker/__tests__/MoodTracker.partnerLink.test.tsx:73,161,176; src/services/__tests__/dateReminders.test.ts:1080; src/services/__tests__/pushNotifications.test.ts:284,710; tests/api/push-love-note-trigger.spec.ts:247,446,505,837,908 (3 s each); tests/unit/services/nativeUpdates.test.ts:338; tests/unit/stores/countdownMarks.test.ts:76; tests/unit/stores/dateRemindersAtLaunch.test.ts:668,759,926; tests/unit/stores/pushPreferencesCopy.test.ts:74. H5 over 1,000 lines: src/services/__tests__/dateReminders.test.ts (1205), src/services/__tests__/pushNotifications.test.ts (1239), tests/api/push-love-note-trigger.spec.ts (1060), tests/unit/stores/dateRemindersAtLaunch.test.ts (1324), tests/unit/stores/eventsSlice.test.ts (1254), tests/unit/stores/signOutClearsAccountState.test.ts (1070), tests/e2e-archive/scripture-reflection-original.spec.ts (1155, frozen: never edit)
-severity: low
-reason: The hook's `--pre` blocks only violations a write adds, so these files can still be edited. But `--post` reports the whole file after every edit, and `--stop` sweeps each test file the turn touched and exits 2, so an agent that edits one of them is told to fix the old violations and gets one extra turn before it can stop. That includes a loop session working on something else. Each hard wait should become a wait on the thing it waits for, such as a fake timer, `vi.waitFor` or a polled assertion. Each oversize file should be split by subject. Counts come from running the hook's own `scanFile` over every file its `testGlobs` match.
-resolution: 22 findings fixed in #475 (82b77686, merged as 0db0d7b8): every listed H1 hard wait now waits on the condition its test needs, and `dateReminders`, `pushNotifications`, `dateRemindersAtLaunch`, `eventsSlice` and `push-love-note-trigger` are split under 1,000 lines. The `tests/e2e-archive/` spec was deleted in cae2be60. `tests/unit/stores/signOutClearsAccountState.test.ts`'s H5 is excluded in `.tea/enforce-config.json` (8f243e16) until epic 10 splits it; that epic's Done when requires the split and the exclusion's removal. The hook's scan of every tracked test file now reports 0 findings. `settleMs`, a wait the H1 pattern cannot see, is DW-480.
+
 status: done 2026-11-06
+origin: installing TEA's write-time enforcement hook (`.claude/hooks/tea-enforce.cjs`, TEA 4.0.0), 2026-11-06
+severity: low
+archived: 2026-11-26
 
 ### DW-480: The date-copy refresh tests still hard-wait 20 ms through `settleMs`, which the H1 regex cannot see.
-origin: DW-466 fix (fix/dw-466-tea-hook-findings), 2026-11-06
-location: tests/unit/stores/dateRemindersAtLaunchFixture.ts (`settleMs`); tests/unit/stores/dateRemindersAtLaunch.triggers.test.ts (14 calls); tests/unit/stores/dateRemindersAtLaunch.test.ts (1 call)
-severity: low
-reason: `settleMs = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms))` waits a fixed time, either before a negative assertion ("runs no refresher", "does nothing for a sign-in") or in an `afterEach` to let a run end. `.claude/hooks/tea-enforce.cjs`'s H1 pattern matches only a literal delay, so it does not flag the variable `ms`, and DW-466 replaced only the waits the hook flags. Fix as DW-466 did the others: the triggers decide before their first await, so a negative step can `mockClear()` `readLocalCopySpy` or a refresher spy and assert at once; the token-renewal cases defer by `setTimeout(0)`, so they need a scoped fake timer, as `MoodTracker.partnerLink.test.tsx` uses; a drain is `await replanDateReminders()`.
-resolution: `settleMs` is gone (fix/dw-480-settle-waits). The five foreground-return negatives assert at once, since the throttle, offline, signed-out and token checks and every refresher call happen inside the return. The six token-renewal cases run their step under `runDeferredRenewal`, which fakes `setTimeout`/`clearTimeout` beside the file's faked `Date` and runs the deferred renewal before asserting. The drain the entry proposed, `await replanDateReminders()`, misses a re-plan a finishing refresh asks for after the call, and plans for the store's new account when it has switched, so the three waits that need a drain (the `afterEach`, the identity switch, the owner the store has left) and the launch test's stalled-refresher check await `dateReminderWorkSettled()`, a new export of `src/services/dateRemindersAtLaunch.ts` that resolves once no trigger-started refresh and no re-plan is running or queued. Breaking the throttle, the offline check, the renewal's event filter, stop's timer cancel or the launch's wait for its refresh fails the changed tests. The fix turned up a gap, closed in #477 (93ca0267): both "owner the store has left" tests (`dateRemindersAtLaunch.triggers.test.ts` and `dateRemindersAtLaunch.test.ts`) passed with `isCurrent` forced true, because `setAuthUser(B)` runs `deleteAccountData(A)`, which deletes the outgoing account's copies, so the left owner's plan stopped at a missing copy. Each now also runs for the same account signed in again (`authSessionVersion` bumped), which keeps the copies, and both new cases fail with `isCurrent` forced true. #477's commit and this entry's first wording called that gap DW-481; the number is story 6.7's entry, which loop run 20261105-224246-5db5 filed on `loop/integration` at the same time, so the gap is recorded here instead.
+
 status: done 2026-11-06
+origin: DW-466 fix (fix/dw-466-tea-hook-findings), 2026-11-06
+severity: low
+archived: 2026-11-26
 
 ### DW-481: AGENTS.md does not describe the daily question's offline model: the data-model paragraph and the "new per-account offline data is a localCopy kind" rule both omit the pick-queue.
+
+status: done 2026-11-06
 origin: spec-deferred 9079f1c0545c
-location: AGENTS.md:66,100
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: AGENTS.md "Maintained by hand" opens with a data-model paragraph ("Check which data model a feature uses…") that spells out how every feature behaves offline but says nothing of Daily. Daily's saved days are the `daily-days` local copy. Picks made offline go into the per-account `pick-queue` store (`services/pickQueue.ts`), and `dailyQuestionSlice.drainQueuedPicks` sends them under `PICK_QUEUE_LOCK` on start, on `online` and on a backoff after a failed pass. A queued pick never enters the copy, so only a server snapshot produces a reveal. The Known-pitfalls rule "New per-account offline data is a new kind in services/localCopy.ts, not a new IndexedDB store" now has a second queue-store exception (beside `note-queue`) that it does not state. This change only added `pickQueue` and `pick-queue` to two lists. The fix edits an agent-context file, so the review deferred it.
-resolution: AGENTS.md's data-model paragraph now describes Daily: the `daily-days` copy written only through `mergeDailyDay`, the `pick-queue` store drained by `dailyQuestionSlice.drainQueuedPicks` under `PICK_QUEUE_LOCK` on start, on `online` and on a backoff, a queued pick never entering the copy, the online-only written question, and the device-only `daily-write-declined` kind. The localCopy rule now names `note-queue` and `pick-queue` as its two queue-store exceptions. Fixed in story 6.10.
-status: done 2026-11-06
+archived: 2026-11-26
 
 ### DW-482: A pick the server refuses shows a technical message, such as "[DailyQuestionApi.submitDailyPick] Database error: …".
+
+status: done 2026-11-06
 origin: story 6.10 refactor sweep, from the residual risks of stories 6.2 and 6.7, 2026-11-06
-location: src/api/dailyQuestionApi.ts (`submitDailyPick`, `toAccountDataError`); src/api/errorHandlers.ts (`handleSupabaseError`); src/components/DailyQuestion/DailyQuestion.tsx:172
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: `submitDailyPick` maps only `DQ001` to a sentence of its own. Every other refusal (`DQ002`, a `picked_at` outside the five-minute window, which a phone clock more than five minutes off the server's meets; `P0002`; `22023`) goes through `toAccountDataError`, whose message is `handleSupabaseError`'s `[<context>] Database error: <server message>`. A queued pick stores that message as its `failure`, and Daily shows it after "Your pick could not be sent."; an online send shows the same text. A fix maps each refusal code to a plain sentence, as `WRITE_REFUSAL_MESSAGES` does for written questions. It changes what users read, so the wording is the owner's.
-resolution: `submitDailyPick` maps `DQ002`, `P0002` and `22023` through `PICK_REFUSAL_MESSAGES` to `AccountDataError('refused', sentence)`, keeping the PostgREST error as `cause` so `isPickRefusal` still recognises all four codes; `DQ001` keeps `day-changed`. The owner's sentences: `DQ002` "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.", `P0002` "This question isn't available any more. Open Daily again to see today's question.", `22023` "This pick couldn't be sent. Please pick again." Each sentence stands on its own as the explanation, so Daily's failure box shows a queued pick's stored `failure` on its own and "Your pick could not be sent." only when there is none. A row a device refused before this fix still holds the old technical text, which now shows without the lead-in. Breaking the mapping or the box fails the new unit tests, and `daily-question-offline-pick.spec.ts` asserts the `DQ002` sentence exactly, on screen and as the queued row's `failure`.
-status: done 2026-11-06
+archived: 2026-11-26
 
 ### DW-483: A refused queued pick for a day no longer on screen is shown nowhere, and refused rows are never removed from the device.
 origin: story 6.10 refactor sweep, from story 6.7's residual risks, 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts (`drainQueuedPicks`, `showQueuedPicks`); src/services/pickQueue.ts
+location: src/stores/slices/dailyDaySlice.ts:349-351 (`drainOnce` marks a refused row `failed`), :228-240 (`showQueuedPicks`); src/services/pickQueue.ts:104-124 (no delete path for a failed row); src/components/DailyQuestion/DailyQuestion.tsx:656 (only the shown day's row)
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: `drainQueuedPicks` marks a refused row `failed` and keeps it. Daily shows a failure only for the day on screen, so a pick refused for yesterday is never seen, and nothing deletes a failed row: it stays in `pick-queue` until a later pick for the same account and day replaces it, which cannot happen once that day is past. The queue survives sign-out by design, so the rows add up over time on a device that keeps meeting refusals.
+reason: `drainQueuedPicks` marks a refused row `failed` and keeps it. Daily shows a failure only for the day on screen, so a pick refused for yesterday is never seen, and nothing deletes a failed row: it stays in `pick-queue` until a later pick for the same account and day replaces it, which cannot happen once that day is past. The queue survives sign-out by design, so the rows add up over time on a device that keeps meeting refusals. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` in story 8.1's split (bf6a8a2d). Since 4583f571 the failure box shows the stored sentence alone.
 status: open
+decision: 2026-11-26 prune-silently — after a successful server answer for today, `loadDailyDay` deletes the signed-in account's `failed` pick-queue rows for other days, never another account's rows; no new copy, since the week strip and the cold banner already show that date as missed.
 
 ### DW-484: An online pick whose request fails in transit shows a send error instead of being queued, even when the server committed it.
 origin: story 6.10 refactor sweep, from the residual risks of stories 6.7 and 6.12, 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts (`submitDailyPick`, the online branch)
+location: src/stores/slices/dailyDaySlice.ts:526-534 (`submitDailyPick`, the online branch, rethrows every online failure); src/components/DailyQuestion/DailyQuestion.tsx:303-310
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: Send my pick queues only when `isOnline()` is false before the request. When the connection drops during the request, or the server commits the pick but answers after the 30 s `requestTimeout`, the action throws and Daily shows a send error; the pick is not queued. In the committed case the screen keeps offering the pick until the next read (a reload, the next open, or a partner's `daily_pick`), and a second Send returns the stored pick. Queuing on a transport failure would close both, since the RPC is idempotent.
+reason: Send my pick queues only when `isOnline()` is false before the request. When the connection drops during the request, or the server commits the pick but answers after the 30 s `requestTimeout`, the action throws and Daily shows a send error; the pick is not queued. In the committed case the screen keeps offering the pick until the next read (a reload, the next open, or a partner's `daily_pick`), and a second Send returns the stored pick. Queuing on a transport failure would close both, since the RPC is idempotent. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` (bf6a8a2d). Besides the reads named above, the app returning to the front and the 20:00:05 re-read (`useDailyDayRereads`, 54d788c9) also re-read, and the error shown is the technical transport text ("[DailyQuestionApi.submitDailyPick] Network error: …", `accountDataError.ts:106-123`). Waits for backlog story 6 (criterion 6, the nudge prompt for an answer sent from the queue): landing first would lose the after-pick nudge offer for a timed-out pick, because a drained pick raises none today. Then a bundle (pick-unknown-send-queued) queues a pick whose request fails with `AccountDataError` code `transport`, with its original `pickedAt` and zone, and starts the drain; `invalid-response` stays an error.
 status: open
 
 ### DW-485: A queued pick waits for the next `online` event or start when another tab held the queue lock and closed before its pass finished.
 origin: story 6.10 refactor sweep, from story 6.7's residual risks, 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts (`drainQueuedPicks`, the `other-tab` branch)
+location: src/stores/slices/dailyDaySlice.ts:377-385 (`drainOnce`, the `other-tab` branch waits and reloads the day), :583-590 (only `transient` and `failed` schedule a retry)
 source_spec: `tickets/epic-daily-question/tickets/story-a-pick-made-offline-is-sent-when-the-connection-returns-plan.md`
 severity: low
-reason: When another tab holds `PICK_QUEUE_LOCK`, this tab waits for the lock, re-reads the day and leaves the retry to that tab ("Its own retry covers a transient stop there"). If that tab stopped on a transient failure and then closed, its retry timer is gone, and this tab sets none, so the row is sent only on the next `online` event or app start.
+reason: When another tab holds `PICK_QUEUE_LOCK`, this tab waits for the lock, re-reads the day and leaves the retry to that tab ("Its own retry covers a transient stop there"). If that tab stopped on a transient failure and then closed, its retry timer is gone, and this tab sets none, so the row is sent only on the next `online` event or app start. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` (bf6a8a2d). Besides the next `online` event or app start, a session or `isOnline` change also re-runs the drain: `App.tsx:603-611` (deps `:631`) calls `drainQueuedPicks` on every `onAuthStateChange` notification, `TOKEN_REFRESHED` included, about hourly at the local `jwt_expiry` of 3600 (the hosted value is UNVERIFIED).
 status: open
 
 ### DW-486: A `daily_pick` broadcast that lands while the channel re-joins and re-reads the partner is dropped, so the partner's pick shows only on the next open.
 origin: story 6.10 refactor sweep, from story 6.6's review (rejected as low, kept as a residual risk), 2026-11-06
-location: src/api/moodSyncService.ts:537 (`refreshChannelIdentity`, run on a re-join of the `subscribePartnerEvents` channel)
+location: src/api/moodSyncService.ts:533-557 (`refreshChannelIdentity`, the null write at :539), fanned out before it settles at :777-794
 source_spec: `tickets/epic-daily-question/tickets/story-the-partner-s-pick-shows-without-a-reload-plan.md`
 severity: low
-reason: On a re-join the registry nulls the partner snapshot while it re-reads `users`, and an event that arrives in that round trip is dropped after the `SUBSCRIBED` re-read has already run. Only re-joins are affected, and `new_mood` shares the window. The review declined the fix because it needs a new registry callback; the next Daily open re-reads.
+reason: On a re-join the registry nulls the partner snapshot while it re-reads `users`, and an event that arrives in that round trip is dropped after the `SUBSCRIBED` re-read has already run. Only re-joins are affected, and `new_mood` shares the window. The review declined the fix because it needs a new registry callback; the next Daily open re-reads. 2026-11-26 triage: `daily_nudge` (story 8.8, 54d788c9) shares the window with `new_mood`. Besides the next Daily open, a return to the app (`useDailyDayRereads.ts:62-65`) and the next re-join re-read. The 6.6 review's "needs a new registry callback" was an automated triage call: holding the broadcasts that arrive while the refresh runs, and dispatching them against the snapshot it wrote, needs none.
 status: open
 
 ### DW-487: A failed IndexedDB read during a Daily copy merge rewrites the copy with only the new day.
+
+status: done 2026-11-25
 origin: story 6.10 refactor sweep, from story 6.5's review (rejected as low, kept as a residual risk), 2026-11-06
-location: src/services/dailyDaysCopy.ts (`mergeDailyDay`); src/services/dailyWriteDeclined.ts (`addDeclinedWriteDay`); src/services/dailyDaysCopy.ts:214-231 (`mergeDailyDays`); src/services/localCopy.ts:97-106 (`readLocalCopy`)
 source_spec: `tickets/epic-daily-question/tickets/story-daily-shows-its-saved-day-offline-and-invites-an-unlinked-ac-plan.md`
 severity: low
-reason: `readLocalCopy` returns `null` both for no copy and for a failed read, so `mergeDailyDay` treats a failed read as empty and writes a map holding only the new entry. The other saved days are lost and the kept state can be lower than the lost one. It needs the read to fail and the following write to succeed on the same database; the screen keeps the higher state through `mergeAnswer`, and the next successful read restores the server's state. The fix needs a throwing read variant in `localCopy.ts`, new public surface, which the review declined. The same weakness is in `addDeclinedWriteDay` (`src/services/dailyWriteDeclined.ts:41-53`, story 6.8): `readDeclinedWriteDays` answers `[]` on a failed read (`:27-31`) and the add then writes a list holding only the new day, so earlier "No thanks" days are lost and the write prompt comes back for them (epic 6 retrospective, A2, 2026-11-06). Story 7.9 added a third, `mergeDailyDays`, and removed the 31-day cap: one failed read while a history page is merged now rewrites the whole copy with that page, so every other saved day is gone until its page is read online again. DW-509 is the same root in `claimCelebration`; one `readLocalCopy` variant that tells "absent" from "failed", used by all four merges, closes both (epic 7 retrospective, G2, 2026-11-07).
-resolution: `localCopy.ts` gains `readLocalCopyStatus`, which answers `found`, `absent` or `failed` (`readLocalCopy` delegates to it and keeps its behaviour). `mergeDailyDay` and `mergeDailyDays` write nothing on `failed` (`mergeDailyDay` returns the answer as it is); `addDeclinedWriteDay` throws and writes nothing, so the slice's catch leaves the declined list as it was. Unit: `localCopy.test.ts` (`readLocalCopyStatus`), `dailyDaysCopy.test.ts` (both merges) and `dailyWriteDeclined.test.ts`, each failing the IndexedDB read once.
-status: done 2026-11-25
+archived: 2026-11-26
 
 ### DW-488: The live check reads both pages after a reload, so a production break in the partner-has-picked update without a reload (R2) still ships unseen.
 origin: spec-deferred b8c1506b047a
-location: tests/live/daily-question-live.spec.ts:313
+location: tests/live/daily-question-live.spec.ts:458-462 (B's reload before its pick), :478-482 (A's reload after B's pick)
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: medium
-reason: Before this change nothing checked Daily on the live site; this change adds the hidden-pick and reveal checks but each page reads its state after `pageB.reload()` / `pageA.reload()` (tests/live/daily-question-live.spec.ts), so a hosted Realtime or broadcast-authorization break is not caught. tests/e2e/daily/daily-question-live-pick.spec.ts checks the no-reload update locally only. A no-reload step needs the channel-joined wait that spec uses (the `SUBSCRIBED` log), which is more than a trivial addition.
+reason: Before this change nothing checked Daily on the live site; this change adds the hidden-pick and reveal checks but each page reads its state after `pageB.reload()` / `pageA.reload()` (tests/live/daily-question-live.spec.ts), so a hosted Realtime or broadcast-authorization break is not caught. tests/e2e/daily/daily-question-live-pick.spec.ts checks the no-reload update locally only. A no-reload step needs the channel-joined wait that spec uses (the `SUBSCRIBED` log), which is more than a trivial addition. 2026-11-26 triage: the `SUBSCRIBED` log the local spec waits on is `logger.debug`, which prints only in DEV (`src/utils/logger.ts:6-8`), so it never prints on the live site; the live check needs a join signal a production build gives, such as the Realtime join reply on `mood-updates:<uid>` with the listener attached before navigation. `tests/**` does not trigger `deploy.yml` (`deploy.yml:14-15`), so the proof on production is the next deploy that is not test-only. Waits for backlog story 6, whose criterion 14 rewrites the live check's nudge step (:405-435) and removes the waiting card's Nudge button; then it is its own bundle.
 status: open
 
 ### DW-489: Through the mise shims, a local Playwright run aimed at any stack but the default one reaches the default (shared) stack anyway, so a local run of the live spec on an isolated stack signs the bots up
+
+status: done 2026-11-06
 origin: spec-deferred 6aa6294b27c9
-location: playwright.config.ts:40
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: medium
-reason: Reproduced on 2026-11-07 in story 6.11's follow-up review. `npx` is a mise shim that puts the pinned `supabase` first on PATH, so `supabase status -o env` in playwright.config.ts succeeds against the default project and force-sets VITE_SUPABASE_URL to it, overriding the caller's value (a stub `supabase` placed first on PATH did not help). Separately, `npx vite --mode test` through the shim receives fnox's hosted VITE_* values, which vite.config.ts's local-supabase-in-test-mode plugin deletes, so the app falls back to .env.test, which is the default stack, while the spec's own API clients use the caller's stack. Running node and npx from the node install directory (not the shims) kept both on the isolated stack. The plan's earlier note blamed a different `supabase` that fails; the observed cause is the pinned one succeeding. The live spec's localhost guard cannot tell one local stack from another.
-status: done 2026-11-06
-resolution: won't fix -- decided 2026-11-06 by the owner: every local test run, the loop's included, uses the one shared local stack. A second stack was started only in the rare case of database work running alongside a loop run, so the bug it needs is rare too.
+archived: 2026-11-26
 
 ### DW-490: An open Daily keeps showing the invitation to link after the partner accepts, until Daily is left and reopened.
+
+status: done 2026-11-06
 origin: epic 6 retrospective (Diff-scope review, R1), 2026-11-06
-location: src/hooks/useDailyPickListener.ts:43-49 (`subscribePartnerEvents` handlers); src/hooks/usePartnerLinkListener.ts:80-100
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: `useDailyPickListener` registers only `daily_pick` and `onStatus` on the partner-event registry; `partner_linked` reaches only `usePartnerLinkListener`, which reloads the partner and pending requests but not the day. So an account whose request is accepted while Daily is open keeps seeing "Link with your partner" until it leaves Daily and comes back, or until the new partner's first pick reaches it through `showIfOnScreen`'s empty-screen rule (`dailyQuestionSlice.ts:202`), a path no test covers from an `unlinked` screen. A fix re-reads the day on `partner_linked`; the retrospective leaves open whether that waits for epic 7's Partner page rebuild.
-resolution: `useDailyPickListener` now registers `partner_linked` on its subscriber and re-reads today's day (`loadDailyDay`) under the same `active` guard; the subscriber is held while the account is unlinked, as the topic is the account's own `mood-updates:<uid>`, and `mergeAnswer` replaces `unlinked` with the server's `ok`. Unit: `useDailyPickListener.test.ts` (a `partner_linked` calls `loadDailyDay`, and not after unmount). E2E: `tests/e2e/daily/daily-question-partner-linked.spec.ts`, two throwaway accounts: A sits on /daily showing the invitation, B accepts from its Partner tab, and A's Daily shows today's question with no reload. Both fail with the handler removed. `seedRequest` and `acceptFromPartnerTab` moved from `partner-connect.spec.ts` into `tests/support/helpers/partner-requests.ts` for both specs.
-status: done 2026-11-06
+archived: 2026-11-26
 
 ### DW-491: The write sheet opens after a failed or offline read, though it is meant to wait for the server's answer.
 origin: epic 6 retrospective (Diff-scope review, R2), 2026-11-06
-location: src/components/DailyQuestion/DailyQuestion.tsx:262-269 (`readFor`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:553-556 (the mount read that sets `readFor`), :497-506 (`showWriteSheet`); src/stores/slices/dailyDaySlice.ts:145, :402-466 (`loadDailyDay`)
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: `readFor` is set after any `loadDailyDay()`, and `loadDailyDay()` never throws, so the sheet's wait, meant to keep a saved day whose turn was written on another device from opening it (comment at `:262-266`), passes offline or after a failed read too. Offline, Send is refused before any request and No thanks still works, so the cost is a sheet that should not have opened. A fix sets `readFor` only when the read answered from the server.
+reason: `readFor` is set after any `loadDailyDay()`, and `loadDailyDay()` never throws, so the sheet's wait, meant to keep a saved day whose turn was written on another device from opening it (comment at `:262-266`), passes offline or after a failed read too. Offline, Send is refused before any request and No thanks still works, so the cost is a sheet that should not have opened. A fix sets `readFor` only when the read answered from the server. 2026-11-26 triage: the comment is now at `DailyQuestion.tsx:548-552`. `readFor` also gates the nudge offer (:543) and the +1 claim (:574). Online it costs more: after a failed read, a send for a turn written on another device returns the stored question unchanged (`20261106000000_daily_question_written_questions.sql:186-191`), so the sheet closes as sent while the typed text is dropped.
 status: open
 
 ### DW-492: Daily's saved copy can show an old pairing's day for today after a relink or `reset_bot_daily_days`.
-origin: epic 6 retrospective (Diff-scope review, R3), 2026-11-06
-location: src/services/dailyDaysCopy.ts:71 (`readSavedDailyDay`), :103 (`mergeDailyDay`); src/stores/slices/dailyQuestionSlice.ts:163 (`mergeAnswer`)
-source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
-severity: low
-reason: `readSavedDailyDay` picks today's entry by date and rank across all `day_id`s, and `mergeDailyDay` never drops another `day_id` with the same `day`. After a reset or a relink this device never saw as `unlinked`, an old `both` entry is shown first. Online the server's answer replaces it, because `mergeAnswer` merges only within one `day_id`, so it flashes; offline it stays.
-resolution: `mergeSnapshots` in `dailyDaysCopy.ts` drops every other `day_id` for a date the server has just answered, whichever partner it was read with, so an old pairing's entry is deleted on every date the new pair also answers and stays saved, hidden, only on the other dates. Each saved entry records the partner it was read with (`partner_id`, the newest tag wins; an entry saved before the tag reads as `null`). `readSavedDailyHistory` gives only the current partner's entries. `readSavedDailyDay` gives the current partner's and, since 26514052, an untagged one too, so a day saved before the tag still shows offline until the server's next answer for its date re-tags it; an entry tagged with another partner stays hidden. The cap and `prune` went with it. Unit: `dailyDaysCopy.test.ts` (date drop, tag, filter, legacy entry, no cap), `dailyQuestionSlice.partner.test.ts` and `dailyHistorySlice.test.ts`. E2E: the relink test in `tests/e2e/partner/partner-past-questions-offline.spec.ts`, throwaway accounts only: after an admin relink A shows none of the old pairing's questions offline, and the copy still holds its three done days, dates the new pair has not answered. It fails with the partner filter removed. Corrected 2026-11-25 (epic 7 retrospective, D8): the earlier text said a legacy entry is hidden and did not say the date drop deletes an old pairing's entry.
-status: done 2026-11-07
 
-### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only on their next open.
-origin: epic 6 retrospective (Diff-scope review, R4), 2026-11-06
-location: src/stores/slices/dailyQuestionSlice.ts:289-294 (`drainQueuedPicks`, the confirmed branch)
+status: done 2026-11-07
+origin: epic 6 retrospective (Diff-scope review, R3), 2026-11-06
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: After a queued pick is confirmed and removed, `if (!isCurrent()) return 'stale'` runs before `announceDailyPick`, though the comment above says the pick is committed "whatever the session did meanwhile". A same-account re-login during the send bumps `authSessionVersion` and skips the broadcast. A fix announces before the session check, since the announcement carries only the `day_id`.
+archived: 2026-11-26
+
+### DW-493: A queued pick confirmed during a same-account re-login is never announced, so the partner sees it only when their Daily next reads the day (an open, a return to the app or a later re-read).
+origin: epic 6 retrospective (Diff-scope review, R4), 2026-11-06
+location: src/stores/slices/dailyDaySlice.ts:356-361 (`drainOnce`, the confirmed branch), :541-547 (`submitDailyPick`'s online path, the same skip)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: After a queued pick is confirmed and removed, `if (!isCurrent()) return 'stale'` runs before `announceDailyPick`, though the comment above says the pick is committed "whatever the session did meanwhile". A same-account re-login during the send bumps `authSessionVersion` and skips the broadcast. A fix announces before the session check, since the announcement carries only the `day_id`. 2026-11-26 triage: the code moved to `dailyDaySlice.ts` (bf6a8a2d), and the online path at :541-547 skips the same way. Announcing before every check is wrong: after an account switch it would send the old pair's `day_id` to the new account's partner, because `announceDailyPick` resolves the partner from the current session (`dailyQuestionApi.ts:266-270`). The fix announces while the same account is signed in (`get().userId === requestedBy`).
 status: open
 
 ### DW-494: "{partner} gets it tomorrow" on the write sheet is false when partners are on different clocks and one is already past midnight.
-origin: epic 6 retrospective (Diff-scope review, R5), 2026-11-06
-location: src/components/DailyQuestion/WriteQuestionSheet.tsx:123; the written-question target-date rule (story 6.3, `submit_written_question`)
-source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
-severity: low
-reason: A written question goes to the first date after the source day with no `couple_days` row (6.3 Auto Run Result). A partner whose clock is already past midnight has created that row with a pool question, so the written one lands two days later while the sheet says tomorrow. Same-zone writers are refused once their own date ends (DQ006), so only partners in different time zones meet it. The choice between naming the target date on the sheet and always targeting the source day + 1 is the owner's (retrospective, Open questions).
-resolution: The owner chose to name the real day the partner gets the question. Migration `20261107000000_daily_question_write_target_day.sql` replaces `daily_day_snapshot` (same signature, settings and grants, so `database.types.ts` is unchanged) and adds `write.target_day`, the date the day's written question is asked, or would be if written now: the `couple_days` row that asks it once asked; otherwise a walk over the pair's free dates after the day that takes, on each date, the question `assign_couple_day` would ask (the earliest waiting written question by `target_day`, then source day, then id), starting from the stored `target_day` or, with none, the target `record_written_question` would store. So a partner ahead who already opened tomorrow, and a second question waiting on the same target, both move the named day on. `record_written_question` and its stored `target_day` are unchanged; the snapshot copies both functions' rules, so the three must change together. `DailyDaySnapshotSchema` reads `target_day` as optional, so a snapshot saved in `daily-days` before the server sent it parses and reads as tomorrow. `WriteQuestionSheet` keeps today's wording while the date is the shown day + 1 (or missing) and otherwise names its weekday, parsed with `parseEventDate`: "Saturday", "Write Saturday's question?", "{partner} gets it on Saturday. You'll answer it too.", "Send for Saturday". pgTAP WRITE-064 to WRITE-072 (`42_daily_question_written_questions.sql`) pin the day + 1 and the next free date with nothing else waiting, the asked day, and two questions on one target (the second source day's sheet names the date after the target, before and after its write and once asked); DAILY-039 pins `write`'s keys. The refusal sentences (`DQ004` to `DQ006`) and the offline sentence still say "tomorrow's question". DW-498 records that the named day is read once, when the snapshot is.
-status: done 2026-11-06
 
-### DW-495: Opening Daily reads the day up to four times, and each read takes the pair's advisory lock and writes `user_time_zones`.
-origin: epic 6 retrospective (Diff-scope review, R6), 2026-11-06
-location: src/components/DailyQuestion/DailyQuestion.tsx:267-269 (mount read); src/hooks/useDailyPickListener.ts:46-48 (`SUBSCRIBED` re-read); src/stores/slices/dailyQuestionSlice.ts (`loadDailyDay`)
+status: done 2026-11-06
+origin: epic 6 retrospective (Diff-scope review, R5), 2026-11-06
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: Observed on the live site on 2026-11-07: one sign-in, then `/mood` to `/daily`, made 4 `get_daily_day` calls. 6.6's Design Notes accept two reads per open and 6.12 rejected a request-token guard twice as "overlapping loads"; filed so the cost is visible. Each call takes the pair's advisory lock and writes the caller's `user_time_zones` row.
+archived: 2026-11-26
+
+### DW-495: Opening Daily reads the day up to four times, and each linked read takes the pair's advisory lock and every read writes `user_time_zones`.
+origin: epic 6 retrospective (Diff-scope review, R6), 2026-11-06
+location: src/components/DailyQuestion/DailyQuestion.tsx:553-556 (mount read); src/hooks/useDailyPickListener.ts:79-83 (`SUBSCRIBED` re-read), :74-78 (`partner_linked` re-read); src/hooks/useDailyDayRereads.ts:54-65; src/stores/slices/dailyDaySlice.ts:402-466 (`loadDailyDay`; its refresher at :225)
+source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
+severity: low
+reason: Observed on the live site on 2026-11-07: one sign-in, then `/mood` to `/daily`, made 4 `get_daily_day` calls. 6.6's Design Notes accept two reads per open and 6.12 rejected a request-token guard twice as "overlapping loads"; filed so the cost is visible. Each call takes the pair's advisory lock and writes the caller's `user_time_zones` row. 2026-11-26 triage: `loadDailyDay` has no in-flight guard and is called from 10 sites. Only a linked read takes the lock (`assign_couple_day`, `20261106000000_daily_question_written_questions.sql:264`), while every read upserts `user_time_zones` (`20261105210000_daily_question_own_clocks.sql:269-275`). The rejections were automated triage calls, not owner decisions: 6.6's review rejected coalescing (it adds slice state), and 6.12's review rejected a request-token guard for the early-cleared loading flag. The fix keeps one read in flight plus one trailing pass, never a join-only coalesce.
 status: open
 
 ### DW-496: The day-changed notice can stay above a day that needs no pick.
 origin: epic 6 retrospective (Diff-scope review, R8), 2026-11-06
-location: src/components/DailyQuestion/DailyQuestion.tsx:236-240, :293 (`clearDayChanged` passed as `onSendStart`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:443-449 (the notice state and `clearDayChanged`), :297 (`onSendStart` in DayCard's send), :658 (`onSendStart={clearDayChanged}`)
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: The notice is cleared only by the next Send (`onSendStart={clearDayChanged}`). When the re-read day is already picked, no Send is rendered, so the notice stays until Daily is reopened.
+reason: The notice is cleared only by the next Send (`onSendStart={clearDayChanged}`). When the re-read day is already picked, no Send is rendered, so the notice stays until Daily is reopened. 2026-11-26 triage: no Send renders while a queued pick is pending either (:319, :336-349), so the notice stays then too.
 status: open
 
 ### DW-497: The hosted database has never been compared with the migrations as a whole, so objects no migration created can still be there.
@@ -4235,140 +4000,138 @@ origin: owner request during loop run 20261105-224246-5db5 (story 6.11's live ch
 location: the hosted Supabase project; supabase/migrations/
 source_spec: none
 severity: low
-reason: AGENTS.md records that the hosted database carries objects no migration created (tables and a function removed at e5f1ab6d, two photos policies at 8f9d35d4), and each was found only when a migration touched that table. Nothing compares the whole hosted schema with what the migrations build, so a leftover policy, grant or function elsewhere is found only by chance. A one-off, read-only comparison (`supabase db diff --linked`, or the hosted catalog read table by table) would list every difference; each leftover is then dropped by a migration with `drop … if exists` after the owner approves it. The post-deploy live check (story 6.11) covers Daily's gate only, not drift elsewhere.
+reason: AGENTS.md records that the hosted database carries objects no migration created (tables and a function removed at e5f1ab6d, two photos policies at 8f9d35d4), and each was found only when a migration touched that table. Nothing compares the whole hosted schema with what the migrations build, so a leftover policy, grant or function elsewhere is found only by chance. A one-off, read-only comparison (`supabase db diff --linked`, or the hosted catalog read table by table) would list every difference; each leftover is then dropped by a migration with `drop … if exists` after the owner approves it. The post-deploy live check (story 6.11) covers Daily's gate only, not drift elsewhere. 2026-11-26 triage: `supabase db diff --linked` is not a read-only comparison: the pinned CLI 2.122.0's help says it may need `database_write`, and it builds a shadow database in local Docker (what it writes is UNVERIFIED). Read the hosted catalog with `supabase db query --linked` instead, under an access token scoped to `database_read` only, table by table, and run the same queries on the local stack.
 status: open
+decision: 2026-11-26 one-sitting — one sitting outside the loop, never while a loop run uses the shared local stack: read the hosted catalog read-only (tables, policies, grants and functions in `public` and `storage`), compare it with the local stack, the owner approves one list, and one migration drops each hosted-only object with `drop … if exists` (or adds what the live app needs); local tests pass, `deploy.yml` applies it, and this entry closes.
 
 ### DW-498: The write sheet keeps the day it named when the date the question is asked moves while the sheet is open.
 origin: review of the DW-494 fix (fix/daily-pick-refusals-and-write-day), 2026-11-06
-location: supabase/migrations/20261107000000_daily_question_write_target_day.sql (`daily_day_snapshot`, `write.target_day`); src/components/DailyQuestion/WriteQuestionSheet.tsx
+location: supabase/migrations/20261107000000_daily_question_write_target_day.sql (`daily_day_snapshot`, `write.target_day`); supabase/migrations/20261126020000_daily_nudge.sql:225, :318-397 (the current `daily_day_snapshot`, its walk copied unchanged); src/components/DailyQuestion/WriteQuestionSheet.tsx:82; src/components/DailyQuestion/DailyQuestion.tsx:740
 source_spec: `tickets/epic-daily-question/epic-daily-question-retrospective.md`
 severity: low
-reason: `write.target_day` is computed when the snapshot is read. When the partner whose clock is ahead opens the next date, or another written question takes that date, while the writer's sheet is open, the date the question is asked moves on but the sheet keeps the day it named until the snapshot is read again; the question is then asked a day later than the sheet said. The snapshot the send returns carries the new date, but the sheet closes on that send.
+reason: `write.target_day` is computed when the snapshot is read. When the partner whose clock is ahead opens the next date, or another written question takes that date, while the writer's sheet is open, the date the question is asked moves on but the sheet keeps the day it named until the snapshot is read again; the question is then asked a day later than the sheet said. The snapshot the send returns carries the new date, but the sheet closes on that send. 2026-11-26 triage: the reminder schedule moves the date too: on each 08:00 and 20:00 tick `enqueue_daily_reminders` calls `assign_couple_day` for the partner's local date (`20261126000000_daily_reminders_schedule.sql:104`, no branch by slot). Backlog story 6 removes the 08:00 one; the 20:00 one stays, though it needs partners about 20 hours apart. This is the epic 8 retrospective's dropped Adversarial 6.
 status: open
+decision: 2026-11-26 line-after-send — after Send, when the answer's `write.target_day` differs from the date the sheet named, Daily shows one line naming the real day ("{partner} gets it on Sunday."); no migration and no extra request. Built after backlog story 6, beside the nudge prompt that follows the sheet (criterion 5).
 
 ### DW-499: The live Daily check once stalled on the writer's reload: the page sent no day read and missed the partner's pick broadcast.
+
+status: done 2026-11-26
 origin: deploy run 42340556736 (merge of PR #486), Live Daily Check, attempt 1, 2026-11-06; attempt 2 passed unchanged
-location: tests/live/daily-question-live.spec.ts (the writer's `openDaily(pageA, () => pageA.reload())` after B's pick); src/components/DailyQuestion/DailyQuestion.tsx; src/stores/slices/dailyQuestionSlice.ts
 source_spec: `tickets/epic-daily-question/tickets/story-after-every-deploy-a-test-checks-daily-on-the-real-website-plan.md`
 severity: low
-reason: After both bots picked (both `submit_daily_pick` calls 200), Claude Bot's page, the day's writer with the write sheet open, was reloaded and never sent `get_daily_day` in the 180 s test timeout; its failure screenshot still shows the waiting state under the sheet. The hosted edge logs also show no `daily_pick` broadcast to Claude Bot's channel after Claude Partner's pick, where the passing run at 04:23 UTC the same day sent one. Every server answer was 200, and Claude Partner's page showed the reveal. The page videos were cut short, so where the writer's page stopped is unknown. Reproduce with the live spec run repeatedly against the hosted site before changing code.
-status: open
+archived: 2026-11-26
 
 ### DW-500: A linked Partner page shows only the partner's name, with no card, loading block or error, when the slice holds an `unlinked` streak answer (or null with nothing loading) while a partner is shown.
 origin: spec-deferred df427a169e35
-location: src/components/PartnerView/PartnerView.tsx
+location: src/components/PartnerView/PartnerView.tsx:153-173 (the streak ternary ends in `: null` at :173)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: PartnerView.tsx falls through to null when `coupleStreak` is not `ok`, not loading and has no error. Reachable only when the server says unlinked while a saved or stale partner is still shown (a server-side unlink with no client action, or the partner read failing after one); there is no unlink feature. Rare; the fix adds a branch. Reported by blind-hunter, edge-case-hunter, verification-gap and intent-alignment.
+reason: PartnerView.tsx falls through to null when `coupleStreak` is not `ok`, not loading and has no error. Reachable only when the server says unlinked while a saved or stale partner is still shown (a server-side unlink with no client action, or the partner read failing after one); there is no unlink feature. Rare; the fix adds a branch. Reported by blind-hunter, edge-case-hunter, verification-gap and intent-alignment. 2026-11-26 triage: the location gained its lines; the code is unchanged since b154eb31.
 status: open
 
 ### DW-501: The Connect screen's typed email, shown search answer and error line are lost whenever `loadPartner` runs while the account is unlinked.
 origin: spec-deferred 22a75e44ce54
-location: src/components/PartnerView/PartnerView.tsx
+location: src/stores/slices/partnerSlice.ts:165 (`loadPartner` raises `isLoadingPartner` whenever `partner` is null); src/components/PartnerView/PartnerView.tsx:129-143; src/components/PartnerView/PartnerConnect.tsx:37-40
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: That state now lives in PartnerConnect, which unmounts while `isLoadingPartner` is true, and partnerSlice.loadPartner raises the flag on every call when `partner` is null (partnerSlice.ts:165). In PartnerMoodView the state sat in the parent and survived. It needs a partner reload during typing (a reconnect refresh, or Retry). Rare; the fix keeps PartnerConnect mounted but hidden across loads, which adds branches.
+reason: That state now lives in PartnerConnect, which unmounts while `isLoadingPartner` is true, and partnerSlice.loadPartner raises the flag on every call when `partner` is null (partnerSlice.ts:165). In PartnerMoodView the state sat in the parent and survived. It needs a partner reload during typing (a reconnect refresh, or Retry). Rare; the fix keeps PartnerConnect mounted but hidden across loads, which adds branches. 2026-11-26 triage: fix the cause in the slice instead: `loadPartner` raises `isLoadingPartner` only while nothing has answered (`partner` null and `!partnerKnown`), as its own comment says, and PartnerView's `sawLoading` latch also counts `partnerKnown` so the `/partner/history` redirect still fires. Keeping PartnerConnect mounted but hidden, or lifting its state, would keep the flash, and lifting it would need a `signedOutState` entry for a typed third-party address.
 status: open
 
 ### DW-502: The streak error card offers no Retry, so an online transient failure with nothing shown stays until Realtime re-joins or the page is reopened.
 origin: spec-deferred 22cfebd7aa4f
-location: src/components/PartnerView/PartnerView.tsx
+location: src/components/PartnerView/PartnerView.tsx:166-172 (`partner-streak-error`, text only)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: PartnerView.tsx renders `partner-streak-error` with no action; only SUBSCRIBED, partner_linked, daily_pick, a partner change or a reconnect re-read. Rare (a failed online read with no streak yet); the fix adds a control. Story 3 owns the streak's failure and offline wording.
+reason: PartnerView.tsx renders `partner-streak-error` with no action; only SUBSCRIBED, partner_linked, daily_pick, a partner change or a reconnect re-read. Rare (a failed online read with no streak yet); the fix adds a control. Story 3 owns the streak's failure and offline wording. 2026-11-26 triage: the fix reuses the existing online-only "Retry" button (`SECONDARY_BUTTON`, as `PastQuestionsPage.tsx:233-245` and `DailyQuestion.tsx:700-712` do), disabled while `coupleStreakLoading`; no new copy.
 status: open
 
-### DW-503: The interactions local-copy refresher still reads interactions on every signed-in start although no routed screen shows them, and the deleted interaction E2E specs leave that code without browser
+### DW-503: The interactions local-copy refresher still reads interactions on every signed-in start although no routed screen shows them, and the deleted interaction E2E specs leave that code without browser coverage until epic 10 deletes it.
 origin: spec-deferred c9adea711391
 location: src/stores/slices/interactionsSlice.ts:235
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: interactionsSlice.ts:235 `registerLocalCopy(INTERACTIONS_COPY_KIND, ...)` still runs; tests/e2e/partner/interaction-record-ownership.spec.ts and tests/e2e/offline/interactions-offline-copy.spec.ts were deleted with the Poke/Kiss/Fart tiles (the API-level tests/api/interaction-record-ownership.spec.ts stays). The intent keeps the code for epic 10, so removing the refresher is out of this story.
+reason: interactionsSlice.ts:235 `registerLocalCopy(INTERACTIONS_COPY_KIND, ...)` still runs; tests/e2e/partner/interaction-record-ownership.spec.ts and tests/e2e/offline/interactions-offline-copy.spec.ts were deleted with the Poke/Kiss/Fart tiles (the API-level tests/api/interaction-record-ownership.spec.ts stays). The intent keeps the code for epic 10, so removing the refresher is out of this story. 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is restored. The removal is carried only by epic 10's Description ("each device's mood and interaction copies") and Done when ("A device upgraded from the old build keeps no mood or interaction copy"), which name no DW id; the epic 10 story that deletes the refresher names DW-503 in its verify and declares it in its plan's `closes_deferred`. Not loop work before then: story 7.2 left the interaction code to epic 10.
 status: open
+decision: 2026-11-26 epic-10 — the PO adds DW-503 to epic 10's Notes; it closes with the epic 10 story that deletes the interactions refresher.
 
 ### DW-504: After a relink to a new partner within one session, the previous couple's streak can show under the new partner's name until the new read lands, or for good if it fails.
-origin: spec-deferred 6244cfdb5f44
-location: src/components/PartnerView/PartnerView.tsx
-source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
-severity: low
-reason: The slice answer is not keyed by partner; PartnerView shows any `ok` answer once a partner is present. Needs an unlink (no client action exists) and a new link in the same session. Rare; the fix adds a partner key to the stored answer.
-resolution: `dailyQuestionSlice` clears the streak, its error and loading flag (and the history) when the shown partner changes from one non-null id to another in a session (`clearPairData`, from `api.subscribe`; a first link and a reload of the same partner clear nothing, and an identity change forgets the last id), and bumps `streakSeq` so a read in flight for the old pair writes nothing, to the field or the copy. The `daily-streak` copy now records the partner it was read with (`partner_id`, as `daily-days` does): `saveStreakAnswer(userId, answer, partnerId)` tags it and `readSavedStreak(userId, partnerId)` shows it only for the current partner, an untagged copy reading as partner `null`, so a failed read for the new partner no longer falls back to the old pair's streak. Unit: `coupleStreakSlice.test.ts` (relink, in-flight and failed reads, tag, untagged copy, first link, identity change), `dailyStreakCopy.test.ts`. E2E: `partner-past-questions-offline.spec.ts`, a throwaway A relinked from B to C shows C's name and no A-B streak card or question after a reload with the reads aborted.
-status: done 2026-11-07
 
-### DW-505: When `subscribePartnerEvents` rejects, usePartnerStreakListener logs and holds nothing, with no retry, so the Partner page gets no live re-reads until it is reopened.
-origin: spec-deferred 7a52e464bc0a
-location: src/hooks/usePartnerStreakListener.ts
+status: done 2026-11-07
+origin: spec-deferred 6244cfdb5f44
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: usePartnerStreakListener.ts `.catch` only logs, the same pattern as useDailyPickListener. A registry failure is rare; the page still reads on open, on a partner change and on reconnect. The fix adds retry logic.
+archived: 2026-11-26
+
+### DW-505: When `subscribePartnerEvents` rejects, usePartnerStreakListener logs and holds nothing, with no retry, so the Partner page gets no live re-reads until it is reopened, the device reconnects or the session changes.
+origin: spec-deferred 7a52e464bc0a
+location: src/hooks/usePartnerStreakListener.ts:76-78; the same `.catch` at src/hooks/useDailyPickListener.ts:92-94, src/hooks/usePartnerLinkListener.ts:110-112 and src/hooks/useDatesChangedListener.ts:89-91
+source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
+severity: low
+reason: usePartnerStreakListener.ts `.catch` only logs, the same pattern as useDailyPickListener. A registry failure is rare; the page still reads on open, on a partner change and on reconnect. The fix adds retry logic. 2026-11-26 triage: all four routed listeners have the same `.catch`; the realistic rejection is `supabase.realtime.setAuth()` (`moodSyncService.ts:907`). One shared fix retries on a bounded backoff, copying the registry's `RETRY_CONFIG` and `armMoodReopen` (`moodSyncService.ts:135-139`, `:731-761`), and stops on unmount, a session change or going offline; `usePartnerMood` and `PartnerMoodView` are left to epic 10.
 status: open
 
 ### DW-506: The week strip's "Today" sits on the server's date for the viewer's stored zone, which can be a day off from the device while travelling until a Daily fetch records the new zone.
+
+status: done 2026-11-26
 origin: spec-deferred 0339fde9918d
-location: src/components/PartnerView/StreakCard.tsx
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-shows-the-couple-s-streak-in-place-of-the-p-plan.md`
 severity: low
-reason: get_couple_streak dates the viewer by user_time_zones (story 7.1's recorded residual risk); StreakCard labels the last week entry Today, as the server answers it. Pre-existing server behaviour, and the epic bars the client from working out a day's state.
-status: open
+archived: 2026-11-26
 
 ### DW-507: The offline-pick E2E cannot tell the drain's own streak re-read from the refresher's or the Realtime re-join's.
+
+status: done 2026-11-26
 origin: spec-deferred 484f89571f2f
-location: tests/e2e/daily/daily-streak.spec.ts (the "after a pick queued offline" test)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
 severity: low
-reason: On reconnect App.tsx:562-566 runs drainQueuedPicks() and refreshLocalCopies() together, and the daily-streak refresher (dailyQuestionSlice.ts registerLocalCopy) sends get_couple_streak without waiting for the pick; useDailyPickListener's SUBSCRIBED on re-join reads it again. So `rereadStreak` in the test may be the refresher's read, and the final orange-at-2 assertion would still pass if the `void get().loadCoupleStreak()` in drainOnce were removed. The drain's call is proven only by the unit test "a pick queued offline and drained later re-reads the streak only after the drain" (tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts). Isolating it in E2E needs the refresher and the Realtime re-join suppressed, more than a direct correction; the surface outcome (the chip updates after reconnect without a reload) is shown.
-status: open
+archived: 2026-11-26
 
 ### DW-508: The waiting sentence reads "when Your partner answers too." with a capital Y mid-sentence when the partner's name is missing.
+
+status: done 2026-11-07
 origin: spec-deferred 254a73a92d5c
-location: src/components/DailyQuestion/DailyQuestion.tsx:393
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-daily-shows-the-streak-the-week-and-a-missed-day-plan.md`
 severity: low
-reason: DailyQuestion.tsx:316 falls back to 'Your partner' when `state.partner?.displayName` is empty (users.display_name is nullable, and the partner copy can be unfilled or its read failed), and line 393 puts that value mid-sentence. The fallback predates this change and already reads "Waiting on Your partner" in DayCard. Rare (a linked partner normally has a name and the copy fills on sign-in) and the fix needs a separate lowercase value for mid-sentence use, so it is filed rather than patched.
-resolution: `DailyQuestion` keeps `partnerName` ('Your partner' fallback) for the sentence starts and adds `partnerNameInline` ('your partner' fallback) for the mid-sentence uses: "Waiting on your partner", "The streak lights up when your partner answers too.", and the values passed to `StreakUp` ("You and your partner both answered.", "See your partner's pick") and `Milestone` ("You and your partner have answered together on N days."). Unit: `DailyQuestion.test.tsx` and `DailyQuestion.celebration.test.tsx` with a blank partner name.
-status: done 2026-11-07
+archived: 2026-11-26
 
 ### DW-509: A failed IndexedDB read of daily-celebrated is taken as "nothing stored", so the claim re-seeds over a good stored value.
+
+status: done 2026-11-25
 origin: spec-deferred 2354bd4b96ec
-location: src/services/dailyCelebrated.ts (claimCelebration)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
-reason: readCelebrated returns null both when nothing is stored and when readLocalCopy (src/services/localCopy.ts:97-105) catches a read error. claimCelebration treats null as absent and writes { held: streak.held, milestones: streak.milestones }, so one transient read failure silently drops that held total's +1 and replaces milestones with the server's count, which story 6 would then read as milestone screens already shown. Rare but real (an IndexedDB read failing while the write after it succeeds); the fix needs a read that tells "absent" from "failed", a new branch in the localCopy API rather than a direct correction. Story 6, which starts reading milestones, is the natural place to add it. Story 6 did not add it. Same root as DW-487: one `readLocalCopy` variant closes both (epic 7 retrospective, G2, 2026-11-07).
-resolution: `claimCelebration` and `claimMilestone` read through `readLocalCopyStatus` (DW-487's read): on `failed` they write nothing, answering `NO_CELEBRATION` and `false`; absent and malformed values behave as before. Unit: `dailyCelebrated.test.ts`, failing the IndexedDB read once in each claim.
-status: done 2026-11-25
+archived: 2026-11-26
 
 ### DW-510: After an in-session unlink and relink to a different partner, the Partner page shows the previous pair's past questions under the new partner's name until the new history read lands, or indefinitely
+
+status: done 2026-11-07
 origin: spec-deferred 744eb5a8fd58
-location: src/components/PartnerView/PartnerView.tsx
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-partner-page-lists-past-questions-marked-same-or-differe-plan.md`
 severity: low
-reason: dailyQuestionSlice.dailyHistory is cleared only by signedOutState(); partner_linked does not touch it (usePartnerStreakListener.ts), and PartnerView renders it as soon as `partner` is set. Rare: the app has no unlink action (src/components/Settings/PartnerPage.tsx l.13-14), so the unlink is server-side and the relink must happen in the same session. Fix: reset or key the history on the partner id when it changes; story 9 (saved days record the partner they were read with) is the natural home.
-resolution: The same reset as DW-504: a new partner id clears `dailyHistory`, its error, loading flags and end flag, and bumps `historySeq` and a pair generation, so first-page and load-more reads in flight for the old pair write nothing to the field or the `daily-days` copy, and a list filled from the copy is dropped. Unit: `dailyHistorySlice.test.ts` (relink, in-flight and failed reads). E2E: the same relink spec as DW-504.
-status: done 2026-11-07
+archived: 2026-11-26
 
 ### DW-511: After an in-session relink to a different partner whose first history page is full, the history merge keeps the previous pair's older rows below it and shows them under the new partner's name.
+
+status: done 2026-11-07
 origin: spec-deferred 0672eff09fcf
-location: src/stores/slices/dailyQuestionSlice.ts
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-see-all-opens-every-past-question-with-the-running-count-plan.md`
 severity: low
-reason: loadDailyHistory's full-page branch keeps loaded rows older than the new page's oldest day (dailyQuestionSlice.ts), and nothing resets dailyHistory on a partner change, only signedOutState(). Needs an in-session relink (the app has no unlink action) to a pair that already has 30+ done days; a new pair's first page is short and replaces everything. Fix: reset or key the history on the partner id; extends story 7's deferred relink finding, whose natural home is story 9.
-resolution: The relink now clears `dailyHistory` before the new partner's first page lands, so the full-page merge has no previous pair's rows to keep (and `historyFromCopy` is reset). Unit: `dailyHistorySlice.test.ts` (a new partner's full first page replaces a list filled for the old pair).
-status: done 2026-11-07
+archived: 2026-11-26
 
 ### DW-512: `daily-question-partner-linked.spec.ts` once failed in a full E2E run because a `get_daily_day` read was still in flight 15 s after A's channel joined.
+
+status: done 2026-11-26
 origin: spec-deferred refactor-sweep-7-10
-location: tests/e2e/daily/daily-question-partner-linked.spec.ts:95-101 (the `recurseUntil` that expects `inFlight` 0 before B accepts)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-refactor-sweep-plan.md`
 severity: low
-reason: In story 7.10's full chromium run (302 passed, this 1 failed) the check read `inFlight` 1 at its 15 s `POLL` timeout; the same spec then passed three runs in a row alone, and in the implementing agent's earlier full run. The account is a throwaway that stays unlinked until B accepts, and 7.10 changes nothing on that path (no partner change, no `get_daily_day` call). One `get_daily_day` read took more than 15 s under the suite's parallel load; DW-495 (each Daily read takes the pair's advisory lock and writes `user_time_zones`) is a likely cause, UNVERIFIED. The reruns replaced `test-results/`, so the failed run's trace is gone. A second full chromium run after the review patches passed all 303, this spec included. Reproduce by repeating the full chromium run, then read the slow request's server timing before changing the wait.
-status: open
+archived: 2026-11-26
 
 ### DW-513: After a server-side relink to a different partner, the +1 and milestone stay silent and Daily keeps the old pair's day.
 origin: epic 7 retrospective (D1 and D2), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/services/dailyCelebrated.ts:55-79 (`claimCelebration`); src/stores/slices/dailyQuestionSlice.ts:401-422 (`clearPairData`)
+location: src/services/dailyCelebrated.ts:70-101 (`claimCelebration`); src/stores/slices/dailyDaySlice.ts:295-319 (the pair-change subscriber; its resets at dailyStreakSlice.ts:156-163 and dailyHistorySlice.ts:223)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: The `daily-celebrated` copy holds one `{ held, milestones }` per account and no partner, and `clearPairData` does not touch it, so a new pair's held total, which starts at 0, plays no +1 and shows no milestone until it passes the old pair's. `clearPairData` also keeps `dailyDay`, and Daily's read effect does not re-run on a partner change, so Daily shows the old pair's question and picks under the new partner's name until a remount, a re-join or a `partner_linked` broadcast re-reads the day. The app has no unlink, so this needs a server-side change of `users.partner_id`. No test covers a relink for the celebration. A fix tags the celebration with its partner (or deletes the kind in `clearPairData`) and re-reads the day there.
+reason: The `daily-celebrated` copy holds one `{ held, milestones }` per account and no partner, and `clearPairData` does not touch it, so a new pair's held total, which starts at 0, plays no +1 and shows no milestone until it passes the old pair's. `clearPairData` also keeps `dailyDay`, and Daily's read effect does not re-run on a partner change, so Daily shows the old pair's question and picks under the new partner's name until a remount, a re-join or a `partner_linked` broadcast re-reads the day. The app has no unlink, so this needs a server-side change of `users.partner_id`. No test covers a relink for the celebration. A fix tags the celebration with its partner (or deletes the kind in `clearPairData`) and re-reads the day there. 2026-11-26 triage: story 8.1's split (bf6a8a2d) replaced `clearPairData` with the `dailyDaySlice` pair-change subscriber; read each `clearPairData` above as that subscriber. Tag the celebration with its partner rather than deleting the kind there: the subscriber forgets its last partner on each identity change, so a delete misses a relink made while the app was closed. An untagged value counts as the current pair's and is tagged on its next write, as 26514052 did for days; afterwards AGENTS.md's `daily-celebrated` description needs its one-line edit.
 status: open
 
 ### DW-514: See all shows only its title when there is no past question, and offers no Retry when its first read fails online.
@@ -4378,291 +4141,281 @@ source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-
 severity: low
 reason: With `dailyHistory` `[]`, nothing loading and no error, `/partner/history` (reached by a reload or a direct URL) shows the title and "Same pick on 0 of your 0 days" and nothing else. D4, a failed load-more that was never retried, is fixed (a47a4c19, de3f3fb3, 1e85a54f, d16660d8), but its Retry needs rows (`days.length > 0`), so a failed first read with no rows shows the error box alone until a reconnect, a partner change, a live event or reopening the page reads again.
 status: open
+decision: 2026-11-26 empty-state — See all with no past question shows "No past questions yet" (the app's "No … yet" pattern, as `PhotoGallery.tsx:216`), and a failed first read with no rows gets the existing online-only Retry.
 
 ### DW-515: The cold banner says "Yesterday was missed" when the missed day can be the day before yesterday.
 origin: epic 7 retrospective (D6), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:138-140 (`ColdBanner`)
+location: src/components/DailyQuestion/DailyQuestion.tsx:168-183 (`ColdBanner`; the words at :169-170)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: The words come from `missed === 1` alone, and `missed` counts closed dates; a date closes only after both partners' midnights (AD-3). For the partner whose midnight comes first, yesterday stays open until the other's midnight, so in those hours the one missed date is the day before. It needs partners in different time zones. The copy is the owner's: name the date from `week`, or use a count such as "1 day was missed".
+reason: The words come from `missed === 1` alone, and `missed` counts closed dates; a date closes only after both partners' midnights (AD-3). For the partner whose midnight comes first, yesterday stays open until the other's midnight, so in those hours the one missed date is the day before. It needs partners in different time zones. The copy is the owner's: name the date from `week`, or use a count such as "1 day was missed". 2026-11-26 triage: "The last {n} days were missed" has the same skew while yesterday is still open.
 status: open
+decision: 2026-11-26 name-the-day — the banner keeps "Yesterday was missed" only when the newest missed date in `week` is yesterday, and otherwise names that date's weekday ("Tuesday was missed, so it's frozen at 2."), read with `parseEventDate`; for more than one missed date it keeps "The last {n} days were missed" when yesterday is among them, and otherwise says "{n} days were missed".
 
 ### DW-516: A failed partner lookup saves a day, a history page or the streak with no partner tag.
 origin: epic 7 retrospective (D7), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/stores/slices/dailyQuestionSlice.ts:355-366 (`mergePartnerId`); src/services/dailyDaysCopy.ts:166 (`mergeSnapshots`)
+location: src/stores/dailyPartnerIds.ts:26-40 (`mergePartnerId`); src/services/dailyDaysCopy.ts:173-192 (`mergeSnapshots`, the tag at :188); src/services/dailyStreakCopy.ts:48-61 (`saveStreakAnswer`)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: `mergePartnerId` answers `null` for unlinked, for an error answer and for a throw, and the merge always writes the new tag, over a good one too; AGENTS.md's Known pitfalls name this null-for-two-states pattern. Reachable only when neither the store nor the saved `partner` copy has a partner (a first sign-in on a device), and only until the next good merge. Since 26514052 an untagged day still shows on Daily; untagged past questions and an untagged streak are hidden offline. A fix keeps a non-null stored tag when the lookup failed, or returns a status.
+reason: `mergePartnerId` answers `null` for unlinked, for an error answer and for a throw, and the merge always writes the new tag, over a good one too; AGENTS.md's Known pitfalls name this null-for-two-states pattern. Reachable only when neither the store nor the saved `partner` copy has a partner (a first sign-in on a device), and only until the next good merge. Since 26514052 an untagged day still shows on Daily; untagged past questions and an untagged streak are hidden offline. A fix keeps a non-null stored tag when the lookup failed, or returns a status. 2026-11-26 triage: `mergePartnerId` moved to `src/stores/dailyPartnerIds.ts` (bf6a8a2d). It is also reached when the saved partner copy's read fails (`readSavedPartner`, `partnerSlice.ts:73-80`, reads through `readLocalCopy`). The fix returns a status, as `lookupPartnerId()` does: on an unknown partner the day merge keeps each stored entry's `partner_id` and the streak copy keeps its stored tag.
 status: open
 
 ### DW-517: The partner tag is asserted with a known partner on two of Daily's merge callers, and Daily's component fixtures use a partner state the app never reaches.
 origin: epic 7 retrospective (D9 and D10), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts:290,320; dailyQuestionSlice.writeQuestion.test.ts:100,202; dailyQuestionSlice.test.ts:291,479; src/components/DailyQuestion/__tests__/DailyQuestion.test.tsx:62-66; WriteQuestionSheet.test.tsx:81
+location: tests/unit/stores/dailyQuestionSlice.pickQueue.test.ts:290,320; dailyQuestionSlice.writeQuestion.test.ts:100,202; dailyQuestionSlice.test.ts:291,479; dailyQuestionSlice.nudge.test.ts:88,193; src/components/DailyQuestion/__tests__/DailyQuestion.test.tsx:62-66; WriteQuestionSheet.test.tsx:81-83; DailyQuestion.celebration.test.tsx:108-110,204
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: `dailyQuestionSlice.partner.test.ts` checks `loadDailyDay`'s tag with a known partner and `dailyHistorySlice.test.ts` the history pages'; `drainQueuedPicks`, `refreshDailyDay`, `submitDailyPick` and `submitWrittenQuestion` are asserted only with no partner known, where `partner_id: null` is right. A call site that passed `null` would drop the day from offline past questions and no test would fail. Separately, `setPartner` and the write-sheet tests set `partner` without `partnerKnown`, though `partnerSlice.loadPartner` sets both together, so the saved-day reads in those tests run with no known partner.
+reason: `dailyQuestionSlice.partner.test.ts` checks `loadDailyDay`'s tag with a known partner and `dailyHistorySlice.test.ts` the history pages'; `drainQueuedPicks`, `refreshDailyDay`, `submitDailyPick` and `submitWrittenQuestion` are asserted only with no partner known, where `partner_id: null` is right. A call site that passed `null` would drop the day from offline past questions and no test would fail. Separately, `setPartner` and the write-sheet tests set `partner` without `partnerKnown`, though `partnerSlice.loadPartner` sets both together, so the saved-day reads in those tests run with no known partner. 2026-11-26 triage: `sendDailyNudge` (story 8.8, 54d788c9) joins the callers asserted only with no partner known (`dailyQuestionSlice.nudge.test.ts:88,193`), and `DailyQuestion.celebration.test.tsx` sets `partner` without `partnerKnown` too. `DailyQuestion.nudge.test.tsx` and `DailyQuestion.afterPick.test.tsx` are left to backlog story 6, which rewrites them.
 status: open
 
 ### DW-518: `get_couple_streak` is read from many places at once, and each read walks the pair's whole history.
 origin: epic 7 retrospective (D11), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:406; src/components/PartnerView/PartnerView.tsx:81-87; src/hooks/useDailyPickListener.ts:57-67; src/hooks/usePartnerStreakListener.ts:54-65; src/stores/slices/dailyQuestionSlice.ts:297,421,490,865
+location: src/components/DailyQuestion/DailyQuestion.tsx:555; src/components/PartnerView/PartnerView.tsx:81-87; src/hooks/useDailyPickListener.ts:64-83; src/hooks/usePartnerStreakListener.ts:52-66; src/stores/slices/dailyDaySlice.ts:363,549; src/stores/slices/dailyStreakSlice.ts:99 (refresher), :162 (the pair-change re-read)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: Daily's mount, `SUBSCRIBED`, `daily_pick` and `partner_linked` in both listeners, each confirmed pick or drained row, the `daily-streak` refresher (each signed-in start and each reconnect) and `PartnerView`'s partner and `isOnline` effect each send one, and the function runs a `generate_series` over every date since the pair's first day. Performance only; DW-495 is the same over-read for `get_daily_day`.
+reason: Daily's mount, `SUBSCRIBED`, `daily_pick` and `partner_linked` in both listeners, each confirmed pick or drained row, the `daily-streak` refresher (each signed-in start and each reconnect) and `PartnerView`'s partner and `isOnline` effect each send one, and the function runs a `generate_series` over every date since the pair's first day. Performance only; DW-495 is the same over-read for `get_daily_day`. 2026-11-26 triage: the call sites moved with story 8.1's split (bf6a8a2d). `resetCoupleStreakForNewPair`'s re-read (`dailyStreakSlice.ts:162`) is one more, and `streakSeq` only discards older answers (`dailyStreakSlice.ts:131`), so every call still sends a read.
 status: open
 
 ### DW-519: A second celebration claim in one Daily mount can replace the overlay that is playing. PLAUSIBLE, not reproduced.
 origin: epic 7 retrospective (D12), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:428-445
+location: src/components/DailyQuestion/DailyQuestion.tsx:573-608 (the claim effect; its gate at :573-574, `setCelebration` at :597-603)
 source_spec: `tickets/epic-streak-and-partner-page/epic-streak-and-partner-page-retrospective.md`
 severity: low
-reason: The claim effect claims each `ok` streak shown. If the saved copy is above the stored celebration and the server's answer is higher again, both claims play, and the second `setCelebration` resets `stage` to `'up'`, even during the milestone screen. The effect waits for the mount's own day read, which narrows the window. Reproduce before changing code.
+reason: The claim effect claims each `ok` streak shown. If the saved copy is above the stored celebration and the server's answer is higher again, both claims play, and the second `setCelebration` resets `stage` to `'up'`, even during the milestone screen. The effect waits for the mount's own day read, which narrows the window. Reproduce before changing code. 2026-11-26 triage: since dcb93efe a mount's own saved and server answers make one claim (the `!streakLoading` gate at :573-574); what remains is a re-read answering a higher held total while the +1 or the milestone screen is up (a `daily_pick`, a drained pick, the reconnect refresher). The mechanism is confirmed by reading the code; only the real-app case is unreproduced.
 status: open
+decision: 2026-11-26 never-restart — a newer claim while the +1 or the milestone screen is up updates the shown streak (the newer held total, the milestone kept if either claim had one) and keeps the overlay on its stage; built test-first with the existing component harness.
 
 ### DW-520: A sign-out between the last session check and the IndexedDB put can recreate the outgoing account's saved copy. UNVERIFIED as reachable.
+
+status: done 2026-11-26
 origin: epic 7 retrospective (P1, story 7.3's residual risk), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/stores/slices/dailyQuestionSlice.ts:696-703 (`saveStreakAnswer`'s caller); src/services/dailyStreakCopy.ts; src/services/dailyDaysCopy.ts:199-201
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-shows-offline-from-its-saved-copy-plan.md`
 severity: low
-reason: `isCurrent()` is checked before `saveStreakAnswer` is called, not inside the write, so a sign-out landing between the check and the put could write the `daily-streak` copy right after `deleteAccountCopies` removed it. `mergeDailyDay`, `mergeDailyDays` and `partnerSlice` have the same window. The row stays keyed by the outgoing account's id.
-status: open
+archived: 2026-11-26
 
 ### DW-521: Offline, a short-lived Daily mount can claim the +1 and unmount before playing it. UNVERIFIED.
 origin: epic 7 retrospective (P1, story 7.5's residual risk), 2026-11-07; re-checked on main 8696807a, 2026-11-25
-location: src/components/DailyQuestion/DailyQuestion.tsx:413-445
+location: src/components/DailyQuestion/DailyQuestion.tsx:562-608; src/services/dailyCelebrated.ts:70-101; src/stores/slices/navigationSlice.ts:214-285 (`setView`'s walk through Home)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-the-streak-s-1-plays-once-for-each-new-day-plan.md`
 severity: low
-reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 is lost on the device (its milestone, if any, shows on the next open since DW-523).
+reason: A dock tap from a page above Home mounts Daily, unmounts it and mounts it again within milliseconds. The claim waits for the mount's own day read, which guards that online; offline the saved day answers almost at once, so the first mount could store the held total with nothing left to play it on, and that +1 is lost on the device (its milestone, if any, shows on the next open since DW-523). 2026-11-26 triage: since dcb93efe the claim also waits out the streak read (offline, one more saved-streak read), and mount 2 then shows an owed milestone at once, without its +1. Reproduce first with an offline variant of `daily-streak-up.spec.ts`'s Partner-to-Daily dock scenario: if it stays green, keep the spec as the guard and close this entry as not reachable; if the +1 is lost, `claimCelebration` re-checks inside its lock, right before the write, that the mount can still show it, as `claimMilestone` does.
 status: open
 
 ### DW-522: Offline, Past questions can show fewer days than the count above them.
 origin: epic 7 closure check, 2026-11-25
-location: src/components/PartnerView/PartnerView.tsx:81-87; src/stores/slices/dailyQuestionSlice.ts:581-609 (`loadDailyHistory`), :613-649 (`loadMoreDailyHistory`)
+location: src/components/PartnerView/PartnerView.tsx:81-87; src/stores/slices/dailyHistorySlice.ts:91-163 (`loadDailyHistory`; the copy fill at :151-161), :165-221 (`loadMoreDailyHistory`); src/components/PartnerView/PastQuestionsPage.tsx:87-91 (the pager stops after the offline refusal)
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-past-questions-show-offline-plan.md`
 severity: low
-reason: The Partner page reads only the newest 30 done days, and older pages reach the `daily-days` copy only when See all is scrolled to them online. A couple past 30 done days that never scrolled sees, offline, 30 rows under "of your N days", and the copy fill sets `dailyHistoryEnd`, so nothing says there are more. Going offline with the page already loaded also hides older days that are saved: the copy fills the list only while it is `null`, and the pager stops after the offline refusal. The epic's 2026-11-07 decision removed the 31-day cap so the rows match the count. `partner-past-questions-offline.spec.ts` covers only a list paged to its end before the reload.
+reason: The Partner page reads only the newest 30 done days, and older pages reach the `daily-days` copy only when See all is scrolled to them online. A couple past 30 done days that never scrolled sees, offline, 30 rows under "of your N days", and the copy fill sets `dailyHistoryEnd`, so nothing says there are more. Going offline with the page already loaded also hides older days that are saved: the copy fills the list only while it is `null`, and the pager stops after the offline refusal. The epic's 2026-11-07 decision removed the 31-day cap so the rows match the count. `partner-past-questions-offline.spec.ts` covers only a list paged to its end before the reload. 2026-11-26 triage: the history code moved to `dailyHistorySlice.ts` (bf6a8a2d).
 status: open
+decision: 2026-11-26 background-fill — while online, page every remaining done day into the `daily-days` copy in the background (into the copy only) until the end, or until the saved done days reach `streak.done`; and on an offline refusal with rows shown, append the saved rows older than the oldest shown and set `historyFromCopy` and `dailyHistoryEnd`, so the next online first page replaces the list and paging resumes.
 
 ### DW-523: A milestone screen is lost for good on a device when its +1 is cut short.
+
+status: done 2026-11-25
 origin: epic 7 closure check, 2026-11-25
-location: src/services/dailyCelebrated.ts:55-79 (`claimCelebration`); src/components/DailyQuestion/DailyQuestion.tsx:370-376, :428-445
 source_spec: `tickets/epic-streak-and-partner-page/tickets/story-every-25-days-the-milestone-screen-shows-its-badge-plan.md`
 severity: medium
-reason: The claim stores the new `held` and `milestones` before anything shows, and the milestone screen opens only from the +1's button, so a reload or leaving Daily during the +1 skips the milestone screen and no later open shows it ("a milestone never shows without the +1"). It contradicts R5, under which reaching a milestone shows its screen once per device, so it is a bug; story 7.6's plan had recorded it as by design. Owner's decision, 2026-11-25: if the +1 is cut short, the milestone screen shows by itself the next time Daily opens. The +1 itself is still not replayed. The file comments in `dailyCelebrated.ts` and `DailyQuestion.tsx` that state the old rule change with the fix; DW-521 is another way the claim is stored with nothing shown.
-resolution: `claimCelebration` now stores the new `held` alone and leaves the stored `milestones` as the highest count shown; `claimMilestone` stores the count under the same lock just before the screen shows. A +1 cut short leaves the milestone owed (the stored held with a lower milestone count), and the next open of Daily shows it by itself, with no second +1. Only a +1 claimed before the mount's first claim counts as cut short, so Daily open in another tab never shows the milestone early; the claim also waits out a streak read in flight, so an owed milestone never comes up from the saved streak and is then replaced by a newer +1. Unit: `dailyCelebrated.test.ts`, `dailyQuestionSlice.celebration.test.ts`, `DailyQuestion.celebration.test.tsx` ("the +1 cut short"). E2E: `daily-streak-milestone.spec.ts`, a reload during the +1 and leaving Daily during the +1.
-status: done 2026-11-25
+archived: 2026-11-26
 
 ### DW-524: `new-date-forms.spec.ts`'s add-an-anniversary test failed two weekly burn-ins while loading the partner's Dates list.
 origin: epic 7 closure check, from the scheduled Tests runs, 2026-11-25; not this epic's work
-location: tests/e2e/settings/new-date-forms.spec.ts:55 (the second context, lines 138-148)
+location: tests/e2e/settings/new-date-forms.spec.ts:137-144 (the partner's anniversaries observer, set up after the UI sign-in at :131-135)
 severity: low
-reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait.
+reason: Run 42464385749 (2026-11-08, Burn-In Shard 1/3): the 60 s test timeout ran out at line 144 waiting for the partner's read after `partnerPage.goto('/settings/dates')`. Run 43697149176 (2026-11-15, the same shard): "No response received for the request", with the `goto` at line 143 still waiting for "load". Run 45008070746 (2026-11-22) passed. Both stop in the second browser context's first load; the cause is unknown. The reports were kept 7 days, so the traces are gone. Reproduce with the spec repeated before changing a wait. 2026-11-26 triage: both stop on the navigation from the signed-in Home page to `/settings/dates`: the observer is set up after the sign-in, which starts the anniversaries refresher (`datesSlice.ts:292-294`), so it plausibly latches onto Home's refresher read, which the navigation cuts off (a null response on 11-15, a response that never settles on 11-08); the same mechanism as DW-280 and 535fc097. The fix moves the live spec's `observeRpcAfterNavigation` (`tests/live/daily-question-live.spec.ts:241-269`) into a shared helper that accepts only the loaded document's request and bounds its response wait.
 status: open
 
 ### DW-525: send-push does not check a pick's is_second against the posted kind, so a mis-posted daily_partner_picked or daily_both_answered sends the wrong copy and, because both kinds share the (daily_pick_id,
-origin: spec-deferred 3f83caf550f5
-location: supabase/functions/send-push/handler.ts resolveSource, daily_partner_picked / daily_both_answered
-source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
-severity: low
-reason: getDailyPick (supabase/functions/send-push/index.ts) selects id, day_id, user_id; service_role may read is_second. Reachable only if a story 6 trigger's WHEN is wrong or a call with the shared secret is forged; reminders already get a posted/stored kind guard. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter).
-status: done 2026-11-26
-resolution: `getDailyPick` now selects `is_second`, and `resolveSource` answers no recipient and no payload when it disagrees with the posted kind (`daily_partner_picked` needs false, `daily_both_answered` true): 200, every count 0, no device listed, nothing claimed, so the matching post later still records. Unit: `handler.test.ts` (both mismatches, and a mis-post followed by the correct post). The sentence in `supabase/migrations/20261125000000_daily_push_sender.sql` (lines 17-20) that says send-push does not check `is_second` (DW-525) predates this fix and is left as written.
 
-### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's
-origin: spec-deferred 184bc275beae
-location: supabase/functions/send-push/handler.ts resolveSource, daily_question / daily_reminder
+status: done 2026-11-26
+origin: spec-deferred 3f83caf550f5
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
 severity: low
-reason: resolveSource takes getPartnerId(reminder.user_id) and never compares it with the day's other seat; picks use otherInPair(day, ...). The ticket says the reminder's sender is the recipient's partner; the gap is a partner change within the seconds between the story 5 enqueue and pg_net's post. Real low defect, deferred because users are unlikely to meet it (review 2026-11-25: blind-hunter, edge-case-hunter, intent-alignment).
-status: open
+archived: 2026-11-26
+
+### DW-526: A daily reminder's sender is users.partner_id while its day and streak come from the reminder's couple_days pair, so a re-pairing between enqueue and send would name the new partner on the old pair's day.
+
+status: done 2026-11-26
+origin: spec-deferred 184bc275beae
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-527: tests/api/push-daily-sender.spec.ts fixes "today" and "two days ago" from the host clock when it seeds the pair, while send-push reads the recipient's date from its own now(), so a run that crosses
+
+status: done 2026-11-26
 origin: spec-deferred 5c56c69dc1e9
-location: tests/api/push-daily-sender.spec.ts setUpPair and the pick-kinds case (twoDaysAgo)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-sender-knows-the-five-daily-pushes-plan.md`
 severity: low
-reason: setUpPair takes today = isoDateDaysFromNow(0, new Date()) and seedPairDays writes a user_time_zones row in the host's zone; the pick-kinds case takes twoDaysAgo the same way. user_local_date(recipient, now()) then answers the next day after midnight, so the on-day partner-picked push is dropped as late and the "3-day streak", "Day 4" and "See ...'s pick." assertions miss. Real low flake, deferred because a run must straddle local midnight within seconds (follow-up review 2026-11-25: blind-hunter, edge-case-hunter); the fix is a guard (skip within a few minutes of local midnight) or re-deriving the date from user_local_date before each post.
-status: done 2026-11-26
-resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in both tests of `push-daily-sender.spec.ts`, before `setUpPair`.
+archived: 2026-11-26
 
-### DW-528: The live daily-reminders cron job (every 5 minutes on real time) can act on api-spec accounts during a host-zone 08:00-08:30 or 20:00-20:30 window, so a tick that lands mid-spec makes
+### DW-528: The live daily-reminders cron job (every 5 minutes on real time) can act on api-spec accounts during a host-zone 08:00-08:30 or 20:00-20:30 window, so a tick that lands mid-spec makes push-daily-sender.spec.ts's hand-inserted reminder hit the (user_id, local_date, slot) key or adds daily records to push-partner-activity-trigger.spec.ts's by-token count of six.
 origin: spec-deferred 2a1496a6b7b2
-location: tests/api/push-daily-sender.spec.ts addReminder; tests/api/push-partner-activity-trigger.spec.ts by-token count; supabase/migrations/20261126000000_daily_reminders_schedule.sql daily-reminders job
+location: tests/api/push-daily-sender.spec.ts:112-120 (`addReminder`; called at :132, :149, :191); tests/api/push-partner-activity-trigger.spec.ts:375-381 (the by-token count of six); supabase/migrations/20261126000000_daily_reminders_schedule.sql:206-210 (the daily-reminders job); supabase/tests/database/35_push_devices.sql:292, 307, 320, 349, 392, 407, 420, 441, 586, 602, 614, 627, 639 (unscoped queue reads)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
 severity: low
-reason: push-daily-sender.spec.ts setUpPair links a throwaway pair both ways, registers devices and seedPairDays writes a host-zone user_time_zones row, so enqueue_daily_reminders(now()) treats it as due; addReminder then asserts a null insert error (tests/api/push-daily-sender.spec.ts addReminder). push-partner-activity-trigger.spec.ts reads push_requests by token and expects toHaveLength(6) while the pool pair (linked, a stored zone from get_daily_day) holds devices. 35_push_devices.sql's unscoped net.http_request_queue counts are exposed the same way to a committed cron insert. Needs a tick inside a window during the few seconds a spec holds that state (about 0.1-0.2% of runs). Real low flake, deferred because developers are unlikely to meet it (review 2026-11-26: blind-hunter, edge-case-hunter, verification-gap). Fix: pause the job around the api leg or clear a cron-made row for (user, today, slot) before the spec inserts.
+reason: push-daily-sender.spec.ts setUpPair links a throwaway pair both ways, registers devices and seedPairDays writes a host-zone user_time_zones row, so enqueue_daily_reminders(now()) treats it as due; addReminder then asserts a null insert error (tests/api/push-daily-sender.spec.ts addReminder). push-partner-activity-trigger.spec.ts reads push_requests by token and expects toHaveLength(6) while the pool pair (linked, a stored zone from get_daily_day) holds devices. 35_push_devices.sql's unscoped net.http_request_queue counts are exposed the same way to a committed cron insert. Needs a tick inside a window during the few seconds a spec holds that state (about 0.1-0.2% of runs). Real low flake, deferred because developers are unlikely to meet it (review 2026-11-26: blind-hunter, edge-case-hunter, verification-gap). Fix: pause the job around the api leg or clear a cron-made row for (user, today, slot) before the spec inserts. 2026-11-26 triage: the title was cut by the harvest's 200-character clamp and is completed from the plan. The partner-activity and pgTAP sites are local-stack only: in CI no api spec writes a pool account's zone, and the Database Tests stack has no eligible account; CI also retries twice (`playwright.config.ts:102`). Pausing the job conflicts with DAILY-REM-011, which pins it active (`48_daily_reminders.sql:151-161`), and with the shared stack, where a killed run would leave it paused; scoping 35's reads by id prefix would weaken PUSH-DB-065 to 067. Waits for backlog story 6, which removes the 08:00 window, the morning and `evening_partner` kinds that `addReminder` inserts, and the nudge slots; then a bundle (api-specs-clear-of-reminder-ticks) waits clear of each */5 tick inside the host's 20:00-20:30 window and excludes `daily_reminders` rows from 35's unscoped reads, keeping every "nothing queued" check as strong as before.
 status: open
 
 ### DW-529: For partners on clocks four or more hours apart, the 8 PM evening_partner push can tell the earlier partner to nudge about a date the later partner can no longer pick, because the later partner's date
-origin: spec-deferred 916c1600ab8a
-location: supabase/migrations/20261126000000_daily_reminders_schedule.sql enqueue_daily_reminders, evening branch
-source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
-severity: low
-reason: enqueue_daily_reminders checks picks on the couple day for the recipient's own local date; record_daily_pick refuses a pick whose local date is not the day, and AD-17 refuses a nudge unless the day is the recipient's current date, so "Nudge them before midnight." asks for something neither partner can do. The intent and AD-9 state the evening_partner rule literally (only the recipient has picked, no spent evening nudge), so changing it needs an owner or architect decision. Real low defect, deferred because it needs partners far apart and the fix adds a branch (review 2026-11-26: blind-hunter, intent-alignment).
-status: done 2026-11-26
-resolution: won't fix -- decided 2026-11-26 by the owner: keep the evening_partner rule as AD-9 states it. The owner and partner share one clock, so the far-apart case does not arise for them.
 
-### DW-530: tests/api/push-daily-reminders.spec.ts fails its own guard on a host in a half-hour zone (for example +05:30), because the pool accounts then sit at 08:10 and 20:10 at the spec's Kathmandu 08:25 and
-origin: spec-deferred 64204ccf98b3
-location: tests/api/push-daily-reminders.spec.ts otherAccountsDueAt and the two instants
+status: done 2026-11-26
+origin: spec-deferred 916c1600ab8a
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
 severity: low
-reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment).
+archived: 2026-11-26
+
+### DW-530: push-daily-reminders.spec.ts's guard stops the spec when any other linked account with a push device stores a zone due at its Kathmandu instants, such as a pair a killed run left behind.
+origin: spec-deferred 64204ccf98b3
+location: tests/api/push-daily-reminders.spec.ts:55-68 (`otherAccountsDueAt`), :86-98 (the `dailyrem-` pair), :100-107 (the instants and the two guard calls)
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-8-am-and-8-pm-pushes-are-scheduled-on-each-person-s-cloc-plan.md`
+severity: low
+reason: Pool accounts store the host zone (tests/support/factories/daily-question.ts seedPairDays; get_daily_day on sign-in). otherAccountsDueAt counts them as due and the spec stops before the rpc, loudly. No owner, partner or CI host is in a half-hour zone today. Real low defect, deferred because developers are unlikely to meet it and the fix (choosing the instants from the stored zones) adds logic (review 2026-11-26: intent-alignment). 2026-11-26 triage: the title was cut by the harvest's 200-character clamp (it ended at "Kathmandu 08:25 and") and is rewritten to the confirmed mechanism. The guard counts any account other than the pair that is linked both ways, holds a push device (:62) and stores a zone due at the instant: a throwaway pair or pool device left by a killed run, or a local-stack account with a device in the host's half-hour zone. Pool accounts hold no device while this spec runs, since only the two trigger specs register them and their cleanup deletes them. Absorbs DW-544 (a `dailyrem-` pair left behind by a killed run is counted by the same guard; excluding the prefix alone fails `expect(morning.data).toBe(2)`, because the rpc would also insert the leftover's rows, so the fix is the zone-chosen instant or an age-gated delete of the spec's own stale `dailyrem-` accounts before seeding). Waits for backlog story 6, which rewrites this spec's assertions and its morning instant; then one bundle (reminders-spec-instant-from-zones) picks the pair's zone and instant from the zones the other eligible accounts store, keeping the guard as the final check with a message naming the accounts it counted.
 status: open
 
 ### DW-531: tests/api/push-daily-picks.spec.ts fixes today, yesterday and two days ago from the host clock when it seeds the pair, so a run that crosses host-local midnight between the seed and a pick fails
+
+status: done 2026-11-26
 origin: spec-deferred cf4802363580
-location: tests/api/push-daily-picks.spec.ts seed and submitPick
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-picks-push-the-partner-and-both-answered-plan.md`
 severity: low
-reason: The spec computes `today` with isoDateDaysFromNow(0, now) before seedPairDays, then submits today's pick with picked_at = new Date() for dayIds[today]; after midnight record_daily_pick refuses it with DQ001 (pick date is not the day's date), and user_local_date would also move the recipient's date so the on-date partner-picked push is dropped. The same low flake story 8.3 deferred for push-daily-sender.spec.ts. Real low flake, deferred because a run must straddle local midnight within seconds; the fix is a guard (skip within a few minutes of local midnight) shared by both specs.
+archived: 2026-11-26
+
+### DW-532: A sender whose clock is past midnight while the recipient's is still on the day can nudge about that day in a fresh slot of the sender's new date, which also spends that date's slot before the new day's question.
+
 status: done 2026-11-26
-resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in `push-daily-picks.spec.ts`, before the pair is seeded.
-
-### DW-532: A sender whose clock is past midnight while the recipient's is still on the day can nudge about that day in a fresh slot of the sender's new date, which also spends that date's slot before the new
 origin: spec-deferred 900939320814
-location: supabase/migrations/20261126020000_daily_nudge.sql record_daily_nudge and daily_day_snapshot nudge block
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
 severity: low
-reason: record_daily_nudge and the snapshot key the limit on (from_user, sender_local_date, slot) and require only user_local_date(partner, at) = the day (AD-17 as written). With A on UTC and B in New York, at 2030-09-11 02:00 UTC A (picked 09-10, B not) gets slot after_pick for 09-10, unspent, so a third nudge about 09-10 lands and A's 09-11 after_pick slot is spent before 09-11's question. Real low defect, deferred because it needs partners in different zones and a nudge after the sender's midnight, and the fix (also requiring the sender's own date to be the day, or keying on day_id) changes AD-17's rule, which is the architect's or owner's call (review 2026-11-26: blind-hunter, edge-case-hunter, intent-alignment).
-status: open
-progress: 2026-11-26 the owner superseded this entry's decision: backlog story 6 keys the limit as one nudge per sender per daily question and removes the two slots. Do not build the per-question-day migration from the decision line; story 6 closes this entry.
-decision: 2026-11-26 per-question-day — the owner chose the standard practice: key the nudge limit on the day being nudged about, (from_user, day_id, slot), instead of (from_user, sender_local_date, slot), so crossing the sender's midnight neither adds a nudge about the old day nor spends the new day's slot. A migration changes record_daily_nudge, the unique key and the snapshot's spent read; AD-17 is updated to match.
+archived: 2026-11-26
 
-### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the
+### DW-533: record_daily_nudge reads the sender's stored zone twice (user_local_date, then daily_nudge_slot), so a zone written between the two statements gives the row a date from one zone and a slot from the other.
+
+status: done 2026-11-26
 origin: spec-deferred 54bfbe5d4e23
-location: supabase/migrations/20261126020000_daily_nudge.sql:154-155
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
 severity: low
-reason: Under READ COMMITTED each statement in the volatile function takes a fresh snapshot, and get_daily_day may update user_time_zones from the same account's other device in between. Real low defect, deferred because it needs a zone change within the same milliseconds as a nudge; the fix is to read the zone once and derive both values from it (review 2026-11-26: edge-case-hunter).
-status: open
+archived: 2026-11-26
 
 ### DW-534: tests/api/push-daily-nudge.spec.ts takes today from the host clock before seeding, so a run that crosses host-local midnight between the seed and the nudge fails spuriously.
+
+status: done 2026-11-26
 origin: spec-deferred e25547d0886d
-location: tests/api/push-daily-nudge.spec.ts setUpPair
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-server-takes-a-nudge-and-pushes-it-plan.md`
 severity: low
-reason: setUpPair seeds today with isoDateDaysFromNow(0, new Date()) and host-zone user_time_zones rows; after midnight user_local_date(recipient, now()) is the next date and send_daily_nudge refuses DQ009. The same low flake stories 8.3 and 8.6 deferred for push-daily-sender.spec.ts and push-daily-picks.spec.ts; the shared fix is a guard near local midnight (review 2026-11-26: intent-alignment).
-status: done 2026-11-26
-resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called first in both tests of `push-daily-nudge.spec.ts`, before `setUpPair`; the repeat-in-slot refusal is covered too.
+archived: 2026-11-26
 
 ### DW-535: tests/e2e/daily/daily-question-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the nudge and the reload.
-origin: spec-deferred bdab4a51c247
-location: tests/e2e/daily/daily-question-nudge.spec.ts after the nudge send
-source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
-severity: low
-reason: The server picks the slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the spec expects the button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6 and 8.7 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.8 implementation, 2026-11-26).
-status: done 2026-11-26
-resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called in `daily-question-nudge.spec.ts` before the pair's days are cleared.
 
-### DW-536: The client keeps nudge.spent per (day_id, slot), while the server spends a slot per (sender-local date, slot), so a sender whose date has passed the shown day sees a greyed button the server would
-origin: spec-deferred d00b99c79ea2
-location: src/services/dailyDaysCopy.ts keepNudgeSpent
+status: done 2026-11-26
+origin: spec-deferred bdab4a51c247
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: keepNudgeSpent keeps a stored {after_pick, spent: true} over a later {after_pick, spent: false} for the same day_id. With the sender far ahead of the partner (UTC+9 against UTC-5) and the day still on screen after the sender's midnight, the server opens a fresh after_pick slot on the sender's new date for the same day, and the button stays greyed. Same root cause as story 8.7's deferred sender-date crossing (AD-17 keys the limit on the sender's date); the snapshot carries no date to tell the two slots apart (review 2026-11-26: blind-hunter).
-status: open
-progress: 2026-11-26 superseded with DW-532: backlog story 6 removes the slots, so the client's per-slot spent rule goes with them; story 6 closes this entry.
-decision: 2026-11-26 follows-DW-532 — fixed by DW-532's per-question-day key: the client already keeps spent per (day_id, slot), which then matches the server.
+archived: 2026-11-26
+
+### DW-536: The client keeps nudge.spent per (day_id, slot), while the server spends a slot per (sender-local date, slot), so a sender whose date has passed the shown day sees a greyed button the server would still accept.
+
+status: done 2026-11-26
+origin: spec-deferred d00b99c79ea2
+source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
+severity: low
+archived: 2026-11-26
 
 ### DW-537: After a P0002 refusal (the pair changed) the nudge's re-read of the same day_id fails too, so the stale waiting card keeps an enabled button that fails on every tap.
 origin: spec-deferred 50678f62b2da
-location: src/stores/slices/dailyDaySlice.ts sendDailyNudge
+location: src/stores/slices/dailyDaySlice.ts:646 (`sendDailyNudge`'s re-read), :468-491 (`refreshDailyDay`, which only logs at :489)
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter).
+reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter). 2026-11-26 triage: it needs a server-side change of `users.partner_id`, as the app has no unlink action (`src/components/Settings/PartnerPage.tsx:13-14`) and `accept_partner_request` refuses a linked user (`20260818000000_revoke_anon_execute_and_fix_partner_guards.sql:170-175`). Waits for backlog story 6: the waiting card's button goes (criterion 9), but the prompt keeps an enabled Nudge after a P0002, and criterion 12's new re-read meets the same dead end. Then a small bundle with DW-547 (nudge-failure-path): a P0002 from `refreshDailyDay` falls back to `loadDailyDay`, which also covers the broadcast re-reads at `useDailyPickListener.ts:66,72`; the title's waiting card then reads as the nudge prompt.
 status: open
 
 ### DW-538: Daily does not re-read at the sender's local midnight, so a page left open and visible across midnight keeps the old day and its nudge slot.
 origin: spec-deferred 300c948db47a
-location: src/hooks/useDailyDayRereads.ts
+location: src/hooks/useDailyDayRereads.ts:42-71
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter).
+reason: useDailyDayRereads arms only 20:00:05 and visibilitychange; Daily had no midnight re-read before this change either (pre-existing). A pick made then is refused day-changed and re-reads, but the nudge button shows the old day's state until a return or reload (review 2026-11-26: blind-hunter). 2026-11-26 triage: what remains once backlog story 6 removes the slots and the waiting card's button: the header, question, chip and week stay on the old day, and an open write sheet stays until its send is refused with DQ006. It waits for story 6 only because story 6 deletes the 20:00 timer in the same hook. Then a one-entry bundle (daily-midnight-reread) re-reads the day and the streak just after the device's local midnight, re-armed daily and cleared on unmount or a session change, with one more read a few seconds later if the day is still not the device date; once story 6 lands the title drops "and its nudge slot".
 status: open
 progress: 2026-11-26 epic 8 retrospective (F1e): the partner's midnight is not re-read either, so a page left open across it keeps an enabled Nudge button that DQ009 refuses on every tap. Backlog story 6 removes the waiting card's Nudge button, which covers that case. The stale day across the sender's own midnight remains.
 
 ### DW-539: A nudge request that times out after the server committed it shows "Your nudge could not be sent." although the push went out.
+
+status: done 2026-11-26
 origin: spec-deferred 31cd9232798f
-location: src/components/DailyQuestion/DailyQuestion.tsx WaitingCard
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: requestTimeout aborts the client request; the row and its trigger post may already be committed. The card shows NUDGE_FAILED_MESSAGE, and the re-read then greys the button (spent), so the line and the state disagree. Real low defect, deferred because it needs a timeout after commit; the fix needs a rule for when the re-read overrides the line that the intent does not give (review 2026-11-26: edge-case-hunter).
-status: open
-progress: 2026-11-26 the owner put this rule into backlog story 6 (criterion 12), on the after-answer prompt, since the waiting card loses its button; story 6 closes this entry.
-decision: 2026-11-26 unknown-is-not-failed — the owner left the rule to standard practice: a send that times out or fails on the network is unknown, not failed. Show no line at first and re-read the day; if the re-read has the slot spent, show it as sent (button grey, no line); if not, show NUDGE_FAILED_MESSAGE and leave the button enabled (a retry cannot double-send: one nudge per slot is a unique key). A server refusal (DQ007 to DQ010, P0002) keeps today's behaviour.
+archived: 2026-11-26
 
 ### DW-540: The 20:00 re-read uses the device's clock while the server's slot uses the stored zone, which differ when the same account reads Daily from a second device in another zone.
+
+status: done 2026-11-26
 origin: spec-deferred 24a822fb1e50
-location: src/hooks/useDailyDayRereads.ts
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
 severity: low
-reason: get_daily_day stores the zone of whichever device read last; Daily's mount read stores this device's zone, so they agree unless another device of the same account in another zone reads in between. Then the timer fires at the wrong hour and the evening slot shows only on a return or reload (review 2026-11-26: edge-case-hunter, intent-alignment).
-status: open
-progress: 2026-11-26 epic 8 retrospective (F1a, F1c). F1a: inside one `get_daily_day` the day is dated with the zone the request sends, while the stored zone is replaced only by a newer `reported_at` (`supabase/migrations/20261105210000_daily_question_own_clocks.sql:116-121, 282-286`). With a second device of the same account in another zone, the day comes from this device, and DQ009 and the scheduled pushes from the other device's zone. F1c: the 20:00:05 re-read (`src/hooks/useDailyDayRereads.ts`) fires once with no retry, so device clock skew past 5 s or a failed read leaves the evening slot unseen until a return or reload. Backlog story 6 removes the nudge slots, which covers F1c and the 20:00 timer this entry names; F1a remains.
+archived: 2026-11-26
 
 ### DW-541: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts fails when a run crosses 20:00 or host-local midnight between the pick and the reload.
+
+status: done 2026-11-26
 origin: spec-deferred 038b11dcab84
-location: tests/e2e/daily/daily-question-after-pick-nudge.spec.ts after the nudge send
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-app-offers-a-nudge-right-after-a-pick-plan.md`
 severity: low
-reason: The server picks the nudge slot (after_pick before 20:00 on the sender's stored zone, evening from 20:00) and the first test expects the waiting button disabled after a reload; a reload after 20:00 reads the new slot unspent, and one after midnight reads a new day. The same low host-clock flake stories 8.3, 8.6, 8.7 and 8.8 deferred for their specs; the shared fix is a guard near 20:00 and midnight (story 8.9 implementation, 2026-11-26).
-status: done 2026-11-26
-resolution: `waitClearOfDailyTurns(testInfo)` (`tests/support/helpers/events.ts`; the pure rule `msUntilClearOfDailyTurns` is unit-tested in `tests/unit/helpers/events.test.ts`) sleeps until 10 s past a host-local midnight or 20:00 that falls inside the test's own timeout window (or within 10 s behind it) and extends the timeout by the wait, so the test starts clear of both turns; no skip. Called at the top of the `setup` fixture in `daily-question-after-pick-nudge.spec.ts`, before the pair's days are cleared.
+archived: 2026-11-26
 
-### DW-542: The live check fails on the wrong sheet when UTC midnight passes between bot A's first Daily read and its pick on a day A is the writer.
+### DW-542: The live check's turn guard reads the host clock, so a local run on a host not on UTC can cross the bots' UTC midnight and, on bot A's writing day, fail on the wrong sheet.
 origin: spec-deferred 04fbea10cd5f
-location: tests/live/daily-question-live.spec.ts (the `openedA.snapshot.write.mine` branch)
+location: tests/live/daily-question-live.spec.ts:362 (the `waitClearOfDailyTurns` call with no zone), :408-417 (the `openedA.snapshot.write.mine` branch); tests/support/helpers/events.ts:233-258
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-after-every-deploy-the-live-check-also-sends-a-nudge-plan.md`
 severity: low
-reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC.
+reason: The spec picks its branch from A's `snapshot.write.mine` at open, but `showWriteSheet` (src/components/DailyQuestion/DailyQuestion.tsx:496-505) also needs `snapshot.day` to equal the device date. After a midnight crossing no write sheet shows and the nudge sheet does, so `daily-write-sheet` toBeVisible fails. It is real but rare (a crossing in the seconds between the open and the pick), and the spec already failed on a midnight crossing between A's pick and B's read. Routed here rather than rejected (the build's persistent fact for unlikely lows): the fix is a UTC-midnight guard, and `waitClearOfDailyTurns` reads the host clock, not UTC. 2026-11-26 triage: `showWriteSheet` is now at `DailyQuestion.tsx:497-506`. The guard builds the 00:00 and 20:00 turns on the host clock (`events.ts:233-241`), while the bots run on UTC (`daily-question-live.spec.ts:68`, `:373`; `playwright.live.config.ts:34`). The progress line holds for deploy runs, but backlog story 6's criterion 14 is checked in local mode on a host not on UTC, and story 6 keeps the write-sheet branch. The fix gives `waitClearOfDailyTurns` and `msUntilClearOfDailyTurns` an optional zone that builds the turns with `Date.UTC`, passed at :362 only.
 status: open
 progress: 2026-11-26 `ea53dabb` (PR #513 review) runs `waitClearOfDailyTurns` before the reset, and the deploy runner is on UTC, so a deploy run waits past both UTC turns and this crossing cannot happen there. It remains only for a local live run on a host not on UTC. Backlog story 6 rewrites the live check's nudge step.
 
 ### DW-543: send-push judges whether a pick's day is the recipient's current date when it sends, not when the pick was made.
+
+status: done 2026-11-26
 origin: epic 8 retrospective, 2026-11-26
-location: supabase/functions/send-push/handler.ts:436-454 (`resolveSource`), :657-658 (the send-time `now`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F1b. The trigger posts within seconds, and the sender compares the day with `user_local_date(recipient, now())` at send time. A first pick made just before the recipient's midnight and sent after it is dropped as late, and a second pick is worded "That day counts." though it was on the day. Backlog story 6 removes the partner-picked push, which takes the first half; the both-answered wording remains.
-status: open
+archived: 2026-11-26
 
 ### DW-544: push-daily-reminders.spec.ts's guard counts a throwaway pair left behind by a killed run. PLAUSIBLE, not reproduced.
+
+status: done 2026-11-26
 origin: epic 8 retrospective, 2026-11-26
-location: tests/api/push-daily-reminders.spec.ts:106 (the guard before the rpc)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F5 R4. The spec's throwaway `dailyrem-*` pair is removed by its cleanup, which a killed run never reaches. The next run's guard counts that pair as an account due in the window and stops before the rpc, so a red P0 api spec reads like a reminder bug. The fix is to exclude the spec's own prefix or delete leftovers before seeding.
-status: open
+archived: 2026-11-26
 
 ### DW-545: send-push reads the couple's streak before it checks the recipient's switch.
+
+status: done 2026-11-26
 origin: epic 8 retrospective, 2026-11-26
-location: supabase/functions/send-push/handler.ts:448, 462, 505 (`getCoupleStreak`) against :669 (`isPushEnabled`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F5 R5. `resolveSource` builds each daily kind with `couple_streak` before the handler reads the switch, so a kind the recipient turned off still costs a streak read and answers 500 when that read fails, though it would have been dropped.
-status: open
+archived: 2026-11-26
 
 ### DW-546: Three daily push api specs hand-write the couple-day lookup and the linked-pair recipe that shared helpers already give.
 origin: epic 8 retrospective, 2026-11-26
-location: tests/api/push-daily-nudge.spec.ts:47-82; tests/api/push-daily-sender.spec.ts:63-100; tests/api/push-daily-picks.spec.ts:58-82
+location: tests/api/push-daily-nudge.spec.ts:47-82; tests/api/push-daily-sender.spec.ts:63-100; tests/api/push-daily-picks.spec.ts:58-82; tests/api/push-daily-reminders.spec.ts:149-150
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F6 (duplication map). Each spec queries `couple_days` by sorted `user_a`/`user_b` itself, although `tests/support/factories/daily-question.ts` exports `readPairDayIds` and `orderedPair`; two specs also copy the `setUpPair` recipe and redeclare `type Cleanup`. AGENTS.md, Shared test helpers (DW-313). The 8.5 and 8.6 reviews moved the other helpers into `tests/support/helpers/push-requests.ts` and left these.
+reason: Retrospective F6 (duplication map). Each spec queries `couple_days` by sorted `user_a`/`user_b` itself, although `tests/support/factories/daily-question.ts` exports `readPairDayIds` and `orderedPair`; two specs also copy the `setUpPair` recipe and redeclare `type Cleanup`. AGENTS.md, Shared test helpers (DW-313). The 8.5 and 8.6 reviews moved the other helpers into `tests/support/helpers/push-requests.ts` and left these. 2026-11-26 triage: correction: `daily-question.ts` orders the pair with the module-private `orderedPair` (:220) and reads the pair's day ids with `readPairDayIds` (:225, ids only, no dates), and `type Cleanup` is exported by `tests/support/fixtures/cleanup.ts:51`; `push-daily-reminders.spec.ts:149-150` is a fourth instance. The fix gives the factory one read of the pair's days as a date-to-id map, exports the pair ordering, and moves the linked-pair recipe into `tests/support/helpers/push-requests.ts`, with no assertion changed.
 status: open
 
-### DW-547: A refused nudge is logged twice.
+### DW-547: A failed nudge (refused or transport) is logged twice.
 origin: epic 8 retrospective, 2026-11-26
-location: src/api/dailyQuestionApi.ts:300 (`logSupabaseError`); src/components/DailyQuestion/nudgeFailureMessage.ts:16 (`console.error`)
+location: src/api/dailyQuestionApi.ts:300 (`logSupabaseError`); src/services/accountDataError.ts:108 (`toAccountDataError` logs a transport failure); src/components/DailyQuestion/nudgeFailureMessage.ts:16 (`console.error`)
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Retrospective F6 (duplication map). `sendDailyNudge` logs a refusal before throwing `AccountDataError('refused')`, and `nudgeFailureMessage` logs the same failure again on its way to the line it shows.
+reason: Retrospective F6 (duplication map). `sendDailyNudge` logs a refusal before throwing `AccountDataError('refused')`, and `nudgeFailureMessage` logs the same failure again on its way to the line it shows. 2026-11-26 triage: a transport failure is logged twice too, by `toAccountDataError` (`accountDataError.ts:108`) and then by `nudgeFailureMessage`. Only `NudgeSheet.test.tsx:115,133,235` assert the second log, and the API's own log is never asserted. Waits for backlog story 6, which removes the waiting card's handler and rewrites the sheet's transport handling (criterion 12); a timed-out send that turns out recorded must not log a failure. Then a small bundle with DW-537 (nudge-failure-path) logs each failed nudge once, where the error is mapped.
 status: open
 
 ### DW-548: Drop the `push_preferences` columns for New question and Partner picked once installed builds have taken story 6's update.
 origin: epic 8 retrospective, 2026-11-26
-location: push_preferences.daily_question, push_preferences.daily_partner_picked; src/services/pushPreferencesService.ts (the column list); supabase/tests/database/36_push_preferences.sql (PUSH-PREF-009); src/types/database.types.ts
+location: push_preferences.daily_question, push_preferences.daily_partner_picked; src/services/pushPreferencesService.ts (the column list); supabase/tests/database/36_push_preferences.sql (PUSH-PREF-009); supabase/tests/database/47_daily_pushes.sql:397-418 (DAILY-PUSH-051, 052, 056, 057); src/types/database.types.ts
 source_spec: `tickets/epic-daily-pushes-and-nudge/epic-daily-pushes-and-nudge-retrospective.md`
 severity: low
-reason: Backlog story 6 removes both switches and the pushes they controlled, but keeps the columns (owner, 2026-11-26): installed shells run the old web bundle until they take the live update, and that bundle reads both columns by name, so dropping them in the same deploy would fail its Settings reads. Drop them in a later migration, after the owner's and partner's shells run a bundle from story 6 or later, regenerating the types and updating PUSH-PREF-009 in the same change.
+reason: Backlog story 6 removes both switches and the pushes they controlled, but keeps the columns (owner, 2026-11-26): installed shells run the old web bundle until they take the live update, and that bundle reads both columns by name, so dropping them in the same deploy would fail its Settings reads. Drop them in a later migration, after the owner's and partner's shells run a bundle from story 6 or later, regenerating the types and updating PUSH-PREF-009 in the same change. 2026-11-26 triage: a precondition the story does not yet state: story 6's deploy must stop the client selecting and upserting both columns (`pushPreferencesService.ts:99-100`, `:106`, `:134`, `:162`), since AD-10 (`architecture-daily-question.md:158`) requires stop reading, ship, then drop. Before the drop, read the hosted catalog of `push_preferences` for dependents, read-only (AGENTS.md). No gate line is added: this entry blocks no ticket, and a backlog file name is not a valid gate token.
 status: open
+decision: 2026-11-26 epic-10 — rides epic 10's second-step `push_preferences` drop: one migration with the moods and pokes-and-kisses columns, one `npm run db:types` and one PUSH-PREF-009 edit; the PO adds it to epic 10's Notes and the drop story declares it in its plan's `closes_deferred`.
