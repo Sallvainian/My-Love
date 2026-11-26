@@ -259,6 +259,8 @@ export function signedOutState() {
     // The days this device's account declined to write for; the kind itself is
     // deleted with the account's other copies.
     dailyWriteDeclined: [],
+    // The server answers shown so far; the next account counts from none.
+    dailyDayAnswers: 0,
     // The couple's streak the outgoing account was shown, and its read state.
     coupleStreak: null,
     coupleStreakLoading: false,

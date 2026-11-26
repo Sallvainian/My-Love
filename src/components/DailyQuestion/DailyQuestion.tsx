@@ -76,11 +76,13 @@
  * sheet). Nudge sends through `sendDailyNudge` and closes it; Not now, the scrim
  * and Escape close it with nothing sent. The partner's `daily_pick` for that day,
  * or any re-read that leaves the state `me`, ends it.
- * The write sheet opens only after a read of this mount stored the server's
- * answer (`loadDailyDay` resolves `true`), never after a failed or offline read
- * (DW-491). The day-changed notice is dropped for good once the shown day offers
- * no Send (DW-496), and the cold banner names a missed date that is not
- * yesterday by its weekday (DW-515).
+ * The write sheet opens only once the server has answered for the shown day in
+ * this mount: any answer the store shows after the mount counts (`dailyDayAnswers`
+ * has grown since it), whether a read, a re-read, the pick's own confirmation or
+ * a refresh, and never a failed or offline read alone (DW-491). The day-changed
+ * notice is dropped for good once the shown day offers no Send (DW-496), and
+ * the cold banner names a missed date that is not yesterday by its weekday
+ * (DW-515).
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
@@ -542,10 +544,20 @@ export function DailyQuestion() {
   }, [celebration, claimStreakMilestone]);
 
   // The session whose read this mount has had finished, answered or not (see
-  // the effect below), and the one whose read this mount has had stored the
-  // server's answer for: the write sheet waits for that one (DW-491).
+  // the effect below).
   const [readFor, setReadFor] = useState<string | null>(null);
-  const [answeredFor, setAnsweredFor] = useState<string | null>(null);
+  // The write sheet waits for the server's answer in this mount (DW-491): the
+  // store's count of shown answers, taken when this mount began its session,
+  // and the count now. Whatever the server answers after that, a read, a pick's
+  // confirmation or a re-read, lets the sheet ask; the saved day shown first
+  // does not. The baseline is adjusted while rendering, as the day-changed
+  // notice is, so no render sees the new session against the old count.
+  const answers = useAppStore((state) => state.dailyDayAnswers);
+  const [answersAtMount, setAnswersAtMount] = useState({ session: sessionKey, count: answers });
+  if (answersAtMount.session !== sessionKey) {
+    setAnswersAtMount({ session: sessionKey, count: answers });
+  }
+  const answeredHere = answersAtMount.session === sessionKey && answers > answersAtMount.count;
 
   // The write sheet, closed by a scrim tap or Escape, stays closed for this
   // mount of Daily: the day it was closed for, so a new day can ask again.
@@ -562,7 +574,7 @@ export function DailyQuestion() {
     !writeDeclined.includes(writeSnapshot.day_id) &&
     writeSnapshot.day === formatDateISO(new Date()) &&
     writeClosedFor !== writeSnapshot.day_id &&
-    answeredFor === sessionKey &&
+    answeredHere &&
     !celebrationShown;
 
   // The nudge offer (R2), raised only by the in-view Send my pick and kept with
@@ -607,28 +619,16 @@ export function DailyQuestion() {
 
   // Re-read on each mount, and for a new session while the view stays open (an
   // account switch clears `dailyDay` through signedOutState). The sheet waits
-  // for a read of this mount to store the server's answer: the day shown first
+  // for the server to answer in this mount (`answeredHere`): the day shown first
   // may be a saved one whose turn was written on another device, and a read
   // that failed or ran offline has not shown otherwise. The nudge offer and the
-  // +1 claim wait for any finished read (`readFor`). Flags, not
+  // +1 claim wait for any finished read (`readFor`). Counts and flags, not
   // `dailyDayLoading`: a later background load must not take the sheet away
-  // mid-typing.
+  // mid-typing, and a later answer only ever adds to the count.
   useEffect(() => {
-    void loadDailyDay().then((stored) => {
-      setReadFor(sessionKey);
-      if (stored) setAnsweredFor(sessionKey);
-    });
+    void loadDailyDay().then(() => setReadFor(sessionKey));
     void loadCoupleStreak();
   }, [loadDailyDay, loadCoupleStreak, sessionKey]);
-  // Retry after a failed first read: a read that stores the server's answer
-  // also lets the sheet ask, as the mount's own read would have.
-  const retryRead = useCallback(
-    () =>
-      void loadDailyDay().then((stored) => {
-        if (stored) setAnsweredFor(sessionKey);
-      }),
-    [loadDailyDay, sessionKey]
-  );
 
   // Only a successful, linked answer shows anything; a null, unlinked or failed
   // read leaves the header without a chip, with no strip and no banner.
@@ -779,7 +779,7 @@ export function DailyQuestion() {
               type="button"
               className={SECONDARY_BUTTON}
               disabled={loading}
-              onClick={retryRead}
+              onClick={() => void loadDailyDay()}
               data-testid="daily-retry"
             >
               Retry

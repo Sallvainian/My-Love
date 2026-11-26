@@ -324,6 +324,65 @@ describe("the write tomorrow's question sheet", () => {
     expect(sheet()).toBeNull();
   });
 
+  it('a saved day with the turn open and a failed read: the pick the server confirms opens the sheet, and the nudge offer waits', async () => {
+    const user = userEvent.setup();
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: dailySnapshot({ write: { mine: true, done: false } }),
+    });
+    fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
+    submitDailyPickRequest.mockResolvedValue(
+      writerSnapshot('this', { nudge: { slot: 'after_pick', spent: false } })
+    );
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-error');
+    expect(sheet()).toBeNull();
+
+    await user.click(screen.getByTestId('daily-option-this'));
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-nudge-sheet')).toBeNull();
+  });
+
+  it('a saved day with the turn open and no connection: the sheet opens when a later load stores the answer', async () => {
+    await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, { [DAY_ID]: writerSnapshot() });
+    setOnline(false);
+    fetchDailyDay.mockRejectedValue(
+      new AccountDataError('offline', "You are offline. Today's question needs a connection to load.")
+    );
+
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-question');
+    await waitFor(() => expect(useAppStore.getState().dailyDayLoading).toBe(false));
+    expect(sheet()).toBeNull();
+
+    // The connection returns and a background load (the `online` refresh, a
+    // re-read on return to the app) gets the server's answer.
+    setOnline(true);
+    fetchDailyDay.mockReset();
+    fetchDailyDay.mockResolvedValue(writer());
+    await act(async () => {
+      await useAppStore.getState().loadDailyDay();
+    });
+
+    expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
+  });
+
+  it('a second mount waits for its own answer, though the first one had one', async () => {
+    const first = await open();
+    await screen.findByTestId('daily-write-sheet');
+    first.unmount();
+
+    fetchDailyDay.mockReset();
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'The server is down'));
+    render(<DailyQuestion />);
+    await screen.findByTestId('daily-error');
+
+    expect(screen.getByTestId('daily-question')).toBeInTheDocument();
+    expect(sheet()).toBeNull();
+  });
+
   it('a later background load does not take the open sheet away', async () => {
     const user = userEvent.setup();
     await open();
