@@ -38,10 +38,25 @@ function fakePage() {
   } as unknown as Page;
   return {
     page,
-    navigate: () => events.emit('framenavigated', mainFrame),
+    /** A navigation that loads a document: the main frame's document request, then the commit. */
+    navigate: () => {
+      events.emit('request', documentRequest(mainFrame));
+      events.emit('framenavigated', mainFrame);
+    },
+    /** A same-document change (`pushState`): `framenavigated` with no document request. */
+    pushState: () => events.emit('framenavigated', mainFrame),
     send: (request: Request) => events.emit('request', request),
     listeners: () => events.listenerCount('framenavigated') + events.listenerCount('request'),
   };
+}
+
+function documentRequest(frame: Frame): Request {
+  return {
+    method: () => 'GET',
+    url: () => `${ORIGIN}/`,
+    isNavigationRequest: () => true,
+    frame: () => frame,
+  } as unknown as Request;
 }
 
 function fakeRequest(
@@ -52,6 +67,8 @@ function fakeRequest(
   return {
     method: () => method,
     url: () => `${ORIGIN}${path}?select=*`,
+    isNavigationRequest: () => false,
+    frame: () => ({}) as Frame,
     response,
   } as unknown as Request;
 }
@@ -84,6 +101,22 @@ describe('observeReadAfterNavigation', () => {
     await expect(observed).resolves.toEqual({ status: 200, responseJson: [{ label: 'x' }] });
     expect(leftPage).not.toHaveBeenCalled();
     expect(fake.listeners()).toBe(0);
+  });
+
+  it('does not count a same-document pushState as the navigation', async () => {
+    const fake = fakePage();
+    const observed = observeReadAfterNavigation(fake.page, {
+      method: 'GET',
+      url: ANNIVERSARIES_READ,
+    });
+    const leftPage = vi.fn(async () => null);
+    fake.pushState();
+    fake.send(fakeRequest('GET', '/rest/v1/anniversaries', leftPage));
+    fake.navigate();
+    fake.send(fakeRequest('GET', '/rest/v1/anniversaries', answer(200, [])));
+
+    await expect(observed).resolves.toEqual({ status: 200, responseJson: [] });
+    expect(leftPage).not.toHaveBeenCalled();
   });
 
   it('matches the method and the path end, so a sibling RPC or a write is not the read', async () => {
@@ -130,6 +163,63 @@ describe('observeReadAfterNavigation', () => {
     expect(error).toBeInstanceOf(ReadAfterNavigationTimeoutError);
     expect(error).toMatchObject({ stage: 'response' });
     expect(fake.listeners()).toBe(0);
+  });
+
+  it('gives the response its own full budget when the request matched late', async () => {
+    const fake = fakePage();
+    const observed = observeReadAfterNavigation(fake.page, {
+      method: 'GET',
+      url: ANNIVERSARIES_READ,
+      timeout: 1000,
+    });
+    fake.navigate();
+    await vi.advanceTimersByTimeAsync(990);
+    let answered!: (response: FakeResponse) => void;
+    fake.send(
+      fakeRequest(
+        'GET',
+        '/rest/v1/anniversaries',
+        () => new Promise<FakeResponse>((resolve) => (answered = resolve))
+      )
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    answered({ status: () => 200, json: async () => [] });
+
+    await expect(observed).resolves.toEqual({ status: 200, responseJson: [] });
+  });
+
+  it('throws a plain error, not the timeout error, when the loaded page request gets no response', async () => {
+    const fake = fakePage();
+    const observed = observeReadAfterNavigation(fake.page, {
+      method: 'GET',
+      url: ANNIVERSARIES_READ,
+    });
+    const failure = observed.catch((error: unknown) => error);
+    fake.navigate();
+    fake.send(fakeRequest('GET', '/rest/v1/anniversaries', async () => null));
+
+    const error = await failure;
+    expect(error).not.toBeInstanceOf(ReadAfterNavigationTimeoutError);
+    expect(error).toMatchObject({ message: expect.stringContaining('got no response') });
+  });
+
+  it('returns a null responseJson for a body that is not JSON, so the status assertion reports it', async () => {
+    const fake = fakePage();
+    const observed = observeReadAfterNavigation(fake.page, {
+      method: 'GET',
+      url: ANNIVERSARIES_READ,
+    });
+    fake.navigate();
+    fake.send(
+      fakeRequest('GET', '/rest/v1/anniversaries', async () => ({
+        status: () => 502,
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON');
+        },
+      }))
+    );
+
+    await expect(observed).resolves.toEqual({ status: 502, responseJson: null });
   });
 
   it('refuses a glob that pins query parameters, which it would not match on', async () => {

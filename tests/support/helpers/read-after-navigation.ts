@@ -14,9 +14,17 @@
  *
  * Start {@link observeReadAfterNavigation} before the `goto`, `reload` or click
  * that navigates, and await it after: it ignores every request sent before the
- * main frame commits the navigation and accepts only the loaded document's own.
+ * main frame commits a navigation that fetched a new document and accepts only
+ * the loaded document's own. A same-document change (`pushState`, `replaceState`,
+ * a hash change) fires `framenavigated` too but sends no document request, so it
+ * does not count as the navigation.
+ *
+ * A request that fails with no response throws a plain `Error` on purpose: there
+ * is no status to assert, so the failure is the message. A body that is not JSON
+ * gives `responseJson: null`, as `interceptNetworkCall` does, so the caller's
+ * `status` assertion reports it.
  */
-import type { Frame, Page } from '@playwright/test';
+import type { Frame, Page, Request } from '@playwright/test';
 import { SECOND_CONTEXT_READ_TIMEOUT } from './reads';
 
 /** A wait of {@link observeReadAfterNavigation} ran out; `stage` says which one. */
@@ -29,8 +37,8 @@ export class ReadAfterNavigationTimeoutError extends Error {
   ) {
     super(
       stage === 'request'
-        ? `${method} ${url}: the loaded page sent no such request within ${timeout} ms of the navigation`
-        : `${method} ${url}: the loaded page's own request got no response within ${timeout} ms`
+        ? `${method} ${url}: the loaded page sent no such request within ${timeout} ms of the observer starting`
+        : `${method} ${url}: the loaded page's own request got no response within ${timeout} ms of being sent`
     );
     this.name = 'ReadAfterNavigationTimeoutError';
   }
@@ -62,12 +70,18 @@ export async function observeReadAfterNavigation(
   }: { method: 'GET' | 'POST'; url: string; timeout?: number }
 ): Promise<{ status: number; responseJson: unknown }> {
   const path = pathOfRead(url);
+  let documentRequested = false;
   let navigated = false;
-  const onNavigated = (frame: Frame) => {
-    if (frame === page.mainFrame()) navigated = true;
+  const onRequest = (candidate: Request) => {
+    if (candidate.isNavigationRequest() && candidate.frame() === page.mainFrame()) {
+      documentRequested = true;
+    }
   };
+  const onNavigated = (frame: Frame) => {
+    if (frame === page.mainFrame() && documentRequested) navigated = true;
+  };
+  page.on('request', onRequest);
   page.on('framenavigated', onNavigated);
-  const deadline = Date.now() + timeout;
   try {
     // playwright-utils deviation: interceptNetworkCall's observe mode latches onto the first matching request, whichever document sent it, and throws when that one gets no response.
     const request = await page
@@ -90,13 +104,15 @@ export async function observeReadAfterNavigation(
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => reject(new ReadAfterNavigationTimeoutError(method, url, 'response', timeout)),
-          Math.max(deadline - Date.now(), 0)
+          timeout
         );
       }),
     ]).finally(() => clearTimeout(timer));
     if (!response) throw new Error(`${method} ${url}: the loaded page's own read got no response`);
-    return { status: response.status(), responseJson: await response.json() };
+    const responseJson: unknown = await response.json().catch(() => null);
+    return { status: response.status(), responseJson };
   } finally {
+    page.off('request', onRequest);
     page.off('framenavigated', onNavigated);
   }
 }
