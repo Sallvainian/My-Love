@@ -27,6 +27,7 @@ vi.mock('../../stores/useAppStore', () => {
 });
 
 import { moodSyncService } from '../../api/moodSyncService';
+import { RETRY_CONFIG } from '../../api/realtimeRetry';
 import { useDatesChangedListener } from '../useDatesChangedListener';
 
 const subscribe = vi.mocked(moodSyncService.subscribePartnerEvents);
@@ -166,5 +167,47 @@ describe('useDatesChangedListener: what the broadcast cannot reach', () => {
     expect(state.loadEvents).toHaveBeenCalledTimes(1);
     expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(1);
     hook.unmount();
+  });
+
+  it('retries a subscribe that rejects once, then stays subscribed and re-reads on its first SUBSCRIBED', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const release = vi.fn<() => void>();
+      const failure = new Error('no channel');
+      subscribe.mockReset();
+      subscribe.mockRejectedValueOnce(failure).mockResolvedValue(release);
+
+      const hook = renderHook(() => useDatesChangedListener());
+      await act(async () => {});
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[useDatesChangedListener] Could not listen for date changes:',
+        failure
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RETRY_CONFIG.baseDelay);
+      });
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(release).not.toHaveBeenCalled();
+
+      // The start's own loads did not cover the time spent failing, so unlike a
+      // first join this one re-reads.
+      act(() => subscribe.mock.calls[1][0].onStatus!('SUBSCRIBED'));
+      expect(state.loadEvents).toHaveBeenCalledTimes(1);
+      expect(state.loadAnniversariesFromServer).toHaveBeenCalledTimes(1);
+
+      hook.unmount();
+      expect(release).toHaveBeenCalledTimes(1);
+      // Held, so nothing is attempted again.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RETRY_CONFIG.maxDelay);
+      });
+      expect(subscribe).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

@@ -58,7 +58,7 @@ vi.mock('@/api/supabaseClient', () => ({
   resolveSignedInUserForDelivery: (...args: unknown[]) => fakeResolveSignedInUser(...args),
 }));
 
-import { moodSyncService } from '@/api/moodSyncService';
+import { moodSyncService, type PartnerEventHandlers } from '@/api/moodSyncService';
 
 describe('subscribePartnerEvents channel ownership', () => {
   beforeEach(() => {
@@ -410,5 +410,149 @@ describe('a partner link made while the channel is open', () => {
     emitMood(channel, 'after-accept');
     expect(onMood).toHaveBeenCalledTimes(1);
     unsubscribe();
+  });
+});
+
+describe('a broadcast that lands while the partner snapshot is being re-read (DW-486)', () => {
+  const DAY_ID = '00000000-0000-4000-8000-0000000000d1';
+
+  beforeEach(() => {
+    resetRealtimeFake();
+  });
+
+  afterEach(async () => {
+    await teardownRealtimeFake();
+  });
+
+  /**
+   * Join, then start a RE-join whose `users` lookup is held open by the test.
+   * `answer` settles it, and resolves once the registry has acted on the answer.
+   */
+  async function rejoinWithLookupHeld(handlers: PartnerEventHandlers) {
+    const pending = moodSyncService.subscribePartnerEvents(handlers);
+    resolveNextSession();
+    const unsubscribe = await pending;
+    const channel = constructedChannels[0];
+
+    // The join itself. Everything after this is a re-join.
+    const joinChecked = nextLookupHandled('session');
+    emitStatus(channel, 'SUBSCRIBED');
+    await joinChecked;
+
+    let settle: (partnerId: string | null) => void = () => {};
+    let fail: (error: Error) => void = () => {};
+    getPartnerId.mockReturnValueOnce(
+      new Promise<string | null>((resolve, reject) => {
+        settle = resolve;
+        fail = reject;
+      })
+    );
+    const lookupAsked = nextLookupHandled('partner');
+    emitStatus(channel, 'SUBSCRIBED');
+    // The session check passes and the lookup is now in flight.
+    await vi.waitFor(() => expect(getPartnerId).toHaveBeenCalledTimes(2));
+
+    return {
+      channel,
+      unsubscribe,
+      answer: async (partnerId: string | null) => {
+        settle(partnerId);
+        await lookupAsked;
+      },
+      /** The `users` read fails on every attempt: an inconclusive answer. */
+      answerInconclusive: async () => {
+        fail(new Error('network down'));
+        await lookupAsked;
+      },
+    };
+  }
+
+  it('delivers a daily_pick once the lookup answers linked to that partner, and only then', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe, answer } = await rejoinWithLookupHeld({ daily_pick });
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+
+    await answer(PARTNER_ID);
+
+    expect(daily_pick).toHaveBeenCalledTimes(1);
+    expect(daily_pick).toHaveBeenCalledWith({ event: 'daily_pick', day_id: DAY_ID });
+    unsubscribe();
+  });
+
+  it('drops a daily_pick once the lookup answers unlinked', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe, answer } = await rejoinWithLookupHeld({ daily_pick });
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    await answer(null);
+
+    expect(daily_pick).not.toHaveBeenCalled();
+    // And the snapshot it wrote stays null for what follows.
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it('holds a daily_nudge and a mood the same way, and keeps their order', async () => {
+    const order: string[] = [];
+    const { channel, unsubscribe, answer } = await rejoinWithLookupHeld({
+      daily_pick: () => order.push('daily_pick'),
+      daily_nudge: () => order.push('daily_nudge'),
+      new_mood: () => order.push('new_mood'),
+    });
+
+    emitEvent(channel, 'daily_nudge', { day_id: DAY_ID });
+    emitMood(channel, 'during-refresh');
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(order).toEqual([]);
+
+    await answer(PARTNER_ID);
+
+    expect(order).toEqual(['daily_nudge', 'new_mood', 'daily_pick']);
+    unsubscribe();
+  });
+
+  it('delivers what it held against the restored snapshot when the lookup is inconclusive', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe, answerInconclusive } = await rejoinWithLookupHeld({ daily_pick });
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+
+    // A failed read restores the partner it cleared, as it does for a mood.
+    await answerInconclusive();
+
+    expect(daily_pick).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('does not hold dates_changed or partner_linked, which carry nothing to check', async () => {
+    const partner_linked = vi.fn();
+    const dates_changed = vi.fn();
+    const { channel, unsubscribe, answer } = await rejoinWithLookupHeld({
+      partner_linked,
+      dates_changed,
+    });
+
+    emitEvent(channel, 'dates_changed');
+    emitEvent(channel, 'partner_linked');
+    expect(dates_changed).toHaveBeenCalledTimes(1);
+    expect(partner_linked).toHaveBeenCalledTimes(1);
+
+    await answer(PARTNER_ID);
+    unsubscribe();
+  });
+
+  it('drops what it held when every consumer detached before the lookup answered', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe, answer } = await rejoinWithLookupHeld({ daily_pick });
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    unsubscribe();
+    await answer(PARTNER_ID);
+
+    expect(daily_pick).not.toHaveBeenCalled();
   });
 });

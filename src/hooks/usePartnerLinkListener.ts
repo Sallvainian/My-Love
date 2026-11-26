@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { moodSyncService } from '../api/moodSyncService';
+import { listenToPartnerEvents } from '../api/listenToPartnerEvents';
 import { resolvePartnerLookupForDelivery } from '../api/supabaseClient';
 import { useAppStore } from '../stores/useAppStore';
 
@@ -75,15 +75,14 @@ export function usePartnerLinkListener(): void {
     if (!listening) return;
 
     let active = true;
-    let unsubscribe: (() => void) | null = null;
 
     const reloadPartner = () => {
       void loadPartner();
       void loadPendingRequests();
     };
 
-    moodSyncService
-      .subscribePartnerEvents({
+    const stop = listenToPartnerEvents(
+      {
         // Moods are for the screens that show them; this subscriber only waits
         // for the link.
         onStatus: (status) => {
@@ -99,21 +98,13 @@ export function usePartnerLinkListener(): void {
         partner_linked: () => {
           if (active) reloadPartner();
         },
-      })
-      .then((release) => {
-        if (!active) {
-          release();
-          return;
-        }
-        unsubscribe = release;
-      })
-      .catch((error: unknown) => {
-        console.error('[usePartnerLinkListener] Could not listen for a partner link:', error);
-      });
+      },
+      { failureMessage: '[usePartnerLinkListener] Could not listen for a partner link:' }
+    );
 
     return () => {
       active = false;
-      unsubscribe?.();
+      stop();
     };
   }, [listening, session, loadPartner, loadPendingRequests]);
 }
