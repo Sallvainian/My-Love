@@ -424,6 +424,31 @@ describe('a broadcast that lands while the partner snapshot is being re-read (DW
     await teardownRealtimeFake();
   });
 
+  /** The next `users` partner read stays open until the test settles or fails it. */
+  function holdNextPartnerLookup() {
+    let settle: (partnerId: string | null) => void = () => {};
+    let fail: (error: Error) => void = () => {};
+    getPartnerId.mockReturnValueOnce(
+      new Promise<string | null>((resolve, reject) => {
+        settle = resolve;
+        fail = reject;
+      })
+    );
+    return { settle: (partnerId: string | null) => settle(partnerId), fail: (error: Error) => fail(error) };
+  }
+
+  /** Join, and let the first SUBSCRIBED finish its session check. */
+  async function joinLinked(handlers: PartnerEventHandlers) {
+    const pending = moodSyncService.subscribePartnerEvents(handlers);
+    resolveNextSession();
+    const unsubscribe = await pending;
+    const channel = constructedChannels[0];
+    const joinChecked = nextLookupHandled('session');
+    emitStatus(channel, 'SUBSCRIBED');
+    await joinChecked;
+    return { channel, unsubscribe };
+  }
+
   /**
    * Join, then start a RE-join whose `users` lookup is held open by the test.
    * `answer` settles it, and resolves once the registry has acted on the answer.
@@ -439,14 +464,7 @@ describe('a broadcast that lands while the partner snapshot is being re-read (DW
     emitStatus(channel, 'SUBSCRIBED');
     await joinChecked;
 
-    let settle: (partnerId: string | null) => void = () => {};
-    let fail: (error: Error) => void = () => {};
-    getPartnerId.mockReturnValueOnce(
-      new Promise<string | null>((resolve, reject) => {
-        settle = resolve;
-        fail = reject;
-      })
-    );
+    const held = holdNextPartnerLookup();
     const lookupAsked = nextLookupHandled('partner');
     emitStatus(channel, 'SUBSCRIBED');
     // The session check passes and the lookup is now in flight.
@@ -456,12 +474,12 @@ describe('a broadcast that lands while the partner snapshot is being re-read (DW
       channel,
       unsubscribe,
       answer: async (partnerId: string | null) => {
-        settle(partnerId);
+        held.settle(partnerId);
         await lookupAsked;
       },
       /** The `users` read fails on every attempt: an inconclusive answer. */
       answerInconclusive: async () => {
-        fail(new Error('network down'));
+        held.fail(new Error('network down'));
         await lookupAsked;
       },
     };
@@ -554,5 +572,132 @@ describe('a broadcast that lands while the partner snapshot is being re-read (DW
     await answer(PARTNER_ID);
 
     expect(daily_pick).not.toHaveBeenCalled();
+  });
+
+  it('holds a daily_pick that lands while a partner_linked refresh reads the partner', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe } = await joinLinked({ daily_pick });
+
+    const held = holdNextPartnerLookup();
+    const lookupAsked = nextLookupHandled('partner');
+    emitEvent(channel, 'partner_linked');
+    await vi.waitFor(() => expect(getPartnerId).toHaveBeenCalledTimes(2));
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+
+    held.settle(PARTNER_ID);
+    await lookupAsked;
+
+    expect(daily_pick).toHaveBeenCalledTimes(1);
+    expect(daily_pick).toHaveBeenCalledWith({ event: 'daily_pick', day_id: DAY_ID });
+    unsubscribe();
+  });
+
+  it('holds a daily_pick that lands while refreshPartnerSnapshots reads the partner', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe } = await joinLinked({ daily_pick });
+
+    const held = holdNextPartnerLookup();
+    const refreshed = moodSyncService.refreshPartnerSnapshots();
+    await vi.waitFor(() => expect(getPartnerId).toHaveBeenCalledTimes(2));
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+
+    held.settle(PARTNER_ID);
+    await refreshed;
+
+    expect(daily_pick).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('drops a held daily_pick when the session lookup answers another account', async () => {
+    const daily_pick = vi.fn();
+    const { channel, unsubscribe } = await joinLinked({ daily_pick });
+
+    let answerSession: (userId: string | null) => void = () => {};
+    getSignedInUserId.mockReturnValueOnce(
+      new Promise<string | null>((resolve) => {
+        answerSession = resolve;
+      })
+    );
+    const sessionChecked = nextLookupHandled('session');
+    emitStatus(channel, 'SUBSCRIBED');
+
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+
+    answerSession(OUTSIDER_ID);
+    await sessionChecked;
+
+    expect(daily_pick).not.toHaveBeenCalled();
+    // The channel stays muted for what follows.
+    emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+    expect(daily_pick).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  describe('when two refreshes overlap', () => {
+    /** A re-join whose lookup is held, then a second refresh started while it is. */
+    async function overlappingRefreshes(handlers: PartnerEventHandlers) {
+      const { channel, unsubscribe } = await joinLinked(handlers);
+
+      const first = holdNextPartnerLookup();
+      emitStatus(channel, 'SUBSCRIBED');
+      await vi.waitFor(() => expect(getPartnerId).toHaveBeenCalledTimes(2));
+
+      const second = holdNextPartnerLookup();
+      const secondAsked = nextLookupHandled('partner');
+      emitStatus(channel, 'SUBSCRIBED');
+      await vi.waitFor(() => expect(getPartnerId).toHaveBeenCalledTimes(3));
+
+      return { channel, unsubscribe, first, second, secondAsked };
+    }
+
+    it('stops holding once the newer refresh has settled, however slow the older one is', async () => {
+      const daily_pick = vi.fn();
+      const { channel, unsubscribe, first, second, secondAsked } = await overlappingRefreshes({ daily_pick });
+
+      emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+      expect(daily_pick).not.toHaveBeenCalled();
+
+      second.settle(PARTNER_ID);
+      await secondAsked;
+      // The held one goes out now, with the older lookup still open ...
+      expect(daily_pick).toHaveBeenCalledTimes(1);
+
+      // ... and so does one that arrives afterwards.
+      emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+      expect(daily_pick).toHaveBeenCalledTimes(2);
+
+      // The older lookup answers late with a stale unlink: it writes nothing.
+      first.settle(null);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+      expect(daily_pick).toHaveBeenCalledTimes(3);
+      unsubscribe();
+    });
+
+    it('restores the last settled partner, not the null the first refresh left, when the newer lookup is inconclusive', async () => {
+      const daily_pick = vi.fn();
+      const { channel, unsubscribe, first, second, secondAsked } = await overlappingRefreshes({ daily_pick });
+
+      emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+
+      second.fail(new Error('network down'));
+      await secondAsked;
+
+      expect(daily_pick).toHaveBeenCalledTimes(1);
+      emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+      expect(daily_pick).toHaveBeenCalledTimes(2);
+
+      // The older lookup failing late changes nothing either.
+      first.fail(new Error('network down'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      emitEvent(channel, 'daily_pick', { day_id: DAY_ID });
+      expect(daily_pick).toHaveBeenCalledTimes(3);
+      unsubscribe();
+    });
   });
 });

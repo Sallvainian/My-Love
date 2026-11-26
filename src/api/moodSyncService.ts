@@ -127,16 +127,31 @@ interface MoodChannelEntry {
    */
   reopenTimer: ReturnType<typeof setTimeout> | null;
   /**
-   * Partner-snapshot refreshes running right now (a re-join, a
-   * `partner_linked`, `refreshPartnerSnapshots`). While it is above zero
-   * `partnerId` is null or about to change, so a broadcast that depends on it
-   * is parked in `held` rather than parsed against that.
+   * Generation of the newest partner-snapshot refresh (a re-join, a
+   * `partner_linked`, `refreshPartnerSnapshots`). Each refresh takes the next
+   * number when it starts and, after every await, stops if a newer one has
+   * started: only the newest refresh writes `partnerId` or releases `held`, so
+   * a slow older one cannot delay or overwrite what a newer one already settled.
    */
-  refreshesInFlight: number;
+  refreshGen: number;
+  /**
+   * Whether the newest refresh is still running. While it is, `partnerId` is
+   * null or about to change, so a broadcast that depends on it is parked in
+   * `held` rather than parsed against that.
+   */
+  refreshPending: boolean;
+  /**
+   * The last snapshot a refresh (or the join) settled on, or null for an
+   * unlink or an account change. `partnerId` is cleared while a refresh runs,
+   * so an inconclusive lookup restores THIS, not the live value: a second
+   * refresh would otherwise read the null the first one left and restore that.
+   */
+  settledPartnerId: string | null;
   /**
    * Broadcasts that arrived while a refresh ran, in arrival order. Dispatched
-   * by the last refresh to settle, against the snapshot it wrote: delivered
-   * when that answers the sender is the partner, dropped when it does not.
+   * by the newest refresh when it settles, against the snapshot it wrote:
+   * delivered when that answers the sender is the partner, dropped when it does
+   * not.
    */
   held: HeldBroadcast[];
 }
@@ -160,9 +175,11 @@ const SNAPSHOT_EVENTS: ReadonlySet<PartnerEventName> = new Set([
 ]);
 
 /**
- * Most broadcasts one refresh will hold. A refresh ends within the lookup's
- * bounded retries, so this is a guard against a burst, not a working limit;
- * past it the oldest is dropped, which is the same as the old behaviour.
+ * Most broadcasts a refresh will hold. The lookup's retries are bounded in
+ * number, not in time: a request that stalls holds the refresh for as long as
+ * the platform lets it hang. So this is the guard against a burst during that
+ * wait, not a working limit; past it the oldest is dropped, which is the same
+ * as the old behaviour.
  */
 const MAX_HELD_BROADCASTS = 50;
 
@@ -563,17 +580,24 @@ class MoodSyncService {
     // between here and the new value, and a broadcast arriving in that window
     // would otherwise be authorized against the snapshot being replaced — the
     // ex-partner, which is exactly who this refresh exists to stop.
-    const previous = entry.partnerId;
     entry.partnerId = null;
 
-    // Counted in the same tick as the clear, so no broadcast can be parsed
+    // Held from the same tick as the clear, so no broadcast can be parsed
     // against the cleared value; DW-486. A broadcast that arrives in the
-    // window is held, not dropped: the refresh settles in `finally`, in the
-    // same tick as the write below, and dispatches what it held against the
-    // snapshot it wrote.
-    entry.refreshesInFlight++;
+    // window is held, not dropped: the newest refresh settles in `finally`, in
+    // the same tick as its write below, and dispatches what was held against
+    // the snapshot it wrote. An older refresh that is still running when a newer
+    // one starts finds `refreshGen` moved on and does nothing more, so a slow
+    // first lookup cannot hold broadcasts the second has already answered for.
+    const gen = ++entry.refreshGen;
+    entry.refreshPending = true;
     try {
-      if (!(await this.verifyChannelOwner(entry))) return;
+      const ownerHolds = await this.verifyChannelOwner(entry);
+      if (gen !== entry.refreshGen) return;
+      if (!ownerHolds) return;
+
+      const lookup = await resolvePartnerLookupForDelivery();
+      if (gen !== entry.refreshGen) return;
 
       // An INCONCLUSIVE lookup restores what the clear above removed. The retry
       // narrows how often that happens but cannot remove it: exhausting every
@@ -584,15 +608,17 @@ class MoodSyncService {
       // restored window: `couple_broadcast_partner_can_send` pins the send on
       // `get_my_partner_id()`, so after a real unlink the server refuses their
       // insert and there is no broadcast for this snapshot to admit.
-      const lookup = await resolvePartnerLookupForDelivery();
       if (lookup.status === 'error') {
-        entry.partnerId = previous;
+        entry.partnerId = entry.settledPartnerId;
         return;
       }
-      entry.partnerId = lookup.status === 'linked' ? lookup.partnerId : null;
+      entry.settledPartnerId = lookup.status === 'linked' ? lookup.partnerId : null;
+      entry.partnerId = entry.settledPartnerId;
     } finally {
-      entry.refreshesInFlight--;
-      if (entry.refreshesInFlight === 0) this.releaseHeldBroadcasts(entry);
+      if (gen === entry.refreshGen) {
+        entry.refreshPending = false;
+        this.releaseHeldBroadcasts(entry);
+      }
     }
   }
 
@@ -655,6 +681,7 @@ class MoodSyncService {
       // Mute explicitly: on the first-join path nothing has cleared it, and
       // this entry's snapshot belongs to an account that is no longer here.
       entry.partnerId = null;
+      entry.settledPartnerId = null;
       return false;
     }
 
@@ -736,7 +763,7 @@ class MoodSyncService {
     // The snapshot is being re-taken: hold the broadcast for the refresh to
     // dispatch once it has settled, instead of checking it against a snapshot
     // that is cleared or about to change.
-    if (entry.refreshesInFlight > 0 && SNAPSHOT_EVENTS.has(name)) {
+    if (entry.refreshPending && SNAPSHOT_EVENTS.has(name)) {
       if (entry.held.length >= MAX_HELD_BROADCASTS) {
         entry.held.shift();
         logger.debug('[MoodSyncService] Held-broadcast limit reached; dropped the oldest');
@@ -888,7 +915,9 @@ class MoodSyncService {
       partnerId: entry.partnerId,
       closedRetryCount: entry.closedRetryCount,
       reopenTimer: null,
-      refreshesInFlight: 0,
+      refreshGen: 0,
+      refreshPending: false,
+      settledPartnerId: entry.settledPartnerId,
       held: [],
     };
     this.moodChannels.set(topic, replacement);
@@ -1018,7 +1047,9 @@ class MoodSyncService {
         partnerId: partnerIdAtJoin,
         closedRetryCount: 0,
         reopenTimer: null,
-        refreshesInFlight: 0,
+        refreshGen: 0,
+        refreshPending: false,
+        settledPartnerId: partnerIdAtJoin,
         held: [],
       };
 
@@ -1051,6 +1082,7 @@ class MoodSyncService {
     // at all.
     if (partnerIdAtJoin) {
       entry.partnerId = partnerIdAtJoin;
+      entry.settledPartnerId = partnerIdAtJoin;
     }
 
     entry.subscribers.add(subscriber);
