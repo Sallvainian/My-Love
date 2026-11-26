@@ -52,6 +52,7 @@ import {
   DAILY_PICK_SEND,
   SECOND_CONTEXT_READ_TIMEOUT,
 } from '../support/helpers/reads';
+import { waitClearOfDailyTurns } from '../support/helpers/events';
 import { trackReads } from '../support/helpers/request-tracker';
 import { dismissWelcomeSplash } from '../support/helpers/welcome-splash';
 
@@ -330,7 +331,7 @@ test.describe('Live Daily check', () => {
   test('[P0] the bot pair sees one question, a hidden pick, a nudge, the reveal on the second pick, and the day on Partner', async ({
     browser,
     baseURL,
-  }) => {
+  }, testInfo) => {
     const passwordA = requireEnv(BOT_A_PASSWORD_VAR);
     const passwordB = requireEnv(BOT_B_PASSWORD_VAR);
     const target = resolveTarget();
@@ -354,6 +355,11 @@ test.describe('Live Daily check', () => {
       const b: Bot = { ...botB, id: await signInBot(target, botB) };
 
       await ensureLinked(target, a, b);
+
+      // The bots' day and nudge slot turn at 00:00 and 20:00 UTC (both store
+      // UTC). The guard waits on the host clock's turns, which are those in the
+      // deploy job (its runner is on UTC); wait past one before the reset.
+      await waitClearOfDailyTurns(testInfo);
 
       for (const bot of [a, b]) {
         const { error } = await bot.client.rpc('reset_bot_daily_days');
