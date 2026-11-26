@@ -8,6 +8,7 @@ companions: ["_bmad-output/initiative-my-love/architecture-daily-question/archit
 after: []
 refined: true
 risk: high
+status: done
 ---
 
 # Daily Pushes and Nudge
@@ -53,12 +54,11 @@ R8 (retrospective, Action items 9; DW-487, DW-509): A failed read of a saved cop
 
 ## Done when
 
-- Each of the five push kinds has arrived on the owner's iPhone in the iOS shell, 8 AM and 8 PM on the recipient's own clock. The owner reports it at closure; it is no story's step.
 - A nudge, offered after the pick or sent from the waiting screen, pushes the partner, and a third nudge on one day is refused.
 - The partner-picked push never shows the pick.
 - Turning a new kind's Settings switch off stops that push.
 - Date reminders still fire after a re-plan while the daily pushes are scheduled: `dateReminders.ts` is unchanged and its tests pass.
-- Shipped to production through `deploy.yml`, and on the hosted database both cron jobs are listed and their last runs succeeded. No native code changes are needed, so no reinstall.
+- Shipped to production through `deploy.yml`, and on the hosted database both cron jobs are listed and active. No native code changes are needed, so no reinstall.
 
 ## Boundaries
 
@@ -93,4 +93,5 @@ R8 (retrospective, Action items 9; DW-487, DW-509): A failed read of a saved cop
 - Decision: 2026-11-25 declined by the PO: an epic PRD. The initiative, the spine and the mock-up answer how the pushes and the nudge work; the remaining choices are copy and layout, put to the owner.
 - Decision: 2026-11-25 the spine at `1e5f8ea1` settles what this epic handed to Winston: AD-10 sends `daily_both_answered` on every second pick with "That day counts." when the day is not the recipient's current date, and gives the nudge and both 8 PM reminders the default sound; AD-9 makes `daily_reminders.day_id` not null with both slots assigning the day; AD-15 lists `user_local_date`; AD-13 binds epic 8 and keeps `nudge.spent` from moving back within one slot; the State row and layer diagram name `dailyDaySlice.ts`, `dailyStreakSlice.ts` and `dailyHistorySlice.ts`, and AD-12 names `dailyDaySlice`. AD-10's closed-day Source conflict is closed. Stories 1, 3, 6, 7 and 8 were re-sliced against that wording, ids and order kept, and AD-13 joins the Constraints.
 - Decision: 2026-11-25 when `send_daily_nudge` refuses or the request fails, the waiting card broadcasts nothing, shows "Your nudge could not be sent." in its failure box as a refused pick does, and Daily re-reads the day so the button follows the server; offline the button stays enabled and a tap shows `offlineMessage`, and the after-pick sheet shows the same line on a refusal (PO's pick, owner approved). Also approved from the set check: story 3 covers the text and sound part of R2, R3 and R5 and checks an off switch spares other kinds and the partner; story 7 checks the snapshot's `nudge`; story 9 skips the sheet when the slot is null; story 11's writer answers No thanks.
-
+- Decision: 2026-11-26 (owner) two `Done when` lines reconciled before closure. The iPhone line is dropped: the push kinds are covered by the api and E2E specs, and device delivery was proven in story 3.13. The cron line no longer asks that both jobs' last runs succeeded: `daily-reminders` has succeeded runs, and `daily-reminders-run-history` is listed and active.
+- Decision: 2026-11-26 (owner) closed with the retrospective's verdict, accepted-with-open-items (`epic-daily-pushes-and-nudge-retrospective.md`). The nudge line is met for partners on one clock. DW-532's cross-clock third nudge is left to the follow-up backlog story "simplify the daily pushes and nudges", which replaces the two slots with one nudge per daily question.
