@@ -111,6 +111,15 @@ describe('sendDailyNudge', () => {
     });
   });
 
+  it('grows the shown answers when the nudged day is on screen (DW-491)', async () => {
+    sendDailyNudgeRequest.mockResolvedValue(nudgeSnapshot('after_pick', true));
+
+    await state().sendDailyNudge();
+
+    expect(state().dailyDayAnswers).toBe(1);
+    expect(state().dailyDayAnsweredId).toBe(DAY_ID);
+  });
+
   it('logs a failed broadcast and still resolves', async () => {
     sendDailyNudgeRequest.mockResolvedValue(nudgeSnapshot('after_pick', true));
     const failure = new Error('Unauthorized');

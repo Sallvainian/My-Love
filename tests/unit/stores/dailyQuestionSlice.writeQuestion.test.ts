@@ -116,6 +116,24 @@ describe('submitWrittenQuestion', () => {
     expect(saved?.[DAY_ID]).toEqual({ ...done(), partner_id: KNOWN_PARTNER_ID });
   });
 
+  it('grows the shown answers with the day the answer showed (DW-491)', async () => {
+    submitWrittenQuestionRequest.mockResolvedValue(done());
+
+    await state().submitWrittenQuestion('a', 'b');
+
+    expect(state().dailyDayAnswers).toBe(1);
+    expect(state().dailyDayAnsweredId).toBe(DAY_ID);
+  });
+
+  it('leaves the shown answers as they were when the request is refused (DW-491)', async () => {
+    submitWrittenQuestionRequest.mockRejectedValue(new AccountDataError('refused', 'No'));
+
+    await expect(state().submitWrittenQuestion('Tea', 'tea')).rejects.toThrow('No');
+
+    expect(state().dailyDayAnswers).toBe(0);
+    expect(state().dailyDayAnsweredId).toBeNull();
+  });
+
   it('does not let the answer undo a higher state', async () => {
     useAppStore.setState({
       dailyDay: ok(writerSnapshot('this', { state: 'both', partner_choice: 'that', same: false })),

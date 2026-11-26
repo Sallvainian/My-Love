@@ -23,6 +23,9 @@
  *   exists. Throws.
  * - `removeQueuedPick(userId, dayId)` — delete one row. Deleting an absent row
  *   is a no-op. Throws.
+ * - `removeFailedQueuedPicksExcept(userId, dayId)` — delete that account's
+ *   `failed` rows for every day but `dayId`; never a pending row, never another
+ *   account's. Resolves the number deleted. Throws.
  *
  * ## Queue rules
  *
@@ -34,7 +37,10 @@
  *   pick is committed. A server refusal marks the row `failed` instead; any
  *   other failure leaves it pending for the next drain trigger.
  * - FAILED rows are not pending: the view gives the pick control back, and a
- *   new pick for that day replaces the row.
+ *   new pick for that day replaces the row. Once the server has answered for
+ *   today, `loadDailyDay` prunes the account's failed rows for other days
+ *   (`removeFailedQueuedPicksExcept`): nothing shows them, and no new pick can
+ *   replace them.
  * - ACCOUNTS. Sign-out keeps an account's rows; they send when that account
  *   signs back in. `deleteAccountData` never touches this store.
  * - Queued picks are never written to the `daily-days` local copy.
@@ -121,4 +127,21 @@ export async function markQueuedPickFailed(
 export async function removeQueuedPick(userId: string, dayId: string): Promise<void> {
   const db = await getDb();
   await db.delete(STORE_NAMES.PICK_QUEUE, [userId, dayId]);
+}
+
+/**
+ * Delete `userId`'s `failed` rows for every day but `dayId`. A pending row and
+ * another account's row are never touched. Resolves the number of rows deleted.
+ * Throws on failure.
+ */
+export async function removeFailedQueuedPicksExcept(
+  userId: string,
+  dayId: string
+): Promise<number> {
+  const db = await getDb();
+  const tx = db.transaction(STORE_NAMES.PICK_QUEUE, 'readwrite');
+  const rows = await tx.store.index('by-user').getAll(userId);
+  const stale = rows.filter((row) => row.failed && row.day_id !== dayId);
+  await Promise.all([...stale.map((row) => tx.store.delete([row.user_id, row.day_id])), tx.done]);
+  return stale.length;
 }
