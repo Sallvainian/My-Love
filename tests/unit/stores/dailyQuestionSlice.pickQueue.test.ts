@@ -508,6 +508,9 @@ describe('drainQueuedPicks', () => {
     expect(announceDailyPick).toHaveBeenCalledTimes(1);
     expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
     expect(await copy()).toBeNull();
+    expect(loadCoupleStreak).not.toHaveBeenCalled();
+    expect(state().dailyDay).toBeNull();
+    expect(state().dailyQueuedPicks).toEqual([]);
   });
 
   it('sign-out during the send: the row goes and nothing is announced', async () => {

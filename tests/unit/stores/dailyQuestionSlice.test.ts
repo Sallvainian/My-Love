@@ -740,11 +740,10 @@ describe('submitDailyPick', () => {
   it('announces the confirmed pick after a same-account re-login during the send', async () => {
     const request = deferred<ReturnType<typeof waitingSnapshot>>();
     submitDailyPickRequest.mockReturnValue(request.promise);
-    const account = state().userId as string;
 
     const submit = state().submitDailyPick('this');
     state().clearAuth();
-    state().setAuthUser(account);
+    state().setAuthUser(A);
     request.settle(waitingSnapshot('this'));
     await submit;
 
@@ -758,7 +757,7 @@ describe('submitDailyPick', () => {
 
     const submit = state().submitDailyPick('this');
     state().clearAuth();
-    state().setAuthUser('USER-OTHER-ID');
+    state().setAuthUser(C);
     request.settle(waitingSnapshot('this'));
     await submit;
 

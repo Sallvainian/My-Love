@@ -41,12 +41,16 @@
  * rows, oldest first, under `PICK_QUEUE_LOCK`, on start and on `online`
  * (`App.tsx`). A confirmed row is removed and announced as above; a refusal
  * (`isPickRefusal`) marks it failed with its message; any other failure leaves
- * it pending, and a pass that stops that way while online is retried on a
- * backoff (5 s, 10 s, 20 s, 40 s, then every 60 s) until a pass completes; a
- * session change cancels it, and offline the `online` event drains instead.
+ * it pending, and a pass that stops that way while online, or that waited out
+ * another tab's lock and still finds pending rows, is retried on a backoff
+ * (5 s, 10 s, 20 s, 40 s, then every 60 s) until a pass completes; a session
+ * change cancels it, and offline the `online` event drains instead.
  * `dailyQueuedPicks` mirrors the account's rows for the view. A
  * queued pick never enters `dailyDay` or the copy, so the reveal shows only
  * from a server snapshot. The rows survive sign-out; only the field is cleared.
+ * A `failed` row is never sent again: an `ok` answer for the device's date
+ * deletes the signed-in account's `failed` rows for other days (never a
+ * pending row, never another account's).
  *
  * The day's writer is asked to write tomorrow's question (AD-4, AD-13):
  * `submitWrittenQuestion` sends it and merges the returned snapshot (whose
@@ -142,7 +146,11 @@ export interface DailyDaySlice {
   /** The `day_id`s whose write prompt this account declined on this device. */
   dailyWriteDeclined: string[];
 
-  /** Read today's day from the server. Never throws; a failure keeps what is shown. */
+  /**
+   * Read today's day from the server. Never throws; a failure keeps what is
+   * shown. An `ok` answer for the device's date also deletes the signed-in
+   * account's `failed` queued picks for other days.
+   */
   loadDailyDay: () => Promise<void>;
   /**
    * Re-read one day by id (a partner's `daily_pick` named it) and merge the
@@ -197,8 +205,8 @@ export interface DailyDaySlice {
 type DrainPassOutcome = 'done' | 'transient' | 'stale' | 'offline' | 'other-tab' | 'failed';
 
 /**
- * After a pass stops on a transient failure while online, the drain runs
- * again after 5 s, 10 s, 20 s and 40 s, then every 60 s, until a pass
+ * After a pass stops on a transient failure while online, or waits out another
+ * tab's lock and still finds pending rows, the drain runs again after 5 s, 10 s, 20 s and 40 s, then every 60 s, until a pass
  * completes. Offline, the `online` event triggers it instead.
  */
 const PICK_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000];
@@ -286,7 +294,8 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   let drainInFlight: Promise<void> | null = null;
   let drainRequested = false;
 
-  // The retry after a pass stops on a transient failure while online. One timer
+  // The retry after a pass stops on a transient failure while online, or ends
+  // 'other-tab' (pending rows remain after another tab's lock let go). One timer
   // at a time; `retryAttempt` picks its delay and resets on a completed pass.
   // `retryFor` is the session it was set for: any change of account or session
   // cancels it (the subscription below), and a timer that fires anyway
@@ -625,8 +634,9 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
             outcome = await drainOnce();
           } while (drainRequested);
 
-          // A transient stop while online retries on a backoff; a completed
-          // pass resets it. Known offline, the `online` event drains instead.
+          // A transient stop, or an other-tab pass that left pending rows, while
+          // online retries on a backoff; a completed pass resets it. Known
+          // offline, the `online` event drains instead.
           const { userId, authSessionVersion } = get();
           if (outcome === 'done' || outcome === 'offline') {
             cancelDrainRetry();
