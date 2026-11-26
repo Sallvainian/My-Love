@@ -51,6 +51,11 @@ const ROW = {
   partner_requests: true,
   dates: true,
   date_reminders: true,
+  daily_question: true,
+  daily_partner_picked: true,
+  daily_nudge: true,
+  daily_reminder: true,
+  daily_both_answered: true,
 };
 
 function argsOf(method: string, index = 0) {
@@ -76,6 +81,11 @@ describe('fetchPushPreferences', () => {
       partnerRequests: true,
       dates: true,
       dateReminders: true,
+      dailyQuestion: true,
+      dailyPartnerPicked: true,
+      dailyNudge: true,
+      dailyReminder: true,
+      dailyBothAnswered: true,
     });
     expect(calls[0].table).toBe('push_preferences');
     expect(argsOf('eq')).toEqual([['user_id', 'USER-A']]);
@@ -90,6 +100,40 @@ describe('fetchPushPreferences', () => {
     expect(columns.split(', ')).toContain('dates');
     expect(columns).toContain('date_reminders');
     expect(read.dates).toBe(false);
+  });
+
+  it('selects the five daily columns and maps each', async () => {
+    results.push({
+      data: {
+        ...ROW,
+        daily_question: false,
+        daily_partner_picked: true,
+        daily_nudge: false,
+        daily_reminder: true,
+        daily_both_answered: false,
+      },
+      error: null,
+    });
+
+    const read = await pushPreferencesService.fetchPushPreferences('USER-A');
+
+    const [[columns]] = argsOf('select') as [[string]];
+    expect(columns.split(', ')).toEqual(
+      expect.arrayContaining([
+        'daily_question',
+        'daily_partner_picked',
+        'daily_nudge',
+        'daily_reminder',
+        'daily_both_answered',
+      ])
+    );
+    expect(read).toMatchObject({
+      dailyQuestion: false,
+      dailyPartnerPicked: true,
+      dailyNudge: false,
+      dailyReminder: true,
+      dailyBothAnswered: false,
+    });
   });
 
   it('reads a missing row as every switch on', async () => {
@@ -126,6 +170,11 @@ describe('savePushPreference', () => {
     ['pokesAndKisses', 'pokes_and_kisses'],
     ['partnerRequests', 'partner_requests'],
     ['dateReminders', 'date_reminders'],
+    ['dailyQuestion', 'daily_question'],
+    ['dailyPartnerPicked', 'daily_partner_picked'],
+    ['dailyNudge', 'daily_nudge'],
+    ['dailyReminder', 'daily_reminder'],
+    ['dailyBothAnswered', 'daily_both_answered'],
   ];
 
   it.each(COLUMNS)('%s upserts user_id and %s alone, on user_id', async (key, column) => {

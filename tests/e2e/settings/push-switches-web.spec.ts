@@ -44,6 +44,7 @@ test.describe('Settings notifications on the web', () => {
     await expect(page.getByTestId('settings-push')).toHaveCount(0);
     await expect(view.getByRole('heading', { name: 'Push and reminders' })).toHaveCount(0);
     await expect(view.getByRole('switch', { name: 'Love notes' })).toHaveCount(0);
+    await expect(view.getByRole('switch', { name: 'New question' })).toHaveCount(0);
     await expect(page.getByTestId('settings-push-permission-off')).toHaveCount(0);
     await expect(page.getByTestId('settings-reminder-marks')).toHaveCount(0);
     await expect(view.getByRole('heading', { name: 'Reminders', exact: true })).toHaveCount(0);

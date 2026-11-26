@@ -1,10 +1,11 @@
 /**
  * NotificationsPage — Settings > Notifications (`/settings/notifications`):
- * a switch for each kind of push, and below them the "Reminders" group with
- * the Date reminders switch. The page is registered in `SUBPAGES` with
- * `available: hasNativePush`, so the website, the Home Screen web app and a
- * shell installed before the push plugins existed never reach it, and nothing
- * here reads `push_preferences` there.
+ * a switch for each kind of push (the five Daily ones last: New question,
+ * Partner picked, Nudges, Evening reminder, Both answered), and below them
+ * the "Reminders" group with the Date reminders switch. The page is
+ * registered in `SUBPAGES` with `available: hasNativePush`, so the website,
+ * the Home Screen web app and a shell installed before the push plugins
+ * existed never reach it, and nothing here reads `push_preferences` there.
  *
  * The switches are the account's `push_preferences` row, loaded when the page
  * opens (`notificationsSlice.loadPushPreferences`) and written one column at a
@@ -31,10 +32,15 @@
 
 import {
   Bell,
+  BellRing,
   CalendarHeart,
+  CircleCheck,
   Hand,
+  HeartHandshake,
   Image as ImageIcon,
   MessageCircleHeart,
+  MessageCircleQuestionMark,
+  Moon,
   Smile,
   UserPlus,
   type LucideIcon,
@@ -71,6 +77,26 @@ const ROWS: readonly PushRow[] = [
     testId: 'partner-requests',
     icon: UserPlus,
     label: 'Partner requests',
+  },
+  {
+    key: 'dailyQuestion',
+    testId: 'new-question',
+    icon: MessageCircleQuestionMark,
+    label: 'New question',
+  },
+  {
+    key: 'dailyPartnerPicked',
+    testId: 'partner-picked',
+    icon: CircleCheck,
+    label: 'Partner picked',
+  },
+  { key: 'dailyNudge', testId: 'nudges', icon: BellRing, label: 'Nudges' },
+  { key: 'dailyReminder', testId: 'evening-reminder', icon: Moon, label: 'Evening reminder' },
+  {
+    key: 'dailyBothAnswered',
+    testId: 'both-answered',
+    icon: HeartHandshake,
+    label: 'Both answered',
   },
 ];
 

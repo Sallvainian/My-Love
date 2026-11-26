@@ -140,6 +140,13 @@ describe('Settings: the Notifications row', () => {
     expect(await screen.findByRole('button', { name: 'Notifications, Some' })).toBeInTheDocument();
   });
 
+  it('reads Some when one daily switch is off', async () => {
+    backend.fetchPushPreferences.mockResolvedValue({ ...ALL_PUSH_PREFERENCES_ON, dailyNudge: false });
+    await renderSettings();
+
+    expect(await screen.findByRole('button', { name: 'Notifications, Some' })).toBeInTheDocument();
+  });
+
   it('has no per-date reminder list and no switch on the top page where the reminders plugin is missing', async () => {
     await renderSettings();
 

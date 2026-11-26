@@ -162,6 +162,12 @@ const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
   // An added event or anniversary opens Home, which re-reads both.
   event: 'home',
   anniversary: 'home',
+  // The five Daily pushes open Daily (story 8.4).
+  daily_question: 'daily',
+  daily_partner_picked: 'daily',
+  daily_nudge: 'daily',
+  daily_reminder: 'daily',
+  daily_both_answered: 'daily',
 };
 
 /** `aps.thread-id` of a love note; a push sent before `kind` existed is told apart by it alone. */
