@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import type { TestInfo } from '@playwright/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventDateFrom } from '../../support/factories/events';
 import {
@@ -8,6 +9,7 @@ import {
   isoBirthdayDaysFromNow,
   isoDateDaysFromNow,
   msUntilClearOfDailyTurns,
+  waitClearOfDailyTurns,
 } from '../../support/helpers/events';
 
 describe('isoDateDaysFromNow', () => {
@@ -306,9 +308,9 @@ describe('msUntilClearOfDailyTurns on the UTC clock', () => {
     expect(msUntilClearOfDailyTurns(new Date(Date.UTC(2026, 10, 27, 0, 0, 4)), 60_000, 'UTC')).toBe(
       6_000
     );
-    expect(msUntilClearOfDailyTurns(new Date(Date.UTC(2026, 10, 27, 0, 0, 10)), 60_000, 'UTC')).toBe(
-      0
-    );
+    expect(
+      msUntilClearOfDailyTurns(new Date(Date.UTC(2026, 10, 27, 0, 0, 10)), 60_000, 'UTC')
+    ).toBe(0);
   });
 
   it('ignores a host turn that is not a UTC turn', () => {
@@ -318,9 +320,46 @@ describe('msUntilClearOfDailyTurns on the UTC clock', () => {
     expect(msUntilClearOfDailyTurns(now, 60_000, 'UTC')).toBe(0);
   });
 
-  it('is unaffected by a host DST change: UTC turns are fixed instants', () => {
-    // 1 November 2026 (fall back in New York) is 25 hours long on the host, 24 in UTC.
-    const now = new Date(Date.UTC(2026, 10, 1, 19, 59, 30));
-    expect(msUntilClearOfDailyTurns(now, 60_000, 'UTC')).toBe(40_000);
+  it('measures a window that spans the host fall-back in real elapsed time', () => {
+    // 05:30 UTC on 1 November 2026 is 01:30 EDT, half an hour before New York falls
+    // back (06:00 UTC); the next UTC turn, 20:00, is 14.5 hours of real time away.
+    const now = new Date(Date.UTC(2026, 10, 1, 5, 30));
+    const ms = msUntilClearOfDailyTurns(now, 15 * 3_600_000, 'UTC');
+    expect(ms).toBe(Date.UTC(2026, 10, 1, 20, 0, 10) - now.getTime());
+    expect(ms).toBe(14.5 * 3_600_000 + 10_000);
+  });
+});
+
+// The live spec reaches the UTC clock only through this forwarding, and runs only
+// post-deploy on a UTC runner, where the host and UTC turns coincide.
+describe('waitClearOfDailyTurns', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] });
+    // 23:59:30 UTC on the 26th is 18:59:30 in New York: clear on the host clock only.
+    vi.setSystemTime(new Date(Date.UTC(2026, 10, 26, 23, 59, 30)));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('passes the time zone on, sleeping past a UTC turn and extending the timeout', async () => {
+    const testInfo = { timeout: 60_000, setTimeout: vi.fn() };
+    let done = false;
+    const waited = waitClearOfDailyTurns(testInfo as unknown as TestInfo, 'UTC').then(() => {
+      done = true;
+    });
+    expect(testInfo.setTimeout).toHaveBeenCalledWith(100_000);
+    await vi.advanceTimersByTimeAsync(39_999);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await waited;
+    expect(done).toBe(true);
+  });
+
+  it('reads the host clock when no time zone is given', async () => {
+    const testInfo = { timeout: 60_000, setTimeout: vi.fn() };
+    await waitClearOfDailyTurns(testInfo as unknown as TestInfo);
+    expect(testInfo.setTimeout).not.toHaveBeenCalled();
   });
 });
