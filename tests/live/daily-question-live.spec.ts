@@ -336,9 +336,9 @@ test.describe('Live Daily check', () => {
       await ensureLinked(target, a, b);
 
       // The bots' day and nudge slot turn at 00:00 and 20:00 UTC (both store
-      // UTC). The guard waits on the host clock's turns, which are those in the
-      // deploy job (its runner is on UTC); wait past one before the reset.
-      await waitClearOfDailyTurns(testInfo);
+      // UTC), so the guard reads the UTC clock whatever zone the host is on
+      // (DW-542); wait past one before the reset.
+      await waitClearOfDailyTurns(testInfo, 'UTC');
 
       for (const bot of [a, b]) {
         const { error } = await bot.client.rpc('reset_bot_daily_days');

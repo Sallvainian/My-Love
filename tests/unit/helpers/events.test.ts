@@ -280,3 +280,47 @@ describe('msUntilClearOfDailyTurns', () => {
     expect(msUntilClearOfDailyTurns(night, 60_000)).toBe(40_000);
   });
 });
+
+// DW-542: the live check's bots turn on UTC, whatever zone the host is in. Under the
+// pinned America/New_York the host midnight is 04:00 or 05:00 UTC, so a guard that
+// read the host clock would miss the UTC turns below.
+describe('msUntilClearOfDailyTurns on the UTC clock', () => {
+  it('waits until 10 s past UTC midnight when the host is hours behind it', () => {
+    // 23:59:30 UTC on the 26th is 18:59:30 in New York, clear on the host clock.
+    const now = new Date(Date.UTC(2026, 10, 26, 23, 59, 30));
+    expect(msUntilClearOfDailyTurns(now, 60_000)).toBe(0);
+    const ms = msUntilClearOfDailyTurns(now, 60_000, 'UTC');
+    expect(ms).toBe(40_000);
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(Date.UTC(2026, 10, 27, 0, 0, 10)));
+  });
+
+  it('waits until 10 s past 20:00 UTC', () => {
+    const now = new Date(Date.UTC(2026, 10, 26, 19, 58, 30));
+    expect(msUntilClearOfDailyTurns(now, 60_000)).toBe(0);
+    const ms = msUntilClearOfDailyTurns(now, 120_000, 'UTC');
+    expect(ms).toBe(100_000);
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(Date.UTC(2026, 10, 26, 20, 0, 10)));
+  });
+
+  it('still waits just after a UTC turn, until the 10 s mark, and not once past it', () => {
+    expect(msUntilClearOfDailyTurns(new Date(Date.UTC(2026, 10, 27, 0, 0, 4)), 60_000, 'UTC')).toBe(
+      6_000
+    );
+    expect(msUntilClearOfDailyTurns(new Date(Date.UTC(2026, 10, 27, 0, 0, 10)), 60_000, 'UTC')).toBe(
+      0
+    );
+  });
+
+  it('ignores a host turn that is not a UTC turn', () => {
+    // 23:59:30 New York is 04:59:30 UTC: a host turn, clear on the UTC clock.
+    const now = new Date(2026, 10, 26, 23, 59, 30);
+    expect(msUntilClearOfDailyTurns(now, 60_000)).toBe(40_000);
+    expect(msUntilClearOfDailyTurns(now, 60_000, 'UTC')).toBe(0);
+  });
+
+  it('is unaffected by a host DST change: UTC turns are fixed instants', () => {
+    // 1 November 2026 (fall back in New York) is 25 hours long on the host, 24 in UTC.
+    const now = new Date(Date.UTC(2026, 10, 1, 19, 59, 30));
+    expect(msUntilClearOfDailyTurns(now, 60_000, 'UTC')).toBe(40_000);
+  });
+});

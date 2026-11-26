@@ -214,26 +214,39 @@ export function clockAnchor(now: Date = new Date()): Date {
 /** How far past a turn the guard sleeps: `useDailyDayRereads` re-reads at 20:00:05. */
 const PAST_TURN_MS = 10_000;
 
+/** The clock a Daily turn is read on: the host's (omitted) or UTC, where the live check's bots run. */
+export type DailyTurnZone = 'UTC';
+
 /**
  * The milliseconds to wait before a test that starts at `now` and may run for
  * `windowMs` can no longer have a Daily turn inside it, or 0 when none can.
  *
- * The turns are host-local wall-clock 00:00 (the Daily day changes) and 20:00
- * (the nudge slot changes). A turn inside [now - 10 s, now + `windowMs`] makes
+ * The turns are wall-clock 00:00 (the Daily day changes) and 20:00 (the nudge
+ * slot changes), on the host clock by default or, with `timeZone: 'UTC'`, on the
+ * UTC clock the live check's bots run on (DW-542). A turn inside [now - 10 s, now + `windowMs`] makes
  * the answer "sleep until 10 s past that turn": the lower bound is the same 10 s,
  * so a start just after a turn waits out the 20:00:05 re-read as well. Built from
- * calendar components (`new Date(y, m, d, h)`), never parsed from a string, so a
- * DST day's turn is the wall-clock one; the day before and after are tried so a
+ * calendar components (`new Date(y, m, d, h)`, or `Date.UTC` for UTC), never
+ * parsed from a string, so a DST day's turn is the wall-clock one; the day before and after are tried so a
  * window that straddles midnight finds it.
  *
  * Why a wait and not a skip: a skip would drop P0 coverage silently on those runs.
  * Used by `waitClearOfDailyTurns` for the five Daily specs that seed or read a
  * date and assert it later (DW-527, DW-531, DW-534, DW-535, DW-541).
  */
-export function msUntilClearOfDailyTurns(now: Date, windowMs: number): number {
+export function msUntilClearOfDailyTurns(
+  now: Date,
+  windowMs: number,
+  timeZone?: DailyTurnZone
+): number {
   for (const hour of [0, 20]) {
     for (const dayOffset of [-1, 0, 1]) {
-      const turn = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour);
+      const turn =
+        timeZone === 'UTC'
+          ? new Date(
+              Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + dayOffset, hour)
+            )
+          : new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour);
       const until = turn.getTime() - now.getTime();
       if (until > -PAST_TURN_MS && until <= windowMs) return until + PAST_TURN_MS;
     }
@@ -248,10 +261,14 @@ export function msUntilClearOfDailyTurns(now: Date, windowMs: number): number {
  *
  * The window is `testInfo.timeout` because a test that ends in time cannot cross
  * a turn it started clear of, whatever it does inside. The timeout is extended
- * first: the wait itself counts against it. A no-op on a clear clock.
+ * first: the wait itself counts against it. A no-op on a clear clock. Pass
+ * `timeZone: 'UTC'` where the data turns on UTC, not on the host clock.
  */
-export async function waitClearOfDailyTurns(testInfo: TestInfo): Promise<void> {
-  const waitMs = msUntilClearOfDailyTurns(new Date(), testInfo.timeout);
+export async function waitClearOfDailyTurns(
+  testInfo: TestInfo,
+  timeZone?: DailyTurnZone
+): Promise<void> {
+  const waitMs = msUntilClearOfDailyTurns(new Date(), testInfo.timeout, timeZone);
   if (waitMs <= 0) return;
   if (testInfo.timeout > 0) testInfo.setTimeout(testInfo.timeout + waitMs);
   await new Promise<void>((done) => setTimeout(done, waitMs));
