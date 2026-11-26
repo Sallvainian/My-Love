@@ -35,7 +35,11 @@
  * Daily view calls it for each `ok` streak it shows, and the device-state
  * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
  * whether that held total is new to this device and, in the same claim, whether
- * its milestone screen has yet to show. That claim stores the held total alone;
+ * its milestone screen has yet to show. Both claims pass the partner known when
+ * the claim is made (`mergePartnerId`, the source the saved days are tagged
+ * from), which the kind stores with its value: a value tagged with another
+ * partner is re-seeded, not played, and with no known partner nothing is
+ * claimed. `claimStreakCelebration` stores the held total alone;
  * `claimStreakMilestone(streak)` stores the milestone count just before its
  * screen shows (R5), so a +1 cut short leaves the milestone for the next open of
  * Daily. Both hold no state here, so sign-out needs nothing in
@@ -61,7 +65,17 @@ import {
 } from '../../services/dailyStreakCopy';
 import { registerLocalCopy } from '../../services/localCopy';
 import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
-import type { AppStateCreator } from '../types';
+import type { AppState, AppStateCreator } from '../types';
+
+/**
+ * The partner a celebration claim is made for: the id the saved days would be
+ * tagged with, or `null` when none is known (an `unlinked` or failed lookup),
+ * and then nothing is claimed.
+ */
+const claimPartnerId = async (get: () => AppState, userId: string): Promise<string | null> => {
+  const tag = await mergePartnerId(get, userId);
+  return tag.status === 'linked' ? tag.partnerId : null;
+};
 
 export interface DailyStreakSlice {
   /** The last server answer for the couple's streak, or `null` before any. */
@@ -86,7 +100,8 @@ export interface DailyStreakSlice {
    * this device too; else `play: false`, with `milestone` when that held total's
    * +1 was claimed and its milestone screen is still owed. Never throws: a
    * failure is logged and answers `NO_CELEBRATION`, as does no signed-in user or
-   * a session that changed meanwhile.
+   * a session that changed meanwhile. With no known partner nothing is claimed
+   * and nothing is written.
    */
   claimStreakCelebration: (streak: CoupleStreak) => Promise<CelebrationClaim>;
   /**
@@ -215,14 +230,19 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
     claimStreakCelebration: async (streak) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return NO_CELEBRATION;
-      const isCurrent = () =>
+      const sessionIsCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
       try {
-        const claim = await claimCelebration(requestedBy, streak, isCurrent);
+        const partnerId = await claimPartnerId(get, requestedBy);
+        if (!sessionIsCurrent()) return NO_CELEBRATION;
+        // A partner change while the claim runs makes `streak` the old pair's.
+        const isCurrent = () =>
+          sessionIsCurrent() && (get().partner?.id ?? partnerId) === partnerId;
+        const claim = await claimCelebration(requestedBy, partnerId, streak, isCurrent);
         return isCurrent() ? claim : NO_CELEBRATION;
       } catch (error) {
-        if (isCurrent()) {
+        if (sessionIsCurrent()) {
           console.error('[DailyQuestion] Could not record the streak celebration:', error);
         }
         return NO_CELEBRATION;
@@ -232,18 +252,23 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
     claimStreakMilestone: async (streak, canShow) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return false;
-      const isCurrent = () =>
+      const sessionIsCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
       try {
+        const partnerId = await claimPartnerId(get, requestedBy);
+        if (!sessionIsCurrent()) return false;
+        const isCurrent = () =>
+          sessionIsCurrent() && (get().partner?.id ?? partnerId) === partnerId;
         const claimed = await claimMilestone(
           requestedBy,
+          partnerId,
           streak,
           () => isCurrent() && canShow()
         );
         return claimed && isCurrent();
       } catch (error) {
-        if (isCurrent()) {
+        if (sessionIsCurrent()) {
           console.error('[DailyQuestion] Could not record the milestone as shown:', error);
         }
         return false;

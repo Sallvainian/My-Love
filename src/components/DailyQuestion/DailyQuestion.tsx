@@ -542,9 +542,10 @@ export function DailyQuestion() {
       return;
     }
     const claimed = await claimStreakMilestone(celebration.streak, () => mounted.current);
+    // `current` may hold a newer claim's streak: the screen takes that one.
     setCelebration((current) => {
-      if (claimed) return { ...celebration, stage: 'milestone' };
-      return current === celebration ? null : current;
+      if (claimed) return { ...(current ?? celebration), stage: 'milestone' };
+      return current?.stage === 'up' ? null : current;
     });
   }, [celebration, claimStreakMilestone]);
 
@@ -653,7 +654,9 @@ export function DailyQuestion() {
   // play it on. Its read never answers in time; the second mount's does. It
   // also waits out a streak read in flight (this mount's own among them): a
   // milestone owed from the saved streak would otherwise come up and be replaced
-  // by the +1 of a newer held total in the server's answer.
+  // by the +1 of a newer held total in the server's answer. A claim made while
+  // an overlay is up (a re-read answering a higher total) never restarts it: see
+  // `setCelebration` below.
   const shownStreak =
     dailyDay?.status === 'ok' && readFor === sessionKey && !streakLoading ? streak : null;
   // The held total stored on this device when this mount's first claim was made.
@@ -679,12 +682,23 @@ export function DailyQuestion() {
       // One batch: the answer is observable (`data-streak-claimed`) in the same
       // commit that shows the overlay, or the absence of one.
       if (claim.play || showOwed) {
-        setCelebration({
-          session: sessionKey,
-          streak: shownStreak,
-          stage: claim.play ? 'up' : 'milestone',
-          milestone: claim.milestone,
-        });
+        // An overlay already up is never restarted: a newer claim only brings
+        // it the newer streak (the milestone kept if either claim had one) and
+        // leaves it on the stage it is on.
+        setCelebration((current) =>
+          current !== null && current.session === sessionKey
+            ? {
+                ...current,
+                streak: shownStreak,
+                milestone: current.milestone || claim.milestone,
+              }
+            : {
+                session: sessionKey,
+                streak: shownStreak,
+                stage: claim.play ? 'up' : 'milestone',
+                milestone: claim.milestone,
+              }
+        );
       }
       setClaimedHeld(shownStreak.held);
     };

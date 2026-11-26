@@ -19,6 +19,9 @@
  * 4. The first picker, on the Partner page when the day finishes, sees the new
  *    held there with no +1; opening Daily then plays it.
  *
+ * 5. The same Partner-to-Daily dock tap made offline (DW-521): the saved day
+ *    and streak answer at once, and the +1 still plays on the mount that stays.
+ *
  * The day's writer is asked to write tomorrow's question after their pick; the
  * sheet waits behind the +1 screen and covers the dock, so the writer says
  * "No thanks" where a step needs the dock.
@@ -39,6 +42,7 @@ import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { isoDateDaysFromNow } from '../../support/helpers/events';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { navigateTo } from '../../support/helpers/navigation';
+import { goOffline } from '../../support/helpers/offline';
 import {
   COUPLE_STREAK_READ,
   DAILY_DAY_READ,
@@ -284,6 +288,49 @@ test.describe('Daily: the streak goes up by one', () => {
 
     await log.step('Opening Daily plays it');
     await navigateTo(own, 'daily');
+    await expectStreakUp(own, {
+      held: 2,
+      otherName: partnerName,
+      button: `See ${partnerName}'s pick`,
+    });
+    await dismissStreakUp(own);
+    await recurseUntil(
+      () => savedLocalCopy<{ held: number }>(own, CELEBRATED_KIND),
+      (saved) => {
+        expect(saved).toMatchObject({ held: 2 });
+      }
+    );
+  });
+
+  test('[P1] offline, the Partner-to-Daily dock tap still plays the +1 on the mount that stays', async ({
+    setup: { own, partner, ownIsWriter, partnerName },
+    interceptNetworkCall,
+  }) => {
+    await pick(own, 'this');
+    await expect(own.getByTestId('daily-waiting')).toBeVisible();
+    await closeAfterPickSheet(own, ownIsWriter, 'decline');
+
+    await log.step('The worker opens Partner; the partner finishes the day');
+    const firstRead = interceptNetworkCall({ method: 'POST', url: COUPLE_STREAK_READ });
+    await navigateTo(own, 'partner');
+    expect((await firstRead).status).toBe(200);
+    await pick(partner, 'that');
+    await expect(own.getByTestId('partner-streak-held')).toHaveText('2');
+    // The saved streak is what Daily shows offline, so wait for its write.
+    await recurseUntil(
+      () => savedLocalCopy<{ held: number }>(own, 'daily-streak'),
+      (saved) => {
+        expect(saved).toMatchObject({ held: 2 });
+      }
+    );
+    expect(await savedLocalCopy<{ held: number }>(own, CELEBRATED_KIND)).toMatchObject({ held: 1 });
+
+    await log.step('Drop the connection, then tap Daily in the dock');
+    await goOffline(own, true);
+    expect(await own.evaluate(() => navigator.onLine), 'premise: the page is offline').toBe(false);
+    await navigateTo(own, 'daily');
+
+    await log.step('The +1 plays from the saved streak');
     await expectStreakUp(own, {
       held: 2,
       otherName: partnerName,

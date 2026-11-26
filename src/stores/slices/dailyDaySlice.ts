@@ -67,15 +67,17 @@
  *
  * When the shown partner changes from one id to another in a session (an unlink
  * and a new link, or a refreshed partner read that answers a new id), this
- * slice's one `api.subscribe` listener calls `resetDailyHistoryForNewPair` and
- * `resetCoupleStreakForNewPair` (the history and streak slices), which
- * clear the streak, the past questions and their errors, loading flags and end
- * flag, and make the reads in flight for the old pair write nothing, to the
- * fields or to the copy; a streak that was shown or being read is then read
- * again for the new partner. Only a non-null id that differs from the last
- * non-null one seen in the session counts: a first link and a reload of the
- * same partner clear nothing, and an identity change (`userId`/
- * `authSessionVersion`) forgets the last id.
+ * slice's one `api.subscribe` listener clears the day (`dailyDay`, its error and
+ * loading flag) and calls `resetDailyHistoryForNewPair` and
+ * `resetCoupleStreakForNewPair` (the history and streak slices), which clear the
+ * streak, the past questions and their errors, loading flags and end flag. The
+ * reads in flight for the old pair write nothing, to the fields or to the copy;
+ * a day or streak that was shown or being read is then read again for the new
+ * partner. The `daily-celebrated` kind is not touched there: it is tagged with
+ * its partner (`services/dailyCelebrated.ts`), so the next claim re-seeds it.
+ * Only a non-null id that differs from the last non-null one seen in the session
+ * counts: a first link and a reload of the same partner clear nothing, and an
+ * identity change (`userId`/`authSessionVersion`) forgets the last id.
  *
  * A nudge (AD-13, AD-16, AD-17): `sendDailyNudge` sends it for the shown day and
  * merges the returned snapshot (whose `nudge.spent` is then true) like
@@ -339,15 +341,33 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   let lastPartnerId: string | null = null;
   let seenIdentity = '';
 
+  // Bumped when the partner changes: a read or a write that began before it
+  // (`loadDailyDay`, `refreshDailyDay`, a drained or submitted pick, a written
+  // question, a nudge) is the old pair's and puts nothing on screen and nothing
+  // in the copy.
+  let pairEpoch = 0;
+
+  /**
+   * The old pair's day is gone and the reads in flight for it write nothing; a
+   * day that was shown or being read is read again for the new partner, since
+   * Daily's read effect does not re-run on a partner change.
+   */
+  const resetDayForNewPair = () => {
+    const dayWanted = get().dailyDay !== null || get().dailyDayLoading;
+    pairEpoch += 1;
+    set({ dailyDay: null, dailyDayLoading: false, dailyDayError: null });
+    if (dayWanted && get().userId) void get().loadDailyDay();
+  };
+
   // The tab's running drain, and whether a call arrived while it ran.
   let drainInFlight: Promise<void> | null = null;
   let drainRequested = false;
 
-  // The tab's running day read, the identity (`userId:authSessionVersion`) it
-  // was started in, and whether a call arrived while it ran. A call in the same
-  // identity asks for one more read after the running one, never joins it; a
-  // call in another identity starts its own, and the old read, now stale,
-  // writes nothing.
+  // The tab's running day read, the identity and pair
+  // (`userId:authSessionVersion:pairEpoch`) it was started in, and whether a
+  // call arrived while it ran. A call in the same identity and pair asks for one
+  // more read after the running one, never joins it; a call in another identity
+  // or pair starts its own, and the old read, now stale, writes nothing.
   let dayRead: { key: string; again: boolean; promise: Promise<boolean> } | null = null;
 
   // The retry after a pass stops on a transient failure while online, or ends
@@ -390,7 +410,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     }
 
     // A new partner id after another one (never a first link or the same
-    // partner again) ends the old pair's streak and past questions.
+    // partner again) ends the old pair's day, streak and past questions.
     const identity = `${state.userId}:${state.authSessionVersion}`;
     if (identity !== seenIdentity) {
       seenIdentity = identity;
@@ -403,6 +423,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     if (changed) {
       // History first, so the streak re-read starts last.
       get().resetDailyHistoryForNewPair();
+      resetDayForNewPair();
       get().resetCoupleStreakForNewPair();
     }
   });
@@ -421,8 +442,10 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   const drainOnce = async (): Promise<DrainPassOutcome> => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy || !isOnline()) return 'offline';
+    const epoch = pairEpoch;
     const isCurrent = () =>
       get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+    const isSamePair = () => isCurrent() && pairEpoch === epoch;
 
     let result: DrainPassOutcome;
     try {
@@ -461,13 +484,18 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
           void get().loadCoupleStreak();
           const partner = await mergePartnerId(get, requestedBy);
           if (!isCurrent()) return 'stale';
+          // The partner changed while the pick was sent: the day is the old
+          // pair's, so it stays out of the copy and off the screen, and the
+          // pass goes on with the next row.
+          if (!isSamePair()) continue;
           const merged = await mergeDailyDay(
             requestedBy,
             { status: 'ok', snapshot },
             partner,
-            isCurrent
+            isSamePair
           );
           if (!isCurrent()) return 'stale';
+          if (!isSamePair()) continue;
           showIfOnScreen(snapshot, merged);
         }
         return 'done';
@@ -504,8 +532,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   const readDayOnce = async (): Promise<boolean> => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) return false;
+    const epoch = pairEpoch;
     const isCurrent = () =>
-      get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      get().userId === requestedBy &&
+      get().authSessionVersion === requestedInSession &&
+      pairEpoch === epoch;
 
     set({ dailyDayLoading: true });
 
@@ -593,13 +624,14 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     loadDailyDay: () => {
       const { userId, authSessionVersion } = get();
       if (!userId) return Promise.resolve(false);
-      const key = `${userId}:${authSessionVersion}`;
-      // One read in flight plus one trailing pass per identity: a call that
-      // arrives while a read runs asks for one more read, started after its
+      const key = `${userId}:${authSessionVersion}:${pairEpoch}`;
+      // One read in flight plus one trailing pass per identity and pair: a call
+      // that arrives while a read runs asks for one more read, started after its
       // cause (a re-read after a pick, a partner link or a reconnect must not
       // be answered by a read that began before it), and gets the promise,
       // which settles after that trailing pass and says whether any pass of the
-      // run stored the server's answer.
+      // run stored the server's answer. A new pair (`resetDayForNewPair`'s
+      // `pairEpoch` bump) starts a fresh read rather than waiting on the old one.
       if (dayRead?.key === key) {
         dayRead.again = true;
         return dayRead.promise;
@@ -614,8 +646,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
             if (await readDayOnce()) stored = true;
           } while (
             read.again &&
-            get().userId === userId &&
-            get().authSessionVersion === authSessionVersion
+            `${get().userId}:${get().authSessionVersion}:${pairEpoch}` === key
           );
           return stored;
         } finally {
@@ -628,8 +659,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     refreshDailyDay: async (dayId) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return;
+      const epoch = pairEpoch;
       const isCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairEpoch === epoch;
 
       try {
         const snapshot = await fetchDailyDayById(dayId);
@@ -653,8 +687,10 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     submitDailyPick: async (choice) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) throw new Error('You must be signed in to send your pick');
+      const epoch = pairEpoch;
       const isCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+      const isSamePair = () => isCurrent() && pairEpoch === epoch;
 
       const shown = get().dailyDay;
       if (shown?.status !== 'ok') throw new Error('There is no question to answer yet');
@@ -709,14 +745,14 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       void get().loadCoupleStreak();
       // A confirmed own write is a fill source for the copy.
       const partner = await mergePartnerId(get, requestedBy);
-      if (!isCurrent()) return;
+      if (!isSamePair()) return;
       const merged = await mergeDailyDay(
         requestedBy,
         { status: 'ok', snapshot },
         partner,
-        isCurrent
+        isSamePair
       );
-      if (!isCurrent()) return;
+      if (!isSamePair()) return;
       const stored = mergeAnswer(get().dailyDay, merged);
       set((state) => ({
         dailyDay: stored,
@@ -765,8 +801,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     submitWrittenQuestion: async (thisText, thatText) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) throw new Error("You must be signed in to send tomorrow's question");
+      const epoch = pairEpoch;
       const isCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairEpoch === epoch;
 
       const shown = get().dailyDay;
       if (shown?.status !== 'ok') throw new Error('There is no question to write from yet');
@@ -795,8 +834,11 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     sendDailyNudge: async () => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) throw new Error('You must be signed in to send a nudge');
+      const epoch = pairEpoch;
       const isCurrent = () =>
-        get().userId === requestedBy && get().authSessionVersion === requestedInSession;
+        get().userId === requestedBy &&
+        get().authSessionVersion === requestedInSession &&
+        pairEpoch === epoch;
 
       const shown = get().dailyDay;
       if (shown?.status !== 'ok') throw new Error('There is no day to nudge about yet');

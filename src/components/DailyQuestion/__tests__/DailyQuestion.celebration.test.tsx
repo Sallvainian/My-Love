@@ -75,7 +75,7 @@ vi.mock('motion/react', () => {
 import * as dailyCelebrated from '../../../services/dailyCelebrated';
 import { DAILY_CELEBRATED_KIND, readCelebrated } from '../../../services/dailyCelebrated';
 import { openMyLoveDB } from '../../../services/dbSchema';
-import { deleteAccountCopies, writeLocalCopy } from '../../../services/localCopy';
+import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../services/localCopy';
 import { useAppStore } from '../../../stores/useAppStore';
 import { DailyQuestion } from '../DailyQuestion';
 
@@ -280,6 +280,45 @@ describe('the streak +1 on Daily', () => {
 
     expect(screen.getAllByTestId('daily-streak-up')).toHaveLength(1);
     expect(await readCelebrated(USER)).toEqual({ held: 2, milestones: 0 });
+  });
+
+  it("a relink while Daily is open: the new pair's lower total plays nothing, its next +1 plays (DW-513)", async () => {
+    await writeLocalCopy(USER, DAILY_CELEBRATED_KIND, {
+      held: 40,
+      milestones: 1,
+      partner_id: 'USER-B-ID',
+    });
+    fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+    fetchCoupleStreak.mockResolvedValue(okStreak({ held: 40, milestones: 1 }));
+    render(<DailyQuestion />);
+    await waitFor(() =>
+      expect(screen.getByTestId('daily-question-view')).toHaveAttribute('data-streak-claimed', '40')
+    );
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+
+    // The server moves this account to a new partner: its held total starts again.
+    fetchCoupleStreak.mockResolvedValue(okStreak({ held: 2 }));
+    act(() => {
+      useAppStore.setState({
+        partner: { id: 'USER-C-ID', displayName: 'Casey', email: 'c@example.com' },
+      } as unknown as Parameters<typeof useAppStore.setState>[0]);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('daily-question-view')).toHaveAttribute('data-streak-claimed', '2')
+    );
+    // The day is read again for the new partner too.
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+    expect(await readLocalCopy(USER, DAILY_CELEBRATED_KIND)).toEqual({
+      held: 2,
+      milestones: 0,
+      partner_id: 'USER-C-ID',
+    });
+
+    fetchCoupleStreak.mockResolvedValue(okStreak({ held: 3 }));
+    await useAppStore.getState().loadCoupleStreak();
+    expect(await screen.findByTestId('daily-streak-up-held')).toHaveTextContent('3');
   });
 
   it('a partner pick arriving while Daily is open plays it for the first picker', async () => {
@@ -749,6 +788,107 @@ describe('the streak +1 on Daily', () => {
         render(<DailyQuestion />);
 
         expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('25');
+      });
+    });
+
+    describe('a newer claim while an overlay is up (DW-519)', () => {
+      /** The server now answers `held` (a `daily_pick`, a drained pick or a reconnect re-read). */
+      async function serverAnswers(held: number, milestones: number) {
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held, milestones }));
+        await useAppStore.getState().loadCoupleStreak();
+      }
+
+      /** This mount's claim of `held` has answered. */
+      async function claimAnswered(held: number) {
+        await waitFor(() =>
+          expect(screen.getByTestId('daily-question-view')).toHaveAttribute(
+            'data-streak-claimed',
+            String(held)
+          )
+        );
+      }
+
+      /** Stored 24, answered 25 with its milestone: the +1 is up. */
+      async function plusOneForTheMilestone() {
+        await celebratedAt(24, 0);
+        fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held: 25, milestones: 1 }));
+        render(<DailyQuestion />);
+        await screen.findByTestId('daily-streak-up');
+      }
+
+      it('the milestone screen stays up, showing the newer held total', async () => {
+        await plusOneForTheMilestone();
+        await userEvent.setup().click(screen.getByTestId('daily-streak-up-continue'));
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('25');
+
+        await serverAnswers(26, 1);
+        await claimAnswered(26);
+
+        expect(screen.getByTestId('daily-milestone-held')).toHaveTextContent('26');
+        expect(screen.getAllByTestId('daily-milestone')).toHaveLength(1);
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+        expect(await readCelebrated(USER)).toEqual({ held: 26, milestones: 1 });
+      });
+
+      it('closing that milestone screen reveals the card, with no +1 behind it', async () => {
+        await plusOneForTheMilestone();
+        const user = userEvent.setup();
+        await user.click(screen.getByTestId('daily-streak-up-continue'));
+        await screen.findByTestId('daily-milestone');
+        await serverAnswers(26, 1);
+        await claimAnswered(26);
+
+        await user.click(screen.getByTestId('daily-milestone-continue'));
+
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+        expect(screen.getByTestId('daily-reveal')).toBeInTheDocument();
+      });
+
+      it('the +1 stays on its stage, showing the newer held total, and keeps its milestone', async () => {
+        await plusOneForTheMilestone();
+
+        await serverAnswers(26, 1);
+        await claimAnswered(26);
+
+        expect(screen.getByTestId('daily-streak-up-held')).toHaveTextContent('26');
+        expect(screen.getAllByTestId('daily-streak-up')).toHaveLength(1);
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+        // Its button still leads to the milestone, now for the newer total.
+        expect(screen.getByTestId('daily-streak-up-continue')).toHaveTextContent('Continue');
+        await userEvent.setup().click(screen.getByTestId('daily-streak-up-continue'));
+        expect(await screen.findByTestId('daily-milestone-held')).toHaveTextContent('26');
+        expect(await readCelebrated(USER)).toEqual({ held: 26, milestones: 1 });
+      });
+
+      it('a plain +1 stays up with the newer held total, and its button still closes it', async () => {
+        await celebratedAt(4, 0);
+        fetchDailyDay.mockResolvedValue(ok(revealSnapshot('this', 'that')));
+        fetchCoupleStreak.mockResolvedValue(okStreak({ held: 5 }));
+        render(<DailyQuestion />);
+        await screen.findByTestId('daily-streak-up');
+
+        await serverAnswers(6, 0);
+        await claimAnswered(6);
+
+        expect(screen.getByTestId('daily-streak-up-held')).toHaveTextContent('6');
+        expect(screen.getAllByTestId('daily-streak-up')).toHaveLength(1);
+        await userEvent.setup().click(screen.getByTestId('daily-streak-up-continue'));
+        expect(screen.queryByTestId('daily-streak-up')).toBeNull();
+        expect(screen.queryByTestId('daily-milestone')).toBeNull();
+      });
+
+      it('a newer claim that has no milestone leaves the +1 pointing at the one it had', async () => {
+        await plusOneForTheMilestone();
+        // The other claim's stored milestone is already shown (another tab), so it owes none.
+        await celebratedAt(24, 1);
+
+        await serverAnswers(26, 1);
+        await claimAnswered(26);
+
+        expect(screen.getByTestId('daily-streak-up-held')).toHaveTextContent('26');
+        expect(screen.getByTestId('daily-streak-up-continue')).toHaveTextContent('Continue');
       });
     });
 
