@@ -1,8 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
-    "Replaces Dependabot's version updates; the rules mirror .github/dependabot.yml.backup.",
-    "Dependabot security alerts stay on as a GitHub setting."
+    "Replaces Dependabot's version updates, with the same rules Dependabot's version-update config had.",
+    "Security fixes stay with Dependabot (alerts and security updates on as GitHub settings; dependabot-auto-merge.yml merges its PRs): it updates vulnerable packages that only appear in package-lock.json, which Renovate's own security PRs do not."
   ],
   "extends": [
     "config:recommended"
@@ -25,6 +25,9 @@
   "automergeType": "pr",
   "platformAutomerge": true,
   "automergeStrategy": "squash",
+  "vulnerabilityAlerts": {
+    "enabled": false
+  },
   "packageRules": [
     {
       "description": "npm: weekly on Monday, commits as deps(deps) / deps(deps-dev), labelled npm (Dependabot's npm block).",
