@@ -463,11 +463,13 @@ describe('overlapping loadDailyDay calls', () => {
 
     const oldLoad = state().loadDailyDay();
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
-    void state().loadDailyDay();
+    const dropped = state().loadDailyDay();
     state().clearAuth();
     old.settle(ok(dailySnapshot()));
     await oldLoad;
 
+    // The call that asked for the dropped pass settles; it is not left hanging.
+    await expect(dropped).resolves.toBeUndefined();
     expect(fetchDailyDay).toHaveBeenCalledTimes(1);
     expect(state().dailyDay).toBeNull();
   });
@@ -478,13 +480,14 @@ describe('overlapping loadDailyDay calls', () => {
 
     const oldLoad = state().loadDailyDay();
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
-    void state().loadDailyDay();
+    const dropped = state().loadDailyDay();
     // The same account signs in again: the user id is the same, the session is not.
     state().clearAuth();
     state().setAuthUser(A);
     await deleteAccountCopies(A);
     old.settle(ok(dailySnapshot()));
     await oldLoad;
+    await expect(dropped).resolves.toBeUndefined();
     await pause();
 
     expect(fetchDailyDay).toHaveBeenCalledTimes(1);

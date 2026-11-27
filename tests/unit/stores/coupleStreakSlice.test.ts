@@ -918,12 +918,14 @@ describe('the partner changes in the session', () => {
 
     const first = state().loadCoupleStreak();
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
-    void state().loadCoupleStreak();
+    const dropped = state().loadCoupleStreak();
     // The pair change starts the new pair's read, which is the second and last one.
     withPartner(PARTNER_C);
     await vi.waitFor(() => expect(state().coupleStreak).toEqual(okStreak({ held: 8 })));
     older.settle(okStreak({ held: 1 }));
     await first;
+    // The call that asked for the dropped pass settles; it is not left hanging.
+    await expect(dropped).resolves.toBeUndefined();
     await pause();
 
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
