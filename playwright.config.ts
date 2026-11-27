@@ -129,9 +129,13 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    // Every test keeps a trace, so a local failure still has the step-by-step replay.
+    // Screenshots only on failure. Video only on CI, kept for failed tests: each
+    // video runs a recorder beside its browser, which a 16 GB Mac cannot spare,
+    // and CI's burn-in runs with --retries=0, so on-first-retry would never record.
     trace: 'on',
-    screenshot: 'on',
-    video: 'on',
+    screenshot: 'only-on-failure',
+    video: process.env.CI ? 'retain-on-failure' : 'off',
     actionTimeout: 15 * 1000, // Action timeout: 15s
     navigationTimeout: 30 * 1000, // Navigation timeout: 30s
   },
