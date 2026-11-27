@@ -23,9 +23,11 @@
  *
  * Overlapping `loadDailyDay` calls collapse: one read runs per signed-in
  * identity, and a call that arrives meanwhile asks for one more read after it
- * (never joins it, so the read starts after its cause) and gets the promise,
- * which settles after that trailing pass. A call in another identity starts its
- * own read; the old one writes nothing.
+ * (never joins it, so the read starts after its cause) and gets that trailing
+ * pass's promise; the call that started the running read keeps the promise of
+ * its own pass, so a caller waiting on it (Daily's claim gate) is not held back
+ * by a later trigger's re-read (`trailingRead.ts`). A call in another identity
+ * starts its own read; the old one writes nothing.
  *
  * A partner's pick reaches an open Daily without a reload (AD-11): after a
  * confirmed pick `submitDailyPick` announces the day on the partner's channel
@@ -135,6 +137,7 @@ import {
 } from '../../api/dailyQuestionApi';
 import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
 import type { AppStateCreator } from '../types';
+import { createTrailingRead } from './trailingRead';
 
 /** One of the account's queued picks, as the view needs it. */
 export type QueuedDailyPick = Pick<
@@ -358,13 +361,6 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
   // The tab's running drain, and whether a call arrived while it ran.
   let drainInFlight: Promise<void> | null = null;
   let drainRequested = false;
-
-  // The tab's running day read, the identity and pair
-  // (`userId:authSessionVersion:pairEpoch`) it was started in, and whether a
-  // call arrived while it ran. A call in the same identity and pair asks for one
-  // more read after the running one, never joins it; a call in another identity
-  // or pair starts its own, and the old read, now stale, writes nothing.
-  let dayRead: { key: string; again: boolean; promise: Promise<void> } | null = null;
 
   // The retry after a pass stops on a transient failure while online, or ends
   // 'other-tab' (pending rows remain after another tab's lock let go). One timer
@@ -603,6 +599,15 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     }
   };
 
+  // The tab's day reads, one in flight plus one trailing pass per identity and
+  // pair (`userId:authSessionVersion:pairEpoch`): see `trailingRead.ts`. A call
+  // in another identity or pair starts its own read, and the old read, now
+  // stale, writes nothing.
+  const dayReads = createTrailingRead(() => {
+    const { userId, authSessionVersion } = get();
+    return userId ? `${userId}:${authSessionVersion}:${pairEpoch}` : null;
+  }, readDayOnce);
+
   return {
     dailyDay: null,
     dailyDayLoading: false,
@@ -612,37 +617,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     dailyDayAnswers: 0,
     dailyDayAnsweredId: null,
 
-    loadDailyDay: () => {
-      const { userId, authSessionVersion } = get();
-      if (!userId) return Promise.resolve();
-      const key = `${userId}:${authSessionVersion}:${pairEpoch}`;
-      // One read in flight plus one trailing pass per identity and pair: a call
-      // that arrives while a read runs asks for one more read, started after its
-      // cause (a re-read after a pick, a partner link or a reconnect must not
-      // be answered by a read that began before it), and gets the promise,
-      // which settles after that trailing pass. A new pair (`resetDayForNewPair`'s
-      // `pairEpoch` bump) starts a fresh read rather than waiting on the old one.
-      if (dayRead?.key === key) {
-        dayRead.again = true;
-        return dayRead.promise;
-      }
-      const read = { key, again: false, promise: Promise.resolve() };
-      dayRead = read;
-      read.promise = (async () => {
-        try {
-          do {
-            read.again = false;
-            await readDayOnce();
-          } while (
-            read.again &&
-            `${get().userId}:${get().authSessionVersion}:${pairEpoch}` === key
-          );
-        } finally {
-          if (dayRead === read) dayRead = null;
-        }
-      })();
-      return read.promise;
-    },
+    loadDailyDay: () => dayReads.call(),
 
     refreshDailyDay: async (dayId) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();

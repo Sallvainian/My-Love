@@ -15,7 +15,8 @@
  * (`shownPartnerId`), as the saved days are. Overlapping calls collapse: one read
  * runs per signed-in identity and pair, and a call that arrives meanwhile asks for
  * one more read after it (never joins it, so the read starts after its cause) and
- * gets the promise, which settles after that trailing pass. Only the newest
+ * gets that trailing pass's promise; the call that started the running read keeps
+ * the promise of its own pass (`trailingRead.ts`). Only the newest
  * started read writes (a sequence counter), and a read that outlives the session
  * or its pair writes nothing, to the field or to the copy. `signedOutState()` clears all
  * three fields.
@@ -66,6 +67,7 @@ import {
 import { registerLocalCopy } from '../../services/localCopy';
 import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
 import type { AppState, AppStateCreator } from '../types';
+import { createTrailingRead } from './trailingRead';
 
 /**
  * The partner a celebration claim is made for: the id the saved days would be
@@ -124,14 +126,8 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
   // started for the new pair never joins one started for the old pair.
   let pairEpoch = 0;
 
-  // The tab's running streak read, the identity and pair it was started for,
-  // and whether a call arrived while it ran: a call for the same identity and
-  // pair asks for one more read after the running one, never joins it.
-  type StreakRead = { key: string; again: boolean; promise: Promise<void> };
-  let streakRead: StreakRead | null = null;
-
   /** One read: the saved streak, then the server's answer. Never throws. */
-  const readStreakOnce = async (read: StreakRead): Promise<void> => {
+  const readStreakOnce = async (trailingRequested: () => boolean): Promise<void> => {
     const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
     if (!requestedBy) return;
     const mine = ++streakSeq;
@@ -158,7 +154,11 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
       // A trailing pass already asked for runs next in this session and pair (a
       // change of either would have failed `isCurrent`), so the streak stays
       // loading until its answer: Daily's claim gate waits for a settled streak.
-      set({ coupleStreak: answer, coupleStreakLoading: read.again, coupleStreakError: null });
+      set({
+        coupleStreak: answer,
+        coupleStreakLoading: trailingRequested(),
+        coupleStreakError: null,
+      });
       try {
         // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
         const partner =
@@ -182,40 +182,19 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
     }
   };
 
+  // The tab's streak reads, one in flight plus one trailing pass per identity
+  // and pair: see `trailingRead.ts`.
+  const streakReads = createTrailingRead(() => {
+    const { userId, authSessionVersion } = get();
+    return userId ? `${userId}:${authSessionVersion}:${pairEpoch}` : null;
+  }, readStreakOnce);
+
   return {
     coupleStreak: null,
     coupleStreakLoading: false,
     coupleStreakError: null,
 
-    loadCoupleStreak: () => {
-      const { userId, authSessionVersion } = get();
-      if (!userId) return Promise.resolve();
-      const key = `${userId}:${authSessionVersion}:${pairEpoch}`;
-      // One read in flight plus one trailing pass per identity and pair: a call
-      // that arrives while a read runs asks for one more read, started after its
-      // cause (a confirmed pick, a reconnect), and gets the promise, which
-      // settles after that trailing pass.
-      if (streakRead?.key === key) {
-        streakRead.again = true;
-        return streakRead.promise;
-      }
-      const read = { key, again: false, promise: Promise.resolve() };
-      streakRead = read;
-      read.promise = (async () => {
-        try {
-          do {
-            read.again = false;
-            await readStreakOnce(read);
-          } while (
-            read.again &&
-            `${get().userId}:${get().authSessionVersion}:${pairEpoch}` === key
-          );
-        } finally {
-          if (streakRead === read) streakRead = null;
-        }
-      })();
-      return read.promise;
-    },
+    loadCoupleStreak: () => streakReads.call(),
 
     resetCoupleStreakForNewPair: () => {
       // Daily's read effect does not re-run on a partner change, so a streak that

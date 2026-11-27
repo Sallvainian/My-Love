@@ -301,6 +301,36 @@ describe('loadCoupleStreak', () => {
     expect(state().coupleStreak).toEqual(okStreak({ held: 9 }));
   });
 
+  it("the first caller's promise settles after its own read, and a call that arrived mid-read settles after the trailing read", async () => {
+    const running = deferred<ReturnType<typeof okStreak>>();
+    const trailing = deferred<ReturnType<typeof okStreak>>();
+    fetchCoupleStreak.mockReturnValueOnce(running.promise).mockReturnValueOnce(trailing.promise);
+    const settled: string[] = [];
+
+    const first = state()
+      .loadCoupleStreak()
+      .then(() => {
+        settled.push('first');
+      });
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
+    const second = state()
+      .loadCoupleStreak()
+      .then(() => {
+        settled.push('second');
+      });
+    running.settle(okStreak({ held: 7 }));
+    await first;
+    // The trailing read is out and the first caller is already done.
+    await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(2));
+    expect(settled).toEqual(['first']);
+    expect(state().coupleStreakLoading).toBe(true);
+    trailing.settle(okStreak({ held: 8 }));
+    await second;
+
+    expect(settled).toEqual(['first', 'second']);
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
+  });
+
   it('a call after the reads ended starts a new read', async () => {
     fetchCoupleStreak
       .mockResolvedValueOnce(okStreak({ held: 1 }))

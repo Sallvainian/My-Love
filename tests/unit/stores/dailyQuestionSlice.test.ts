@@ -319,7 +319,7 @@ describe('overlapping loadDailyDay calls', () => {
     expect(state().dailyDayLoading).toBe(false);
   });
 
-  it('a call that arrives while a read runs gets a read started after the call, not the running one', async () => {
+  it("a call that arrives while a read runs gets a read started after the call, and its promise settles after that read's pass", async () => {
     const running = deferred<ReturnType<typeof ok>>();
     const trailing = deferred<ReturnType<typeof ok>>();
     fetchDailyDay.mockReturnValueOnce(running.promise).mockReturnValueOnce(trailing.promise);
@@ -334,7 +334,7 @@ describe('overlapping loadDailyDay calls', () => {
       });
     running.settle(ok(dailySnapshot()));
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
-    // Both promises wait for the trailing pass.
+    // The second call waits for the trailing pass, which started after it.
     await pause();
     expect(secondSettled).toBe(false);
     expect(state().dailyDayLoading).toBe(true);
@@ -343,6 +343,70 @@ describe('overlapping loadDailyDay calls', () => {
 
     expect(secondSettled).toBe(true);
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it("the first caller's promise settles after its own pass, while a trailing pass is still reading", async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    const trailing = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(running.promise).mockReturnValueOnce(trailing.promise);
+
+    let firstSettled = false;
+    const first = state()
+      .loadDailyDay()
+      .then(() => {
+        firstSettled = true;
+      });
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    let secondSettled = false;
+    const second = state()
+      .loadDailyDay()
+      .then(() => {
+        secondSettled = true;
+      });
+    running.settle(ok(dailySnapshot()));
+    await first;
+    // The trailing pass is requested and its read is out, but the first caller is done.
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    expect(firstSettled).toBe(true);
+    expect(secondSettled).toBe(false);
+    expect(state().dailyDayLoading).toBe(true);
+    trailing.settle(ok(waitingSnapshot('this')));
+    await second;
+    expect(secondSettled).toBe(true);
+  });
+
+  it('calls that arrive during the trailing pass share a third pass; each settles after the pass that covers it', async () => {
+    const reads = [
+      deferred<ReturnType<typeof ok>>(),
+      deferred<ReturnType<typeof ok>>(),
+      deferred<ReturnType<typeof ok>>(),
+    ];
+    fetchDailyDay
+      .mockReturnValueOnce(reads[0].promise)
+      .mockReturnValueOnce(reads[1].promise)
+      .mockReturnValueOnce(reads[2].promise);
+    const settled: string[] = [];
+    const track = (name: string, call: Promise<void>) =>
+      call.then(() => {
+        settled.push(name);
+      });
+
+    const a = track('a', state().loadDailyDay());
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    const b = track('b', state().loadDailyDay());
+    reads[0].settle(ok(dailySnapshot()));
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    // Arrives while the trailing pass reads: it asks for one more.
+    const c = track('c', state().loadDailyDay());
+    const d = track('d', state().loadDailyDay());
+    reads[1].settle(ok(dailySnapshot()));
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(3));
+    expect(settled).toEqual(['a', 'b']);
+    reads[2].settle(ok(waitingSnapshot('this')));
+    await Promise.all([a, b, c, d]);
+
+    expect(settled).toEqual(['a', 'b', 'c', 'd']);
+    expect(fetchDailyDay).toHaveBeenCalledTimes(3);
   });
 
   it('a read that fails still gets its trailing pass, and a later pass clears the error', async () => {
