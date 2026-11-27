@@ -6,7 +6,12 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoupleStreakAnswer, DailyDaySnapshot } from '../../../api/validation/dailyQuestionSchemas';
-import { coupleStreak, revealSnapshot } from '../../../../tests/unit/stores/dailyQuestionFixture';
+import {
+  calendarWeek,
+  coupleStreak,
+  revealSnapshot,
+  streakWeek,
+} from '../../../../tests/unit/stores/dailyQuestionFixture';
 
 vi.mock('../../../hooks/usePartnerStreakListener', () => ({
   usePartnerStreakListener: vi.fn(),
@@ -522,18 +527,10 @@ describe('PartnerView', () => {
       }
     });
 
-    it('shows seven dates with their states; the last is labelled Today', () => {
+    it('shows the calendar week Sunday to Saturday with the server states; no slot reads Today', () => {
       state = makeState({
         coupleStreak: okStreak({
-          week: [
-            { day: '2030-03-03', state: 'open' },
-            { day: '2030-03-04', state: 'done' },
-            { day: '2030-03-05', state: 'missed' },
-            { day: '2030-03-06', state: 'open' },
-            { day: '2030-03-07', state: 'done' },
-            { day: '2030-03-08', state: 'missed' },
-            { day: '2030-03-09', state: 'done' },
-          ],
+          calendar_week: calendarWeek(4, { 0: 'open', 1: 'done', 2: 'missed', 3: 'open', 4: 'done' }),
         }),
       });
       render(<PartnerView />);
@@ -547,11 +544,52 @@ describe('PartnerView', () => {
         'missed',
         'open',
         'done',
+        'upcoming',
+        'upcoming',
+      ]);
+      // 2030-03-03 is a Sunday: S M T W T F S, read as local dates, with no "Today".
+      expect(days.map((day) => day.textContent)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+      // The viewer's date, 2030-03-07 (the last date of `week`), is Thursday: its slot alone is ringed.
+      expect(days.map((day) => day.getAttribute('data-today'))).toEqual([
+        null,
+        null,
+        null,
+        null,
+        'true',
+        null,
+        null,
+      ]);
+    });
+
+    it('draws a streak saved before the calendar week from its last seven dates, today last and ringed', () => {
+      state = makeState({
+        coupleStreak: okStreak({ calendar_week: undefined, week: streakWeek(['missed', 'done']) }),
+      });
+      render(<PartnerView />);
+
+      const days = within(screen.getByTestId('partner-streak-week')).getAllByTestId(
+        'partner-streak-day'
+      );
+      expect(days.map((day) => day.getAttribute('data-state'))).toEqual([
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
         'missed',
         'done',
       ]);
-      // 2030-03-03 is a Sunday: S M T W T F, read as local dates, then Today.
-      expect(days.map((day) => day.textContent)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'Today']);
+      // 2030-03-01 is a Friday: F S S M T W T, today last, ringed, and no "Today".
+      expect(days.map((day) => day.textContent)).toEqual(['F', 'S', 'S', 'M', 'T', 'W', 'T']);
+      expect(days.map((day) => day.getAttribute('data-today'))).toEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        'true',
+      ]);
     });
   });
 });

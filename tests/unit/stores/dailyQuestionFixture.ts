@@ -103,8 +103,38 @@ export function streakWeek(states: CoupleStreak['week'][number]['state'][] = [])
   return padded.map((state, index) => ({ day: `2030-03-0${index + 1}`, state }));
 }
 
+type CalendarDay = NonNullable<CoupleStreak['calendar_week']>[number];
+
+/**
+ * The calendar week 2030-03-03 (Sunday) to 2030-03-09 (Saturday) as the server
+ * answers it for a viewer whose date is `todayIndex` (0 Sunday .. 6 Saturday,
+ * default 4: Thursday 03-07): `states` gives the state of an index, every
+ * other date up to today is `open` and every date after it `upcoming`.
+ */
+export function calendarWeek(
+  todayIndex = 4,
+  states: Partial<Record<number, 'done' | 'missed' | 'open'>> = {}
+): NonNullable<CoupleStreak['calendar_week']> {
+  return Array.from({ length: 7 }, (_, index): CalendarDay => ({
+    day: `2030-03-0${index + 3}`,
+    state: index > todayIndex ? 'upcoming' : (states[index] ?? 'open'),
+  }));
+}
+
 /** The streak `get_couple_streak` answers; override any field. Defaults to one done day, orange. */
 export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStreak {
+  const week = overrides.week ?? streakWeek(['done']);
+  // The calendar week 2030-03-03..03-09 as the server would derive it from `week`: its last
+  // date is the viewer's date, later dates are `upcoming`, an earlier date takes its state in
+  // `week` and a date `week` does not hold is `open`.
+  const today = week[week.length - 1].day;
+  const calendar_week = Array.from({ length: 7 }, (_, index): CalendarDay => {
+    const day = `2030-03-0${index + 3}`;
+    return {
+      day,
+      state: day > today ? 'upcoming' : (week.find((entry) => entry.day === day)?.state ?? 'open'),
+    };
+  });
   return {
     held: 1,
     run: 1,
@@ -113,7 +143,8 @@ export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStrea
     same: 1,
     done: 1,
     missed: 0,
-    week: streakWeek(['done']),
+    week,
+    calendar_week,
     ...overrides,
   };
 }

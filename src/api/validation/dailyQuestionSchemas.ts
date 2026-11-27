@@ -82,6 +82,15 @@ export const CoupleStreakWeekDaySchema = z.object({
   state: z.enum(['done', 'missed', 'open']),
 });
 
+/**
+ * One date of the streak's calendar week: the states of `week`, and `upcoming`
+ * for every date after the viewer's date.
+ */
+export const CoupleStreakCalendarDaySchema = z.object({
+  day: z.iso.date(),
+  state: z.enum(['done', 'missed', 'open', 'upcoming']),
+});
+
 const CountSchema = z.number().int().nonnegative();
 
 /**
@@ -98,6 +107,12 @@ export const CoupleStreakSchema = z.object({
   done: CountSchema,
   missed: CountSchema,
   week: z.array(CoupleStreakWeekDaySchema).length(7),
+  /**
+   * Sunday to Saturday of the week holding the viewer's date (story 11.3).
+   * Optional because a copy saved on the device before that story has none; the
+   * first successful read replaces it.
+   */
+  calendar_week: z.array(CoupleStreakCalendarDaySchema).length(7).optional(),
 });
 
 export type CoupleStreak = z.infer<typeof CoupleStreakSchema>;

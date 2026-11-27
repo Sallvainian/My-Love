@@ -2,18 +2,18 @@
  * StreakCard -- the couple's streak on the Partner page.
  *
  * Shows what `get_couple_streak` answered and computes nothing: the days held,
- * the run since the last missed day, the last seven dates, and how far the next
+ * the run since the last missed day, the calendar week, and how far the next
  * milestone (every 25 days) is. The card is orange when the viewer's date is
  * done (`today_state` orange), blue when a date was missed since (blue) and
  * grey otherwise. Plain `Flame` for grey and orange, `Snowflake` for blue. The
- * week strip is the shared `StreakWeek`, also used by Daily.
+ * week strip is the shared `StreakRow`, also used by Daily.
  *
  * @component
  */
 
 import { Flame, Snowflake } from 'lucide-react';
 import type { CoupleStreak } from '../../api/dailyQuestionApi';
-import { StreakWeek } from '../shared/StreakWeek';
+import { StreakRow } from '../shared/StreakWeek';
 
 /** Days between milestones (`milestones` is `floor(held / 25)`). */
 const MILESTONE_DAYS = 25;
@@ -87,7 +87,7 @@ export function StreakCard({ streak }: { streak: CoupleStreak }) {
         </div>
       </div>
 
-      <StreakWeek week={streak.week} testIdPrefix="partner-streak" labelClass={tone.soft} />
+      <StreakRow streak={streak} testIdPrefix="partner-streak" labelClass={tone.soft} />
 
       <p className={`text-xs font-semibold ${tone.soft}`} data-testid="partner-streak-next">
         Next milestone: {nextMilestone} days · {nextMilestone - streak.held} to go

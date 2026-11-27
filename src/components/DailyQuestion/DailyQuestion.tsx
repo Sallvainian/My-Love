@@ -117,7 +117,7 @@ import type { QueuedDailyPick } from '../../stores/slices/dailyDaySlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
-import { StreakWeek } from '../shared/StreakWeek';
+import { StreakRow } from '../shared/StreakWeek';
 import { Milestone } from './Milestone';
 import { NudgeSheet } from './NudgeSheet';
 import { StreakUp } from './StreakUp';
@@ -755,7 +755,7 @@ export function DailyQuestion() {
 
             {streak && (
               <div className={`${CARD} p-4`}>
-                <StreakWeek week={streak.week} testIdPrefix="daily-streak" labelClass="text-muted" />
+                <StreakRow streak={streak} testIdPrefix="daily-streak" labelClass="text-muted" />
               </div>
             )}
 

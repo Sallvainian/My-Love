@@ -52,6 +52,24 @@ describe('readSavedStreak', () => {
     expect(await readSavedStreak(A, null)).toEqual(streak);
   });
 
+  it('answers a streak saved before the calendar week, with no calendar_week', async () => {
+    const before = coupleStreak({ held: 4 });
+    delete before.calendar_week;
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, before);
+
+    const read = await readSavedStreak(A, null);
+
+    expect(read).toEqual(before);
+    expect(read).not.toHaveProperty('calendar_week');
+  });
+
+  it('answers the calendar week of a streak saved with it', async () => {
+    const streak = coupleStreak({ held: 4 });
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, streak);
+
+    expect((await readSavedStreak(A, null))?.calendar_week).toEqual(streak.calendar_week);
+  });
+
   it("never answers another account's streak", async () => {
     await writeLocalCopy(B, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 9 }));
 
@@ -122,6 +140,15 @@ describe('saveStreakAnswer', () => {
     expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toEqual({
       ...coupleStreak({ held: 3 }),
       partner_id: null,
+    });
+  });
+
+  it('keeps the calendar week of an ok answer in the saved copy', async () => {
+    const streak = coupleStreak({ held: 6 });
+    await saveStreakAnswer(A, { status: 'ok', streak }, UNLINKED, current);
+
+    expect(await readLocalCopy(A, DAILY_STREAK_COPY_KIND)).toMatchObject({
+      calendar_week: streak.calendar_week,
     });
   });
 

@@ -194,6 +194,23 @@ describe('fetchCoupleStreak', () => {
       },
     ],
     [
+      'a calendar week of six days',
+      {
+        status: 'ok',
+        streak: { ...coupleStreak(), calendar_week: coupleStreak().calendar_week?.slice(1) },
+      },
+    ],
+    [
+      'a calendar week state that is unknown',
+      {
+        status: 'ok',
+        streak: {
+          ...coupleStreak(),
+          calendar_week: coupleStreak().calendar_week?.map((d) => ({ ...d, state: 'x' })),
+        },
+      },
+    ],
+    [
       'a week state that is unknown',
       {
         status: 'ok',
