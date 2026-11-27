@@ -148,6 +148,18 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // The stack backend ([experimental] stack in supabase/config.toml) starts each
+  // service on its first request and stops it after 60 s idle; a cold start took
+  // up to 2 s when measured, time a spec's first assertion would spend. Wake
+  // Storage and Realtime here (provisioning below wakes Auth and REST). Any
+  // answer wakes a service, so the status is not checked; on the classic backend
+  // these are two cheap reads.
+  const wake = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
+  await Promise.allSettled([
+    fetch(`${url}/storage/v1/bucket`, { headers: wake }),
+    fetch(`${url}/realtime/v1/api/health`, { headers: wake }),
+  ]);
+
   // Create legacy users
   for (const user of LEGACY_TEST_USERS) {
     await ensureUser(admin, user.email, TEST_USER_PASSWORD, user.displayName);

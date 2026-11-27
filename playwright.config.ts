@@ -18,7 +18,7 @@ function signES256(payload: object, jwk: crypto.JsonWebKey & { kid?: string }): 
 
 /**
  * Load Supabase local env vars for test fixtures.
- * Parses `supabase status -o env` and, when GoTrue uses ES256 signing keys,
+ * Parses `supabase status`'s env output and, when GoTrue uses ES256 signing keys,
  * re-signs SERVICE_ROLE_KEY and ANON_KEY so they're accepted by the auth service.
  * Falls back gracefully if Supabase CLI is unavailable (CI).
  *
@@ -36,12 +36,74 @@ function signES256(payload: object, jwk: crypto.JsonWebKey & { kid?: string }): 
 // env vars were ever set.
 const execOpts = { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] } as const;
 
+/**
+ * The port of this checkout's test dev server. Every worktree has its own local
+ * Supabase (the stack backend), so it needs its own dev server too: with one fixed
+ * port, `reuseExistingServer` would hand a second worktree's run the first one's
+ * server, which points at the first worktree's database. A fixed port per folder,
+ * from a hash of its path, keeps reuse working within a checkout. CI keeps 5173.
+ * PLAYWRIGHT_DEV_PORT overrides it. BASE_URL is set here, before the workers start,
+ * so the auth provider and specs that read it agree with Playwright's baseURL.
+ */
+const devPort =
+  Number(process.env.PLAYWRIGHT_DEV_PORT) ||
+  (process.env.CI
+    ? 5173
+    : 5200 +
+      (parseInt(crypto.createHash('sha1').update(process.cwd()).digest('hex').slice(0, 8), 16) %
+        700));
+process.env.BASE_URL ??= `http://localhost:${devPort}`;
+
+/**
+ * This checkout's local Supabase as KEY=value lines. The stack backend
+ * (`[experimental] stack` in supabase/config.toml: one local Supabase per worktree
+ * and branch, each on its own ports) answers `status --env` and answers `-o env`
+ * with an error message and exit 0; the classic backend CI runs
+ * (SUPABASE_EXPERIMENTAL_STACK=0) rejects `--env`. So try the stack form first and
+ * keep whichever output carries API_URL.
+ */
+function localSupabaseEnv(): string {
+  for (const cmd of ['supabase status --env --output-format text', 'supabase status -o env']) {
+    try {
+      const output = execSync(cmd, execOpts);
+      if (/^API_URL=/m.test(output)) return output;
+    } catch {
+      // try the other backend's form
+    }
+  }
+  throw new Error('no local Supabase answers in this checkout');
+}
+
+/**
+ * The auth container of this checkout's local Supabase. The classic backend has one
+ * fixed name per project; the stack backend names it supabase-<project>-auth-<hash>,
+ * one per worktree and branch, so it is found by the stack id `status` reports.
+ */
+function authContainer(): string {
+  try {
+    const id = JSON.parse(execSync('supabase status --output-format json', execOpts))?.identity?.id;
+    if (typeof id === 'string' && /^[0-9a-f]+$/.test(id)) {
+      const name = execSync(
+        `docker ps --filter label=com.supabase.stack=${id} --filter label=com.supabase.service=auth --format "{{.Names}}"`,
+        execOpts
+      )
+        .trim()
+        .split('\n')[0];
+      if (name) return name;
+    }
+  } catch {
+    // classic backend: its status JSON has no identity
+  }
+  return 'supabase_auth_My-Love';
+}
+
 try {
-  const output = execSync('supabase status -o env', execOpts);
+  const output = localSupabaseEnv();
   const vars: Record<string, string> = {};
   for (const line of output.split('\n')) {
-    const match = line.match(/^(\w+)="(.+)"$/);
-    if (match) vars[match[1]] = match[2];
+    // The classic backend double-quotes values, the stack backend single-quotes them.
+    const match = line.match(/^(\w+)=(["'])(.+)\2$/);
+    if (match) vars[match[1]] = match[3];
   }
 
   let serviceRoleKey = vars.SERVICE_ROLE_KEY;
@@ -52,7 +114,7 @@ try {
     // Double quotes, not single: cmd.exe does not treat ' as a quote character,
     // so a single-quoted --format string arrives as separate argv entries there.
     const jwtKeysRaw = execSync(
-      'docker inspect supabase_auth_My-Love --format "{{range .Config.Env}}{{println .}}{{end}}"',
+      `docker inspect ${authContainer()} --format "{{range .Config.Env}}{{println .}}{{end}}"`,
       execOpts
     );
     const jwtKeysLine = jwtKeysRaw.split('\n').find((l) => l.startsWith('GOTRUE_JWT_KEYS='));
@@ -123,7 +185,7 @@ export default defineConfig({
   },
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.BASE_URL,
     trace: 'on',
     screenshot: 'on',
     video: 'on',
@@ -180,8 +242,8 @@ export default defineConfig({
   // the encrypted production credentials live in fnox.toml, not in any .env file.
   // In CI, set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY directly.
   webServer: {
-    command: 'npx vite --mode test',
-    url: 'http://localhost:5173',
+    command: `npx vite --mode test --port ${devPort} --strictPort`,
+    url: `http://localhost:${devPort}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
