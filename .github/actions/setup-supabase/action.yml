@@ -2,18 +2,6 @@ name: 'Setup Supabase Local'
 description: 'Install Supabase CLI, start local instance, apply migrations, and export credentials'
 
 inputs:
-  supabase-version:
-    description: 'Supabase CLI version to install'
-    required: false
-    # At least 2.117.0, not 2.77.1: the CLI's bundled Realtime image is what serves the
-    # REST broadcast endpoint `src/api/ephemeralBroadcast.ts:120` now sends on,
-    # and that route landed in Realtime v2.97.0. 2.77.1 predates it, so every
-    # `httpSend` in tests/api/couple-broadcast-authorization.spec.ts answered
-    # `the endpoint returned 404` while the same specs passed locally against
-    # the image 2.117.0 pulls (public.ecr.aws/supabase/realtime:v2.124.4).
-    # Keep this at or above the CLI the suite is developed against; a CI pin
-    # behind it silently tests a different Realtime than the app ships for.
-    default: '3.4.0'
   needs-mail:
     description: >-
       Start the Mailpit catcher for jobs whose specs read a real auth email.
@@ -35,83 +23,17 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # Replaces supabase/setup-cli, whose npm postinstall fetches the release
-    # tarball with no cache, no retry and no timeout — that single download
-    # produced the ECONNRESET failures on PRs #252 and #254 and a 15-minute
-    # silent hang that timed out PR #262's Backend Tests (api) job. Cache the
-    # binary keyed on the version, and make the cold-path download retried,
-    # time-bounded and checksum-verified. Cache scoping means a new PR branch
-    # takes the cold path once (it can only read caches from its own ref or
-    # main), so a cold download on a fresh branch is normal, not a broken cache.
-    # deploy.yml's migrate job and supabase-migrations.yml still use setup-cli,
-    # pinned to this same version. Locally the CLI comes from mise (.mise.toml,
-    # locked in mise.lock), so bump all three pins together with .mise.toml's.
-    - name: Cache Supabase CLI
-      id: cli-cache
-      uses: actions/cache@v6
+    # The CLI version is .mise.toml's, locked with its checksum in mise.lock: the
+    # same pin a Mac checkout uses, so local and CI cannot drift, and Renovate
+    # (renovate.json) bumps it in one place. mise verifies the download against
+    # mise.lock and caches it keyed on those files, so a new pin refreshes the
+    # cache. This replaced a hand-rolled download that existed because
+    # supabase/setup-cli's npm postinstall had no retry (ECONNRESET on PRs #252
+    # and #254, a 15-minute hang on #262); mise retries downloads (http_retries).
+    - name: Install Supabase CLI (mise)
+      uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
       with:
-        path: ~/.local/bin/supabase
-        key: ${{ runner.os }}-${{ runner.arch }}-supabase-cli-${{ inputs.supabase-version }}
-
-    - name: Install Supabase CLI
-      if: steps.cli-cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-        ver="${{ inputs.supabase-version }}"
-        base="https://github.com/supabase/cli/releases/download/v$ver"
-
-        # The release layout is not stable across versions, so probe instead of
-        # assuming. v2.77.1 publishes an UNversioned tarball
-        # (supabase_linux_amd64.tar.gz) beside a VERSIONED checksums file
-        # (supabase_2.77.1_checksums.txt); v2.117.0 inverts both -- versioned
-        # tarball, plain checksums.txt -- and a hardcoded pair 404s on one
-        # version or the other. The 404 is silent under -fsSL, so it surfaces
-        # three jobs later as `supabase: command not found`.
-        #
-        # --max-time bounds a single attempt; --retry-max-time bounds the
-        # whole retry loop. Without the latter, 5 retries of a hanging
-        # endpoint could outlast the 15-minute job timeout this defends.
-        dl() {
-          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 \
-            --max-time "$2" --retry-max-time "$3" -o "$4" "$base/$1"
-        }
-
-        tarball=""
-        for name in "supabase_${ver}_linux_amd64.tar.gz" "supabase_linux_amd64.tar.gz"; do
-          if dl "$name" 60 180 /tmp/supabase_cli.tar.gz; then tarball="$name"; break; fi
-        done
-        if [ -z "$tarball" ]; then
-          echo "::error::No linux_amd64 tarball found in supabase/cli release v$ver under either known name."
-          exit 1
-        fi
-
-        sums=""
-        for name in "checksums.txt" "supabase_${ver}_checksums.txt"; do
-          if dl "$name" 20 60 /tmp/supabase_checksums.txt; then sums="$name"; break; fi
-        done
-        if [ -z "$sums" ]; then
-          echo "::error::No checksums file found in supabase/cli release v$ver under either known name."
-          exit 1
-        fi
-
-        # The checksums file names the asset exactly as published, so match on
-        # the tarball name that actually downloaded, and fail loudly if that
-        # name is absent rather than piping an empty list into sha256sum.
-        if ! grep -q "  ${tarball}\$" /tmp/supabase_checksums.txt; then
-          echo "::error::$sums does not list $tarball; refusing to install an unverified binary."
-          exit 1
-        fi
-        cp /tmp/supabase_cli.tar.gz "/tmp/$tarball"
-        (cd /tmp && grep "  ${tarball}\$" supabase_checksums.txt | sha256sum -c -)
-
-        mkdir -p ~/.local/bin
-        tar -xzf /tmp/supabase_cli.tar.gz -C ~/.local/bin supabase
-        chmod +x ~/.local/bin/supabase
-
-    - name: Add Supabase CLI to PATH
-      shell: bash
-      run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        install_args: supabase
 
     # Pull Supabase's images from GitHub's container registry instead of the
     # CLI's default, public.ecr.aws. ECR rate-limits anonymous pulls: 49 of 50
@@ -215,7 +137,7 @@ runs:
         for svc in ${EXCLUDE//,/ }; do
           case ",$VALID," in
             *",$svc,"*) ;;
-            *) echo "::error::'$svc' is not an excludable container in Supabase CLI ${{ inputs.supabase-version }} (valid: $VALID). The exclusion list would silently do nothing."; exit 1 ;;
+            *) echo "::error::'$svc' is not an excludable container in Supabase CLI $(supabase --version) (valid: $VALID). The exclusion list would silently do nothing."; exit 1 ;;
           esac
         done
 

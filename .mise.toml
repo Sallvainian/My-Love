@@ -3,9 +3,12 @@
 # resolved version so every machine and CI still install the same build;
 # run `mise upgrade node` to move the lock to a newer 24.x.
 node = "24"
-# The version CI pins in .github/actions/setup-supabase/action.yml, deploy.yml
-# and supabase-migrations.yml; bump all four together. An exact version, not
-# "latest": scripts/sim-driver/sim compares `supabase --version` to this string.
+# The one Supabase CLI pin: CI installs it through jdx/mise-action (the
+# setup-supabase action, deploy.yml, supabase-migrations.yml) and Renovate
+# bumps it (renovate.json). Keep it at 2.117.0 or later: older releases bundle a
+# Realtime without the REST broadcast route src/api/ephemeralBroadcast.ts sends
+# on. An exact version, not "latest": scripts/sim-driver/sim compares
+# `supabase --version` to this string.
 supabase = "3.4.0"
 
 [settings]
