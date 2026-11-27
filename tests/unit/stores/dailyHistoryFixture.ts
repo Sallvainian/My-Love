@@ -10,16 +10,13 @@ import { cancelDateReminders } from '../../../src/services/dateReminders';
 import { deleteAccountImages } from '../../../src/services/imageCache';
 import { deleteAccountCopies } from '../../../src/services/localCopy';
 import { moodService } from '../../../src/services/moodService';
-import { useAppStore } from '../../../src/stores/useAppStore';
 import { accountDeletesSettled, setOnline } from './accountDataFixtures';
 import { revealSnapshot } from './dailyQuestionFixture';
+import { state } from './dailyQuestionSliceFixture';
+import { A, C } from './loaderIdentityGuardsFixture';
 
-export const A = 'USER-A-ID';
-export const C = 'USER-C-ID';
-
-export function state() {
-  return useAppStore.getState();
-}
+// The account ids and the store reader are the shared fixtures' own, re-exported here.
+export { A, C, state };
 
 export const day = (id: string, date: string) => ({ ...revealSnapshot('this', 'that'), day_id: id, day: date });
 export const PAGE = [day('d2', '2026-11-05'), day('d1', '2026-11-04')];

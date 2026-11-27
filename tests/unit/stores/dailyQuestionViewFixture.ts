@@ -9,21 +9,15 @@ import { vi } from 'vitest';
 import { openMyLoveDB } from '../../../src/services/dbSchema';
 import { deleteAccountCopies } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { dailySnapshot } from './dailyQuestionFixture';
+import { NEXT_DAY, SAME_DAY, ok } from './dailyQuestionSliceFixture';
 import { setOnline } from './navigatorFixtures';
 
-/** A local-time instant on the fixture's day (2026-11-05), whatever the machine's zone. */
-export const SAME_DAY = new Date(2026, 10, 5, 12);
-/** One minute past local midnight: the device's date is no longer the fixture's day. */
-export const NEXT_DAY = new Date(2026, 10, 6, 0, 1);
+// The fixture's instants and the `ok` answer are the slice tests' own, re-exported here.
+export { NEXT_DAY, SAME_DAY, ok };
+
 /** The sentence a `DQ002` refusal is stored with (`submitDailyPick`). */
 export const CLOCK_REFUSAL =
   "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.";
-
-export const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({
-  status: 'ok' as const,
-  snapshot,
-});
 
 export function setPartner(displayName: string | null) {
   useAppStore.setState({
