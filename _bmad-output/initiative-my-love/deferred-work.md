@@ -4477,3 +4477,10 @@ location: src/api/supabaseClient.ts:368 (`getSession`), :394 (`sessionMismatch`)
 severity: low
 reason: eb1fd874 bounded the users read with `requestTimeout`, but the two session reads and the SDK's token read before each request are not, and an abort signal is not checked during them. Every Daily RPC has the same gap, so it predates the single-flight change; with one pass in flight per identity, a stall there also delays the re-reads queued behind it.
 status: open
+
+### DW-554: On a device with nothing saved, the first +1 is lost when the day finishes before Daily's first claim answers.
+origin: investigation of a partner-streak.spec.ts:190 failure during the deferred-work agent run, 2026-11-26
+location: src/services/dailyCelebrated.ts:115-118 (`claimCelebration` seeds without playing when nothing is stored); src/components/DailyQuestion/DailyQuestion.tsx:661 (the claim waits for `readFor` and a settled streak)
+severity: low
+reason: With nothing saved for the account and partner, the first claim stores the streak's total and plays nothing (the first-read rule), so when both partners pick before this device's first claim answers, that day's +1 is never shown. On main the window is the mount's own reads (about 250 ms); the single-flight change widened it until c2b90f5d settled each caller after its own pass. main never failed in 38 CI runs; a test could wait for `data-streak-claimed="0"` before the partner picks, but on its own that would hide a regression rather than fix the race.
+status: open
