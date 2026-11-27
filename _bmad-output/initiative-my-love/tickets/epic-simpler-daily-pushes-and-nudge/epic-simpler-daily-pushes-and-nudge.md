@@ -50,8 +50,6 @@ R5 (parent R7, R11; spine AD-7, AD-10): The streak's row of seven dots, at the t
 - The both-answered push reads "You both answered today's question" over "Click to see what your partner answered!" whatever the day or the streak.
 - The streak's row on Daily and the Partner page shows Sunday to Saturday with today ringed, and an installed build's streak still loads.
 - `dateReminders.ts` is unchanged and its tests pass.
-- Shipped to production through `deploy.yml`. No native code changes, so no reinstall.
-- At closure: after the deploy, the Live Daily Check passes on production, and the hosted `daily-reminders` job's runs after the deploy succeed.
 
 ## Boundaries
 
