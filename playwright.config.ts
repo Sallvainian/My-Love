@@ -39,11 +39,13 @@ const execOpts = { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] } as c
 /**
  * The port of this checkout's test dev server. Every worktree has its own local
  * Supabase (the stack backend), so it needs its own dev server too: with one fixed
- * port, `reuseExistingServer` would hand a second worktree's run the first one's
- * server, which points at the first worktree's database. A fixed port per folder,
- * from a hash of its path, keeps reuse working within a checkout. CI keeps 5173.
- * PLAYWRIGHT_DEV_PORT overrides it. BASE_URL is set here, before the workers start,
- * so the auth provider and specs that read it agree with Playwright's baseURL.
+ * port, a second worktree's run would talk to the first one's server, which points
+ * at the first worktree's database. The port is a hash of the folder path; CI keeps
+ * 5173, and PLAYWRIGHT_DEV_PORT overrides it. Two folders can still hash to the
+ * same port (1 in 700), so locally the server is never reused (webServer below): a
+ * clash then fails with "port already used" instead of silently testing the other
+ * checkout. BASE_URL is set here, before the workers start, so the auth provider and
+ * specs that read it agree with Playwright's baseURL.
  */
 const devPort =
   Number(process.env.PLAYWRIGHT_DEV_PORT) ||
@@ -271,7 +273,9 @@ export default defineConfig({
   webServer: {
     command: `npx vite --mode test --port ${devPort} --strictPort`,
     url: `http://localhost:${devPort}`,
-    reuseExistingServer: !process.env.CI,
+    // Only with an explicit PLAYWRIGHT_DEV_PORT: a hashed port can clash with another
+    // checkout, whose server would point at the wrong local Supabase (see devPort).
+    reuseExistingServer: !process.env.CI && !!process.env.PLAYWRIGHT_DEV_PORT,
     timeout: 120 * 1000,
   },
 });
