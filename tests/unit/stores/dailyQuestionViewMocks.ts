@@ -4,15 +4,24 @@
  * body from here with a dynamic import. This module imports nothing from the
  * app, so a factory that loads it cannot loop back into a module being mocked.
  */
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 
-export const fetchDailyDay = vi.fn();
-export const submitDailyPickRequest = vi.fn();
-export const fetchCoupleStreak = vi.fn();
+// Each export is annotated with vitest's public `Mock`. Inferred, the type
+// names vitest's internal `Procedure`, which TypeScript can only write as a
+// path into node_modules, and a bmad-loop worktree (no node_modules of its
+// own) fails the typecheck with TS2883 on that path.
+export const fetchDailyDay: Mock = vi.fn();
+export const submitDailyPickRequest: Mock = vi.fn();
+export const fetchCoupleStreak: Mock = vi.fn();
 /** The partner-event subscription has its own test; here it is only mounted. */
-export const useDailyPickListener = vi.fn();
+export const useDailyPickListener: Mock = vi.fn();
 
-export function supabaseClientMock() {
+export function supabaseClientMock(): {
+  supabase: { from: Mock; auth: Record<string, never>; channel: Mock; removeChannel: Mock };
+  getPartnerId: Mock;
+  lookupPartnerId: Mock;
+  isSeedFallbackName: () => boolean;
+} {
   return {
     supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
     getPartnerId: vi.fn(),
