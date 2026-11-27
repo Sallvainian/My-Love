@@ -28,6 +28,24 @@ import { serialized } from './serializedState';
 export const A = 'USER-A-ID';
 export const C = 'USER-C-ID';
 
+/**
+ * How many times the store was written while `run` ran, synchronously. Any `set` counts, even
+ * one that writes a value the store already holds, so a read that starts at once is seen by its
+ * loading flag.
+ */
+export function storeWritesDuring(run: () => void): number {
+  let writes = 0;
+  const unsubscribe = useAppStore.subscribe(() => {
+    writes += 1;
+  });
+  try {
+    run();
+  } finally {
+    unsubscribe();
+  }
+  return writes;
+}
+
 /** A promise this test resolves by hand, so the account switch can land mid-flight */
 export function deferred<T>() {
   let settle: (value: T) => void = () => {};
