@@ -4,11 +4,8 @@ import {
   buildAnniversaryPayload,
   buildDailyBothAnsweredPayload,
   buildDailyNudgePayload,
-  buildDailyPartnerPickedPayload,
-  buildDailyQuestionPayload,
   buildDailyReminderPayload,
   DAILY_SOUND,
-  questionText,
   buildEventPayload,
   buildInteractionPayload,
   buildLoveNotePayload,
@@ -222,32 +219,7 @@ Deno.test('withBadge keeps a kind already on the payload', () => {
   assertEquals(withKind(badged, 'photo').aps.badge, 4);
 });
 
-// ---- Story 8.3: the five daily kinds (push-copy.md) ----
-
-Deno.test('the question is worded as Daily words it', () => {
-  assertEquals(questionText('Tea', 'Coffee'), 'Tea or Coffee?');
-});
-
-Deno.test('the morning push quotes the question and counts the day after the held streak', () => {
-  assertEquals(buildDailyQuestionPayload('Tea or Coffee?', 4), {
-    aps: {
-      alert: { title: 'Tea or Coffee?', body: "Today's question is here. Day 5 is waiting." },
-      'thread-id': PARTNER_ACTIVITY_THREAD_ID,
-    },
-  });
-  assertEquals(buildDailyQuestionPayload('Tea or Coffee?', 0).aps.alert.body, "Today's question is here. Day 1 is waiting.");
-});
-
-Deno.test('a partner pick names the picker and has no choice, with Your partner as the fallback', () => {
-  assertEquals(buildDailyPartnerPickedPayload('Casey'), {
-    aps: {
-      alert: { title: 'Casey made their pick', body: 'Pick yours to see what they chose.' },
-      'thread-id': PARTNER_ACTIVITY_THREAD_ID,
-    },
-  });
-  assertEquals(buildDailyPartnerPickedPayload(null).aps.alert.title, 'Your partner made their pick');
-  assertEquals(buildDailyPartnerPickedPayload('  ').aps.alert.title, 'Your partner made their pick');
-});
+// ---- Stories 8.3 and 11.2: the three daily kinds (push-copy.md) ----
 
 Deno.test('a nudge says the sender answered and wants to know the answer, names no streak, and plays the default sound', () => {
   assertEquals(buildDailyNudgePayload('Casey'), {
@@ -266,72 +238,39 @@ Deno.test('a nudge says the sender answered and wants to know the answer, names 
   });
 });
 
-Deno.test('the 8 PM reminder has two variants, both with the default sound', () => {
-  assertEquals(buildDailyReminderPayload('evening_self', 'Tea or Coffee?'), {
+Deno.test('the 8 PM reminder is one wording with the default sound', () => {
+  assertEquals(buildDailyReminderPayload(), {
     aps: {
-      alert: { title: "You haven't done your daily yet", body: 'Tea or Coffee? It takes two taps.' },
+      alert: { title: "Time's running out!", body: 'Answer your daily question before the day is over!' },
       'thread-id': PARTNER_ACTIVITY_THREAD_ID,
       sound: 'default',
     },
   });
-  assertEquals(buildDailyReminderPayload('evening_partner', 'Casey'), {
-    aps: {
-      alert: { title: "Casey hasn't done their daily", body: 'Nudge them before midnight.' },
-      'thread-id': PARTNER_ACTIVITY_THREAD_ID,
-      sound: 'default',
-    },
-  });
-  assertEquals(buildDailyReminderPayload('evening_partner', null).aps.alert.title, "Your partner hasn't done their daily");
 });
 
-Deno.test('both answered titles by the run: n days, 1 day, or none', () => {
-  assertEquals(buildDailyBothAnsweredPayload(7, 'Casey', false), {
+Deno.test('both answered is one wording with no sound, naming no count, partner or late tail', () => {
+  const payload = buildDailyBothAnsweredPayload();
+  assertEquals(payload, {
     aps: {
-      alert: { title: '7 days in a row', body: "You both answered. See Casey's pick." },
+      alert: { title: "You both answered today's question", body: 'Click to see what your partner answered!' },
       'thread-id': PARTNER_ACTIVITY_THREAD_ID,
     },
   });
-  assertEquals(buildDailyBothAnsweredPayload(1, 'Casey', false).aps.alert, {
-    title: '1 day in a row',
-    body: "You both answered. See Casey's pick.",
-  });
-  assertEquals(buildDailyBothAnsweredPayload(0, 'Casey', false).aps.alert, {
-    title: 'You both answered',
-    body: "See Casey's pick.",
-  });
-  assertEquals(buildDailyBothAnsweredPayload(0, null, false).aps.alert.body, "See Your partner's pick.");
-});
-
-Deno.test('a late both answered replaces the pick sentence with That day counts.', () => {
-  assertEquals(buildDailyBothAnsweredPayload(3, 'Casey', true).aps.alert, {
-    title: '3 days in a row',
-    body: 'You both answered. That day counts.',
-  });
-  assertEquals(buildDailyBothAnsweredPayload(1, 'Casey', true).aps.alert.body, 'You both answered. That day counts.');
-  assertEquals(buildDailyBothAnsweredPayload(0, 'Casey', true).aps.alert, {
-    title: 'You both answered',
-    body: 'That day counts.',
-  });
-});
-
-Deno.test('only the nudge and both 8 PM reminders carry a sound; the badge and kind are left to the handler', () => {
-  const silent = [
-    buildDailyQuestionPayload('Tea or Coffee?', 2),
-    buildDailyPartnerPickedPayload('Casey'),
-    buildDailyBothAnsweredPayload(2, 'Casey', false),
-    buildDailyBothAnsweredPayload(2, 'Casey', true),
-  ];
-  for (const payload of silent) {
-    assertFalse('sound' in payload.aps);
-    assertFalse('badge' in payload.aps);
-    assertFalse('kind' in payload);
+  const text = JSON.stringify(payload);
+  for (const forbidden of ['in a row', 'That day counts.', 'See ', 'Your partner']) {
+    assertFalse(text.includes(forbidden), forbidden);
   }
-  for (const payload of [
-    buildDailyNudgePayload('Casey'),
-    buildDailyReminderPayload('evening_self', 'Tea or Coffee?'),
-    buildDailyReminderPayload('evening_partner', 'Casey'),
-  ]) {
+});
+
+Deno.test('only the nudge and the 8 PM reminder carry a sound; the badge and kind are left to the handler', () => {
+  const both = buildDailyBothAnsweredPayload();
+  assertFalse('sound' in both.aps);
+  assertFalse('badge' in both.aps);
+  assertFalse('kind' in both);
+  for (const payload of [buildDailyNudgePayload('Casey'), buildDailyReminderPayload()]) {
     assertEquals(payload.aps.sound, DAILY_SOUND);
     assertEquals(DAILY_SOUND, 'default');
+    assertFalse('badge' in payload.aps);
+    assertFalse('kind' in payload);
   }
 });

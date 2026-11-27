@@ -1,9 +1,10 @@
 /**
- * The 8 AM and 8 PM pushes on each person's clock, over the wire against the local
- * stack (epic-daily-pushes-and-nudge, story 8.5). `enqueue_daily_reminders(at)`
- * inserts each due person's `daily_reminders` row, the row's AFTER INSERT trigger
- * posts it to `send-push` through `pg_net`, and the sender records the request it
- * would have sent (CI cannot reach APNs).
+ * The 8 PM reminder on each person's clock, over the wire against the local stack
+ * (epic-daily-pushes-and-nudge, story 8.5; story 11.2 of epic-simpler-daily-pushes-and-nudge
+ * removed the 8 AM push and the evening_partner variant). `enqueue_daily_reminders(at)`
+ * inserts each due person's `daily_reminders` row, the row's AFTER INSERT trigger posts it to
+ * `send-push` through `pg_net`, and the sender records the request it would have sent (CI
+ * cannot reach APNs).
  *
  * A throwaway linked pair lives in `Asia/Kathmandu` (+05:45, no DST), Alice with one
  * device and Bob with two. The date D is Kathmandu's yesterday, so the instants sit in
@@ -11,14 +12,14 @@
  * A whole-hour zone reads those as :40, never inside a window (a window ends at :30),
  * so only an account in a half-hour zone could be due too. The function sees every
  * account, so a psql guard first requires that no account but this pair is due at
- * either instant: the rpc's return count is then the pair's own, and no other
+ * the evening instant: the rpc's return count is then the pair's own, and no other
  * account's rows are touched (the spec never reaches the pool pairs' rows).
  *
- * Asserted: the rpc at D 08:25 inserts 2 rows, both `morning`, whose records quote
- * D's question with no streak ("Day 1") and no sound; a repeat inserts 0 and the
- * records are unchanged; after Alice's pick for D, the rpc at D 20:25 inserts
- * Alice's `evening_partner` and Bob's `evening_self`, each recorded for that
- * person's devices only, with the default sound.
+ * Asserted: the rpc at D 08:25 inserts 0 rows, records no request and assigns the pair no
+ * couple day for D; after Alice's pick for D, the rpc at D 20:25 inserts Bob's
+ * `evening_self` alone, recorded for his devices only with the one reminder wording and the
+ * default sound, and nothing for Alice, who picked, though her partner has not; a repeat
+ * inserts 0 and the records are unchanged.
  *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI); the `api` project runs one worker.
@@ -31,6 +32,7 @@ import {
   kathmanduInstant,
   kathmanduYesterday,
   otherAccountsDueAt,
+  seedPairDay,
 } from '../support/helpers/daily-clock';
 import { runPsql } from '../support/helpers/migration-replay';
 import {
@@ -47,19 +49,30 @@ const ZONE = KATHMANDU_ZONE;
 const OFFSET_MINUTES = KATHMANDU_OFFSET_MINUTES;
 
 test.describe('Daily reminders on each person\'s clock', () => {
-  async function reminderId(supabaseAdmin: TypedSupabaseClient, userId: string, slot: 'morning' | 'evening', day: string) {
+  async function reminderId(supabaseAdmin: TypedSupabaseClient, userId: string, day: string) {
     const { data, error } = await supabaseAdmin
       .from('daily_reminders')
-      .select('id, kind, local_date')
+      .select('id')
       .eq('user_id', userId)
-      .eq('slot', slot)
+      .eq('slot', 'evening')
       .eq('local_date', day)
       .single();
-    expect(error, `${slot} reminder`).toBeNull();
-    return data!;
+    expect(error, 'evening reminder').toBeNull();
+    return data!.id;
   }
 
-  test('[P0] the morning and evening pushes are queued on the pair\'s own clock, once, and recorded for the right devices', async ({
+  /** The reminder rows these accounts hold, as the columns the pair's assertions compare. */
+  async function remindersOf(supabaseAdmin: TypedSupabaseClient, userIds: string[]) {
+    const { data, error } = await supabaseAdmin
+      .from('daily_reminders')
+      .select('user_id, kind, slot, local_date, day_id')
+      .in('user_id', userIds)
+      .order('user_id');
+    expect(error, 'reminders').toBeNull();
+    return data ?? [];
+  }
+
+  test('[P0] the 8 PM reminder is queued on the pair\'s own clock, once, only for whoever has not picked, and recorded for the right devices', async ({
     supabaseAdmin,
     cleanup,
   }) => {
@@ -81,77 +94,85 @@ test.describe('Daily reminders on each person\'s clock', () => {
     const morningAt = kathmanduInstant(day, '08:25');
     const eveningAt = kathmanduInstant(day, '20:25');
     const own = [alice.userId, bob.userId];
+    const pair = { userId: alice.userId, partnerId: bob.userId };
 
-    // No other account is due at either instant, so the rpc's count is this pair's own.
-    expect(await otherAccountsDueAt(morningAt, own), 'accounts due at the morning instant').toBe(0);
+    // No other account is due at the evening instant, so the rpc's count is this pair's own.
     expect(await otherAccountsDueAt(eveningAt, own), 'accounts due at the evening instant').toBe(0);
 
-    // ---- 8 AM on D in Kathmandu: both get a morning row ----
+    // ---- 8 AM on D in Kathmandu: no reminder, no request and no day assigned ----
     const morning = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: morningAt });
     expect(morning.error).toBeNull();
-    expect(morning.data).toBe(2);
+    // Nothing is inserted at 08:25, for this pair or any other account on the stack.
+    expect(morning.data).toBe(0);
+    expect(await remindersOf(supabaseAdmin, own)).toEqual([]);
+    expect(await readPairQuestionsByDay(supabaseAdmin, pair)).toEqual([]);
 
-    const aliceMorning = await reminderId(supabaseAdmin, alice.userId, 'morning', day);
-    const bobMorning = await reminderId(supabaseAdmin, bob.userId, 'morning', day);
-    expect([aliceMorning.kind, bobMorning.kind]).toEqual(['morning', 'morning']);
+    // ---- Alice picks D at 07:25; a second 8 AM tick then records nothing for either partner ----
+    const dayId = await seedPairDay(pair, day, [{ userId: alice.userId, pickedAt: kathmanduInstant(day, '07:25') }]);
+    const lateMorning = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: kathmanduInstant(day, '08:29') });
+    expect(lateMorning.error).toBeNull();
+    expect(lateMorning.data).toBe(0);
+    // No reminder row exists for either partner, so no `daily_reminder_id` request can either.
+    expect(await remindersOf(supabaseAdmin, own)).toEqual([]);
 
-    const pair = { userId: alice.userId, partnerId: bob.userId };
-    const question = (await readPairQuestionsByDay(supabaseAdmin, pair)).find((d) => d.day === day);
-    expect(question, `the pair's day ${day}`).toBeDefined();
-    const asked = `${question!.this} or ${question!.that}?`;
-    const morningPayload = dailyPayload('daily_question', asked, "Today's question is here. Day 1 is waiting.");
-
-    const aliceMorningRows = await awaitRequests(supabaseAdmin, aliceMorning.id, 'daily_reminder_id', 1);
-    expect(aliceMorningRows.map((r) => [r.token, r.delivery])).toEqual([[aliceDevice, 'recorded']]);
-    const bobMorningRows = await awaitRequests(supabaseAdmin, bobMorning.id, 'daily_reminder_id', 2);
-    expect(bobMorningRows.map((r) => [r.token, r.delivery]).sort()).toEqual(
-      [
-        [bobPhone, 'recorded'],
-        [bobTablet, 'recorded'],
-      ].sort()
-    );
-    for (const row of [...aliceMorningRows, ...bobMorningRows]) {
-      expect(row.payload).toEqual(morningPayload);
-    }
-
-    // ---- the same instant again inserts nothing and records nothing new ----
-    const repeat = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: morningAt });
-    expect(repeat.error).toBeNull();
-    expect(repeat.data).toBe(0);
-    expect(await requestsFor(supabaseAdmin, aliceMorning.id, 'daily_reminder_id')).toEqual(aliceMorningRows);
-    expect(await requestsFor(supabaseAdmin, bobMorning.id, 'daily_reminder_id')).toEqual(bobMorningRows);
-
-    // ---- Alice picks D; 8 PM then tells her Bob has not, and Bob to pick ----
-    const [userA, userB] = orderedPair(pair);
-    const picked = await runPsql(
-      'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
-        `select cd.id, '${alice.userId}', 'this', timestamptz '${morningAt}' + interval '1 hour', '${ZONE}', ${OFFSET_MINUTES}, ` +
-        `public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), false ` +
-        `from public.couple_days cd where cd.user_a = '${userA}' ` +
-        `and cd.user_b = '${userB}' and cd.day = date '${day}';\n`
-    );
-    expect(picked.code, picked.stderr).toBe(0);
+    // ---- 8 PM then tells Bob, who has not picked, and not Alice ----
 
     const evening = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: eveningAt });
     expect(evening.error).toBeNull();
-    expect(evening.data).toBe(2);
+    expect(evening.data).toBe(1);
 
-    const aliceEvening = await reminderId(supabaseAdmin, alice.userId, 'evening', day);
-    const bobEvening = await reminderId(supabaseAdmin, bob.userId, 'evening', day);
-    expect([aliceEvening.kind, bobEvening.kind]).toEqual(['evening_partner', 'evening_self']);
+    expect(await remindersOf(supabaseAdmin, own)).toEqual([
+      { user_id: bob.userId, kind: 'evening_self', slot: 'evening', local_date: day, day_id: dayId },
+    ]);
+    const bobEvening = await reminderId(supabaseAdmin, bob.userId, day);
 
-    const aliceEveningRows = await awaitRequests(supabaseAdmin, aliceEvening.id, 'daily_reminder_id', 1);
-    expect(aliceEveningRows.map((r) => r.token)).toEqual([aliceDevice]);
-    expect(aliceEveningRows[0].payload).toEqual(
-      dailyPayload('daily_reminder', `${bob.name} hasn't done their daily`, 'Nudge them before midnight.', 'default')
-    );
-
-    const bobEveningRows = await awaitRequests(supabaseAdmin, bobEvening.id, 'daily_reminder_id', 2);
+    const bobEveningRows = await awaitRequests(supabaseAdmin, bobEvening, 'daily_reminder_id', 2);
     expect(bobEveningRows.map((r) => r.token).sort()).toEqual([bobPhone, bobTablet].sort());
     for (const row of bobEveningRows) {
       expect(row.payload).toEqual(
-        dailyPayload('daily_reminder', "You haven't done your daily yet", `${asked} It takes two taps.`, 'default')
+        dailyPayload(
+          'daily_reminder',
+          "Time's running out!",
+          'Answer your daily question before the day is over!',
+          'default'
+        )
       );
     }
+
+    // ---- the same instant again inserts nothing and records nothing new ----
+    const repeat = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: eveningAt });
+    expect(repeat.error).toBeNull();
+    expect(repeat.data).toBe(0);
+    expect(await requestsFor(supabaseAdmin, bobEvening, 'daily_reminder_id')).toEqual(bobEveningRows);
+
+    // ---- Bob answers late in the evening: Alice hears both answered, and that is the day's last push ----
+    const [userA, userB] = orderedPair(pair);
+    const second = await runPsql(
+      'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
+        `select cd.id, '${bob.userId}', 'that', timestamptz '${eveningAt}' + interval '1 minute', '${ZONE}', ${OFFSET_MINUTES}, ` +
+        `public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), true ` +
+        `from public.couple_days cd where cd.user_a = '${userA}' and cd.user_b = '${userB}' and cd.day = date '${day}';\n`
+    );
+    expect(second.code, second.stderr).toBe(0);
+    const { data: picks, error: picksError } = await supabaseAdmin
+      .from('daily_picks')
+      .select('id, user_id')
+      .eq('day_id', dayId);
+    expect(picksError).toBeNull();
+    const alicePick = picks!.find((p) => p.user_id === alice.userId)!.id;
+    const bobPick = picks!.find((p) => p.user_id === bob.userId)!.id;
+    const bothRows = await awaitRequests(supabaseAdmin, bobPick, 'daily_pick_id', 1);
+    expect(bothRows.map((r) => r.token)).toEqual([aliceDevice]);
+    expect(bothRows[0].payload).toEqual(
+      dailyPayload(
+        'daily_both_answered',
+        "You both answered today's question",
+        'Click to see what your partner answered!'
+      )
+    );
+    // Altogether the pair was pushed twice: the reminder to Bob and both answered to Alice, and Alice's
+    // own first pick pushed nobody.
+    expect(await requestsFor(supabaseAdmin, alicePick, 'daily_pick_id')).toEqual([]);
+    expect(await requestsFor(supabaseAdmin, bobEvening, 'daily_reminder_id')).toEqual(bobEveningRows);
   });
 });

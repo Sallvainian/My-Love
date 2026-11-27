@@ -339,10 +339,8 @@ describe('readSavedPushPreferences', () => {
     expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
   });
 
-  it('reads a copy saved before story 8.4 (no daily keys) with the five daily switches on', async () => {
+  it('reads a copy saved before story 8.4 (no daily keys) with the three daily switches on', async () => {
     const {
-      dailyQuestion: _q,
-      dailyPartnerPicked: _p,
       dailyNudge: _n,
       dailyReminder: _r,
       dailyBothAnswered: _b,
@@ -351,6 +349,29 @@ describe('readSavedPushPreferences', () => {
     await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, beforeDaily);
 
     expect(await readSavedPushPreferences(A)).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
+  });
+
+  it('parses a copy the build before story 11.2 saved, dropping its two removed keys', async () => {
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, {
+      ...ALL_PUSH_PREFERENCES_ON,
+      moods: false,
+      dailyQuestion: false,
+      dailyPartnerPicked: false,
+    });
+
+    const read = await readSavedPushPreferences(A);
+
+    expect(read).toEqual({ ...ALL_PUSH_PREFERENCES_ON, moods: false });
+    expect(read).not.toHaveProperty('dailyQuestion');
+    expect(read).not.toHaveProperty('dailyPartnerPicked');
+  });
+
+  it('still reads a copy without the two removed keys, and every switch of it as saved', async () => {
+    const saved = { ...ALL_PUSH_PREFERENCES_ON, dailyReminder: false };
+    expect(saved).not.toHaveProperty('dailyQuestion');
+    await writeLocalCopy(A, PUSH_PREFERENCES_COPY_KIND, saved);
+
+    expect(await readSavedPushPreferences(A)).toEqual(saved);
   });
 
   it('keeps a saved daily switch that is off', async () => {

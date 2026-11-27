@@ -1,7 +1,7 @@
 /**
  * NotificationsPage — Settings > Notifications (`/settings/notifications`):
- * a switch for each kind of push (the five Daily ones last: New question,
- * Partner picked, Nudges, Evening reminder, Both answered), and below them
+ * a switch for each kind of push (the three Daily ones last: Nudges,
+ * Evening reminder, Both answered), and below them
  * the "Reminders" group with the Date reminders switch. The page is
  * registered in `SUBPAGES` with `available: hasNativePush`, so the website,
  * the Home Screen web app and a shell installed before the push plugins
@@ -34,12 +34,10 @@ import {
   Bell,
   BellRing,
   CalendarHeart,
-  CircleCheck,
   Hand,
   HeartHandshake,
   Image as ImageIcon,
   MessageCircleHeart,
-  MessageCircleQuestionMark,
   Moon,
   Smile,
   UserPlus,
@@ -77,18 +75,6 @@ const ROWS: readonly PushRow[] = [
     testId: 'partner-requests',
     icon: UserPlus,
     label: 'Partner requests',
-  },
-  {
-    key: 'dailyQuestion',
-    testId: 'new-question',
-    icon: MessageCircleQuestionMark,
-    label: 'New question',
-  },
-  {
-    key: 'dailyPartnerPicked',
-    testId: 'partner-picked',
-    icon: CircleCheck,
-    label: 'Partner picked',
   },
   { key: 'dailyNudge', testId: 'nudges', icon: BellRing, label: 'Nudges' },
   { key: 'dailyReminder', testId: 'evening-reminder', icon: Moon, label: 'Evening reminder' },

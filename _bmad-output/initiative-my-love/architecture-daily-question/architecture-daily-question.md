@@ -70,12 +70,12 @@ Arrows point the only way a dependency may run. Views never call the API directl
 
 - **Binds:** epics 6, 7, 8
 - **Prevents:** pushes and day closure each inventing their own idea of a partner's clock
-- **Rule:** `user_time_zones (user_id pk, time_zone, utc_offset_minutes, effective_zone, reported_at)` holds each user's zone. Only `get_daily_day` writes it, and only when its `reported_at` is newer than the stored one; a `reported_at` later than `now() + 5 min` is clamped to `now()`. A pick never writes it. Only the cron job (AD-9), the streak (AD-7), the nudge's hold and closing instant (AD-17) and `user_local_date` (AD-10) read the stored zone; a fetch dates itself with the zone it sends. Closing day `d` uses each partner's zone from their own pick of `d` when that pick exists, and the stored zone otherwise. A user with no row gets no scheduled push, and their days close on UTC.
+- **Rule:** `user_time_zones (user_id pk, time_zone, utc_offset_minutes, effective_zone, reported_at)` holds each user's zone. Only `get_daily_day` writes it, and only when its `reported_at` is newer than the stored one; a `reported_at` later than `now() + 5 min` is clamped to `now()`. A pick never writes it. Only the cron job (AD-9), the streak (AD-7), the nudge's hold and closing instant (AD-17) and `user_local_date` (AD-10, which `send-push` no longer calls) read the stored zone; a fetch dates itself with the zone it sends. Closing day `d` uses each partner's zone from their own pick of `d` when that pick exists, and the stored zone otherwise. A user with no row gets no scheduled push, and their days close on UTC.
 
 ### AD-4: One function assigns the day's question
 
 - **Binds:** R1, R3, R4; epics 6, 8
-- **Prevents:** the client and the 8 AM push each drawing a question, a question repeating within a cycle, two written questions both claiming one date, both partners asked to write on one day
+- **Prevents:** the client and the 8 PM reminder each drawing a question, a question repeating within a cycle, two written questions both claiming one date, both partners asked to write on one day
 - **Rule:** only the internal `assign_couple_day(user_a, user_b, day)` creates a `couple_days` row. It takes `pg_advisory_xact_lock` on the pair, then inserts into `couple_days` (`unique (user_a, user_b, day)`, `cycle int not null`, `writer uuid not null`) on conflict do nothing, then selects. It takes the couple's earliest pending written question whose `target_day <= day`, so a question whose own date got no row is still asked next. Otherwise it draws at random from the coach's questions plus the couple's own, excluding every `question_id` in the current cycle; when none is left, it starts cycle `max + 1`. Each row stores its writer, `couple_days.writer`, fixed from the date alone: `user_a` when `day - date '2000-01-01'` is even, else `user_b`. It is never derived from a count of rows, so a date with no row still keeps the turns alternating. A written question goes in only through `submit_written_question(day_id, this_text, that_text)`, which takes the same pair lock and records `source_day_id`. It refuses unless the caller is `day_id`'s writer, the caller's own pick of `day_id` exists and `day_id`'s `day` is still the caller's current date (AD-2), so the prompt follows the writer's pick, never the reveal, and a turn ends with its date. Its target is the first date after `day_id`'s `day` that has no `couple_days` row, so an ahead partner having already opened the next date does not push it to the pool. `unique (source_day_id)` holds it to one per source day, and a retry returns the existing row unchanged. "No thanks" writes nothing, and an unused turn is not carried over.
 
 ### AD-5: One gate releases a pick's choice
@@ -85,7 +85,7 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Rule:**
   - `visible_daily_picks(viewer, at)` is a `security definer` set-returning internal function, and the only SQL that selects `daily_picks.choice`. It returns the viewer's own rows. It returns a partner's row only where the viewer's own pick for that `day_id` exists and the day belongs to the viewer's current pair.
   - `daily_picks` grants `authenticated` nothing, SELECT included (AD-15), so no direct read can go around the gate, and no table policy duplicates its rule. `service_role` gets column SELECT on every `daily_picks` column except `choice`.
-  - The fact that a partner picked (the snapshot's `state`) is deliberately visible, as the mock-up's "Jessie made their pick" push shows; "no trace" in the Done-when means the choice. No broadcast or push payload ever carries a `choice`.
+  - The fact that a partner picked (the snapshot's `state`) is deliberately visible (the waiting screen and a nudge rest on it); "no trace" in the Done-when means the choice. No broadcast or push payload ever carries a `choice`.
   - A local copy holds a partner's `choice` only when it came from a server answer the gate released to that account.
   - `send-push` never reads `choice`.
   - One pgTAP file calls every client RPC as the second partner before their own pick and asserts that no choice, Same/Different mark or count for that day comes back. It also asserts that a direct select on `daily_picks` as that partner is denied. Every new client RPC is added to that file in the same change.
@@ -107,14 +107,14 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Prevents:** the Partner page, Daily and the push copy counting the streak three different ways
 - **Rule:**
   - The internal `couple_streak(user_a, user_b, viewer, at)` returns `held` (the streak), `run` (days in a row), `today_state` (`grey | orange | blue`, for the viewer's date), `milestones` (`floor(held / 25)`), `same`, `done`, `missed` and `week`. `missed` is the number of missed dates after the newest done date, or of all missed dates when none is done. `week` is seven `{ day, state: 'done' | 'missed' | 'open' }`, oldest first, ending on the viewer's date; a date before the couple's first day is `open`. No client works out a day's state itself.
-  - The viewer's date is `at` in the viewer's stored zone (AD-3), UTC with no row, for a client and for `send-push` alike.
+  - The viewer's date is `at` in the viewer's stored zone (AD-3), UTC with no row, for a client; `send-push` reads no streak or date (story 11.2).
   - Day `d` is done when both picks exist. It is closed once `at` passes the later of the two partners' local midnights ending `d` (AD-3).
   - A missed day is any closed calendar date since the couple's first `couple_days.day` that is not done, including dates with no row.
   - `run` is the number of done dates after the newest missed date, or of all done dates when none is missed; an open day never breaks it.
   - `today_state` is orange when today is done, else blue when `missed > 0`, else grey. So blue ends as soon as a done date is newer than every missed one, even before that date has closed on both partners' clocks, and blue never comes with `missed` 0.
   - Nothing is stored, so a late pick corrects the result by itself.
   - Same/Different is decided per day inside AD-16's snapshot, and `couple_streak` sums those same marks.
-  - The client RPC `get_couple_streak()` passes `auth.uid()` and answers `{ status: 'ok', streak } | { status: 'unlinked' }`; `send-push` passes the recipient. In copy, "streak" means `held` and "in a row" means `run`.
+  - The client RPC `get_couple_streak()` passes `auth.uid()` and answers `{ status: 'ok', streak } | { status: 'unlinked' }`; `send-push` no longer calls it (story 11.2). In copy, "streak" means `held` and "in a row" means `run`.
 
 ### AD-8: Time-dependent SQL takes the instant, internally
 
@@ -122,16 +122,15 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Prevents:** untestable functions, and a client faking "now" to assign future days or pick past ones
 - **Rule:** every internal function whose result depends on time takes `at timestamptz` and reads no other clock. Client RPCs never take `at`; they pass `now()`. pgTAP calls the internal functions with fixed instants. E2E follows the existing `clockAnchor()` rule.
 
-### AD-9: The server schedules the 8 AM and 8 PM pushes
+### AD-9: The server schedules the 8 PM reminder
 
 - **Binds:** R14, C2, C4; epic 8
 - **Prevents:** phone-scheduled notifications that the date reminders' cancel-all deletes, and conditions on the partner's pick that the phone cannot see
 - **Rule:**
   - A named `pg_cron` job, `*/5 * * * *`, calls `enqueue_daily_reminders(at)`. Epic 8's migration creates the extension on hosted, where it is available but not installed, and re-schedules the job by name, which is idempotent. A second named job deletes `cron.job_run_details` rows older than 7 days. Any removal guards `cron.unschedule` with an existence check.
-  - Before it looks at any user, the function calls `release_held_daily_nudges(at)` in its own exception block (AD-17): a nudge held until its recipient's 08:00 goes out on the first tick of 08:00–08:30 on their clock. The function considers only users with a linked partner and at least one `push_devices` row. It handles each user in its own exception block, as `notify_push` does. It inserts `(user_id, kind, local_date, day_id)` into `daily_reminders (user_id, kind, slot, local_date, day_id, unique (user_id, local_date, slot))`, where `kind` is `morning | evening_self | evening_partner`, and `day_id` is `not null` and cascades with `couple_days`, so `reset_bot_daily_days` still clears a pair. `slot` is a stored generated column from `kind`: `morning` for `morning`, `evening` for `evening_self` and `evening_partner`. No insert sets it, so no row can carry a slot that disagrees with its kind and slip past the unique key.
-  - Both slots call `assign_couple_day` (AD-4) for the recipient's local date before inserting, so every row has a day: the morning push and `evening_self` quote its question, and the evening's who-has-picked test reads that day's picks.
-  - `morning` is due 08:00–08:30 local while the recipient has not picked.
-  - The evening reminder is due 20:00–20:30 local unless both have picked, and the variant is decided per recipient when the row is inserted. `evening_self` ("you haven't done your daily yet", opens Daily) goes when the recipient has not picked. `evening_partner` ("your partner hasn't done their daily", opens Daily's waiting screen to nudge) goes when only the recipient has, and is skipped when the recipient has already sent a nudge about that day's question, from either source (AD-17).
+  - Before it looks at any user, the function calls `release_held_daily_nudges(at)` in its own exception block (AD-17): a nudge held until its recipient's 08:00 goes out on the first tick of 08:00–08:30 on their clock. The function considers only users with a linked partner and at least one `push_devices` row. It handles each user in its own exception block, as `notify_push` does. It inserts `(user_id, kind, local_date, day_id)` into `daily_reminders (user_id, kind, slot, local_date, day_id, unique (user_id, local_date, slot))`, where `kind` is `evening_self` alone, and `day_id` is `not null` and cascades with `couple_days`, so `reset_bot_daily_days` still clears a pair. `slot` is a stored generated column from `kind` that now always reads `evening` (kept, because the unique key names it). No insert sets it.
+  - It calls `assign_couple_day` (AD-4) for the recipient's local date before inserting, so every row has a day and the who-has-picked test reads that day's picks. At 08:00 the loop never reaches `assign_couple_day`, so the 08:00 tick assigns no day: the held-nudge release is the only work it does there (story 11.2).
+  - The one reminder is due 20:00–20:30 local while the recipient has not picked, whether or not their partner has, and goes only to that person: `evening_self` ("Time's running out!", opens Daily). A person who has picked gets no 8 PM push, and there is no 8 AM push. Story 11.2 removed the stored `morning` and `evening_partner` kinds: the migration deletes their rows and `daily_reminders_kind_check` allows `evening_self` alone.
   - A missed window sends nothing. A failed post is not retried (accepted; the signal is `net._http_response` and `cron.job_run_details`).
   - The phone never schedules a daily push, so `reminderIdsToCancel` stays as it is.
 
@@ -140,21 +139,19 @@ Arrows point the only way a dependency may run. Views never call the API directl
 - **Binds:** R13, R14, R19, C2; epics 8, 10
 - **Prevents:** a second push path that skips the dedupe and the switch check, two kinds sharing one dedupe column with no map, the order of picks being guessed when the push is sent, and epic 10 breaking installed shells
 - **Rule:**
-  - One trigger per kind, each with a `WHEN` clause, calls `notify_push('<final kind>')`, and `send-push` resolves the row with its privileged key (the new secret key, PR #469). Every trigger is AFTER INSERT but the second `daily_nudges` one, which is AFTER UPDATE OF `released_at` and posts a held nudge when the hold ends (AD-17):
+  - One trigger per kind calls `notify_push('<final kind>')`, and `send-push` resolves the row with its privileged key (the new secret key, PR #469). Each has a `WHEN` clause except the `daily_reminders` one, which has none because every row is the one reminder. Every trigger is AFTER INSERT but the second `daily_nudges` one, which is AFTER UPDATE OF `released_at` and posts a held nudge when the hold ends (AD-17):
 
     | Trigger table | `WHEN` | Posted kind | `push_requests` column | Recipient |
     | --- | --- | --- | --- | --- |
-    | `daily_picks` | `not new.is_second` | `daily_partner_picked` | `daily_pick_id` | The partner |
     | `daily_picks` | `new.is_second` | `daily_both_answered` | `daily_pick_id` | The first picker |
     | `daily_nudges` (insert) | `not new.held` | `daily_nudge` | `daily_nudge_id` | `to_user` |
     | `daily_nudges` (update of `released_at`) | `old.released_at is null and new.released_at is not null` | `daily_nudge` | `daily_nudge_id` | `to_user` |
-    | `daily_reminders` | `new.kind = 'morning'` | `daily_question` | `daily_reminder_id` | `user_id` |
-    | `daily_reminders` | `new.kind <> 'morning'` | `daily_reminder` | `daily_reminder_id` | `user_id` |
+    | `daily_reminders` | none (every row is `evening_self`) | `daily_reminder` | `daily_reminder_id` | `user_id` |
 
   - The FKs are `on delete cascade`, each `unique` with `token`. The source check names the full column list.
-  - `send-push` never infers order or variant: it reads the posted kind and, for a reminder, the stored `kind`. It drops a `daily_partner_picked` push whose `day` is not the recipient's current date. It sends `daily_both_answered` on every second pick, an offline pick that lands after its day included; a pick is refused unless its own local date is the day (AD-6), so no closed-day test could ever drop one. Its wording is the same whatever the day (owner, 2026-11-27; `push-copy.md`). That rule reads the recipient's current date from `user_local_date(user_id, at)` (AD-15), the stored zone or UTC with no row (AD-3), never from a zone worked out in Deno.
-  - `daily_nudge` and `daily_reminder` (both variants) set `aps.sound` to `default`, the sound date reminders play (`REMINDER_SOUND`). `daily_question`, `daily_partner_picked` and `daily_both_answered` carry no `sound`, like every existing push.
-  - Each kind has one `push_preferences` column, `boolean not null default true`, named after the kind and mapped in `PREFERENCE_FOR_KIND`. One switch covers both evening variants.
+  - `send-push` never infers order or variant: it reads the posted kind and, for a reminder, the stored `kind`, which must be `evening_self`; a stored kind that is not (a `morning` or `evening_partner` row left over) is no push, and a pick that is not second is no `daily_both_answered`. It sends `daily_both_answered` on every second pick, an offline pick that lands after its day included; a pick is refused unless its own local date is the day (AD-6), so no closed-day test could ever drop one. Its wording is the same whatever the day or the streak (owner, 2026-11-27; `push-copy.md`): "You both answered today's question" over "Click to see what your partner answered!". `send-push` reads no recipient date and no streak, so `user_local_date` and `couple_streak` have no caller in it (story 11.2). A post of `daily_question` or `daily_partner_picked`, the two kinds epic 8 added and story 11.2 removed, is a 400 that claims nothing.
+  - `daily_nudge` and `daily_reminder` set `aps.sound` to `default`, the sound date reminders play (`REMINDER_SOUND`). `daily_both_answered` carries no `sound`, like every existing push.
+  - Each kind has one `push_preferences` column, `boolean not null default true`, named after the kind and mapped in `PREFERENCE_FOR_KIND`. The `daily_question` and `daily_partner_picked` columns stay with their values and defaults, because installed builds read them by name until they take the live update; neither the app nor `send-push` reads or writes them from story 11.2 on, and epic 10 drops them (DW-548).
   - Epic 8 ships the sender's new kinds one deploy before the triggers, because the old `POSTED_KINDS` rejects unknown kinds.
   - Epic 10 removes the mood and interaction columns from `push_requests`, the source check and `push_preferences` in two steps: stop reading them and ship, then drop them in a later migration, as `20261104000000_drop_push_preferences_dates.sql` did. Epics 8 and 9 never select a column epic 10 drops.
 
@@ -217,19 +214,19 @@ Arrows point the only way a dependency may run. Views never call the API directl
   - `send_daily_nudge(day_id, source default 'button')` inserts into `daily_nudges (from_user, to_user, day_id, source, held, released_at, created_at, unique (from_user, day_id, source))`, with `source in ('prompt', 'button')`; `day_id` is `not null` and cascades with `couple_days`. The limit is one nudge per sender per question from each source, keyed on the question, never on a date or a clock: the other source is still taken, a nudge about yesterday's question leaves today's open, and the sender's own midnight resets nothing. The one-argument call an installed build makes is the button's nudge. A second nudge from the same source is refused (`DQ010`) and records nothing; a concurrent duplicate loses the unique key and is refused the same way.
   - A nudge needs the sender's own pick for the day to exist, the partner's not to, and the partner link to go both ways (the sender's `partner_id` names the partner and the partner's names the sender, as `enqueue_daily_reminders` reads it; otherwise `P0002`). The partner's clock is their stored zone, UTC with no row (AD-3), and the server reads no other zone. The day stops taking nudges at its end on the partner's clock: a nudge at or after that instant is refused (`DQ009`) and records nothing.
   - A nudge sent before 08:00 on the partner's clock on that day, whether the day has not started there or it is between 00:00 and 08:00, is recorded at once with `held` true and posts no push; the sender sees the normal result. `release_held_daily_nudges(at)`, which `enqueue_daily_reminders` calls (AD-9), sets `released_at` on a held nudge when the partner's clock reads 08:00–08:30 on that day, the partner has a stored zone and has not picked, and the link still goes both ways, and the AFTER UPDATE trigger posts it (AD-10). A held nudge never sets `released_at` when the partner has answered, has no stored zone, or the window was missed, and it still counts as that source's nudge. When both of a sender's nudges about one question are held, the earlier is released and the other is not; when the other was already pushed after the partner's 08:00, the held one is dropped. So at most one push goes out per question and sender in that tick, and a nudge sent after the partner's 08:00 posts on insert as before.
-  - Only a tap inserts a nudge: on the prompt after an answer ("Do you want to nudge your partner?", shown once after the answer, after the write sheet however it closes, or when a pick saved offline is sent while Daily is open) or on the waiting screen's Nudge button. Not now ends only the prompt. The 8 PM `evening_partner` push only opens the waiting screen. A control that was never sent and can no longer be is hidden, not greyed: after `nudges.closes_at`, which the client flips at that instant with no re-read, or while a day saved by an older build waits for the server's answer. Grey means sent.
+  - Only a tap inserts a nudge: on the prompt after an answer ("Do you want to nudge your partner?", shown once after the answer, after the write sheet however it closes, or when a pick saved offline is sent while Daily is open) or on the waiting screen's Nudge button. Not now ends only the prompt. A control that was never sent and can no longer be is hidden, not greyed: after `nudges.closes_at`, which the client flips at that instant with no re-read, or while a day saved by an older build waits for the server's answer. Grey means sent.
   - A send whose answer is lost is not shown as failed: the client re-reads the day, and the control stays disabled until the re-read ends; a re-read that has the nudge ends it as sent, one that has none shows "Your nudge could not be sent.", and one that fails shows "We couldn't check if your nudge went through. Try again?". An `already sent` refusal ends as a sent nudge.
-  - The 8 AM push carries no nudge. The push has the same title and body for every nudge, and follows the partner's Nudges switch and devices when it is sent.
+  - No other push carries a nudge. The push has the same title and body for every nudge, and follows the partner's Nudges switch and devices when it is sent.
 
 ## Consistency Conventions
 
 | Concern | Convention |
 | --- | --- |
 | Table names | `daily_questions`, `couple_days`, `daily_picks`, `daily_nudges`, `daily_reminders`, `user_time_zones` |
-| Push kinds | `daily_question`, `daily_partner_picked`, `daily_nudge`, `daily_reminder`, `daily_both_answered` |
+| Push kinds | `daily_nudge`, `daily_reminder`, `daily_both_answered` |
 | Broadcast events | `daily_pick`, `daily_nudge`; payload `{ day_id }` only |
 | Client names | `DailyQuestion` / `dailyQuestion*`, never `DailyMessage` or `messagesSlice` (Home's bundled message) |
-| View | `ViewType` `'daily'` at `/daily`, in the dock's second slot (R12), with all five registration places from AGENTS.md. Epic 6 redirects `/mood` to `/daily`; epic 8 story 4 routes the five daily push kinds to Daily in `viewForPush` (`VIEW_FOR_KIND`); epic 10 deletes the mood view |
+| View | `ViewType` `'daily'` at `/daily`, in the dock's second slot (R12), with all five registration places from AGENTS.md. Epic 6 redirects `/mood` to `/daily`; epic 8 story 4 routes the daily push kinds to Daily in `viewForPush` (`VIEW_FOR_KIND`), which keeps `daily_question` and `daily_partner_picked` for a push of either delivered before story 11.2 and tapped after; epic 10 deletes the mood view |
 | Partner page | Epic 7 builds it in a new folder; epic 10 deletes `PartnerMoodView/` |
 | Ids | uuid `gen_random_uuid()`; coach questions are seeded by migration with fixed uuids, so an edit is idempotent |
 | Choice | `text check (choice in ('this','that'))` |
@@ -273,7 +270,6 @@ sequenceDiagram
   participant DB as Postgres + send-push
   participant B as Second picker
   A->>DB: submit_daily_pick
-  DB-->>B: push: partner picked
   A-->>B: broadcast {day_id}
   B->>DB: submit_daily_pick
   DB-->>B: snapshot: both (reveal)
@@ -296,7 +292,7 @@ Deployment does not change. `deploy.yml` applies the migrations (tables, functio
 | R10 reply attached | `love_notes.couple_day_id` | AD-14, AD-16 |
 | R12 Daily tab | navigation registration | Conventions (View) |
 | R13 nudge | `daily_nudges`, `send_daily_nudge` | AD-17, AD-10, AD-11 |
-| R14 five pushes | `daily_reminders`, `pg_cron`, triggers | AD-3, AD-9, AD-10 |
+| R14 three pushes | `daily_reminders`, `pg_cron`, triggers | AD-3, AD-9, AD-10 |
 | R15, R16 removal | epic 10 | AD-10 (two-step drop), AD-11 (topic kept) |
 | R17 offline pick | `pick-queue`, `submit_daily_pick` | AD-2, AD-6, AD-7, AD-12 |
 | R18 unlinked | `get_daily_day` status | AD-13 |

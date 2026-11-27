@@ -612,8 +612,6 @@ describe('clearAuth on sign-out', () => {
         partnerRequests: true,
         dates: true,
         dateReminders: true,
-        dailyQuestion: true,
-        dailyPartnerPicked: true,
         dailyNudge: true,
         dailyReminder: true,
         dailyBothAnswered: true,

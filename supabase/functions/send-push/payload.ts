@@ -32,14 +32,14 @@
  * payload. The web code reads it on a tap to choose the view to open
  * (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is unchanged.
  *
- * Story 8.3 adds the five daily kinds (`daily_question`, `daily_partner_picked`,
- * `daily_nudge`, `daily_reminder`, `daily_both_answered`), pure copy from
- * `push-copy.md` (_bmad-output/initiative-my-love/tickets/epic-daily-pushes-and-nudge/).
- * All five keep `partner-activity`; only the nudge and both 8 PM reminders carry
- * `aps.sound` (`DAILY_SOUND`, the sound date reminders play); the other three,
- * like every earlier push, carry none. The question is worded as Daily words it,
- * `${this} or ${that}?` (`questionText`). A payload carries no pick's `choice`:
- * no builder is given one.
+ * Story 8.3 added five daily kinds; story 11.2 cut them to three (`daily_nudge`,
+ * `daily_reminder`, `daily_both_answered`), pure copy from `push-copy.md`
+ * (_bmad-output/initiative-my-love/tickets/epic-daily-pushes-and-nudge/). All three keep
+ * `partner-activity`; only the nudge and the 8 PM reminder carry `aps.sound`
+ * (`DAILY_SOUND`, the sound date reminders play); both answered, like every earlier
+ * push, carries none. The reminder and both-answered wording is the same for every
+ * recipient and day, so those builders take no argument. A payload carries no pick's
+ * `choice`: no builder is given one.
  */
 
 export const LOVE_NOTES_THREAD_ID = 'love-notes';
@@ -58,14 +58,12 @@ export const EVENT_ADDED_PREFIX = 'Added an event';
 export const ANNIVERSARY_ADDED_PREFIX = 'Added an anniversary';
 /** Used when the asker has no display name: they are not a partner yet. */
 export const FALLBACK_REQUESTER_NAME = 'Someone';
-/** The sound the nudge and both 8 PM reminders play: `REMINDER_SOUND` of the date reminders. */
+/** The sound the nudge and the 8 PM reminder play: `REMINDER_SOUND` of the date reminders. */
 export const DAILY_SOUND = 'default';
-export const DAILY_QUESTION_BODY_PREFIX = "Today's question is here. Day";
-export const DAILY_PARTNER_PICKED_BODY = 'Pick yours to see what they chose.';
-export const DAILY_REMINDER_SELF_TITLE = "You haven't done your daily yet";
-export const DAILY_REMINDER_SELF_BODY_SUFFIX = 'It takes two taps.';
-export const DAILY_REMINDER_PARTNER_BODY = 'Nudge them before midnight.';
-export const DAILY_LATE_TAIL = 'That day counts.';
+export const DAILY_REMINDER_TITLE = "Time's running out!";
+export const DAILY_REMINDER_BODY = 'Answer your daily question before the day is over!';
+export const DAILY_BOTH_ANSWERED_TITLE = "You both answered today's question";
+export const DAILY_BOTH_ANSWERED_BODY = 'Click to see what your partner answered!';
 
 /**
  * Display labels for the 12 mood types, in `MOOD_TYPES` order. A copy: this
@@ -210,11 +208,6 @@ export function buildAnniversaryPayload(label: string, senderName: string | null
   return partnerActivityPayload(`${ANNIVERSARY_ADDED_PREFIX}: ${label}`, senderName);
 }
 
-/** The question as Daily words it (`DailyQuestion.tsx`): `Tea or Coffee?`. */
-export function questionText(thisText: string, thatText: string): string {
-  return `${thisText} or ${thatText}?`;
-}
-
 function dailyPayload(title: string, body: string, sound: boolean): ApnsPayload {
   return {
     aps: {
@@ -229,46 +222,21 @@ function partnerName(name: string | null): string {
   return name?.trim() || FALLBACK_SENDER_NAME;
 }
 
-/** 8 AM: `{question}` / `Today's question is here. Day {held + 1} is waiting.`; no sound. */
-export function buildDailyQuestionPayload(question: string, held: number): ApnsPayload {
-  return dailyPayload(question, `${DAILY_QUESTION_BODY_PREFIX} ${held + 1} is waiting.`, false);
-}
-
-/** `{Picker} made their pick` / `Pick yours to see what they chose.`; no sound, no choice. */
-export function buildDailyPartnerPickedPayload(pickerName: string | null): ApnsPayload {
-  return dailyPayload(`${partnerName(pickerName)} made their pick`, DAILY_PARTNER_PICKED_BODY, false);
-}
-
 /** `{From} nudged you` / `{From} answered the daily question and wants to know your answer!`. Plays the default sound. */
 export function buildDailyNudgePayload(fromName: string | null): ApnsPayload {
   const from = partnerName(fromName);
   return dailyPayload(`${from} nudged you`, `${from} answered the daily question and wants to know your answer!`, true);
 }
 
-/**
- * The 8 PM push. `evening_self` goes to someone who has not picked: `detail` is
- * the question, quoted in the body. `evening_partner` goes to someone who has:
- * `detail` is the name of the partner who has not (or null for `Your partner`).
- * Both play the default sound.
- */
-export function buildDailyReminderPayload(
-  variant: 'evening_self' | 'evening_partner',
-  detail: string | null
-): ApnsPayload {
-  if (variant === 'evening_self') {
-    return dailyPayload(DAILY_REMINDER_SELF_TITLE, `${detail ?? ''} ${DAILY_REMINDER_SELF_BODY_SUFFIX}`.trim(), true);
-  }
-  return dailyPayload(`${partnerName(detail)} hasn't done their daily`, DAILY_REMINDER_PARTNER_BODY, true);
+/** 8 PM, to whoever has not answered: `Time's running out!` / `Answer your daily question before the day is over!`. Plays the default sound. */
+export function buildDailyReminderPayload(): ApnsPayload {
+  return dailyPayload(DAILY_REMINDER_TITLE, DAILY_REMINDER_BODY, true);
 }
 
 /**
- * The partner picked second. The title is the run (`3 days in a row`,
- * `1 day in a row`, or `You both answered` for 0); `late` replaces
- * `See {Picker}'s pick.` with `That day counts.`. No sound, no choice.
+ * The partner answered second: `You both answered today's question` / `Click to see what your
+ * partner answered!`, whatever the day or the streak. No sound, no choice.
  */
-export function buildDailyBothAnsweredPayload(run: number, pickerName: string | null, late: boolean): ApnsPayload {
-  const title = run === 0 ? 'You both answered' : run === 1 ? '1 day in a row' : `${run} days in a row`;
-  const tail = late ? DAILY_LATE_TAIL : `See ${partnerName(pickerName)}'s pick.`;
-  const body = run === 0 ? tail : `You both answered. ${tail}`;
-  return dailyPayload(title, body, false);
+export function buildDailyBothAnsweredPayload(): ApnsPayload {
+  return dailyPayload(DAILY_BOTH_ANSWERED_TITLE, DAILY_BOTH_ANSWERED_BODY, false);
 }

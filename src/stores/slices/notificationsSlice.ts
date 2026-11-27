@@ -66,8 +66,6 @@ const PUSH_PREFERENCE_KEYS: readonly (keyof PushPreferences)[] = [
   'partnerRequests',
   'dates',
   'dateReminders',
-  'dailyQuestion',
-  'dailyPartnerPicked',
   'dailyNudge',
   'dailyReminder',
   'dailyBothAnswered',
@@ -76,18 +74,18 @@ const PUSH_PREFERENCE_KEYS: readonly (keyof PushPreferences)[] = [
 /** Keys a saved copy may lack, because they came after it was written; each reads as on. */
 const DEFAULT_ON_WHEN_MISSING = {
   dates: true,
-  dailyQuestion: true,
-  dailyPartnerPicked: true,
   dailyNudge: true,
   dailyReminder: true,
   dailyBothAnswered: true,
 };
 
 /**
- * A saved push-preferences copy: an object whose twelve switches are all
+ * A saved push-preferences copy: an object whose ten switches are all
  * booleans, otherwise `null`. A copy saved before the `dates` switch came back
- * (2026-11-05), or before the five daily switches (story 8.4), lacks those keys
- * and reads each as on, the server's default.
+ * (2026-11-05), or before the three daily switches (story 8.4), lacks those keys
+ * and reads each as on, the server's default. A copy saved before story 11.2 also
+ * holds `dailyQuestion` and `dailyPartnerPicked`; only the listed keys are kept,
+ * so both drop out.
  */
 function parseSavedPushPreferences(value: unknown): PushPreferences | null {
   if (typeof value !== 'object' || value === null) return null;

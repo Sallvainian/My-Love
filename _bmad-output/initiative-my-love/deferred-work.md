@@ -4523,3 +4523,11 @@ source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudg
 severity: low
 reason: showNudgeSheet requires !promptClosed, so the sheet goes at closes_at whatever useNudgeSend's busy state; the outcome of a send in flight at that instant is then never shown on the prompt. Real, low: needs a send in flight at the end of the partner's day; keeping the sheet while busy means lifting the busy state into DailyQuestion (review 2026-11-27: intent-alignment).
 status: open
+
+### DW-560: The story 11.2 migration fails the deploy if an old daily-reminders cron run inserts a morning row between its DELETE and the narrowed kind check, or deadlocks with that run.
+origin: spec-deferred ee5355ecc051
+location: supabase/migrations/20261127010000_three_daily_pushes.sql (the DELETE, ALTER TABLE and DROP TRIGGER steps)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-three-daily-pushes-and-three-switches-plan.md`
+severity: low
+reason: 20261127010000_three_daily_pushes.sql deletes morning and evening_partner rows, then adds daily_reminders_kind_check (kind = 'evening_self'); nothing stops the old enqueue_daily_reminders (still live until the file commits) from committing a morning row in between, which the ALTER's validation then rejects with 23514, and a cron run holding daily_picks while waiting on daily_reminders can deadlock with the file's DROP TRIGGER on daily_picks. Real, low: needs a deploy inside a hosted user's 08:00-08:30 tick, during the milliseconds the migration runs; the failure rolls the file back and stops deploy.yml before the functions and site, so a rerun succeeds. A single LOCK TABLE does not settle it, because the cron run touches daily_picks before and after daily_reminders (review 2026-11-27: quick).
+status: open
