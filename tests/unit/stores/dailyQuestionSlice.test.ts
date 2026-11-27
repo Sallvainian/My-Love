@@ -6,7 +6,7 @@
  * `dailyQuestionSlice.overlap.test.ts`, `refreshDailyDay` in `.refresh.test.ts` and
  * `submitDailyPick` in `.submit.test.ts`.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyDay = vi.fn();
@@ -34,38 +34,11 @@ import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { dailySnapshot, revealSnapshot, waitingSnapshot, DAY_ID } from './dailyQuestionFixture';
-import { NEXT_DAY, ok, SAME_DAY, state } from './dailyQuestionSliceFixture';
+import { NEXT_DAY, ok, state, useDailySliceHooks } from './dailyQuestionSliceFixture';
 import { deferred, A, C } from './loaderIdentityGuardsFixture';
 import { setOnline } from './navigatorFixtures';
 
-const realLoadCoupleStreak = useAppStore.getState().loadCoupleStreak;
-const loadCoupleStreak = vi.fn(async () => {});
-
-beforeEach(async () => {
-  vi.clearAllMocks();
-  fetchDailyDay.mockReset();
-  fetchDailyDayById.mockReset();
-  submitDailyPickRequest.mockReset();
-  announceDailyPick.mockReset();
-  announceDailyPick.mockResolvedValue(undefined);
-  // The streak read has its own tests; here only whether a pick asks for it.
-  useAppStore.setState({ loadCoupleStreak });
-  vi.spyOn(console, 'error').mockImplementation(() => {});
-  setOnline(true);
-  // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(SAME_DAY);
-  state().clearAuth();
-  state().setAuthUser(A);
-  await deleteAccountCopies(A);
-});
-
-afterEach(() => {
-  useAppStore.setState({ loadCoupleStreak: realLoadCoupleStreak });
-  vi.useRealTimers();
-  setOnline(true);
-  vi.restoreAllMocks();
-});
+useDailySliceHooks({ fetchDailyDay, fetchDailyDayById, submitDailyPickRequest, announceDailyPick });
 
 describe('loadDailyDay', () => {
   it('stores an ok answer and clears the loading flag', async () => {

@@ -3,7 +3,7 @@
  * shown only when it is the shown day or the device's today, with only the Supabase
  * client and the API module mocked.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyDay = vi.fn();
@@ -38,38 +38,10 @@ import {
   KNOWN_PARTNER_ID,
   knownPartnerState,
 } from './dailyQuestionFixture';
-import { ok, SAME_DAY, state } from './dailyQuestionSliceFixture';
+import { ok, state, useDailySliceHooks } from './dailyQuestionSliceFixture';
 import { deferred, A } from './loaderIdentityGuardsFixture';
-import { setOnline } from './navigatorFixtures';
 
-const realLoadCoupleStreak = useAppStore.getState().loadCoupleStreak;
-const loadCoupleStreak = vi.fn(async () => {});
-
-beforeEach(async () => {
-  vi.clearAllMocks();
-  fetchDailyDay.mockReset();
-  fetchDailyDayById.mockReset();
-  submitDailyPickRequest.mockReset();
-  announceDailyPick.mockReset();
-  announceDailyPick.mockResolvedValue(undefined);
-  // The streak read has its own tests; here only whether a pick asks for it.
-  useAppStore.setState({ loadCoupleStreak });
-  vi.spyOn(console, 'error').mockImplementation(() => {});
-  setOnline(true);
-  // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(SAME_DAY);
-  state().clearAuth();
-  state().setAuthUser(A);
-  await deleteAccountCopies(A);
-});
-
-afterEach(() => {
-  useAppStore.setState({ loadCoupleStreak: realLoadCoupleStreak });
-  vi.useRealTimers();
-  setOnline(true);
-  vi.restoreAllMocks();
-});
+useDailySliceHooks({ fetchDailyDay, fetchDailyDayById, submitDailyPickRequest, announceDailyPick });
 
 describe('refreshDailyDay', () => {
   const saved = (...snapshots: Array<ReturnType<typeof dailySnapshot>>) =>
@@ -222,4 +194,3 @@ describe('refreshDailyDay', () => {
     expect(state().dailyDay).toBeNull();
   });
 });
-

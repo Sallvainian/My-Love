@@ -4,7 +4,7 @@
  * module mocked. Each read is held open by a `deferred`, and every wait is on the
  * mock's call count or on the promise a call returned, never on a fixed sleep.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyDay = vi.fn();
@@ -29,40 +29,11 @@ vi.mock('../../../src/api/dailyQuestionApi', async (importOriginal) => ({
 
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { deleteAccountCopies } from '../../../src/services/localCopy';
-import { useAppStore } from '../../../src/stores/useAppStore';
 import { dailySnapshot, waitingSnapshot } from './dailyQuestionFixture';
-import { ok, SAME_DAY, state } from './dailyQuestionSliceFixture';
-import { deferred, A } from './loaderIdentityGuardsFixture';
-import { setOnline } from './navigatorFixtures';
+import { ok, state, useDailySliceHooks } from './dailyQuestionSliceFixture';
+import { deferred, storeWritesDuring, A } from './loaderIdentityGuardsFixture';
 
-const realLoadCoupleStreak = useAppStore.getState().loadCoupleStreak;
-const loadCoupleStreak = vi.fn(async () => {});
-
-beforeEach(async () => {
-  vi.clearAllMocks();
-  fetchDailyDay.mockReset();
-  fetchDailyDayById.mockReset();
-  submitDailyPickRequest.mockReset();
-  announceDailyPick.mockReset();
-  announceDailyPick.mockResolvedValue(undefined);
-  // The streak read has its own tests; here only whether a pick asks for it.
-  useAppStore.setState({ loadCoupleStreak });
-  vi.spyOn(console, 'error').mockImplementation(() => {});
-  setOnline(true);
-  // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(SAME_DAY);
-  state().clearAuth();
-  state().setAuthUser(A);
-  await deleteAccountCopies(A);
-});
-
-afterEach(() => {
-  useAppStore.setState({ loadCoupleStreak: realLoadCoupleStreak });
-  vi.useRealTimers();
-  setOnline(true);
-  vi.restoreAllMocks();
-});
+useDailySliceHooks({ fetchDailyDay, fetchDailyDayById, submitDailyPickRequest, announceDailyPick });
 
 describe('overlapping loadDailyDay calls', () => {
   it('three overlapping calls send exactly two reads: the running one and one trailing pass', async () => {
@@ -74,8 +45,12 @@ describe('overlapping loadDailyDay calls', () => {
     const calls = [state().loadDailyDay()];
     await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
     // A call asks for its trailing pass as it is made, so no wait is needed between the calls.
-    calls.push(state().loadDailyDay());
-    calls.push(state().loadDailyDay());
+    // A read that started at once would set the loading flag in this same turn.
+    const writes = storeWritesDuring(() => {
+      calls.push(state().loadDailyDay());
+      calls.push(state().loadDailyDay());
+    });
+    expect(writes).toBe(0);
     expect(fetchDailyDay).toHaveBeenCalledTimes(1);
     running.settle(ok(dailySnapshot()));
     await Promise.all(calls);
@@ -276,8 +251,14 @@ describe('overlapping loadDailyDay calls', () => {
     old.settle(ok(dailySnapshot()));
     await oldLoad;
 
-    // The new session's read is still open, so this call asks for a pass after it.
-    const joined = state().loadDailyDay();
+    // The new session's read is still open, so this call asks for a pass after it. A read of
+    // its own would set the loading flag in this same turn, which is the old read leaving the
+    // slot empty for the call to take.
+    let joined!: Promise<void>;
+    const writes = storeWritesDuring(() => {
+      joined = state().loadDailyDay();
+    });
+    expect(writes).toBe(0);
     expect(fetchDailyDay).toHaveBeenCalledTimes(2);
     fresh.settle(ok(dailySnapshot()));
     await Promise.all([freshLoad, joined]);
@@ -286,4 +267,3 @@ describe('overlapping loadDailyDay calls', () => {
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 });
-
