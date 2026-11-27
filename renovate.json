@@ -87,6 +87,16 @@
       "groupName": "vitest"
     },
     {
+      "description": "Dependabot never touched package.json overrides: they are hand-kept security floors scoped per major (\"uuid@^8.0.0\": \"^11.1.1\"), and a bump would move every package using that line, majors included, with no person looking.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "overrides"
+      ],
+      "enabled": false
+    },
+    {
       "description": "GitHub Actions: weekly on Monday, commits as ci(deps), labelled github-actions; minor and patch updates grouped.",
       "matchManagers": [
         "github-actions"
