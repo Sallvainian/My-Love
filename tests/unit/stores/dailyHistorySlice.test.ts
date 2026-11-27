@@ -9,7 +9,7 @@
  * daily-days copy behind the list is `dailyHistorySlice.copy.test.ts`, and a
  * partner change in the session is `dailyHistorySlice.partner.test.ts`.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyHistory = vi.fn();

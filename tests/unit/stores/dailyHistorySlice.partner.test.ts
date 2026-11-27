@@ -2,7 +2,8 @@
  * The past questions when the partner changes in the session: the old pair's rows
  * and copy are never shown to or kept by the new partner, and a read started under
  * the old pair writes nothing. The rest of the slice is
- * `dailyHistorySlice.test.ts`.
+ * `dailyHistorySlice.test.ts` (the load itself) and `dailyHistorySlice.copy.test.ts`
+ * (the daily-days copy and its background fill).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';

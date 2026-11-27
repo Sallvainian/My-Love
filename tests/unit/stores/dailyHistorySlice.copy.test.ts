@@ -3,7 +3,8 @@
  * `loadMoreDailyHistory` on the composed `useAppStore` merging each page into the
  * per-account copy tagged with the partner, the offline refusal with rows already
  * shown, and the background fill of the copy up to the streak's done days. The
- * rest of the slice is `dailyHistorySlice.test.ts`.
+ * rest of the slice is `dailyHistorySlice.test.ts` (the load itself) and
+ * `dailyHistorySlice.partner.test.ts` (a partner change in the session).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
