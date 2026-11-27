@@ -15,7 +15,7 @@ risk: medium
 
 ## Description
 
-Epic 8's daily pushes come down to three: the partner's nudge (story 1), one 8 PM reminder to whoever has not answered, and both answered, and their switches come down to three as well. The app and `send-push` stop reading and writing the two removed switches' columns, which stay in the database for epic 10 to drop. This story delivers the epic's R2, R3 and the column part of R4, after story 1, which changes the same schedule function and `send-push`. "Answer" here means a pick, as Daily's Send my pick makes it.
+Epic 8's daily pushes come down to three: the partner's nudge (story 1), one 8 PM reminder to whoever has not answered, and both answered, and their switches come down to three as well. The both-answered push gets one wording, whatever the day or the streak. The app and `send-push` stop reading and writing the two removed switches' columns, which stay in the database for epic 10 to drop. This story delivers the epic's R2, R3 and the column part of R4, after story 1, which changes the same schedule function and `send-push`. "Answer" here means a pick, as Daily's Send my pick makes it.
 
 ## Requirements
 
@@ -70,12 +70,18 @@ Epic 8's daily pushes come down to three: the partner's nudge (story 1), one 8 P
 9. **The written push rules match** (R2, R3)
    **Given** the story is built
    **When** `push-copy.md` and the architecture spine (AD-4, AD-9, AD-10, AD-17, the Consistency Conventions' push kinds and View rows, the Structural Seed's sequence diagram and the Capability map's R14 row), and the Settings UX spine's Notifications switch lists are read
-   **Then** they describe the three remaining pushes and their switches, and the one evening reminder
-   **And** none of them names the 8 AM push, the partner-picked push or the `evening_partner` reminder as current
+   **Then** they describe the three remaining pushes and their switches, the one evening reminder and the both-answered push's one wording
+   **And** none of them names the 8 AM push, the partner-picked push, the `evening_partner` reminder, the both-answered push's streak titles or "That day counts." as current
+
+10. **Both answered has one wording** (R2)
+    **Given** one partner has answered a daily question
+    **When** the other answers it, on that question's day or after the day has ended on either partner's clock
+    **Then** the first gets one push titled "You both answered today's question", with the body "Click to see what your partner answered!", playing no sound, and a tap opens Daily
+    **And** it reads the same whatever the streak: no both-answered push names a streak count, the partner's name or "That day counts."
 
 ## Boundaries
 
-- Must not change: the both-answered push, its copy (including "That day counts." for a late pick) and its switch.
+- Must not change: when the both-answered push is sent, and its switch; only its wording changes (criterion 10).
 - Must not change: every remaining push keeps the badge and the `partner-activity` lock-screen group.
 - Must not change: story 1's nudge, its prompt, the waiting card's button, their limits, the hold and the closing instant.
 - Must not change: date reminders and how the phone schedules them; the love-note, photo, date and partner-request pushes and their switches.
@@ -111,4 +117,6 @@ Epic 8's daily pushes come down to three: the partner's nudge (story 1), one 8 P
 - Code (owner-cited): the two columns are read and written through `src/services/pushPreferencesService.ts:82-83`, `:99-100` and `:119-120`. The `COLUMN` map at `:99-100` feeds both the read (`:134`) and the write, which sets the one column at `:158` and reads the row back at `:162`. `send-push` reads one switch column per kind (`supabase/functions/send-push/index.ts:196-200`, `PREFERENCE_FOR_KIND` in `handler.ts:192`). Other sites that carry the two switches: the `push-preferences` local copy (`src/stores/slices/notificationsSlice.ts:58-84`), the On, Off and Some count (`src/components/Settings/notificationsStatus.ts:21-22`), and `VIEW_FOR_KIND` (`src/services/pushNotifications.ts:166-167`), which still has to open Daily for a removed kind's push delivered before the deploy and tapped after.
 - Code (owner-cited): the Settings UX spine's Notifications switch lists are `_bmad-output/initiative-my-love/ux-settings-page/EXPERIENCE.md:89` and `:109`; today they list no daily switch, so criterion 9 adds the three that remain.
 - Code (kept by the owner): date reminders are `src/services/dateReminders.ts` and `reminderIdsToCancel`.
+- Decision: 2026-11-27 (owner) the both-answered push always reads "You both answered today's question", with the body "Click to see what your partner answered!". The late-pick case and "That day counts." are dropped entirely, and the streak titles go with them. The owner put it in this story if small and similar enough; the PO judged it so, as it changes one payload builder and the `push-copy.md` rows this story already rewrites.
+- Code (2026-11-27): the both-answered copy is `buildDailyBothAnsweredPayload` (`supabase/functions/send-push/payload.ts:272-277`) with `DAILY_LATE_TAIL` (`:68`); `send-push` passes it the run and the late flag (`handler.ts:437`, `:448`, `:454`), so the run read and the late flag go for this kind.
 - Risk medium: it removes pushes and switches, and the one remaining reminder keeps its schedule; story 1 carries the hosted risk.

@@ -1,7 +1,8 @@
 # Epic 11, Simpler Daily Pushes and Nudge: every planned story in build order.
 # Both stories change enqueue_daily_reminders and send-push, one lane: story 2
 # waits on story 1 (owner, 2026-11-26). Story 1 goes first: it carries the
-# hosted risk (the nudge limit, the hold and the live check).
+# hosted risk (the nudge limit, the hold and the live check). Story 3 (owner,
+# 2026-11-27) waits on story 2: all three change migrations and the types.
 
 [[entry]]
 id = 1
@@ -20,9 +21,21 @@ id = 2
 type = "story"
 title = "Three daily pushes and three switches"
 description = "The daily pushes come down to the nudge, one 8 PM reminder to whoever has not answered, and both answered, and Settings shows their three switches. The app and send-push stop reading and writing the two removed switches' columns, which stay in the database for epic 10 to drop."
-verify = "pgTAP with fixed instants proves no 8 AM question push, an 08:00 tick that assigns no partner's day, no stored `morning` or `evening_partner` reminder left after the migration and a new one refused, no partner-picked push and the 8 PM reminder only to whoever has not answered; Playwright shows three daily switches on Settings > Notifications and no request naming either removed column; an `api` project spec on the shared local stack runs the old build's select of all twelve columns and a one-column upsert of each removed column and both still succeed; `deno test --no-lock supabase/functions/send-push/` proves the 8 PM reminder's new copy and that each switch stops only its own kind; push-copy.md and the spine name none of the removed pushes. Every check runs with fixed instants or faked time, never a moved clock."
+verify = "pgTAP with fixed instants proves no 8 AM question push, an 08:00 tick that assigns no partner's day, no stored `morning` or `evening_partner` reminder left after the migration and a new one refused, no partner-picked push and the 8 PM reminder only to whoever has not answered; Playwright shows three daily switches on Settings > Notifications and no request naming either removed column; an `api` project spec on the shared local stack runs the old build's select of all twelve columns and a one-column upsert of each removed column and both still succeed; `deno test --no-lock supabase/functions/send-push/` proves the 8 PM reminder's new copy and that each switch stops only its own kind; a both-answered push, on its day and late and at any streak, reads \"You both answered today's question\" over \"Click to see what your partner answered!\"; push-copy.md and the spine name none of the removed pushes or the late-pick wording. Every check runs with fixed instants or faked time, never a moved clock."
 covers = ["R2", "R3", "R4"]
 after = [1]
+hitl = false
+risk = "medium"
+refine = true
+
+[[entry]]
+id = 3
+type = "story"
+title = "The streak's week runs Sunday to Saturday"
+description = "The streak's row of seven dots on Daily and the Partner page shows the calendar week, Sunday to Saturday, with today ringed in its own slot and the days after it not reached; every day not done yet is the same plain grey circle. The server sends the week in a new field beside week, so installed builds keep their last-seven-days row until they take the live update."
+verify = "pgTAP with fixed instants proves the calendar week beside an unchanged week: today on a Sunday, a Saturday and midweek, the days after today not reached, a week holding the couple's first day, and the viewer's stored zone; unit tests (faked time) prove the Sunday-to-Saturday order, the weekday letters with no Today, the ring on today's slot only, one plain grey filled circle for every day not done yet, a saved streak with no calendar week shown as its last seven days, and the old build's schema parsing the new answer; Playwright on Daily and the Partner page, with a page clock from clockAnchor(), shows the row. Every check runs on the shared local stack with fixed instants or faked time, never a moved clock."
+covers = ["R5"]
+after = [2]
 hitl = false
 risk = "medium"
 refine = true

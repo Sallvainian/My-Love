@@ -65,8 +65,8 @@ after = [{ epic = 6, needs = "the picks and the per-partner day the pushes are t
 id = 11
 slug = "epic-simpler-daily-pushes-and-nudge"
 title = "Simpler Daily Pushes and Nudge"
-description = "A person who answers first can nudge their partner once per daily question from the prompt after their answer and once from the waiting card's button, every nudge sent before 8 AM on the partner's clock held until then; the daily pushes are that nudge, one 8 PM reminder to whoever has not answered, and both answered, each with its own Settings switch."
-covers = ["R13", "R14", "R19"]
+description = "A person who answers first can nudge their partner once per daily question from the prompt after their answer and once from the waiting card's button, every nudge sent before 8 AM on the partner's clock held until then; the daily pushes are that nudge, one 8 PM reminder to whoever has not answered, and both answered, each with its own Settings switch. The both-answered push gets one wording, and the streak's week row shows Sunday to Saturday."
+covers = ["R7", "R11", "R13", "R14", "R19"]
 after = [{ epic = 8, needs = "the daily_nudges and daily_reminders tables, send_daily_nudge, enqueue_daily_reminders and its daily-reminders cron job, the five send-push kinds and their switches, which this epic changes" }]
 
 [[epic]]
