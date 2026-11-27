@@ -18,7 +18,7 @@ Epic 8's five daily pushes and two nudge slots are cut down, as the owner decide
 
 ## Outcome
 
-Each partner gets one clear call back to the day's question instead of a run of pushes. Signal: the pgTAP, api and E2E specs for the three pushes and the per-question nudge limit, and the post-deploy Live Daily Check passing.
+Each partner gets one clear call back to the day's question instead of a run of pushes. Signal: the pgTAP, api and E2E specs for the three pushes and the per-question nudge limit pass.
 
 ## Requirements
 
