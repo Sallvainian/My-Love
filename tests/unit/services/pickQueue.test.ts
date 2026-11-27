@@ -11,6 +11,7 @@ import {
   enqueuePick,
   listQueuedPicks,
   markQueuedPickFailed,
+  removeFailedQueuedPicksExcept,
   removeQueuedPick,
   type QueuedPick,
 } from '../../../src/services/pickQueue';
@@ -97,6 +98,20 @@ describe('pickQueue', () => {
     await removeQueuedPick(B, 'DAY-2');
 
     expect((await listQueuedPicks(A)).map((row) => row.day_id)).toEqual(['DAY-2']);
+  });
+
+  it("removes the account's failed rows for other days, never a pending row or another account's", async () => {
+    await enqueuePick(queued('DAY-1', { failed: true, failure: 'REFUSED' }));
+    await enqueuePick(queued('DAY-2', { failed: true, failure: 'REFUSED' }));
+    await enqueuePick(queued('DAY-3', { failed: true, failure: 'REFUSED' }));
+    await enqueuePick(queued('DAY-4'));
+    await enqueuePick(queued('DAY-1', { user_id: B, failed: true, failure: 'REFUSED' }));
+
+    expect(await removeFailedQueuedPicksExcept(A, 'DAY-3')).toBe(2);
+
+    expect((await listQueuedPicks(A)).map((row) => row.day_id)).toEqual(['DAY-3', 'DAY-4']);
+    expect((await listQueuedPicks(B)).map((row) => row.day_id)).toEqual(['DAY-1']);
+    expect(await removeFailedQueuedPicksExcept(A, 'DAY-3')).toBe(0);
   });
 
   it('answers [] with a logged error when the read fails, and throws when a write fails', async () => {

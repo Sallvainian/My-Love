@@ -32,7 +32,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { moodSyncService } from '../api/moodSyncService';
+import { listenToPartnerEvents } from '../api/listenToPartnerEvents';
 import { useAppStore } from '../stores/useAppStore';
 
 export function useDailyPickListener(onPartnerPick?: (dayId: string) => void): void {
@@ -54,13 +54,12 @@ export function useDailyPickListener(onPartnerPick?: (dayId: string) => void): v
   useEffect(() => {
     if (!listening) return;
 
-    // `subscribePartnerEvents` is async, so the effect can be torn down before
-    // it resolves: release a subscription that arrives after unmount.
+    // `listenToPartnerEvents` retries a rejected subscribe on a bounded backoff
+    // and releases a subscription that arrives after the effect is torn down.
     let active = true;
-    let unsubscribe: (() => void) | null = null;
 
-    moodSyncService
-      .subscribePartnerEvents({
+    const stop = listenToPartnerEvents(
+      {
         daily_pick: ({ day_id }) => {
           if (!active) return;
           void refreshDailyDay(day_id);
@@ -81,21 +80,13 @@ export function useDailyPickListener(onPartnerPick?: (dayId: string) => void): v
           void loadDailyDay();
           void loadCoupleStreak();
         },
-      })
-      .then((release) => {
-        if (!active) {
-          release();
-          return;
-        }
-        unsubscribe = release;
-      })
-      .catch((error: unknown) => {
-        console.error('[useDailyPickListener] Could not listen for a partner pick:', error);
-      });
+      },
+      { failureMessage: '[useDailyPickListener] Could not listen for a partner pick:' }
+    );
 
     return () => {
       active = false;
-      unsubscribe?.();
+      stop();
     };
   }, [listening, session, loadDailyDay, refreshDailyDay, loadCoupleStreak]);
 }

@@ -80,7 +80,7 @@ describe('subscribePartnerEvents channel ownership', () => {
       vi.useRealTimers();
     });
 
-    // src/api/moodSyncService.ts RETRY_CONFIG (module-private), mirrored.
+    // src/api/realtimeRetry.ts RETRY_CONFIG, mirrored.
     const MOOD_RETRY = { maxRetries: 5, baseDelay: 1000, maxDelay: 30000 };
 
     /** The wait before each retry, as `armMoodReopen` computes it: 1s, 2s, 4s, 8s, 16s. */

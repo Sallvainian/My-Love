@@ -12,9 +12,14 @@
  * is at least as new), and a successful answer then replaces it (`ok`) or
  * deletes it (`unlinked`); a failed read leaves it. The copy is tagged with the
  * partner it was read with and shown only for the current partner
- * (`shownPartnerId`), as the saved days are. Only the newest started read writes
- * (a sequence counter), and a read that outlives the session writes nothing, to
- * the field or to the copy. `signedOutState()` clears all three fields.
+ * (`shownPartnerId`), as the saved days are. Overlapping calls collapse: one read
+ * runs per signed-in identity and pair, and a call that arrives meanwhile asks for
+ * one more read after it (never joins it, so the read starts after its cause) and
+ * gets that trailing pass's promise; the call that started the running read keeps
+ * the promise of its own pass (`trailingRead.ts`). Only the newest
+ * started read writes (a sequence counter), and a read that outlives the session
+ * or its pair writes nothing, to the field or to the copy. `signedOutState()` clears all
+ * three fields.
  * Daily shows the streak too, so `submitDailyPick` and the queue drain
  * (`dailyDaySlice`) re-read it (`void loadCoupleStreak()`) after each pick the
  * server confirmed, once the session is still current; a queued pick and a
@@ -31,7 +36,11 @@
  * Daily view calls it for each `ok` streak it shows, and the device-state
  * `daily-celebrated` kind (`services/dailyCelebrated.ts`) decides under a lock
  * whether that held total is new to this device and, in the same claim, whether
- * its milestone screen has yet to show. That claim stores the held total alone;
+ * its milestone screen has yet to show. Both claims pass the partner known when
+ * the claim is made (`mergePartnerId`, the source the saved days are tagged
+ * from), which the kind stores with its value: a value tagged with another
+ * partner is re-seeded, not played, and with no known partner nothing is
+ * claimed. `claimStreakCelebration` stores the held total alone;
  * `claimStreakMilestone(streak)` stores the milestone count just before its
  * screen shows (R5), so a +1 cut short leaves the milestone for the next open of
  * Daily. Both hold no state here, so sign-out needs nothing in
@@ -56,8 +65,19 @@ import {
   saveStreakAnswer,
 } from '../../services/dailyStreakCopy';
 import { registerLocalCopy } from '../../services/localCopy';
-import { mergePartnerId, shownPartnerId } from '../dailyPartnerIds';
-import type { AppStateCreator } from '../types';
+import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
+import type { AppState, AppStateCreator } from '../types';
+import { createTrailingRead } from '../trailingRead';
+
+/**
+ * The partner a celebration claim is made for: the id the saved days would be
+ * tagged with, or `null` when none is known (an `unlinked` or failed lookup),
+ * and then nothing is claimed.
+ */
+const claimPartnerId = async (get: () => AppState, userId: string): Promise<string | null> => {
+  const tag = await mergePartnerId(get, userId);
+  return tag.status === 'linked' ? tag.partnerId : null;
+};
 
 export interface DailyStreakSlice {
   /** The last server answer for the couple's streak, or `null` before any. */
@@ -82,7 +102,8 @@ export interface DailyStreakSlice {
    * this device too; else `play: false`, with `milestone` when that held total's
    * +1 was claimed and its milestone screen is still owed. Never throws: a
    * failure is logged and answers `NO_CELEBRATION`, as does no signed-in user or
-   * a session that changed meanwhile.
+   * a session that changed meanwhile. With no known partner nothing is claimed
+   * and nothing is written.
    */
   claimStreakCelebration: (streak: CoupleStreak) => Promise<CelebrationClaim>;
   /**
@@ -101,63 +122,86 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
   // The newest started `loadCoupleStreak`: an older read that lands later writes nothing.
   let streakSeq = 0;
 
+  // The new pairs seen: bumped only by `resetCoupleStreakForNewPair`, so a read
+  // started for the new pair never joins one started for the old pair.
+  let pairEpoch = 0;
+
+  /** One read: the saved streak, then the server's answer. Never throws. */
+  const readStreakOnce = async (trailingRequested: () => boolean): Promise<void> => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) return;
+    const mine = ++streakSeq;
+    const isCurrent = () =>
+      get().userId === requestedBy &&
+      get().authSessionVersion === requestedInSession &&
+      streakSeq === mine;
+
+    set({ coupleStreakLoading: true });
+
+    // 1. The saved streak, at once, over nothing only.
+    const savedFor = await shownPartnerId(get, requestedBy);
+    if (!isCurrent()) return;
+    const saved = await readSavedStreak(requestedBy, savedFor);
+    if (!isCurrent()) return;
+    if (saved && get().coupleStreak === null) {
+      set({ coupleStreak: { status: 'ok', streak: saved } });
+    }
+
+    try {
+      // 2. The server's answer, shown and then saved.
+      const answer = await fetchCoupleStreak();
+      if (!isCurrent()) return;
+      // A trailing pass already asked for runs next in this session and pair (a
+      // change of either would have failed `isCurrent`), so the streak stays
+      // loading until its answer: Daily's claim gate waits for a settled streak.
+      set({
+        coupleStreak: answer,
+        coupleStreakLoading: trailingRequested(),
+        coupleStreakError: null,
+      });
+      try {
+        // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
+        const partner =
+          answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : NO_PARTNER_TAG;
+        if (!isCurrent()) return;
+        await saveStreakAnswer(requestedBy, answer, partner, isCurrent);
+      } catch (error) {
+        console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
+      }
+    } catch (error) {
+      if (!isCurrent()) return;
+      // An offline refusal is expected, not a fault: the error is still set.
+      if (!(error instanceof AccountDataError && error.code === 'offline')) {
+        console.error("[DailyQuestion] Failed to load the couple's streak:", error);
+      }
+      set({
+        coupleStreakLoading: false,
+        coupleStreakError:
+          error instanceof Error ? error.message : "Could not load your couple's streak.",
+      });
+    }
+  };
+
+  // The tab's streak reads, one in flight plus one trailing pass per identity
+  // and pair: see `trailingRead.ts`.
+  const streakReads = createTrailingRead(() => {
+    const { userId, authSessionVersion } = get();
+    return userId ? `${userId}:${authSessionVersion}:${pairEpoch}` : null;
+  }, readStreakOnce);
+
   return {
     coupleStreak: null,
     coupleStreakLoading: false,
     coupleStreakError: null,
 
-    loadCoupleStreak: async () => {
-      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      if (!requestedBy) return;
-      const mine = ++streakSeq;
-      const isCurrent = () =>
-        get().userId === requestedBy &&
-        get().authSessionVersion === requestedInSession &&
-        streakSeq === mine;
-
-      set({ coupleStreakLoading: true });
-
-      // 1. The saved streak, at once, over nothing only.
-      const savedFor = await shownPartnerId(get, requestedBy);
-      if (!isCurrent()) return;
-      const saved = await readSavedStreak(requestedBy, savedFor);
-      if (!isCurrent()) return;
-      if (saved && get().coupleStreak === null) {
-        set({ coupleStreak: { status: 'ok', streak: saved } });
-      }
-
-      try {
-        // 2. The server's answer, shown and then saved.
-        const answer = await fetchCoupleStreak();
-        if (!isCurrent()) return;
-        set({ coupleStreak: answer, coupleStreakLoading: false, coupleStreakError: null });
-        try {
-          // Only an `ok` answer is tagged; `unlinked` deletes the copy and needs no partner.
-          const partnerId = answer.status === 'ok' ? await mergePartnerId(get, requestedBy) : null;
-          if (!isCurrent()) return;
-          await saveStreakAnswer(requestedBy, answer, partnerId);
-        } catch (error) {
-          console.error("[DailyQuestion] Failed to save the couple's streak copy:", error);
-        }
-      } catch (error) {
-        if (!isCurrent()) return;
-        // An offline refusal is expected, not a fault: the error is still set.
-        if (!(error instanceof AccountDataError && error.code === 'offline')) {
-          console.error("[DailyQuestion] Failed to load the couple's streak:", error);
-        }
-        set({
-          coupleStreakLoading: false,
-          coupleStreakError:
-            error instanceof Error ? error.message : "Could not load your couple's streak.",
-        });
-      }
-    },
+    loadCoupleStreak: () => streakReads.call(),
 
     resetCoupleStreakForNewPair: () => {
       // Daily's read effect does not re-run on a partner change, so a streak that
       // was shown or being read is read again for the new partner.
       const streakWanted = get().coupleStreak !== null || get().coupleStreakLoading;
       streakSeq += 1;
+      pairEpoch += 1;
       set({ coupleStreak: null, coupleStreakLoading: false, coupleStreakError: null });
       if (streakWanted && get().userId) void get().loadCoupleStreak();
     },
@@ -165,14 +209,19 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
     claimStreakCelebration: async (streak) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return NO_CELEBRATION;
-      const isCurrent = () =>
+      const sessionIsCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
       try {
-        const claim = await claimCelebration(requestedBy, streak, isCurrent);
+        const partnerId = await claimPartnerId(get, requestedBy);
+        if (!sessionIsCurrent()) return NO_CELEBRATION;
+        // A partner change while the claim runs makes `streak` the old pair's.
+        const isCurrent = () =>
+          sessionIsCurrent() && (get().partner?.id ?? partnerId) === partnerId;
+        const claim = await claimCelebration(requestedBy, partnerId, streak, isCurrent);
         return isCurrent() ? claim : NO_CELEBRATION;
       } catch (error) {
-        if (isCurrent()) {
+        if (sessionIsCurrent()) {
           console.error('[DailyQuestion] Could not record the streak celebration:', error);
         }
         return NO_CELEBRATION;
@@ -182,18 +231,23 @@ export const createDailyStreakSlice: AppStateCreator<DailyStreakSlice> = (set, g
     claimStreakMilestone: async (streak, canShow) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) return false;
-      const isCurrent = () =>
+      const sessionIsCurrent = () =>
         get().userId === requestedBy && get().authSessionVersion === requestedInSession;
 
       try {
+        const partnerId = await claimPartnerId(get, requestedBy);
+        if (!sessionIsCurrent()) return false;
+        const isCurrent = () =>
+          sessionIsCurrent() && (get().partner?.id ?? partnerId) === partnerId;
         const claimed = await claimMilestone(
           requestedBy,
+          partnerId,
           streak,
           () => isCurrent() && canShow()
         );
         return claimed && isCurrent();
       } catch (error) {
-        if (isCurrent()) {
+        if (sessionIsCurrent()) {
           console.error('[DailyQuestion] Could not record the milestone as shown:', error);
         }
         return false;

@@ -336,7 +336,7 @@ const MOOD_REALTIME_TOPIC = `realtime:${MOOD_TOPIC}`;
  * The first reopen after an unsolicited CLOSED waits the base delay (retry
  * count 0, so `baseDelay * 2 ** 0`).
  */
-const FIRST_MOOD_REOPEN_DELAY_MS = 1000; // src/api/moodSyncService.ts RETRY_CONFIG.baseDelay (module-private)
+const FIRST_MOOD_REOPEN_DELAY_MS = 1000; // src/api/realtimeRetry.ts RETRY_CONFIG.baseDelay
 
 function installMoodClient(): void {
   const client = new RealtimeClient('ws://localhost:54321/realtime/v1', {

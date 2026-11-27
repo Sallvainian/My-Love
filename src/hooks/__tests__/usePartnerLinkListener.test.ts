@@ -35,6 +35,7 @@ vi.mock('../../stores/useAppStore', () => {
 });
 
 import { moodSyncService } from '../../api/moodSyncService';
+import { RETRY_CONFIG } from '../../api/realtimeRetry';
 import { resolvePartnerLookupForDelivery } from '../../api/supabaseClient';
 import { usePartnerLinkListener } from '../usePartnerLinkListener';
 
@@ -194,5 +195,46 @@ describe('usePartnerLinkListener', () => {
     await act(async () => resolve(release));
 
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a subscribe that rejects once, then stays subscribed and asks on SUBSCRIBED whether a link was missed', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const failure = new Error('no channel');
+      subscribe.mockReset();
+      subscribe.mockRejectedValueOnce(failure).mockResolvedValue(release);
+
+      const hook = renderSettled();
+      await act(async () => {});
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[usePartnerLinkListener] Could not listen for a partner link:',
+        failure
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RETRY_CONFIG.baseDelay);
+      });
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(release).not.toHaveBeenCalled();
+
+      lookup.mockResolvedValue({ status: 'linked', partnerId: 'PARTNER' });
+      await act(async () => subscribe.mock.calls[1][0].onStatus!('SUBSCRIBED'));
+      expect(lookup).toHaveBeenCalledTimes(1);
+      expect(state.loadPartner).toHaveBeenCalledTimes(1);
+      expect(state.loadPendingRequests).toHaveBeenCalledTimes(1);
+
+      hook.unmount();
+      expect(release).toHaveBeenCalledTimes(1);
+      // Held, so nothing is attempted again.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RETRY_CONFIG.maxDelay);
+      });
+      expect(subscribe).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

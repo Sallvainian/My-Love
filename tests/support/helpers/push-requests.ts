@@ -5,8 +5,8 @@
  * `tests/api/push-daily-sender.spec.ts`, `tests/api/push-daily-reminders.spec.ts`,
  * `tests/api/push-daily-picks.spec.ts` and `tests/api/push-daily-nudge.spec.ts`):
  * read what the `send-push` Edge Function recorded in `push_requests`, speak as a
- * user with a real JWT, build and link throwaway pairs with devices, and post to the
- * sender as the triggers do.
+ * user with a real JWT, build and link throwaway pairs with devices (and seed their
+ * days), and post to the sender as the triggers do.
  *
  * Import by this deep path: `tests/support/helpers` has no barrel.
  */
@@ -14,6 +14,8 @@ import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../../../src/types/database.types';
 import type { TypedSupabaseClient } from '../factories';
+import { readPairDayIdsByDate, seedPairDays, type SeededDay } from '../factories/daily-question';
+import type { Cleanup } from '../fixtures/cleanup';
 import { expect } from '../merged-fixtures';
 import { createOutsiderClient, deleteOutsider } from './rls-security';
 import { getUserAccessToken } from './supabase';
@@ -132,7 +134,7 @@ export const dailyPayload = (kind: string, title: string, body: string, sound?: 
  */
 export async function createParty(
   supabaseAdmin: TypedSupabaseClient,
-  cleanup: { defer: (name: string, fn: () => Promise<unknown>) => void },
+  cleanup: Cleanup,
   prefix: string,
   displayPrefix: string,
   role: string
@@ -172,4 +174,32 @@ export async function link(supabaseAdmin: TypedSupabaseClient, from: Party, to: 
     [from.userId]: to.userId,
     [to.userId]: from.userId,
   });
+}
+
+/**
+ * A linked pair of throwaway accounts (`roles[0]` with one device, `roles[1]` with two: a sandbox
+ * and a production token) whose `days` are seeded with `seedPairDays`. `dayIds` maps each seeded
+ * date (`YYYY-MM-DD`) to its `couple_days` id. `prefix` and `displayPrefix` name the accounts as
+ * `createParty` does.
+ */
+export async function setUpPair(
+  supabaseAdmin: TypedSupabaseClient,
+  cleanup: Cleanup,
+  names: { prefix: string; displayPrefix: string; roles?: [string, string] },
+  days: readonly SeededDay[]
+) {
+  const [firstRole, secondRole] = names.roles ?? ['a', 'b'];
+  const first = await createParty(supabaseAdmin, cleanup, names.prefix, names.displayPrefix, firstRole);
+  const second = await createParty(supabaseAdmin, cleanup, names.prefix, names.displayPrefix, secondRole);
+  await link(supabaseAdmin, first, second);
+  const firstDevice = await registerDevice(first, 'sandbox');
+  const secondDevices: [string, string] = [
+    await registerDevice(second, 'sandbox'),
+    await registerDevice(second, 'production'),
+  ];
+
+  const pair = { userId: first.userId, partnerId: second.userId };
+  await seedPairDays(supabaseAdmin, pair, days);
+  const dayIds = await readPairDayIdsByDate(supabaseAdmin, pair);
+  return { first, second, firstDevice, secondDevices, pair, dayIds };
 }

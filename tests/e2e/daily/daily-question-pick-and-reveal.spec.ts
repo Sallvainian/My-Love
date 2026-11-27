@@ -26,6 +26,7 @@ import {
 import { closeContext } from '../../support/fixtures/cleanup';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
+import { observeReadAfterNavigation } from '../../support/helpers/read-after-navigation';
 import { DAILY_DAY_READ, DAILY_PICK_SEND, SECOND_CONTEXT_READ_TIMEOUT } from '../../support/helpers/reads';
 
 test.describe('Daily question: pick and reveal', () => {
@@ -95,7 +96,9 @@ test.describe('Daily question: pick and reveal', () => {
     await expect(page.getByTestId('daily-option-this')).toHaveCount(0);
 
     await log.step('The worker reloads and still sees the waiting screen');
-    const waitingRead = interceptNetworkCall({ method: 'POST', url: DAILY_DAY_READ });
+    // The pick re-reads the day on this page; a read that starts after this
+    // point is cut off by the reload, so observe the reloaded page's own read.
+    const waitingRead = observeReadAfterNavigation(page, { method: 'POST', url: DAILY_DAY_READ });
     await page.reload();
     expect((await waitingRead).status).toBe(200);
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
@@ -146,7 +149,9 @@ test.describe('Daily question: pick and reveal', () => {
     await expect(partnerPage.getByTestId('daily-reveal-mark')).toHaveText('Different picks');
 
     await log.step('The worker reloads and sees the same reveal');
-    const reload = interceptNetworkCall({ method: 'POST', url: DAILY_DAY_READ });
+    // The partner's pick re-reads the day on this page; observe the reloaded
+    // page's own read, not one the reload cuts off.
+    const reload = observeReadAfterNavigation(page, { method: 'POST', url: DAILY_DAY_READ });
     await page.reload();
     expect((await reload).status).toBe(200);
     await expect(page.getByTestId('daily-reveal')).toBeVisible();

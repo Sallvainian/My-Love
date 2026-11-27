@@ -32,7 +32,14 @@ import { AccountDataError } from '../../../src/services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { deleteAccountCopies, readLocalCopy, writeLocalCopy } from '../../../src/services/localCopy';
 import { useAppStore } from '../../../src/stores/useAppStore';
-import { dailySnapshot, revealSnapshot, waitingSnapshot, DAY_ID } from './dailyQuestionFixture';
+import {
+  dailySnapshot,
+  revealSnapshot,
+  waitingSnapshot,
+  DAY_ID,
+  KNOWN_PARTNER_ID,
+  knownPartnerState,
+} from './dailyQuestionFixture';
 import { setOnline } from './navigatorFixtures';
 import { deferred } from './loaderIdentityGuardsFixture';
 
@@ -122,7 +129,7 @@ describe('loadDailyDay', () => {
     const failure = new AccountDataError('transport', 'boom');
     fetchDailyDay.mockRejectedValue(failure);
 
-    await expect(state().loadDailyDay()).resolves.toBeUndefined();
+    await state().loadDailyDay();
 
     expect(state().dailyDay).toBeNull();
     expect(state().dailyDayError).toBe('boom');
@@ -283,6 +290,237 @@ describe('loadDailyDay', () => {
 
       expect(state().dailyDayError).toBeNull();
     });
+  });
+});
+
+describe('overlapping loadDailyDay calls', () => {
+  // Long enough for a read to get through its saved-copy reads (fake-indexeddb) to its fetch.
+  const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+
+  it('three overlapping calls send exactly two reads: the running one and one trailing pass', async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay
+      .mockReturnValueOnce(running.promise)
+      .mockResolvedValueOnce(ok(waitingSnapshot('this')));
+
+    const calls = [state().loadDailyDay()];
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    // Each call comes after the one before could have reached its fetch.
+    calls.push(state().loadDailyDay());
+    await pause();
+    calls.push(state().loadDailyDay());
+    await pause();
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+    running.settle(ok(dailySnapshot()));
+    await Promise.all(calls);
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    expect(state().dailyDayLoading).toBe(false);
+  });
+
+  it("a call that arrives while a read runs gets a read started after the call, and its promise settles after that read's pass", async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    const trailing = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(running.promise).mockReturnValueOnce(trailing.promise);
+
+    const first = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    let secondSettled = false;
+    const second = state()
+      .loadDailyDay()
+      .then(() => {
+        secondSettled = true;
+      });
+    running.settle(ok(dailySnapshot()));
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    // The second call waits for the trailing pass, which started after it.
+    await pause();
+    expect(secondSettled).toBe(false);
+    expect(state().dailyDayLoading).toBe(true);
+    trailing.settle(ok(waitingSnapshot('this')));
+    await Promise.all([first, second]);
+
+    expect(secondSettled).toBe(true);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it("the first caller's promise settles after its own pass, while a trailing pass is still reading", async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    const trailing = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(running.promise).mockReturnValueOnce(trailing.promise);
+
+    let firstSettled = false;
+    const first = state()
+      .loadDailyDay()
+      .then(() => {
+        firstSettled = true;
+      });
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    let secondSettled = false;
+    const second = state()
+      .loadDailyDay()
+      .then(() => {
+        secondSettled = true;
+      });
+    running.settle(ok(dailySnapshot()));
+    await first;
+    // The trailing pass is requested and its read is out, but the first caller is done.
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    expect(firstSettled).toBe(true);
+    expect(secondSettled).toBe(false);
+    expect(state().dailyDayLoading).toBe(true);
+    trailing.settle(ok(waitingSnapshot('this')));
+    await second;
+    expect(secondSettled).toBe(true);
+  });
+
+  it('calls that arrive during the trailing pass share a third pass; each settles after the pass that covers it', async () => {
+    const reads = [
+      deferred<ReturnType<typeof ok>>(),
+      deferred<ReturnType<typeof ok>>(),
+      deferred<ReturnType<typeof ok>>(),
+    ];
+    fetchDailyDay
+      .mockReturnValueOnce(reads[0].promise)
+      .mockReturnValueOnce(reads[1].promise)
+      .mockReturnValueOnce(reads[2].promise);
+    const settled: string[] = [];
+    const track = (name: string, call: Promise<void>) =>
+      call.then(() => {
+        settled.push(name);
+      });
+
+    const a = track('a', state().loadDailyDay());
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    const b = track('b', state().loadDailyDay());
+    reads[0].settle(ok(dailySnapshot()));
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    // Arrives while the trailing pass reads: it asks for one more.
+    const c = track('c', state().loadDailyDay());
+    const d = track('d', state().loadDailyDay());
+    reads[1].settle(ok(dailySnapshot()));
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(3));
+    expect(settled).toEqual(['a', 'b']);
+    reads[2].settle(ok(waitingSnapshot('this')));
+    await Promise.all([a, b, c, d]);
+
+    expect(settled).toEqual(['a', 'b', 'c', 'd']);
+    expect(fetchDailyDay).toHaveBeenCalledTimes(3);
+  });
+
+  it('a read that fails still gets its trailing pass, and a later pass clears the error', async () => {
+    const running = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(running.promise).mockResolvedValueOnce(ok(dailySnapshot()));
+
+    const first = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    const second = state().loadDailyDay();
+    running.fail(new AccountDataError('transport', 'boom'));
+    await Promise.all([first, second]);
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(state().dailyDayError).toBeNull();
+  });
+
+  it('a call after the reads ended starts a new read', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+    await state().loadDailyDay();
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+  });
+
+  it("a call in a new session starts its own read and never joins the old session's", async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce(ok(waitingSnapshot('this')));
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    await state().loadDailyDay();
+
+    // The new session's read sent while the old one was still open.
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+
+    // The old read's end writes nothing and sends no trailing pass.
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+  });
+
+  it('a call that asks for a trailing pass in a session that ended sends nothing for it', async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(old.promise);
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    const dropped = state().loadDailyDay();
+    state().clearAuth();
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+
+    // The call that asked for the dropped pass settles; it is not left hanging.
+    await expect(dropped).resolves.toBeUndefined();
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+    expect(state().dailyDay).toBeNull();
+  });
+
+  it('a trailing pass asked for before a same-account re-login is never sent in the new session', async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay.mockReturnValueOnce(old.promise).mockResolvedValue(ok(dailySnapshot()));
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    const dropped = state().loadDailyDay();
+    // The same account signs in again: the user id is the same, the session is not.
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+    await expect(dropped).resolves.toBeUndefined();
+    await pause();
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(1);
+    expect(state().dailyDay).toBeNull();
+  });
+
+  it("the old session's read ending leaves the new session's read in its slot", async () => {
+    const old = deferred<ReturnType<typeof ok>>();
+    const fresh = deferred<ReturnType<typeof ok>>();
+    fetchDailyDay
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(fresh.promise)
+      .mockResolvedValueOnce(ok(waitingSnapshot('this')));
+
+    const oldLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(1));
+    state().clearAuth();
+    state().setAuthUser(A);
+    await deleteAccountCopies(A);
+    const freshLoad = state().loadDailyDay();
+    await vi.waitFor(() => expect(fetchDailyDay).toHaveBeenCalledTimes(2));
+    old.settle(ok(dailySnapshot()));
+    await oldLoad;
+
+    // The new session's read is still open, so this call asks for a pass after it.
+    const joined = state().loadDailyDay();
+    await pause();
+    expect(fetchDailyDay).toHaveBeenCalledTimes(2);
+    fresh.settle(ok(dailySnapshot()));
+    await Promise.all([freshLoad, joined]);
+
+    expect(fetchDailyDay).toHaveBeenCalledTimes(3);
+    expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 });
 
@@ -473,6 +711,114 @@ describe('the saved days copy', () => {
   });
 });
 
+describe('the server answers the store shows (dailyDayAnswers, DW-491)', () => {
+  const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
+  const shownAnswers = () => ({
+    count: state().dailyDayAnswers,
+    dayId: state().dailyDayAnsweredId,
+  });
+
+  it('starts at none', () => {
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a read grows it and names the day the answer showed', async () => {
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+
+    await state().loadDailyDay();
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('an unlinked read grows it with no day', async () => {
+    fetchDailyDay.mockResolvedValue({ status: 'unlinked' });
+
+    await state().loadDailyDay();
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: null });
+  });
+
+  it('a failed read leaves it as it was, though a saved day is shown', async () => {
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+      [DAY_ID]: { ...dailySnapshot(), partner_id: null },
+    });
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a saved day that replaces the answered one leaves the answered day as it was', async () => {
+    fetchDailyDay.mockResolvedValueOnce(ok(dailySnapshot()));
+    await state().loadDailyDay();
+    await writeLocalCopy(A, DAILY_DAYS_COPY_KIND, {
+      'next-day': { ...dailySnapshot({ day_id: 'next-day', day: '2026-11-06' }), partner_id: null },
+    });
+    vi.setSystemTime(NEXT_DAY);
+    fetchDailyDay.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().loadDailyDay();
+
+    expect(state().dailyDay).toMatchObject({ snapshot: { day_id: 'next-day' } });
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('a re-read of the day on screen grows it', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it("a re-read with nothing on screen shows today's day and grows it", async () => {
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('a re-read of another day than the one on screen leaves it as it was', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    fetchDailyDayById.mockResolvedValue({ ...OTHER_DAY, state: 'partner' as const });
+
+    await state().refreshDailyDay('other-day');
+
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a failed re-read leaves it as it was', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    fetchDailyDayById.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+
+  it('a confirmed pick grows it', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    expect(shownAnswers()).toEqual({ count: 1, dayId: DAY_ID });
+  });
+
+  it('a refused pick leaves it as it was', async () => {
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+
+    await expect(state().submitDailyPick('this')).rejects.toThrow('boom');
+
+    expect(shownAnswers()).toEqual({ count: 0, dayId: null });
+  });
+});
+
 describe('refreshDailyDay', () => {
   const saved = (...snapshots: Array<ReturnType<typeof dailySnapshot>>) =>
     Object.fromEntries(
@@ -480,6 +826,17 @@ describe('refreshDailyDay', () => {
     );
   const copy = () => readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
   const OTHER_DAY = dailySnapshot({ day_id: 'other-day', day: '2026-11-06' });
+
+  it('tags the merged day with the known partner', async () => {
+    useAppStore.setState(knownPartnerState());
+    fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
+
+    await state().refreshDailyDay(DAY_ID);
+
+    expect(await copy()).toEqual({
+      [DAY_ID]: { ...dailySnapshot({ state: 'partner' }), partner_id: KNOWN_PARTNER_ID },
+    });
+  });
 
   it('asks for the named day', async () => {
     fetchDailyDayById.mockResolvedValue(dailySnapshot({ state: 'partner' }));
@@ -644,6 +1001,18 @@ describe('submitDailyPick', () => {
     expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
   });
 
+  it('tags the saved day with the known partner', async () => {
+    useAppStore.setState(knownPartnerState());
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+
+    await state().submitDailyPick('this');
+
+    const saved = await readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+    expect(saved).toEqual({
+      [DAY_ID]: { ...waitingSnapshot('this'), partner_id: KNOWN_PARTNER_ID },
+    });
+  });
+
   it('stores the reveal when the partner had already picked', async () => {
     useAppStore.setState({ dailyDay: ok(dailySnapshot({ state: 'partner' })) });
     submitDailyPickRequest.mockResolvedValue(revealSnapshot('that', 'this'));
@@ -731,6 +1100,33 @@ describe('submitDailyPick', () => {
 
     const submit = state().submitDailyPick('this');
     state().clearAuth();
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(announceDailyPick).not.toHaveBeenCalled();
+  });
+
+  it('announces the confirmed pick after a same-account re-login during the send', async () => {
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    state().setAuthUser(A);
+    request.settle(waitingSnapshot('this'));
+    await submit;
+
+    expect(announceDailyPick).toHaveBeenCalledTimes(1);
+    expect(announceDailyPick).toHaveBeenCalledWith(DAY_ID);
+  });
+
+  it('announces nothing when another account signed in before the answer', async () => {
+    const request = deferred<ReturnType<typeof waitingSnapshot>>();
+    submitDailyPickRequest.mockReturnValue(request.promise);
+
+    const submit = state().submitDailyPick('this');
+    state().clearAuth();
+    state().setAuthUser(C);
     request.settle(waitingSnapshot('this'));
     await submit;
 

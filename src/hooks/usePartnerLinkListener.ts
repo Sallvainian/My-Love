@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { moodSyncService } from '../api/moodSyncService';
+import { listenToPartnerEvents } from '../api/listenToPartnerEvents';
 import { resolvePartnerLookupForDelivery } from '../api/supabaseClient';
 import { useAppStore } from '../stores/useAppStore';
 
@@ -48,12 +48,13 @@ export function usePartnerLinkListener(): void {
   const loadPartner = useAppStore((state) => state.loadPartner);
   const loadPendingRequests = useAppStore((state) => state.loadPendingRequests);
 
-  // Wait for the first partner load, then stop watching isLoadingPartner: every
-  // later load (each reconnect, each Partner-tab mount) raises it too, and
-  // gating on it tore the channel down and re-joined it each time, dropping any
-  // broadcast that landed in between. Before a load has even started the store
-  // reads "no partner" for a linked account as well, so that is not settled
-  // either. A partner or a load error is written only by a finished load.
+  // Wait for the first partner load, then stop watching isLoadingPartner: only
+  // a session's first load (or a retry over a load error) raises it, and the
+  // latch settles the hook on that one rise, so a later rise never tears the
+  // channel down and re-joins it, dropping any broadcast that landed in
+  // between. Before a load has even started the store reads "no partner" for a
+  // linked account as well, so that is not settled either. A partner or a load
+  // error is written only by a finished load.
   const session = userId ? `${userId}:${authSessionVersion}` : null;
   const [firstLoad, setFirstLoad] = useState<FirstLoad>({
     session: null,
@@ -75,15 +76,14 @@ export function usePartnerLinkListener(): void {
     if (!listening) return;
 
     let active = true;
-    let unsubscribe: (() => void) | null = null;
 
     const reloadPartner = () => {
       void loadPartner();
       void loadPendingRequests();
     };
 
-    moodSyncService
-      .subscribePartnerEvents({
+    const stop = listenToPartnerEvents(
+      {
         // Moods are for the screens that show them; this subscriber only waits
         // for the link.
         onStatus: (status) => {
@@ -99,21 +99,13 @@ export function usePartnerLinkListener(): void {
         partner_linked: () => {
           if (active) reloadPartner();
         },
-      })
-      .then((release) => {
-        if (!active) {
-          release();
-          return;
-        }
-        unsubscribe = release;
-      })
-      .catch((error: unknown) => {
-        console.error('[usePartnerLinkListener] Could not listen for a partner link:', error);
-      });
+      },
+      { failureMessage: '[usePartnerLinkListener] Could not listen for a partner link:' }
+    );
 
     return () => {
       active = false;
-      unsubscribe?.();
+      stop();
     };
   }, [listening, session, loadPartner, loadPendingRequests]);
 }

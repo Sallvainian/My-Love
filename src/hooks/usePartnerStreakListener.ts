@@ -24,7 +24,7 @@
  */
 
 import { useEffect } from 'react';
-import { moodSyncService } from '../api/moodSyncService';
+import { listenToPartnerEvents } from '../api/listenToPartnerEvents';
 import { useAppStore } from '../stores/useAppStore';
 
 export function usePartnerStreakListener(): void {
@@ -42,13 +42,12 @@ export function usePartnerStreakListener(): void {
   useEffect(() => {
     if (!listening) return;
 
-    // `subscribePartnerEvents` is async, so the effect can be torn down before
-    // it resolves: release a subscription that arrives after unmount.
+    // `listenToPartnerEvents` retries a rejected subscribe on a bounded backoff
+    // and releases a subscription that arrives after the effect is torn down.
     let active = true;
-    let unsubscribe: (() => void) | null = null;
 
-    moodSyncService
-      .subscribePartnerEvents({
+    const stop = listenToPartnerEvents(
+      {
         daily_pick: () => {
           if (!active) return;
           void loadCoupleStreak();
@@ -65,21 +64,13 @@ export function usePartnerStreakListener(): void {
           void loadCoupleStreak();
           void loadDailyHistory();
         },
-      })
-      .then((release) => {
-        if (!active) {
-          release();
-          return;
-        }
-        unsubscribe = release;
-      })
-      .catch((error: unknown) => {
-        console.error('[usePartnerStreakListener] Could not listen for the streak:', error);
-      });
+      },
+      { failureMessage: '[usePartnerStreakListener] Could not listen for the streak:' }
+    );
 
     return () => {
       active = false;
-      unsubscribe?.();
+      stop();
     };
   }, [listening, session, loadCoupleStreak, loadDailyHistory, loadPartner, loadPendingRequests]);
 }

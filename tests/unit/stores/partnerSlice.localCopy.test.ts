@@ -398,4 +398,101 @@ describe('partner profile on the local copy', () => {
       expect(refreshCouple).not.toHaveBeenCalled();
     });
   });
+
+  // DW-501: the spinner is for "nothing has answered", not for "no partner".
+  describe('the loading flag', () => {
+    it('is raised by the first load, while nothing has answered', async () => {
+      const server = deferred<unknown>();
+      getPartner.mockReturnValue(server.promise);
+
+      const inFlight = state().loadPartner();
+      expect(state().isLoadingPartner).toBe(true);
+
+      server.settle({ status: 'unlinked' });
+      await inFlight;
+      expect(state().isLoadingPartner).toBe(false);
+      expect(state().partnerKnown).toBe(true);
+    });
+
+    it('is not raised by a reload over a confirmed unlinked answer', async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+      await state().loadPartner();
+      expect(state().partnerKnown).toBe(true);
+
+      const server = deferred<unknown>();
+      getPartner.mockReturnValue(server.promise);
+      const seen: boolean[] = [];
+      const stop = useAppStore.subscribe((next) => seen.push(next.isLoadingPartner));
+
+      const inFlight = state().loadPartner();
+      await vi.waitFor(() => expect(getPartner).toHaveBeenCalledTimes(2));
+      // The saved copy has been read and the server read is open.
+      expect(state().isLoadingPartner).toBe(false);
+
+      server.settle({ status: 'unlinked' });
+      await inFlight;
+      stop();
+
+      expect(seen).not.toContain(true);
+      expect(state().partner).toBeNull();
+      expect(state().partnerKnown).toBe(true);
+    });
+
+    it('is not raised by a reload whose read fails over a confirmed unlinked answer', async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+      await state().loadPartner();
+
+      getPartner.mockResolvedValue(READ_FAILED);
+      const seen: boolean[] = [];
+      const stop = useAppStore.subscribe((next) => seen.push(next.isLoadingPartner));
+      await state().loadPartner();
+      stop();
+
+      expect(seen).not.toContain(true);
+      // The saved "unlinked" copy is still the answer, so no load error either.
+      expect(state().partnerLoadError).toBe(false);
+    });
+
+    it('is raised by a retry over a confirmed unlinked answer that a failed read turned into a load error', async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+      await state().loadPartner();
+      // The saved copy is gone (a failed IndexedDB read answers null) and the
+      // server read fails: the load error is what the screen shows now.
+      await clearCopies();
+      getPartner.mockResolvedValue(READ_FAILED);
+      await state().loadPartner();
+      expect(state().partnerKnown).toBe(true);
+      expect(state().partnerLoadError).toBe(true);
+
+      // Retry: the error card is hidden until an answer lands.
+      const server = deferred<unknown>();
+      getPartner.mockReturnValue(server.promise);
+      const inFlight = state().loadPartner();
+      expect(state().isLoadingPartner).toBe(true);
+
+      server.settle({ status: 'unlinked' });
+      await inFlight;
+      expect(state().isLoadingPartner).toBe(false);
+      expect(state().partnerLoadError).toBe(false);
+    });
+
+    it('is raised again for the next account after a sign-out', async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+      await state().loadPartner();
+      expect(state().partnerKnown).toBe(true);
+
+      state().clearAuth();
+      state().setAuthUser(B);
+      expect(state().partnerKnown).toBe(false);
+
+      const server = deferred<unknown>();
+      getPartner.mockReturnValue(server.promise);
+      const inFlight = state().loadPartner();
+      expect(state().isLoadingPartner).toBe(true);
+
+      server.settle({ status: 'unlinked' });
+      await inFlight;
+      expect(state().isLoadingPartner).toBe(false);
+    });
+  });
 });
