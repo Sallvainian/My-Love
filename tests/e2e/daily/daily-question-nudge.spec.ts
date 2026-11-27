@@ -33,6 +33,7 @@ import { waitClearOfDailyTurns } from '../../support/helpers/events';
 import { closeContext } from '../../support/fixtures/cleanup';
 import { closeAfterPickSheet } from '../../support/helpers/after-pick-sheet';
 import { goOffline } from '../../support/helpers/offline';
+import { observeReadAfterNavigation } from '../../support/helpers/read-after-navigation';
 import {
   DAILY_DAY_READ,
   DAILY_NUDGE_SEND,
@@ -140,7 +141,10 @@ test.describe('Daily question: nudge the partner', () => {
     });
 
     await log.step('After a reload the button is still disabled');
-    const reread = interceptNetworkCall({ method: 'POST', url: DAILY_DAY_READ });
+    // The reconnect above re-reads the day (the `online` refresh and the channel's
+    // re-join), and one of those reads can start after this point, only for the
+    // reload to cut it off: observe the reloaded page's own read.
+    const reread = observeReadAfterNavigation(page, { method: 'POST', url: DAILY_DAY_READ });
     await page.reload();
     const rereadAnswer = await reread;
     expect(rereadAnswer.status).toBe(200);
