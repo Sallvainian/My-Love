@@ -1,16 +1,130 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate watches only the Supabase CLI pin in .mise.toml (and refreshes mise.lock). Dependabot keeps npm (.github/dependabot.yml).",
+  "description": [
+    "Replaces Dependabot's version updates; the rules mirror .github/dependabot.yml.backup.",
+    "Dependabot security alerts stay on as a GitHub setting."
+  ],
+  "extends": [
+    "config:recommended"
+  ],
   "enabledManagers": [
+    "npm",
+    "github-actions",
     "mise"
   ],
+  "timezone": "America/New_York",
   "semanticCommits": "enabled",
-  "semanticCommitType": "deps",
-  "semanticCommitScope": "supabase",
-  "minimumReleaseAge": "3 days",
+  "rangeStrategy": "bump",
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 0,
+  "labels": [
+    "dependencies"
+  ],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
   "packageRules": [
     {
-      "description": "Only the Supabase CLI; node stays on its 24.x range in .mise.toml.",
+      "description": "npm: weekly on Monday, commits as deps(deps) / deps(deps-dev), labelled npm (Dependabot's npm block).",
+      "matchManagers": [
+        "npm"
+      ],
+      "schedule": [
+        "* * * * 1"
+      ],
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "deps",
+      "addLabels": [
+        "npm"
+      ]
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "semanticCommitScope": "deps-dev"
+    },
+    {
+      "description": "Minor and patch updates travel together, one PR for production and one for development dependencies.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "production-dependencies"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "dev-dependencies"
+    },
+    {
+      "description": "vitest and its companion packages peer-pin each other on an exact version, so a major that arrives as one PR per package can never install (every job dies at npm ci with ERESOLVE). They always travel together, majors included. Listed after the two groups above so it overrides them.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "vitest",
+        "@vitest/**"
+      ],
+      "groupName": "vitest"
+    },
+    {
+      "description": "GitHub Actions: weekly on Monday, commits as ci(deps), labelled github-actions; minor and patch updates grouped.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "schedule": [
+        "* * * * 1"
+      ],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "deps",
+      "addLabels": [
+        "github-actions"
+      ]
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "actions"
+    },
+    {
+      "description": "preactjs/compressed-size-action's v3 is an unreleased development branch, not a release (newest release is 2.10.0). Dependabot once bumped onto it and broke the Bundle Size check on every PR. Stay on v2 until a real v3 release exists.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "preactjs/compressed-size-action"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "mise: only the Supabase CLI; node stays on its 24.x range in .mise.toml.",
       "matchManagers": [
         "mise"
       ],
@@ -20,18 +134,25 @@
       "enabled": false
     },
     {
-      "description": "Minor and patch releases merge once the PR's required checks pass.",
+      "description": "Supabase CLI: any time, after a 3-day wait so a bad release can be pulled first.",
+      "matchManagers": [
+        "mise"
+      ],
       "matchDepNames": [
         "supabase"
       ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "automerge": true
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "supabase",
+      "minimumReleaseAge": "3 days",
+      "addLabels": [
+        "mise"
+      ]
     },
     {
-      "description": "A major release (like 2.x to 3.x) can change deploy.yml's commands, which no PR check runs, so it waits for a person.",
+      "description": "A Supabase CLI major (like 2.x to 3.x) can change deploy.yml's commands, which no PR check runs, so it waits for a person. Every other update automerges once the required checks pass, as Dependabot's did.",
+      "matchManagers": [
+        "mise"
+      ],
       "matchDepNames": [
         "supabase"
       ],
