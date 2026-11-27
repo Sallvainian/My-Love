@@ -160,6 +160,19 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     fetch(`${url}/realtime/v1/api/health`, { headers: wake }),
   ]);
 
+  // seed.sql points the push triggers at Kong by its classic-backend name
+  // (supabase_kong_My-Love), which only exists on the classic Docker network. On
+  // the stack backend the database reaches the functions through the host's API
+  // port, a different one per worktree and branch, so point it there.
+  if (process.env.SUPABASE_STACK_BACKEND === '1') {
+    const senderUrl = `http://host.docker.internal:${new URL(url).port}/functions/v1/send-push`;
+    const { error } = await admin
+      .from('push_sender_settings')
+      .update({ sender_url: senderUrl })
+      .eq('singleton', true);
+    if (error) throw new Error(`[global-setup] could not point the push sender at ${senderUrl}: ${error.message}`);
+  }
+
   // Create legacy users
   for (const user of LEGACY_TEST_USERS) {
     await ensureUser(admin, user.email, TEST_USER_PASSWORD, user.displayName);

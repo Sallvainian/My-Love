@@ -75,26 +75,38 @@ function localSupabaseEnv(): string {
 }
 
 /**
- * The auth container of this checkout's local Supabase. The classic backend has one
- * fixed name per project; the stack backend names it supabase-<project>-auth-<hash>,
- * one per worktree and branch, so it is found by the stack id `status` reports.
+ * The stack id of this checkout's local Supabase, or null on the classic backend,
+ * whose status JSON has no identity.
  */
-function authContainer(): string {
+function stackId(): string | null {
   try {
     const id = JSON.parse(execSync('supabase status --output-format json', execOpts))?.identity?.id;
-    if (typeof id === 'string' && /^[0-9a-f]+$/.test(id)) {
-      const name = execSync(
-        `docker ps --filter label=com.supabase.stack=${id} --filter label=com.supabase.service=auth --format "{{.Names}}"`,
-        execOpts
-      )
-        .trim()
-        .split('\n')[0];
-      if (name) return name;
-    }
+    return typeof id === 'string' && /^[0-9a-f]+$/.test(id) ? id : null;
   } catch {
-    // classic backend: its status JSON has no identity
+    return null;
   }
-  return 'supabase_auth_My-Love';
+}
+
+/**
+ * A container of this checkout's local Supabase. The classic backend names them
+ * supabase_<service>_My-Love, one per project; the stack backend names them
+ * supabase-<project>-<service>-<hash>, one per worktree and branch, so they are
+ * found by the stack id and the service label. A lazy service's container exists
+ * only while it is awake, so callers wake the service first.
+ */
+function stackContainer(id: string | null, service: string, classic: string): string {
+  if (!id) return classic;
+  try {
+    const name = execSync(
+      `docker ps --filter label=com.supabase.stack=${id} --filter label=com.supabase.service=${service} --format "{{.Names}}"`,
+      execOpts
+    )
+      .trim()
+      .split('\n')[0];
+    return name || classic;
+  } catch {
+    return classic;
+  }
 }
 
 try {
@@ -109,12 +121,22 @@ try {
   let serviceRoleKey = vars.SERVICE_ROLE_KEY;
   let anonKey = vars.ANON_KEY;
 
+  // Helpers that run psql inside the database container (tests/support/helpers/
+  // migration-replay.ts) and global-setup's push-sender URL read these. The
+  // database never sleeps, so its container is always there to find.
+  const id = stackId();
+  if (id) process.env.SUPABASE_STACK_BACKEND = '1';
+  process.env.SUPABASE_DB_CONTAINER ??= stackContainer(id, 'database', 'supabase_db_My-Love');
+
   // Detect HS256/ES256 mismatch: if GoTrue has GOTRUE_JWT_KEYS, re-sign tokens.
   try {
+    // Wake Auth first: on the stack backend its container exists only while it
+    // is awake. Any answer wakes it.
+    if (id) execSync(`curl -s -o /dev/null "${vars.API_URL}/auth/v1/health"`, execOpts);
     // Double quotes, not single: cmd.exe does not treat ' as a quote character,
     // so a single-quoted --format string arrives as separate argv entries there.
     const jwtKeysRaw = execSync(
-      `docker inspect ${authContainer()} --format "{{range .Config.Env}}{{println .}}{{end}}"`,
+      `docker inspect ${stackContainer(id, 'auth', 'supabase_auth_My-Love')} --format "{{range .Config.Env}}{{println .}}{{end}}"`,
       execOpts
     );
     const jwtKeysLine = jwtKeysRaw.split('\n').find((l) => l.startsWith('GOTRUE_JWT_KEYS='));
