@@ -198,7 +198,7 @@ On push to `main`: apply migrations → build → smoke test → `wrangler deplo
 - `bundle-size.yml` — PR bundle size comparison
 - `codeql.yml` — Security analysis
 - `dependency-review.yml` — Flags risky dependency changes on PRs
-- `dependabot-auto-merge.yml` — Turns on auto-merge for every Dependabot PR
+- `dependabot-auto-merge.yml` — Turns on auto-merge for every Dependabot PR (version updates moved to Renovate, `renovate.json`; this stays until Renovate has proven itself)
 - `supabase-migrations.yml` — Migration validation on PRs that touch `supabase/`
 - `claude-code-review.yml` — Claude reviews every PR
 - `claude.yml` — Answers `@claude` mentions on issues and PRs
