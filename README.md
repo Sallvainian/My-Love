@@ -37,7 +37,7 @@ A Progressive Web App for couples to exchange daily love messages, track moods, 
 git clone https://github.com/Sallvainian/My-Love.git
 cd My-Love
 npm install
-supabase start          # Start local Supabase (Postgres, Auth, Realtime, etc.)
+npm run supabase:up     # Start this checkout's local Supabase (one per worktree and branch)
 fnox exec -- npm run dev  # Start dev server with decrypted secrets
 ```
 
@@ -48,7 +48,8 @@ Open http://localhost:5173 in your browser.
 ```bash
 fnox exec -- npm run dev      # Start dev server (cleanup wrapper)
 fnox exec -- npm run dev:raw  # Vite dev server directly
-npm run dev:local             # Vite against local Supabase (.env.test, no secrets needed)
+npm run dev:local             # Vite against this checkout's local Supabase (no secrets needed)
+npm run supabase:prune        # Stop/destroy local Supabases of switched-away branches and removed worktrees
 fnox exec -- npm run build    # Production build (tsc + vite)
 npm run typecheck             # tsc -b --force (all three tsconfig projects)
 npm run lint                  # ESLint
@@ -198,7 +199,7 @@ On push to `main`: apply migrations → build → smoke test → `wrangler deplo
 - `bundle-size.yml` — PR bundle size comparison
 - `codeql.yml` — Security analysis
 - `dependency-review.yml` — Flags risky dependency changes on PRs
-- `dependabot-auto-merge.yml` — Turns on auto-merge for every Dependabot PR
+- `dependabot-auto-merge.yml` — Turns on auto-merge for every Dependabot PR (version updates moved to Renovate, `renovate.json`; this stays until Renovate has proven itself)
 - `supabase-migrations.yml` — Migration validation on PRs that touch `supabase/`
 - `claude-code-review.yml` — Claude reviews every PR
 - `claude.yml` — Answers `@claude` mentions on issues and PRs

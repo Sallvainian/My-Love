@@ -6,7 +6,9 @@
 -- the shared secret it presents. Local only; the hosted project gets its own
 -- values in story 3.3. The URL reaches the `send-push` function through Kong
 -- from inside the Docker network, so `supabase functions serve` (or CI's
--- edge-runtime) must be running for the sender to be called at all.
+-- edge-runtime) must be running for the sender to be called at all. That name
+-- exists only on the classic backend (CI); on the stack backend Playwright's
+-- global-setup repoints the row at the host's per-stack API port.
 insert into public.push_sender_settings (sender_url, sender_secret)
 values (
   'http://supabase_kong_My-Love:8000/functions/v1/send-push',

@@ -1,3 +1,9 @@
+# BACKUP, not read by Dependabot (it reads only .github/dependabot.yml).
+# Renovate (renovate.json) carries these rules while it is tried out; once it
+# has proven itself, delete this file and .github/workflows/dependabot-auto-merge.yml.
+# To roll back: rename this file to dependabot.yml and drop the npm and
+# github-actions managers from renovate.json.
+#
 # Dependabot configuration
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
