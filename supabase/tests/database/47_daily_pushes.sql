@@ -1,9 +1,11 @@
 -- ============================================
--- pgTAP: the sender's schema for the five daily pushes (20261125000000)
+-- pgTAP: the sender's schema for the daily pushes (20261125000000; daily_nudges
+-- as story 11.1's 20261127000000 reshaped it: source, held, released_at;
+-- daily_reminders as story 11.2's 20261127010000 narrowed it to evening_self)
 --
 -- Story 8.3 of epic-daily-pushes-and-nudge (architecture-daily-question:
 -- AD-3, AD-9, AD-10, AD-15, AD-17). Pinned here:
---   * daily_nudges and daily_reminders: their columns, the slot check, the
+--   * daily_nudges and daily_reminders: their columns, the source check, the
 --     reminder slot as a stored generated column (an insert cannot set it), the
 --     kind check, the two unique keys, day_id not null, RLS on with no policy,
 --     no privilege for anon or authenticated, and service_role able to insert.
@@ -24,7 +26,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(74);
+select plan(77);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -83,8 +85,8 @@ select has_table('public', 'daily_nudges', 'DAILY-PUSH-001: daily_nudges exists'
 select has_table('public', 'daily_reminders', 'DAILY-PUSH-002: daily_reminders exists');
 
 select columns_are('public', 'daily_nudges',
-  array['id', 'from_user', 'to_user', 'day_id', 'sender_local_date', 'slot', 'created_at'],
-  'DAILY-PUSH-003: daily_nudges has exactly its seven columns');
+  array['id', 'from_user', 'to_user', 'day_id', 'source', 'held', 'released_at', 'created_at'],
+  'DAILY-PUSH-003: daily_nudges has exactly its eight columns');
 select columns_are('public', 'daily_reminders',
   array['id', 'user_id', 'kind', 'slot', 'local_date', 'day_id', 'created_at'],
   'DAILY-PUSH-004: daily_reminders has exactly its seven columns');
@@ -93,8 +95,8 @@ select col_not_null('public', 'daily_nudges', 'day_id', 'DAILY-PUSH-005: daily_n
 select col_not_null('public', 'daily_reminders', 'day_id', 'DAILY-PUSH-006: daily_reminders.day_id is not null');
 select col_not_null('public', 'daily_reminders', 'slot', 'DAILY-PUSH-071: daily_reminders.slot is not null');
 select col_not_null('public', 'daily_reminders', 'local_date', 'DAILY-PUSH-072: daily_reminders.local_date is not null');
-select col_not_null('public', 'daily_nudges', 'slot', 'DAILY-PUSH-073: daily_nudges.slot is not null');
-select col_not_null('public', 'daily_nudges', 'sender_local_date', 'DAILY-PUSH-074: daily_nudges.sender_local_date is not null');
+select col_not_null('public', 'daily_nudges', 'source', 'DAILY-PUSH-073: daily_nudges.source is not null');
+select col_not_null('public', 'daily_nudges', 'held', 'DAILY-PUSH-074: daily_nudges.held is not null');
 select ok(
   (select a.attgenerated = 's' from pg_attribute a
     where a.attrelid = 'public.daily_reminders'::regclass and a.attname = 'slot'),
@@ -157,43 +159,57 @@ reset role;
 set local role service_role;
 
 select lives_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-01', 'after_pick')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d1')),
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'prompt')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d1')),
   'DAILY-PUSH-015: service_role inserts a nudge'
 );
 select throws_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-01', 'after_pick')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d1')),
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'prompt')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d1')),
   '23505', null,
-  'DAILY-PUSH-016: a second nudge by the same sender, date and slot is refused'
+  'DAILY-PUSH-016: a second nudge by the same sender, day and source is refused'
 );
 select lives_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-01', 'evening')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d1')),
-  'DAILY-PUSH-017: the same sender and date in the other slot is allowed'
-);
-select throws_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-01', 'after_pick')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d2')),
-  '23505', null,
-  'DAILY-PUSH-018: the key is the sender, the sender''s date and the slot, whatever the day_id'
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'button')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d1')),
+  'DAILY-PUSH-017: the same sender and day from the other source is allowed'
 );
 select lives_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-01', 'after_pick')$$, pg_temp.u('b'), pg_temp.u('a'), pg_temp.d('d1')),
-  'DAILY-PUSH-019: the other partner has their own slots'
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'prompt')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d2')),
+  'DAILY-PUSH-018: the key is the sender, the day and the source: the same source on another day is allowed'
+);
+select lives_ok(
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'prompt')$$, pg_temp.u('b'), pg_temp.u('a'), pg_temp.d('d1')),
+  'DAILY-PUSH-019: the other partner has their own sources'
 );
 select throws_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-02', 'midday')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d2')),
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'midday')$$, pg_temp.u('a'), pg_temp.u('b'), pg_temp.d('d3')),
   '23514', null,
-  'DAILY-PUSH-020: a slot other than after_pick or evening is refused'
+  'DAILY-PUSH-020: a source other than prompt or button is refused'
 );
 select throws_ok(
-  format($$insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-           values (%L, %L, %L, date '2030-07-02', 'after_pick')$$, pg_temp.u('a'), pg_temp.u('b'), gen_random_uuid()),
+  format($$insert into public.daily_nudges (from_user, to_user, day_id, source)
+           values (%L, %L, %L, 'prompt')$$, pg_temp.u('a'), pg_temp.u('b'), gen_random_uuid()),
   '23503', null,
   'DAILY-PUSH-021: a nudge needs an existing day'
+);
+select is(
+  (select held::text || ',' || coalesce(released_at::text, 'null') from public.daily_nudges
+    where from_user = pg_temp.u('a') and day_id = pg_temp.d('d1') and source = 'prompt'),
+  'false,null',
+  'DAILY-PUSH-075: a nudge is not held and not released unless it says so'
+);
+select is(
+  (select array_agg(a.attname order by k.ord)
+     from pg_constraint c
+     cross join lateral unnest(c.conkey) with ordinality as k(attnum, ord)
+     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.attnum
+    where c.conrelid = 'public.daily_nudges'::regclass and c.conname = 'daily_nudges_sender_day_source_key'),
+  array['from_user', 'day_id', 'source']::name[],
+  'DAILY-PUSH-076: the limit is the unique key (from_user, day_id, source)'
 );
 
 -- ============================================
@@ -201,29 +217,30 @@ select throws_ok(
 -- ============================================
 select lives_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
-           values (%L, 'morning', date '2030-07-01', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
-  'DAILY-PUSH-022: service_role inserts a morning reminder'
+           values (%L, 'evening_self', date '2030-07-01', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
+  'DAILY-PUSH-022: service_role inserts an evening_self reminder'
 );
-select lives_ok(
+select throws_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
            values (%L, 'evening_self', date '2030-07-01', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
-  'DAILY-PUSH-023: and an evening one for the same date'
+  '23505', null,
+  'DAILY-PUSH-023: a second reminder for the same date is refused (the unique key is once per date)'
 );
 select throws_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
-           values (%L, 'evening_partner', date '2030-07-01', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
-  '23505', null,
-  'DAILY-PUSH-024: the two evening kinds share one slot, so a second evening reminder is refused'
+           values (%L, 'morning', date '2030-07-05', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
+  '23514', null,
+  'DAILY-PUSH-024: a morning reminder is refused by daily_reminders_kind_check'
 );
 select throws_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
-           values (%L, 'morning', date '2030-07-01', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
-  '23505', null,
-  'DAILY-PUSH-025: a second morning reminder on the same date is refused'
+           values (%L, 'evening_partner', date '2030-07-05', %L)$$, pg_temp.u('a'), pg_temp.d('d1')),
+  '23514', null,
+  'DAILY-PUSH-025: an evening_partner reminder is refused by daily_reminders_kind_check'
 );
 select throws_ok(
   format($$insert into public.daily_reminders (user_id, kind, slot, local_date, day_id)
-           values (%L, 'morning', 'evening', date '2030-07-02', %L)$$, pg_temp.u('a'), pg_temp.d('d2')),
+           values (%L, 'evening_self', 'evening', date '2030-07-02', %L)$$, pg_temp.u('a'), pg_temp.d('d2')),
   '428C9', null,
   'DAILY-PUSH-026: an insert cannot set the generated slot'
 );
@@ -231,22 +248,28 @@ select throws_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
            values (%L, 'noon', date '2030-07-02', %L)$$, pg_temp.u('a'), pg_temp.d('d2')),
   '23514', null,
-  'DAILY-PUSH-027: a kind other than morning, evening_self or evening_partner is refused'
+  'DAILY-PUSH-027: a kind other than evening_self is refused'
 );
 select lives_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
-           values (%L, 'evening_partner', date '2030-07-02', %L)$$, pg_temp.u('a'), pg_temp.d('d2')),
-  'DAILY-PUSH-028: evening_partner on another date is allowed'
+           values (%L, 'evening_self', date '2030-07-02', %L)$$, pg_temp.u('a'), pg_temp.d('d2')),
+  'DAILY-PUSH-028: evening_self on another date is allowed'
 );
 select is(
-  (select string_agg(r.kind || '=' || r.slot, ',' order by r.local_date, r.kind)
+  (select string_agg(r.kind || '=' || r.slot, ',' order by r.local_date)
      from public.daily_reminders r where r.user_id = pg_temp.u('a')),
-  'evening_self=evening,morning=morning,evening_partner=evening',
-  'DAILY-PUSH-029: the slot follows the kind: morning for morning, evening for both evening kinds'
+  'evening_self=evening,evening_self=evening',
+  'DAILY-PUSH-029: the slot is generated from the kind and always reads evening'
+);
+select is(
+  (select pg_get_constraintdef(c.oid) from pg_constraint c
+    where c.conrelid = 'public.daily_reminders'::regclass and c.conname = 'daily_reminders_kind_check'),
+  'CHECK ((kind = ''evening_self''::text))',
+  'DAILY-PUSH-077: daily_reminders_kind_check allows evening_self alone'
 );
 select throws_ok(
   format($$insert into public.daily_reminders (user_id, kind, local_date, day_id)
-           values (%L, 'morning', date '2030-07-03', null)$$, pg_temp.u('a')),
+           values (%L, 'evening_self', date '2030-07-03', null)$$, pg_temp.u('a')),
   '23502', null,
   'DAILY-PUSH-030: a reminder needs a day'
 );
@@ -320,21 +343,21 @@ select lives_ok(
 select lives_ok(
   format($$insert into public.push_requests (daily_nudge_id, token, environment, payload, delivery)
            select n.id, 'tok-1', 'production', '{}'::jsonb, 'sent' from public.daily_nudges n
-            where n.from_user = %L and n.slot = 'after_pick'$$, pg_temp.u('a')),
+            where n.from_user = %L and n.day_id = %L and n.source = 'prompt'$$, pg_temp.u('a'), pg_temp.d('d1')),
   'DAILY-PUSH-040: a request with only a nudge source is accepted'
 );
 select lives_ok(
   format($$insert into public.push_requests (daily_reminder_id, token, environment, payload, delivery)
            select r.id, 'tok-1', 'sandbox', '{}'::jsonb, 'recorded' from public.daily_reminders r
-            where r.user_id = %L and r.kind = 'morning'$$, pg_temp.u('a')),
+            where r.user_id = %L and r.kind = 'evening_self' and r.day_id = %L$$, pg_temp.u('a'), pg_temp.d('d1')),
   'DAILY-PUSH-041: a request with only a reminder source is accepted'
 );
 select throws_ok(
   format($$insert into public.push_requests (daily_pick_id, daily_nudge_id, token, environment, payload, delivery)
            select (select p.id from public.daily_picks p where p.day_id = %L and p.user_id = %L),
                   n.id, 'tok-3', 'sandbox', '{}'::jsonb, 'recorded'
-             from public.daily_nudges n where n.from_user = %L and n.slot = 'after_pick'$$,
-         pg_temp.d('d3'), pg_temp.u('a'), pg_temp.u('a')),
+             from public.daily_nudges n where n.from_user = %L and n.day_id = %L and n.source = 'prompt'$$,
+         pg_temp.d('d3'), pg_temp.u('a'), pg_temp.u('a'), pg_temp.d('d1')),
   '23514', null,
   'DAILY-PUSH-042: a request with two sources is refused'
 );

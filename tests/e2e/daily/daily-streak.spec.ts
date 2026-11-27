@@ -53,14 +53,27 @@ test.use({ trace: 'off', video: 'off' });
 
 type DayState = 'done' | 'missed' | 'open';
 
-/** The seven dates of Daily's strip, oldest first, in the state the server gave. */
+/**
+ * Daily's strip is the calendar week of the host's local date, Sunday to
+ * Saturday. `states` are the last seven dates, oldest first, ending today (as
+ * the seeds are dated by `daysAgo`); each lands on its weekday slot, the dates
+ * after today are `upcoming`, and the labels are weekday letters with the ring
+ * on today's slot alone and no "Today".
+ */
 async function expectWeek(page: Page, states: DayState[]): Promise<void> {
+  const todayIndex = new Date().getDay();
   const days = page.getByTestId('daily-streak-day');
   await expect(days).toHaveCount(7);
-  for (const [index, state] of states.entries()) {
-    await expect(days.nth(index)).toHaveAttribute('data-state', state);
+  for (let slot = 0; slot < 7; slot += 1) {
+    await expect(days.nth(slot)).toHaveAttribute(
+      'data-state',
+      slot > todayIndex ? 'upcoming' : states[6 - todayIndex + slot]
+    );
+    await expect(days.nth(slot)).toHaveText(['S', 'M', 'T', 'W', 'T', 'F', 'S'][slot]);
   }
-  await expect(days.last()).toContainText('Today');
+  await expect(days.nth(todayIndex)).toHaveAttribute('data-today', 'true');
+  await expect(page.locator('[data-testid="daily-streak-day"][data-today="true"]')).toHaveCount(1);
+  await expect(page.getByTestId('daily-streak-week')).not.toContainText('Today');
 }
 
 test.describe('Daily streak', () => {

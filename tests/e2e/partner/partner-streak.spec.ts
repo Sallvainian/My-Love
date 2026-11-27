@@ -81,16 +81,6 @@ function chromeText(page: Page): Promise<string> {
   return page.getByTestId('partner-view').evaluate((root) => root.textContent ?? '');
 }
 
-/** Seven consecutive local dates ending today, `YYYY-MM-DD`, oldest first. */
-function lastSevenDates(): string[] {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - index));
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  });
-}
-
 /**
  * Open the connected Partner page at phone width in `colorScheme`, with the
  * partner, its profile, the requests and the streak (in `todayState`) faked in
@@ -131,19 +121,24 @@ async function openStubbedPartner(
     fulfillResponse: { status: 200, body: [] },
     timeout: 15000,
   });
-  // Done today when orange; a missed day before an open today when blue; so
-  // the dark pass sees the check, snowflake and dashed-ring dots.
-  const week = lastSevenDates().map((day, index) => ({
-    day,
-    state:
-      index === 4
-        ? 'done'
-        : index === 5 && todayState === 'blue'
-          ? 'missed'
-          : index === 6 && todayState === 'orange'
-            ? 'done'
-            : 'open',
-  }));
+  // Fixed dates, as the server's answer carries them: the client takes today from `week`'s
+  // last date, never the device clock, so the stub holds on every weekday. `week` ends on
+  // Wednesday 2030-03-06 and `calendar_week` is that Sunday to Saturday. Done on Monday
+  // and, when orange, on Wednesday; missed on Tuesday when blue; so the dark pass sees the
+  // check, snowflake and grey circle dots.
+  const states: Record<string, string> = {
+    '2030-03-04': 'done',
+    '2030-03-05': todayState === 'blue' ? 'missed' : 'open',
+    '2030-03-06': todayState === 'orange' ? 'done' : 'open',
+  };
+  const week = ['02-28', '03-01', '03-02', '03-03', '03-04', '03-05', '03-06'].map((md) => {
+    const day = `2030-${md}`;
+    return { day, state: states[day] ?? 'open' };
+  });
+  const calendarWeek = ['03', '04', '05', '06', '07', '08', '09'].map((dd) => {
+    const day = `2030-03-${dd}`;
+    return { day, state: day > '2030-03-06' ? 'upcoming' : (states[day] ?? 'open') };
+  });
   const streak = fulfillOn({
     page,
     method: 'POST',
@@ -161,6 +156,7 @@ async function openStubbedPartner(
           done: 12,
           missed: 0,
           week,
+          calendar_week: calendarWeek,
         },
       },
     },
@@ -283,8 +279,13 @@ test.describe('Partner page streak', () => {
 
       const days = view.getByTestId('partner-streak-week').getByTestId('partner-streak-day');
       await expect(days).toHaveCount(7);
-      await expect(days.last()).toHaveAttribute('data-state', 'done');
-      await expect(days.last()).toContainText('Today');
+      // Today is done, in its own weekday's slot of the Sunday-to-Saturday row, and ringed alone.
+      const todayIndex = new Date().getDay();
+      await expect(days.nth(todayIndex)).toHaveAttribute('data-state', 'done');
+      await expect(days.nth(todayIndex)).toHaveAttribute('data-today', 'true');
+      await expect(view.locator('[data-testid="partner-streak-day"][data-today="true"]')).toHaveCount(1);
+      await expect(days).toHaveText(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+      await expect(view.getByTestId('partner-streak-week')).not.toContainText('Today');
       await expect(view.getByTestId('partner-streak-next')).toHaveText(
         'Next milestone: 25 days · 24 to go'
       );

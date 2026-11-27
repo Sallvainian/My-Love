@@ -209,7 +209,7 @@ describe('DailyQuestion', () => {
       expect(banner).not.toHaveTextContent('The last');
     });
 
-    it('the strip shows each date in the state the server gave', async () => {
+    it('the strip shows the calendar week in the state the server gave, with today ringed and no "Today"', async () => {
       fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
       fetchCoupleStreak.mockResolvedValue(okStreak({ today_state: 'orange' }));
 
@@ -217,9 +217,31 @@ describe('DailyQuestion', () => {
 
       const days = await screen.findAllByTestId('daily-streak-day');
       expect(days.map((day) => day.getAttribute('data-state'))).toEqual([
+        'open', 'open', 'open', 'open', 'done', 'upcoming', 'upcoming',
+      ]);
+      expect(days.map((day) => day.textContent)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+      // The viewer's date is 2030-03-07, a Thursday.
+      expect(days.map((day) => day.getAttribute('data-today'))).toEqual([
+        null, null, null, null, 'true', null, null,
+      ]);
+    });
+
+    it('a streak with no calendar_week, as a copy saved before it reads, shows its last seven dates, today last', async () => {
+      fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+      fetchCoupleStreak.mockResolvedValue(
+        okStreak({ calendar_week: undefined, week: streakWeek(['done']) }),
+      );
+
+      render(<DailyQuestion />);
+
+      const days = await screen.findAllByTestId('daily-streak-day');
+      expect(days.map((day) => day.getAttribute('data-state'))).toEqual([
         'open', 'open', 'open', 'open', 'open', 'open', 'done',
       ]);
-      expect(days[6]).toHaveTextContent('Today');
+      expect(days.map((day) => day.getAttribute('data-today'))).toEqual([
+        null, null, null, null, null, null, 'true',
+      ]);
+      expect(days.map((day) => day.textContent)).not.toContain('Today');
     });
 
     it.each([

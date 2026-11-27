@@ -33,8 +33,37 @@ export function waitingSnapshot(
   return dailySnapshot({ state: 'me', my_choice: myChoice, my_picked_at: pickedAt });
 }
 
-/** The viewer picked and the partner has not, with the viewer's `nudge` as given. */
-export function nudgeSnapshot(
+/**
+ * A closing instant well after the fixture's day (2026-11-05) in any zone: the
+ * question still takes nudges unless a test moves its clock past it.
+ */
+export const NUDGE_CLOSES_AT = '2026-11-07T00:00:00+00:00';
+
+/**
+ * The viewer picked and the partner has not, with the day's `nudges` as given:
+ * which sources are sent (neither by default) and the closing instant
+ * (`NUDGE_CLOSES_AT` by default; `null` gives none).
+ */
+export function nudgesSnapshot(
+  nudges: { prompt?: boolean; button?: boolean; closesAt?: string | null } = {},
+  overrides: Partial<DailyDaySnapshot> = {}
+): DailyDaySnapshot {
+  return {
+    ...waitingSnapshot('this'),
+    nudges: {
+      prompt_sent: nudges.prompt ?? false,
+      button_sent: nudges.button ?? false,
+      closes_at: nudges.closesAt === undefined ? NUDGE_CLOSES_AT : nudges.closesAt,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * The viewer picked and the partner has not, as the build before story 11.1
+ * saved it: its `nudge { slot, spent }` and no `nudges`.
+ */
+export function legacyNudgeSnapshot(
   slot: 'after_pick' | 'evening' | null,
   spent: boolean,
   overrides: Partial<DailyDaySnapshot> = {}
@@ -74,8 +103,38 @@ export function streakWeek(states: CoupleStreak['week'][number]['state'][] = [])
   return padded.map((state, index) => ({ day: `2030-03-0${index + 1}`, state }));
 }
 
+type CalendarDay = NonNullable<CoupleStreak['calendar_week']>[number];
+
+/**
+ * The calendar week 2030-03-03 (Sunday) to 2030-03-09 (Saturday) as the server
+ * answers it for a viewer whose date is `todayIndex` (0 Sunday .. 6 Saturday,
+ * default 4: Thursday 03-07): `states` gives the state of an index, every
+ * other date up to today is `open` and every date after it `upcoming`.
+ */
+export function calendarWeek(
+  todayIndex = 4,
+  states: Partial<Record<number, 'done' | 'missed' | 'open'>> = {}
+): NonNullable<CoupleStreak['calendar_week']> {
+  return Array.from({ length: 7 }, (_, index): CalendarDay => ({
+    day: `2030-03-0${index + 3}`,
+    state: index > todayIndex ? 'upcoming' : (states[index] ?? 'open'),
+  }));
+}
+
 /** The streak `get_couple_streak` answers; override any field. Defaults to one done day, orange. */
 export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStreak {
+  const week = overrides.week ?? streakWeek(['done']);
+  // The calendar week 2030-03-03..03-09 as the server would derive it from `week`: its last
+  // date is the viewer's date, later dates are `upcoming`, an earlier date takes its state in
+  // `week` and a date `week` does not hold is `open`.
+  const today = week[week.length - 1].day;
+  const calendar_week = Array.from({ length: 7 }, (_, index): CalendarDay => {
+    const day = `2030-03-0${index + 3}`;
+    return {
+      day,
+      state: day > today ? 'upcoming' : (week.find((entry) => entry.day === day)?.state ?? 'open'),
+    };
+  });
   return {
     held: 1,
     run: 1,
@@ -84,7 +143,8 @@ export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStrea
     same: 1,
     done: 1,
     missed: 0,
-    week: streakWeek(['done']),
+    week,
+    calendar_week,
     ...overrides,
   };
 }

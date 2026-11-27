@@ -1,7 +1,8 @@
 /**
- * useDailyDayRereads — while signed in, `loadDailyDay` runs at the next local
- * 20:00:05 (and each day after) and on every return to the front; both are
- * cleaned up on unmount and on a session change.
+ * useDailyDayRereads — while signed in, `loadDailyDay` runs on every return to
+ * the front and on nothing else: the 20:00:05 evening re-read went with the
+ * nudge slots (story 11.1). The listener is removed on unmount and on a session
+ * change.
  */
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,38 +41,13 @@ describe('useDailyDayRereads', () => {
     setVisibility('visible');
   });
 
-  it('re-reads at 20:00:05 local, not before', () => {
+  it('does not re-read at 20:00:05 or at any other hour: there is no evening timer', () => {
     renderHook(() => useDailyDayRereads());
 
-    act(() => vi.advanceTimersByTime(65_000 - 1));
+    act(() => vi.advanceTimersByTime(48 * 60 * 60 * 1000));
+
     expect(state.loadDailyDay).not.toHaveBeenCalled();
-
-    act(() => vi.advanceTimersByTime(1));
-    expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-arms for the next day after it fires, and does not fire again the same day', () => {
-    renderHook(() => useDailyDayRereads());
-
-    act(() => vi.advanceTimersByTime(65_000));
-    expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
-
-    act(() => vi.advanceTimersByTime(23 * 60 * 60 * 1000));
-    expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
-
-    act(() => vi.advanceTimersByTime(60 * 60 * 1000));
-    expect(state.loadDailyDay).toHaveBeenCalledTimes(2);
-  });
-
-  it("arms tomorrow's 20:00 when mounted after today's", () => {
-    vi.setSystemTime(at(21));
-    renderHook(() => useDailyDayRereads());
-
-    act(() => vi.advanceTimersByTime(23 * 60 * 60 * 1000 + 4_000));
-    expect(state.loadDailyDay).not.toHaveBeenCalled();
-
-    act(() => vi.advanceTimersByTime(1_000 + 5_000));
-    expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('re-reads on each visibilitychange to visible, and not to hidden', () => {
@@ -87,11 +63,10 @@ describe('useDailyDayRereads', () => {
     expect(state.loadDailyDay).toHaveBeenCalledTimes(2);
   });
 
-  it('cleans up the timer and the listener on unmount', () => {
+  it('removes the listener on unmount', () => {
     const { unmount } = renderHook(() => useDailyDayRereads());
 
     unmount();
-    act(() => vi.advanceTimersByTime(24 * 60 * 60 * 1000));
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
 
     expect(state.loadDailyDay).not.toHaveBeenCalled();
@@ -101,23 +76,18 @@ describe('useDailyDayRereads', () => {
     state.userId = null;
     renderHook(() => useDailyDayRereads());
 
-    act(() => vi.advanceTimersByTime(24 * 60 * 60 * 1000));
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
 
     expect(state.loadDailyDay).not.toHaveBeenCalled();
   });
 
-  it('re-arms for a new session and drops the old one', () => {
+  it('listens once for a new session and drops the old listener', () => {
     const { rerender } = renderHook(() => useDailyDayRereads());
 
-    act(() => vi.advanceTimersByTime(30_000));
     state.authSessionVersion = 1;
     rerender();
-    // The old timer (due at +35 s) is gone; the new one is a fresh 35 s from now.
-    act(() => vi.advanceTimersByTime(34_999));
-    expect(state.loadDailyDay).not.toHaveBeenCalled();
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
 
-    act(() => vi.advanceTimersByTime(1));
     expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
   });
 });

@@ -38,10 +38,26 @@ export const DailyDaySnapshotSchema = z.object({
     target_day: z.string().optional(),
   }),
   /**
-   * The viewer's nudge (AD-13, AD-17): `slot` is the slot a nudge sent now would
-   * take, or null when none may be sent; `spent` is whether the viewer already
-   * sent that slot's nudge. Missing from a snapshot saved before the server sent
-   * it, which reads as `{ slot: null, spent: false }`.
+   * The viewer's nudges about this day (AD-16, AD-17): whether the nudge from
+   * each source, the prompt after an answer and the waiting card's button, is
+   * on record, and `closes_at`, the instant the day stops taking nudges (the end
+   * of the day on the partner's clock), or null while no nudge could be offered.
+   * Missing from a snapshot saved before the server sent it: read through
+   * `nudgeState`, which falls back to `nudge`.
+   */
+  nudges: z
+    .object({
+      prompt_sent: z.boolean(),
+      button_sent: z.boolean(),
+      closes_at: z.iso.datetime({ offset: true }).nullable(),
+    })
+    .optional(),
+  /**
+   * The nudge object of the build before story 11.1 (AD-17's slot model): `slot`
+   * is the slot a nudge sent then would take, `spent` whether it was sent. The
+   * server no longer sends it, so it appears only in a day saved by that build,
+   * which `nudgeState` reads by slot (`after_pick` is the prompt, `evening` the
+   * button). Optional, as the old schema had it.
    */
   nudge: z
     .object({
@@ -66,6 +82,15 @@ export const CoupleStreakWeekDaySchema = z.object({
   state: z.enum(['done', 'missed', 'open']),
 });
 
+/**
+ * One date of the streak's calendar week: the states of `week`, and `upcoming`
+ * for every date after the viewer's date.
+ */
+export const CoupleStreakCalendarDaySchema = z.object({
+  day: z.iso.date(),
+  state: z.enum(['done', 'missed', 'open', 'upcoming']),
+});
+
 const CountSchema = z.number().int().nonnegative();
 
 /**
@@ -82,6 +107,12 @@ export const CoupleStreakSchema = z.object({
   done: CountSchema,
   missed: CountSchema,
   week: z.array(CoupleStreakWeekDaySchema).length(7),
+  /**
+   * Sunday to Saturday of the week holding the viewer's date (story 11.3).
+   * Optional because a copy saved on the device before that story has none; the
+   * first successful read replaces it.
+   */
+  calendar_week: z.array(CoupleStreakCalendarDaySchema).length(7).optional(),
 });
 
 export type CoupleStreak = z.infer<typeof CoupleStreakSchema>;

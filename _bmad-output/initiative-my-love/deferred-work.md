@@ -4350,7 +4350,7 @@ severity: low
 reason: sendDailyNudge starts refreshDailyDay(dayId) on any non-offline failure; get_daily_day_by_id answers P0002 for a day outside the current pair, and refreshDailyDay only logs. Real low defect, deferred because it needs an unlink between showing the card and tapping, and the fix (loadDailyDay on P0002) adds a branch the plan does not settle (review 2026-11-26: blind-hunter). 2026-11-26 triage: it needs a server-side change of `users.partner_id`, as the app has no unlink action (`src/components/Settings/PartnerPage.tsx:13-14`) and `accept_partner_request` refuses a linked user (`20260818000000_revoke_anon_execute_and_fix_partner_guards.sql:170-175`). Waits for story 11.1: the waiting card's button stays beside the prompt (criterion 6), both keep an enabled Nudge after a P0002, and criterion 16's new re-read meets the same dead end. Then a small bundle with DW-547 (nudge-failure-path): a P0002 from `refreshDailyDay` falls back to `loadDailyDay`, which also covers the broadcast re-reads at `useDailyPickListener.ts:66,72`; the fix covers both the prompt and the waiting card's button.
 status: open
 
-### DW-538: Daily does not re-read at the sender's local midnight, so a page left open and visible across midnight keeps the old day and its nudge slot.
+### DW-538: Daily does not re-read at the sender's local midnight, so a page left open and visible across midnight keeps the old day.
 origin: spec-deferred 300c948db47a
 location: src/hooks/useDailyDayRereads.ts:42-71
 source_spec: `tickets/epic-daily-pushes-and-nudge/tickets/story-the-waiting-screen-s-nudge-button-nudges-the-partner-plan.md`
@@ -4483,4 +4483,92 @@ origin: investigation of a partner-streak.spec.ts:190 failure during the deferre
 location: src/services/dailyCelebrated.ts:115-118 (`claimCelebration` seeds without playing when nothing is stored); src/components/DailyQuestion/DailyQuestion.tsx:661 (the claim waits for `readFor` and a settled streak)
 severity: low
 reason: With nothing saved for the account and partner, the first claim stores the streak's total and plays nothing (the first-read rule), so when both partners pick before this device's first claim answers, that day's +1 is never shown. On main the window is the mount's own reads (about 250 ms); the single-flight change widened it until c2b90f5d settled each caller after its own pass. main never failed in 38 CI runs; a test could wait for `data-streak-claimed="0"` before the partner picks, but on its own that would hide a regression rather than fix the race.
+status: open
+
+### DW-555: `waitClearOfDailyTurns` still waits out 20:00, a turn that went with the nudge slots, and does not wait out 08:00, the turn a held nudge now has.
+origin: build of story 11.1 (two nudges per question, held until the partner's 8 AM), 2026-11-27
+location: tests/support/helpers/events.ts:221-285 (`msUntilClearOfDailyTurns`, hours `[0, 20]`; the six Daily specs that call `waitClearOfDailyTurns`); tests/unit/helpers/events.test.ts
+severity: low
+reason: The 20:00 turn existed because the nudge slot changed there (DW-534); story 11.1 removed the slots and the 20:00:05 re-read, so a run that starts near 20:00 now sleeps for nothing. A nudge the real clock sends is held before 08:00 on the partner's clock, which no spec waits out, so `push-daily-nudge.spec.ts` reads the row's `held` and asserts the branch the host clock is in instead of choosing one. Dropping 20:00 changes `events.test.ts`'s expectations and every spec's wait, so it is a change of its own.
+status: open
+
+### DW-556: A device clock behind the server's keeps the nudge controls enabled after the server's closing instant, so each tap gets DQ009 and "Your nudge could not be sent." until the device clock catches up.
+origin: spec-deferred 1d83c4e1a88d
+location: src/stores/slices/dailyDaySlice.ts (sendDailyNudge refusal path); src/components/DailyQuestion/useNudgeSend.ts (useNudgeClosed)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: daily_day_snapshot does not null closes_at after the instant (DAILY-NUDGE-053) and useNudgeClosed compares closes_at with the device clock, so after a DQ009 refusal the re-read leaves the control offerable while Date.now() < closes_at. Real, low: needs clock skew at the end of the partner's day; a fix (closing the source on DQ009, or the server sending its own now) adds a branch the plan does not settle (review 2026-11-27: blind-hunter).
+status: open
+
+### DW-557: A definite PostgREST error on a nudge send (an expired-token 401, a PGRST code) is treated as a lost answer, so a failed re-read shows "couldn't check" instead of "could not be sent".
+origin: spec-deferred 95aaaf1f39a2
+location: src/api/dailyQuestionApi.ts (isNudgeOutcomeUnknown, sendDailyNudge catch)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: isNudgeOutcomeUnknown counts every 'transport' AccountDataError as unknown, and toAccountDataError maps non-refusal PostgREST errors to 'transport'. Only the failure wording differs, and Nudge is re-enabled either way. Real, low, rare; the fix adds a classification branch (review 2026-11-27: edge-case-hunter).
+status: open
+progress: 2026-11-27 epic 11 retrospective (R5): an unreadable reply from send_daily_nudge (invalid-response, dailyQuestionApi.ts:308-313) is the same misclassification family: the re-read settles it when it succeeds, but when the re-read also fails the sender sees "couldn't check" for a nudge the server recorded.
+
+### DW-558: A DQ010 "already sent" ending whose re-read fails marks the source sent only in memory, so an offline reload from the saved copy offers that control again until the next tap.
+origin: spec-deferred 453b05826acf
+location: src/stores/slices/dailyDaySlice.ts (sendDailyNudge, DQ010 branch)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: sendDailyNudge applies withNudgeSent to the shown day only; the daily-days copy is written only from a successful server answer (AGENTS.md), and the refusal carries no snapshot. The next tap online is refused DQ010 again and ends as sent. Real, low: needs DQ010, a failed re-read and an offline reload (review 2026-11-27: edge-case-hunter).
+status: open
+
+### DW-559: The nudge prompt unmounts at the closing instant even while its send or the re-read after a lost answer is in progress, cutting short criterion 16's disabled-until-re-read.
+origin: spec-deferred 8aaa08e2e72d
+location: src/components/DailyQuestion/DailyQuestion.tsx (showNudgeSheet)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: showNudgeSheet requires !promptClosed, so the sheet goes at closes_at whatever useNudgeSend's busy state; the outcome of a send in flight at that instant is then never shown on the prompt. Real, low: needs a send in flight at the end of the partner's day; keeping the sheet while busy means lifting the busy state into DailyQuestion (review 2026-11-27: intent-alignment).
+status: open
+
+### DW-560: The story 11.2 migration fails the deploy if an old daily-reminders cron run inserts a morning row between its DELETE and the narrowed kind check, or deadlocks with that run.
+origin: spec-deferred ee5355ecc051
+location: supabase/migrations/20261127010000_three_daily_pushes.sql (the DELETE, ALTER TABLE and DROP TRIGGER steps)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-three-daily-pushes-and-three-switches-plan.md`
+severity: low
+reason: 20261127010000_three_daily_pushes.sql deletes morning and evening_partner rows, then adds daily_reminders_kind_check (kind = 'evening_self'); nothing stops the old enqueue_daily_reminders (still live until the file commits) from committing a morning row in between, which the ALTER's validation then rejects with 23514, and a cron run holding daily_picks while waiting on daily_reminders can deadlock with the file's DROP TRIGGER on daily_picks. Real, low: needs a deploy inside a hosted user's 08:00-08:30 tick, during the milliseconds the migration runs; the failure rolls the file back and stops deploy.yml before the functions and site, so a rerun succeeds. A single LOCK TABLE does not settle it, because the cron run touches daily_picks before and after daily_reminders (review 2026-11-27: quick).
+status: open
+
+### DW-561: After a nudge ends as "already sent" or its answer is lost, the re-read can run under a different account, and the unit test that guarded this was narrowed without a stated reason.
+origin: epic 11 retrospective, 2026-11-27
+location: src/stores/slices/dailyDaySlice.ts:870 (DQ010 branch), :881 (lost-answer branch); tests/unit/stores/dailyQuestionSlice.nudge.test.ts:352-363
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/epic-simpler-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: In sendDailyNudge both branches call readDayById(dayId) without first re-checking that the same session is still signed in; readDayById records whoever is signed in when it starts, so after an account switch it reads the old account's day as the new one. The server refuses that day for a different account, so nothing is written: the cost is a failed request, a logged error and possibly the wrong message. 857be1bf switched the "session changed, so no re-read" test from a network failure to a DQ009 refusal, the one branch that does check, and the commit does not say why it narrows (AGENTS.md, Known pitfalls). Retrospective finding R1.
+status: open
+
+### DW-562: A nudge that ends as sent after the fact ("already sent", or found sent by the re-read after a lost answer) never tells the partner's open Daily or the sender's other device.
+origin: epic 11 retrospective, 2026-11-27
+location: src/stores/slices/dailyDaySlice.ts:859-871, :879-883 (both return before announceDailyNudge at :897)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/epic-simpler-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: Both branches return before announceDailyNudge, so no live message goes out for a nudge the server holds as sent. Story 11.1 criterion 17 (a stale control is refused as already sent) limits the harm. Retrospective finding R2.
+status: open
+
+### DW-563: The re-read after a lost nudge answer runs at once, so a connection that fails while the server is still committing can show "Your nudge could not be sent." while the push goes out. PLAUSIBLE, not reproduced.
+origin: epic 11 retrospective, 2026-11-27
+location: src/stores/slices/dailyDaySlice.ts:879-883
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/epic-simpler-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: The re-read can reach the server before the send's transaction commits and see the nudge unsent. Only a connection failure during the commit causes it; no client timeout was found in dailyQuestionApi.ts or supabaseClient.ts. Proving it needs a test with a server that commits after the client's request has failed (retrospective Open questions). Retrospective finding R3.
+status: open
+
+### DW-564: The migration-replay helper's check for a migration's own transaction can be fooled by dollar-quote tags with digits or a stray $$ in a comment.
+origin: epic 11 retrospective, 2026-11-27
+location: tests/support/helpers/migration-replay.ts:122
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/epic-simpler-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: The pattern /(\$[A-Za-z_]*\$)[\s\S]*?\1/ misses tags such as $fn1$, so a valid migration is wrongly rejected; a stray $$ in a comment can blank a real commit;, which the replay would then commit into the shared stack. Test tooling only. Retrospective finding R4.
+status: open
+
+### DW-565: Epic 11's tests duplicate the daily seed helpers and build the Sunday-to-Saturday week four times.
+origin: epic 11 retrospective, 2026-11-27
+location: tests/support/helpers/daily-clock.ts:36-91 (storeZone, seedPairDay) against tests/support/factories/daily-question.ts:91-160 (seedPairDays); tests/api/push-daily-reminders.spec.ts:84-90, :150-156; tests/unit/stores/dailyQuestionFixture.ts:114-121, :127-138; src/components/shared/__tests__/StreakRow.test.tsx:14-30; tests/e2e/partner/partner-streak.spec.ts:126-141
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/epic-simpler-daily-pushes-and-nudge-retrospective.md`
+severity: low
+reason: seedPairDay and storeZone repeat seedPairDays' assign_couple_day, daily_picks and user_time_zones SQL with a fixed zone instead of the host's, and push-daily-reminders.spec.ts still writes the same inserts inline; the calendar week is built separately in four test files. AGENTS.md's shared-helpers rule (DW-313) asks for one import. Retrospective finding G3.
 status: open

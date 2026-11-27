@@ -1,7 +1,7 @@
 /**
  * NotificationsPage — Settings > Notifications (story 6, from the section of
- * story 3.7, the Date reminders switch of story 4.3 and the five Daily switches
- * of story 8.4): eleven push switches without helper lines, the Reminders
+ * story 3.7, the Date reminders switch of story 4.3 and the three Daily switches
+ * of stories 8.4 and 11.2): nine push switches without helper lines, the Reminders
  * group with the Date reminders switch and its Footnote, a write per toggle
  * that goes through the store, one Error box, and a notice when iOS has
  * notifications off; plus the top page's `NotificationsRow` and
@@ -75,8 +75,6 @@ const ROWS = [
   ['settings-push-pokes-and-kisses', 'Pokes and kisses', 'pokesAndKisses'],
   ['settings-push-dates', 'Dates', 'dates'],
   ['settings-push-partner-requests', 'Partner requests', 'partnerRequests'],
-  ['settings-push-new-question', 'New question', 'dailyQuestion'],
-  ['settings-push-partner-picked', 'Partner picked', 'dailyPartnerPicked'],
   ['settings-push-nudges', 'Nudges', 'dailyNudge'],
   ['settings-push-evening-reminder', 'Evening reminder', 'dailyReminder'],
   ['settings-push-both-answered', 'Both answered', 'dailyBothAnswered'],
@@ -128,7 +126,7 @@ afterEach(() => {
 });
 
 describe('NotificationsPage: the groups', () => {
-  it('has a Notify me about group of eleven switches, then a Reminders group with Date reminders', async () => {
+  it('has a Notify me about group of nine switches, then a Reminders group with Date reminders', async () => {
     await renderLoaded();
 
     const page = screen.getByTestId('settings-notifications');
@@ -142,7 +140,7 @@ describe('NotificationsPage: the groups', () => {
       REMINDERS_SWITCH,
     ]);
     const notifyGroup = screen.getByRole('region', { name: 'Notify me about' });
-    expect(within(notifyGroup).getAllByRole('switch')).toHaveLength(11);
+    expect(within(notifyGroup).getAllByRole('switch')).toHaveLength(9);
     const remindersGroup = screen.getByRole('region', { name: 'Reminders' });
     expect(within(remindersGroup).getAllByRole('switch')).toEqual([screen.getByTestId(REMINDERS_SWITCH)]);
   });
@@ -182,7 +180,33 @@ describe('NotificationsPage: the groups', () => {
     expect(screen.queryByRole('heading', { name: 'Reminders' })).not.toBeInTheDocument();
     expect(screen.queryByTestId(REMINDERS_SWITCH)).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-reminders-footnote')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('switch')).toHaveLength(11);
+    expect(screen.getAllByRole('switch')).toHaveLength(9);
+  });
+
+  it('shows exactly Nudges, Evening reminder and Both answered as the daily switches, in that order, with no New question or Partner picked', async () => {
+    await renderLoaded();
+
+    const notifyGroup = screen.getByRole('region', { name: 'Notify me about' });
+    const labels = within(notifyGroup)
+      .getAllByRole('switch')
+      .map((row) => row.getAttribute('data-testid'));
+    expect(labels.slice(-3)).toEqual([
+      'settings-push-nudges',
+      'settings-push-evening-reminder',
+      'settings-push-both-answered',
+    ]);
+    expect(labels.slice(-3).map((id) => screen.getByTestId(id!))).toHaveLength(3);
+    expect(within(notifyGroup).getByTestId('settings-push-nudges')).toHaveAccessibleName('Nudges');
+    expect(within(notifyGroup).getByTestId('settings-push-evening-reminder')).toHaveAccessibleName(
+      'Evening reminder'
+    );
+    expect(within(notifyGroup).getByTestId('settings-push-both-answered')).toHaveAccessibleName(
+      'Both answered'
+    );
+    expect(screen.queryByTestId('settings-push-new-question')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-push-partner-picked')).not.toBeInTheDocument();
+    expect(screen.queryByText('New question')).not.toBeInTheDocument();
+    expect(screen.queryByText('Partner picked')).not.toBeInTheDocument();
   });
 });
 
@@ -256,7 +280,7 @@ describe('NotificationsPage: toggling', () => {
     await waitFor(() =>
       expect(screen.getByTestId('settings-push-nudges')).toHaveAttribute('aria-checked', 'false')
     );
-    expect(screen.getByTestId('settings-push-new-question')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('settings-push-evening-reminder')).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByTestId('settings-notifications-error')).not.toBeInTheDocument();
   });
 
@@ -667,19 +691,17 @@ describe('notificationsSummary', () => {
     partnerRequests: false,
     dates: false,
     dateReminders: false,
-    dailyQuestion: false,
-    dailyPartnerPicked: false,
     dailyNudge: false,
     dailyReminder: false,
     dailyBothAnswered: false,
   };
 
   it.each([
-    ['all twelve on, permission granted', ALL_PUSH_PREFERENCES_ON, 'granted', true, 'On'],
+    ['all ten on, permission granted', ALL_PUSH_PREFERENCES_ON, 'granted', true, 'On'],
     ['one push switch off', { ...ALL_PUSH_PREFERENCES_ON, moods: false }, 'granted', true, 'Some'],
     ['one daily switch off', { ...ALL_PUSH_PREFERENCES_ON, dailyNudge: false }, 'granted', true, 'Some'],
     ['only Date reminders off', REMINDERS_OFF, 'granted', true, 'Some'],
-    ['all twelve off', allOff, 'granted', true, 'Off'],
+    ['all ten off', allOff, 'granted', true, 'Off'],
     ['permission denied with every switch on', ALL_PUSH_PREFERENCES_ON, 'denied', true, 'Off'],
     ['permission denied before the switches load', null, 'denied', true, 'Off'],
     ['permission prompt, all on', ALL_PUSH_PREFERENCES_ON, 'prompt', true, 'On'],
@@ -687,18 +709,16 @@ describe('notificationsSummary', () => {
     ['the switches not loaded', null, 'granted', true, undefined],
     ['the permission not read yet', ALL_PUSH_PREFERENCES_ON, null, true, undefined],
     ['neither known', null, null, true, undefined],
-    ['no reminders plugin, Date reminders off, eleven on', REMINDERS_OFF, 'granted', false, 'On'],
+    ['no reminders plugin, Date reminders off, nine on', REMINDERS_OFF, 'granted', false, 'On'],
     ['no reminders plugin, one push switch off', { ...allOff, loveNotes: true }, 'granted', false, 'Some'],
-    ['no reminders plugin, eleven off, Date reminders on', { ...allOff, dateReminders: true }, 'granted', false, 'Off'],
+    ['no reminders plugin, nine off, Date reminders on', { ...allOff, dateReminders: true }, 'granted', false, 'Off'],
   ] as const)('%s', (_name, preferences, permission, withReminders, expected) => {
     expect(notificationsSummary(preferences, permission, withReminders)).toBe(expected);
   });
 
-  // Each of the five daily switches counts, both ways: a summary that left one
+  // Each of the three daily switches counts, both ways: a summary that left one
   // out would read On with it off, and Off with only it on.
   const DAILY_KEYS = [
-    'dailyQuestion',
-    'dailyPartnerPicked',
     'dailyNudge',
     'dailyReminder',
     'dailyBothAnswered',

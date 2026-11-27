@@ -113,6 +113,7 @@ const EXPECTED_RESET: Record<string, unknown> = {
   dailyWriteDeclined: [],
   dailyDayAnswers: 0,
   dailyDayAnsweredId: null,
+  dailyQueuedPickSent: null,
   coupleStreak: null,
   coupleStreakLoading: false,
   coupleStreakError: null,
@@ -280,6 +281,8 @@ function seedSignedInSession(): void {
     // The server answers shown to the account.
     dailyDayAnswers: 4,
     dailyDayAnsweredId: 'DAY-ANSWERED',
+    // The queued pick the drain last confirmed: the next account's Daily must not offer a prompt for it.
+    dailyQueuedPickSent: { dayId: 'DAY-QUEUED', seq: 3 },
     // The couple's streak the account was shown, a read in flight and a failed read.
     coupleStreak: { status: 'ok', streak: coupleStreak({ held: 31, run: 4, milestones: 1 }) },
     coupleStreakLoading: true,
@@ -609,8 +612,6 @@ describe('clearAuth on sign-out', () => {
         partnerRequests: true,
         dates: true,
         dateReminders: true,
-        dailyQuestion: true,
-        dailyPartnerPicked: true,
         dailyNudge: true,
         dailyReminder: true,
         dailyBothAnswered: true,

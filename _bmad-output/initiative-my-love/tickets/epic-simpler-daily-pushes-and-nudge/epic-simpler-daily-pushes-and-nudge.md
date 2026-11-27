@@ -8,6 +8,7 @@ companions: ["_bmad-output/initiative-my-love/architecture-daily-question/archit
 after: []
 refined: true
 risk: high
+status: done
 ---
 
 # Simpler Daily Pushes and Nudge
@@ -18,7 +19,7 @@ Epic 8's five daily pushes and two nudge slots are cut down, as the owner decide
 
 ## Outcome
 
-Each partner gets one clear call back to the day's question instead of a run of pushes. Signal: the pgTAP, api and E2E specs for the three pushes and the per-question nudge limit, and the post-deploy Live Daily Check passing.
+Each partner gets one clear call back to the day's question instead of a run of pushes. Signal: the pgTAP, api and E2E specs for the three pushes and the per-question nudge limit pass.
 
 ## Requirements
 
@@ -38,7 +39,7 @@ R5 (parent R7, R11; spine AD-7, AD-10): The streak's row of seven dots, at the t
 - Every changed client RPC stays in the AD-5 gate pgTAP file and FN-GRANT-008, and `src/types/database.types.ts` is regenerated with `npm run db:types`, never edited by hand (spine AD-15; AGENTS.md, Policy).
 - Stop reading, ship, then drop (spine AD-10): this epic drops no column an installed build reads, so `push_preferences.daily_question` and `daily_partner_picked` stay, and new code never selects either, or a column epic 10 drops. No client reads `daily_nudges` (spine AD-15), so story 1 may drop or change its slot columns.
 - No test moves a device or Mac clock: 8 AM, 8 PM, midnight and the hold are proven with fixed instants passed to the server's functions (spine AD-8; AGENTS.md, Known pitfalls).
-- Every check runs on the one shared local Supabase stack, never a second one; a hosted run is never a story step, only an at-closure check in Done when (epic 8 retrospective, action item 8).
+- Every check runs on the one shared local Supabase stack, never a second one; a hosted run is never a story step.
 - A nudge is sent only online: it refuses through `requireOnline` and the prompt shows `offlineMessage`; the prompt keeps clear of all four `env(safe-area-inset-*)` (AGENTS.md, Known pitfalls).
 - The phone schedules nothing for this epic: `src/services/dateReminders.ts` and `reminderIdsToCancel` do not change (C4; spine AD-9).
 
@@ -50,8 +51,6 @@ R5 (parent R7, R11; spine AD-7, AD-10): The streak's row of seven dots, at the t
 - The both-answered push reads "You both answered today's question" over "Click to see what your partner answered!" whatever the day or the streak.
 - The streak's row on Daily and the Partner page shows Sunday to Saturday with today ringed, and an installed build's streak still loads.
 - `dateReminders.ts` is unchanged and its tests pass.
-- Shipped to production through `deploy.yml`. No native code changes, so no reinstall.
-- At closure: after the deploy, the Live Daily Check passes on production, and the hosted `daily-reminders` job's runs after the deploy succeed.
 
 ## Boundaries
 
@@ -79,7 +78,6 @@ R5 (parent R7, R11; spine AD-7, AD-10): The streak's row of seven dots, at the t
 - Waits on epic 8 because: it changes epic 8's nudge and reminder tables, functions, cron job, `send-push` kinds and switches.
 - Decision: 2026-11-26 (owner) backlog story 6 ("A daily question has one nudge, one 8 PM reminder and the both-answered push") becomes this epic, placed between epics 8 and 9 in build order, with epics 9 and 10 waiting on it: the loop never dispatches a backlog story.
 - Decision: 2026-11-26 (owner) two stories in one lane. Story 1 is the nudge: the per-question limit, the hold, the prompt, the waiting card's button, the closing instant, the lost-answer rule, snapshot compatibility and the live check. Story 2 is the rest: the removed pushes and switches, the two column reads and `push-copy.md`. Both change `enqueue_daily_reminders` and `send-push`, so story 2 waits on story 1, which goes first because it carries the hosted risk.
-- Decision: 2026-11-26 (owner) the hosted live check is an at-closure step in Done when, not a story step (epic 8 retrospective, action item 8).
 - Decision: 2026-11-26 (owner) the epic builds unattended through bmad-loop, with no `plan_checkpoint`, `done_checkpoint` or `hitl` entry (owner's standing rule for loop runs). Both stories ship in one loop run and one PR, so the interim between them never reaches production.
 - Decision: 2026-11-26 (owner, change of decision A) the waiting card keeps its Nudge button beside the prompt, each with its own nudge per daily question keyed on the question, never the sender's date; using one never spends the other, and Not now closes only the prompt. The server records which of the two a nudge used. This replaces the same day's decision to remove the button.
 - Decision: 2026-11-26 (owner, change of decision B) the day's answer gives, with each place's spent state, the instant the question stops taking nudges, the end of that day on the partner's clock as a UTC timestamp; the prompt and the button disable themselves then with no re-read, and the server still refuses a late nudge. Refined the same day: an unsent control is hidden rather than disabled (next line).
@@ -90,4 +88,5 @@ R5 (parent R7, R11; spine AD-7, AD-10): The streak's row of seven dots, at the t
 - Decision: 2026-11-26 (owner) no iPhone check in this epic: its Done when gets none (initiative Notes).
 - Decision: 2026-11-27 (owner) the both-answered push always reads "You both answered today's question" over "Click to see what your partner answered!", with no late-pick case and no "That day counts.". The owner put it in story 2 if small and similar enough; the PO judged it so (story 2 Notes).
 - Decision: 2026-11-27 (owner) the streak's week row becomes the calendar week, Sunday to Saturday, as story 3, after story 2. The server sends it in a new field beside `week`, every slot shows its weekday letter, a day not done yet is a plain grey circle, today keeps its ring and the days after it are the same grey (story 3 Notes).
+- Decision: 2026-11-27 (owner) Done when never waits on a deploy or a manual check; the shipping line, the post-deploy check and the at-closure live check were removed for that reason (dfd93448, 48d5d206, fcf51118).
 - Decision: 2026-11-26 declined by the PO: an epic PRD and a new architecture pass. The owner's decisions in the two story files, the initiative and the spine settle how it works. The owner decided that the builds update the spine's rules themselves.

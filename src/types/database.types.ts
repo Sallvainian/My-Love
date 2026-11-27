@@ -250,9 +250,10 @@ export type Database = {
           created_at: string
           day_id: string
           from_user: string
+          held: boolean
           id: string
-          sender_local_date: string
-          slot: string
+          released_at: string | null
+          source: string
           to_user: string
         }
         ComputedFields: never
@@ -260,18 +261,20 @@ export type Database = {
           created_at?: string
           day_id: string
           from_user: string
+          held?: boolean
           id?: string
-          sender_local_date: string
-          slot: string
+          released_at?: string | null
+          source: string
           to_user: string
         }
         Update: {
           created_at?: string
           day_id?: string
           from_user?: string
+          held?: boolean
           id?: string
-          sender_local_date?: string
-          slot?: string
+          released_at?: string | null
+          source?: string
           to_user?: string
         }
         Relationships: [
@@ -1172,10 +1175,6 @@ export type Database = {
         Args: { at: string; day_id: string; viewer: string }
         Returns: Json
       }
-      daily_nudge_slot: {
-        Args: { at: string; sender: string }
-        Returns: string
-      }
       decline_partner_request: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -1221,7 +1220,7 @@ export type Database = {
         Returns: string
       }
       record_daily_nudge: {
-        Args: { at: string; day_id: string; viewer: string }
+        Args: { at: string; day_id: string; source: string; viewer: string }
         Returns: Json
       }
       record_daily_pick: {
@@ -1260,11 +1259,15 @@ export type Database = {
         Args: { p_environment: string; p_token: string }
         Returns: undefined
       }
+      release_held_daily_nudges: { Args: { at: string }; Returns: number }
       reset_bot_daily_days: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      send_daily_nudge: { Args: { day_id: string }; Returns: Json }
+      send_daily_nudge: {
+        Args: { day_id: string; source?: string }
+        Returns: Json
+      }
       submit_daily_pick: {
         Args: {
           choice: string

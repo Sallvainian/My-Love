@@ -15,12 +15,11 @@
  * - `events` and `anniversaries` AFTER INSERT (`notify_push`,
  *   20261105010000_push_added_dates.sql) post `{ "kind": "event" | "anniversary",
  *   "id": "<uuid>" }`. Only an added date pushes; an edit has no trigger;
- * - the five daily kinds (story 8.3, push-copy.md): `daily_partner_picked` and
- *   `daily_both_answered` post a `daily_picks` id, `daily_nudge` a
- *   `daily_nudges` id, `daily_question` and `daily_reminder` a
- *   `daily_reminders` id. The sender knew them a deploy ahead of the triggers:
- *   `daily_reminders` posts the reminder kinds since story 8.5 and `daily_picks`
- *   the two pick kinds since story 8.6, and `daily_nudges` the nudge since story 8.7.
+ * - the three daily kinds (push-copy.md): `daily_both_answered` posts a
+ *   `daily_picks` id, `daily_nudge` a `daily_nudges` id and `daily_reminder` a
+ *   `daily_reminders` id. `daily_question` and `daily_partner_picked`, which
+ *   epic 8 added, are removed (story 11.2): their triggers are gone and the
+ *   sender answers 400 to either, claiming nothing.
  *
  * Split out of `index.ts` so `deno test` can drive it with a fake database
  * and a fake APNs client.
@@ -50,29 +49,21 @@
  *
  * ## The daily kinds
  *
- * A pick goes to the other member of its `couple_days` pair (not
- * `users.partner_id`), the picker is the sender: `daily_partner_picked` says
- * the partner picked, `daily_both_answered` says the second pick landed. A
- * nudge goes from `from_user` to `to_user`. A reminder goes to its `user_id`
- * and its sender is the recipient's partner; no partner means nothing to tell.
- * The posted kind decides the copy and the sender never infers order or
- * variant: a reminder's stored `kind` picks the variant (`daily_question` needs
- * `morning`, `daily_reminder` needs `evening_self` or `evening_partner`), and a
- * posted/stored mismatch is no push, claiming nothing. A pick's stored
- * `is_second` is held to its posted kind the same way (`daily_partner_picked`
- * needs false, `daily_both_answered` true).
- *
- * The recipient's current date comes only from `PushDb.getUserLocalDate`
- * (`user_local_date`, 20261125000000_daily_push_sender.sql) called with the
- * sender's clock as `at`; there is no zone arithmetic here. A
- * `daily_partner_picked` whose day is not that date is dropped (200, every
- * count 0, nothing claimed); a `daily_both_answered` for such a day still
- * sends, with "That day counts." in place of "See {Picker}'s pick.". The
- * nudge, the morning push and `daily_both_answered` read the streak from
- * `couple_streak` (`held` or `run`) as the recipient sees it. The sender never
- * selects a pick's `choice`, and no payload carries one. These reads happen
- * before the switch check, and a failed one answers 500 and claims nothing.
- * Only the nudge and both 8 PM reminders carry `aps.sound`.
+ * A second pick goes to the other member of its `couple_days` pair (not
+ * `users.partner_id`), the picker is the sender: `daily_both_answered` says the
+ * partner answered too, and always reads the same ("You both answered today's
+ * question" over "Click to see what your partner answered!"), whatever the day
+ * or the streak. A nudge goes from `from_user` to `to_user`. A reminder goes to
+ * its `user_id` and its sender is the recipient's partner; no partner means
+ * nothing to tell. The posted kind decides the copy and the sender never infers
+ * order or variant: a reminder's stored `kind` must be `evening_self` and a
+ * pick's stored `is_second` must be true for `daily_both_answered`, and a
+ * mismatch is no push, claiming nothing. The sender reads no date and no
+ * streak: the 8 PM reminder and both-answered wording take no argument. A nudge
+ * names no streak: its body is the same for every nudge, and a held one whose
+ * `released_at` is still null is dropped the same way (the release posts it
+ * again). The sender never selects a pick's `choice`, and no payload carries
+ * one. Only the nudge and the 8 PM reminder carry `aps.sound`.
  *
  * ## The receiver's switches
  *
@@ -101,7 +92,7 @@
  *
  * Every payload also carries a top-level `kind` (`withKind`), the `PushKind`
  * handled: `love_note`, `mood`, `photo`, `interaction` (poke and kiss alike),
- * `partner_request`, `partner_accept`, `event`, `anniversary` or one of the five daily kinds. It is the web code's tap
+ * `partner_request`, `partner_accept`, `event`, `anniversary` or one of the three daily kinds. It is the web code's tap
  * routing key (`viewForPush`, `src/services/pushNotifications.ts`); `aps` is
  * not touched.
  *
@@ -148,10 +139,7 @@ import {
   buildEventPayload,
   buildDailyBothAnsweredPayload,
   buildDailyNudgePayload,
-  buildDailyPartnerPickedPayload,
-  buildDailyQuestionPayload,
   buildDailyReminderPayload,
-  questionText,
   type ApnsPayload,
   type PushMood,
   withBadge,
@@ -168,8 +156,6 @@ export type PushKind =
   | 'partner_accept'
   | 'event'
   | 'anniversary'
-  | 'daily_question'
-  | 'daily_partner_picked'
   | 'daily_nudge'
   | 'daily_reminder'
   | 'daily_both_answered';
@@ -182,8 +168,6 @@ export type PushPreference =
   | 'pokes_and_kisses'
   | 'partner_requests'
   | 'dates'
-  | 'daily_question'
-  | 'daily_partner_picked'
   | 'daily_nudge'
   | 'daily_reminder'
   | 'daily_both_answered';
@@ -198,8 +182,6 @@ export const PREFERENCE_FOR_KIND: Record<PushKind, PushPreference> = {
   partner_accept: 'partner_requests',
   event: 'dates',
   anniversary: 'dates',
-  daily_question: 'daily_question',
-  daily_partner_picked: 'daily_partner_picked',
   daily_nudge: 'daily_nudge',
   daily_reminder: 'daily_reminder',
   daily_both_answered: 'daily_both_answered',
@@ -214,8 +196,6 @@ const POSTED_KINDS = [
   'partner_accept',
   'event',
   'anniversary',
-  'daily_question',
-  'daily_partner_picked',
   'daily_nudge',
   'daily_reminder',
   'daily_both_answered',
@@ -266,7 +246,7 @@ export interface DailyPickRow {
   id: string;
   day_id: string;
   user_id: string;
-  /** True for the day's second pick: `daily_both_answered` is its kind, `daily_partner_picked` the first's. */
+  /** True for the day's second pick: the only pick that pushes (`daily_both_answered`). */
   is_second: boolean;
 }
 
@@ -275,6 +255,9 @@ export interface DailyNudgeRow {
   from_user: string;
   to_user: string;
   day_id: string;
+  /** True for a nudge sent before 08:00 on the recipient's clock; it pushes only once `released_at` is set. */
+  held: boolean;
+  released_at: string | null;
 }
 
 export interface DailyReminderRow {
@@ -284,21 +267,11 @@ export interface DailyReminderRow {
   day_id: string;
 }
 
-/** A `couple_days` row with its question's two halves. */
+/** A `couple_days` row: the pair, which is all a push reads of it. */
 export interface CoupleDayRow {
   id: string;
   user_a: string;
   user_b: string;
-  /** `YYYY-MM-DD`. */
-  day: string;
-  this_text: string;
-  that_text: string;
-}
-
-/** The two numbers of `couple_streak` the pushes quote. */
-export interface CoupleStreak {
-  held: number;
-  run: number;
 }
 
 export interface DeviceRow {
@@ -310,7 +283,7 @@ export interface DeviceRow {
 
 export interface PushRequestRow {
   kind: PushKind;
-  /** The id of the note, mood, photo, interaction, partner request, event, anniversary, pick, nudge or reminder. */
+  /** The id of the note, mood, photo, interaction, partner request, event, anniversary, second pick, nudge or reminder. */
   source_id: string;
   token: string;
   environment: string;
@@ -331,12 +304,8 @@ export interface PushDb {
   getDailyPick(pickId: string): Promise<DailyPickRow | null>;
   getDailyNudge(nudgeId: string): Promise<DailyNudgeRow | null>;
   getDailyReminder(reminderId: string): Promise<DailyReminderRow | null>;
-  /** The couple day and its question, or null when the day is gone. */
+  /** The couple day's pair, or null when the day is gone. */
   getCoupleDay(dayId: string): Promise<CoupleDayRow | null>;
-  /** `user_local_date`: the user's calendar date (`YYYY-MM-DD`) at the instant, in their stored zone or UTC. */
-  getUserLocalDate(userId: string, atIso: string): Promise<string>;
-  /** `couple_streak` for the pair as `viewer` sees it at the instant. */
-  getCoupleStreak(userA: string, userB: string, viewer: string, atIso: string): Promise<CoupleStreak>;
   /** The account's linked partner, or null when it has none. */
   getPartnerId(userId: string): Promise<string | null>;
   /** The receiver's switch: true when on or when the account has no `push_preferences` row. */
@@ -376,7 +345,7 @@ interface PushSource {
   senderId: string;
   /** Null when the sender has no one to push to. */
   recipientId: string | null;
-  /** Null when this row is not a push (an interaction type that is neither poke nor kiss, a dropped daily push). */
+  /** Null when this row is not a push (an interaction type that is neither poke nor kiss, a first pick, an unreleased nudge, a removed reminder kind). */
   buildPayload: ((senderName: string | null) => ApnsPayload) | null;
 }
 
@@ -391,7 +360,7 @@ function parseBody(body: { note_id?: unknown; kind?: unknown; id?: unknown }): P
       return {
         ok: false,
         message: 'kind must be mood, photo, interaction, partner_request, partner_accept, event, anniversary, ' +
-          'daily_question, daily_partner_picked, daily_nudge, daily_reminder or daily_both_answered',
+          'daily_nudge, daily_reminder or daily_both_answered',
       };
     }
     if (typeof body.id !== 'string' || !UUID.test(body.id)) {
@@ -416,99 +385,62 @@ function otherInPair(day: CoupleDayRow, userId: string): string | null {
   return null;
 }
 
-/** Reads the row and finds its sender and recipient; null when the row is gone. `atIso` is the sender's clock. */
-async function resolveSource(db: PushDb, kind: PushKind, id: string, atIso: string): Promise<PushSource | null> {
+/** Reads the row and finds its sender and recipient; null when the row is gone. */
+async function resolveSource(db: PushDb, kind: PushKind, id: string): Promise<PushSource | null> {
   switch (kind) {
-    case 'daily_partner_picked':
     case 'daily_both_answered': {
       const pick = await db.getDailyPick(id);
       if (!pick) return null;
-      // The posted kind must be the pick's own: a first pick is `daily_partner_picked`, a second
-      // `daily_both_answered`. A mismatch is no push, claiming nothing, so the right post still records.
-      if (pick.is_second !== (kind === 'daily_both_answered')) {
+      // Only a second pick is `daily_both_answered`. A first pick is no push, claiming nothing,
+      // so the second pick's own post still records.
+      if (!pick.is_second) {
         return { kind, id, senderId: pick.user_id, recipientId: null, buildPayload: null };
       }
       const day = await db.getCoupleDay(pick.day_id);
       if (!day) return null;
-      // The pair's other member, not users.partner_id; the picker is the sender.
+      // The pair's other member, not users.partner_id; the second picker is the sender and the
+      // first picker the recipient. The wording is the same whatever the day or the streak, so
+      // no date and no streak is read.
       const recipientId = otherInPair(day, pick.user_id);
-      if (!recipientId) return { kind, id, senderId: pick.user_id, recipientId: null, buildPayload: null };
-      const recipientDate = await db.getUserLocalDate(recipientId, atIso);
-      const onDate = day.day === recipientDate;
-      if (kind === 'daily_partner_picked') {
-        // A pick for a day that is not the recipient's current date is no news to them.
-        return {
-          kind,
-          id,
-          senderId: pick.user_id,
-          recipientId,
-          buildPayload: onDate ? (name) => buildDailyPartnerPickedPayload(name) : null,
-        };
-      }
-      const { run } = await db.getCoupleStreak(day.user_a, day.user_b, recipientId, atIso);
       return {
         kind,
         id,
         senderId: pick.user_id,
         recipientId,
-        buildPayload: (name) => buildDailyBothAnsweredPayload(run, name, !onDate),
+        buildPayload: recipientId ? () => buildDailyBothAnsweredPayload() : null,
       };
     }
     case 'daily_nudge': {
       const nudge = await db.getDailyNudge(id);
       if (!nudge) return null;
-      const day = await db.getCoupleDay(nudge.day_id);
-      if (!day) return null;
-      const { held } = await db.getCoupleStreak(day.user_a, day.user_b, nudge.to_user, atIso);
+      // A nudge held until the partner's 8 AM posts nothing yet: its insert trigger skips it and
+      // `release_held_daily_nudges` posts it again with `released_at` set. A held row that arrives
+      // unreleased is no push, claiming nothing, so the release's post still sends.
+      const unreleased = nudge.held && nudge.released_at === null;
       return {
         kind,
         id,
         senderId: nudge.from_user,
         recipientId: nudge.to_user,
-        buildPayload: (name) => buildDailyNudgePayload(name, held),
+        buildPayload: unreleased ? null : (name) => buildDailyNudgePayload(name),
       };
     }
-    case 'daily_question':
     case 'daily_reminder': {
       const reminder = await db.getDailyReminder(id);
       if (!reminder) return null;
-      // The posted kind decides the copy; the stored kind picks the variant. A mismatch is no push.
-      const variant = reminder.kind;
-      const matches =
-        kind === 'daily_question' ? variant === 'morning' : variant === 'evening_self' || variant === 'evening_partner';
-      const partnerId = matches ? await db.getPartnerId(reminder.user_id) : null;
+      // The stored kind must be `evening_self`, the one reminder there is. A row of any other kind
+      // (the removed `morning` and `evening_partner`) is no push, claiming nothing.
+      const partnerId = reminder.kind === 'evening_self' ? await db.getPartnerId(reminder.user_id) : null;
       // The reminder's sender is the recipient's partner; with none there is nobody to tell.
-      if (!matches || !partnerId) {
-        return { kind, id, senderId: partnerId ?? reminder.user_id, recipientId: null, buildPayload: null };
+      if (!partnerId) {
+        return { kind, id, senderId: reminder.user_id, recipientId: null, buildPayload: null };
       }
-      if (variant === 'evening_partner') {
-        return {
-          kind,
-          id,
-          senderId: partnerId,
-          recipientId: reminder.user_id,
-          buildPayload: (name) => buildDailyReminderPayload('evening_partner', name),
-        };
-      }
-      const day = await db.getCoupleDay(reminder.day_id);
-      if (!day) return null;
-      const question = questionText(day.this_text, day.that_text);
-      if (variant === 'evening_self') {
-        return {
-          kind,
-          id,
-          senderId: partnerId,
-          recipientId: reminder.user_id,
-          buildPayload: () => buildDailyReminderPayload('evening_self', question),
-        };
-      }
-      const { held } = await db.getCoupleStreak(day.user_a, day.user_b, reminder.user_id, atIso);
       return {
         kind,
         id,
         senderId: partnerId,
         recipientId: reminder.user_id,
-        buildPayload: () => buildDailyQuestionPayload(question, held),
+        buildPayload: () => buildDailyReminderPayload(),
       };
     }
     case 'love_note': {
@@ -655,7 +587,7 @@ export async function handleSendPush(req: Request, deps: SendPushDeps): Promise<
     let gone = 0;
 
     const now = deps.now ?? Date.now;
-    const source = await resolveSource(deps.db, parsed.kind, parsed.id, new Date(now()).toISOString());
+    const source = await resolveSource(deps.db, parsed.kind, parsed.id);
     if (!source) return json(404, { error: 'Not found' });
 
     // Nobody to tell: an unlinked owner, a self-addressed row or a type that

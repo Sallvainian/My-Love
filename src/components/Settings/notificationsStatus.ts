@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { getPushPermission, type PushPermission } from '../../services/pushNotifications';
 import type { PushPreferenceKey, PushPreferences } from '../../services/pushPreferencesService';
 
-/** The eleven push switches under "Notify me about", in the order the page shows them. */
+/** The nine push switches under "Notify me about", in the order the page shows them. */
 export const PUSH_SWITCH_KEYS: readonly PushPreferenceKey[] = [
   'loveNotes',
   'moods',
@@ -18,8 +18,6 @@ export const PUSH_SWITCH_KEYS: readonly PushPreferenceKey[] = [
   'pokesAndKisses',
   'dates',
   'partnerRequests',
-  'dailyQuestion',
-  'dailyPartnerPicked',
   'dailyNudge',
   'dailyReminder',
   'dailyBothAnswered',
@@ -69,7 +67,7 @@ export function usePushPermission(): PushPermission | null {
 
 /**
  * The top page row's value: `Off` when iOS has the permission denied, else
- * `On` / `Off` / `Some` over the eleven push switches, plus Date reminders where
+ * `On` / `Off` / `Some` over the nine push switches, plus Date reminders where
  * `withReminders` (a missing plugin hides that switch, so it must not count).
  * `undefined` while the switches or the permission are not known yet, so the
  * value never flashes `On` before turning `Off`.

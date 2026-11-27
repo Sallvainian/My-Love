@@ -413,6 +413,13 @@ describe('viewForPush', () => {
     }
   });
 
+  it('still opens Daily for a daily_question or daily_partner_picked push delivered before story 11.2 and tapped after', async () => {
+    const { viewForPush } = await freshModule();
+
+    expect(viewForPush({ kind: 'daily_question', ...thread('partner-activity') })).toBe('daily');
+    expect(viewForPush({ kind: 'daily_partner_picked', ...thread('partner-activity') })).toBe('daily');
+  });
+
   it('navigates nowhere for a date push from an older sender', async () => {
     const { viewForPush } = await freshModule();
 

@@ -370,6 +370,47 @@ describe('drainQueuedPicks', () => {
     expect(state().dailyDayAnsweredId).toBeNull();
   });
 
+  it('a confirmed drained pick signals its day, once per row, after the shown day is updated', async () => {
+    await enqueuePick(queued());
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+    expect(state().dailyQueuedPickSent).toBeNull();
+
+    // Seen from the moment the signal changes, the day on screen already holds the answer.
+    const seen: unknown[] = [];
+    const unsubscribe = useAppStore.subscribe((now, before) => {
+      if (now.dailyQueuedPickSent !== before.dailyQueuedPickSent) seen.push(now.dailyDay);
+    });
+    await state().drainQueuedPicks();
+    unsubscribe();
+
+    expect(state().dailyQueuedPickSent).toEqual({ dayId: DAY_ID, seq: expect.any(Number) });
+    expect(seen).toEqual([ok(waitingSnapshot('this'))]);
+
+    // A later confirmed row is a new value, so an open Daily takes it as a new answer.
+    const first = state().dailyQueuedPickSent;
+    await enqueuePick(queued());
+    await state().drainQueuedPicks();
+    expect(state().dailyQueuedPickSent).not.toBe(first);
+    expect(state().dailyQueuedPickSent?.seq).toBeGreaterThan(first?.seq ?? 0);
+  });
+
+  it('a refused row, a transient failure and a pick made online signal nothing', async () => {
+    await enqueuePick(queued());
+    useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'Failed to fetch'));
+    await state().drainQueuedPicks();
+    expect(state().dailyQueuedPickSent).toBeNull();
+
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('refused', 'No', { cause: { code: 'DQ002' } }));
+    await state().drainQueuedPicks();
+    expect(state().dailyQueuedPickSent).toBeNull();
+
+    submitDailyPickRequest.mockResolvedValue(waitingSnapshot('this'));
+    await state().submitDailyPick('this');
+    expect(state().dailyQueuedPickSent).toBeNull();
+  });
+
   it('an idempotent answer for a pick made elsewhere removes the row', async () => {
     await enqueuePick(queued({ choice: 'that' }));
     useAppStore.setState({ dailyDay: ok(dailySnapshot()) });

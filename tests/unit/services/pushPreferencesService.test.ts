@@ -51,8 +51,6 @@ const ROW = {
   partner_requests: true,
   dates: true,
   date_reminders: true,
-  daily_question: true,
-  daily_partner_picked: true,
   daily_nudge: true,
   daily_reminder: true,
   daily_both_answered: true,
@@ -81,8 +79,6 @@ describe('fetchPushPreferences', () => {
       partnerRequests: true,
       dates: true,
       dateReminders: true,
-      dailyQuestion: true,
-      dailyPartnerPicked: true,
       dailyNudge: true,
       dailyReminder: true,
       dailyBothAnswered: true,
@@ -102,12 +98,10 @@ describe('fetchPushPreferences', () => {
     expect(read.dates).toBe(false);
   });
 
-  it('selects the five daily columns and maps each', async () => {
+  it('selects the three daily columns and maps each', async () => {
     results.push({
       data: {
         ...ROW,
-        daily_question: false,
-        daily_partner_picked: true,
         daily_nudge: false,
         daily_reminder: true,
         daily_both_answered: false,
@@ -120,20 +114,31 @@ describe('fetchPushPreferences', () => {
     const [[columns]] = argsOf('select') as [[string]];
     expect(columns.split(', ')).toEqual(
       expect.arrayContaining([
-        'daily_question',
-        'daily_partner_picked',
         'daily_nudge',
         'daily_reminder',
         'daily_both_answered',
       ])
     );
     expect(read).toMatchObject({
-      dailyQuestion: false,
-      dailyPartnerPicked: true,
       dailyNudge: false,
       dailyReminder: true,
       dailyBothAnswered: false,
     });
+  });
+
+  it('selects exactly the ten columns it maps, and neither the New question nor the Partner picked column', async () => {
+    results.push({ data: ROW, error: null });
+
+    const read = await pushPreferencesService.fetchPushPreferences('USER-A');
+
+    const [[columns]] = argsOf('select') as [[string]];
+    expect(columns.split(', ').sort()).toEqual(Object.keys(ROW).sort());
+    expect(columns.split(', ')).toHaveLength(10);
+    expect(columns).not.toMatch(/daily_question\b/);
+    expect(columns).not.toContain('daily_partner_picked');
+    expect(Object.keys(read)).toHaveLength(10);
+    expect(Object.keys(read)).not.toContain('dailyQuestion');
+    expect(Object.keys(read)).not.toContain('dailyPartnerPicked');
   });
 
   it('reads a missing row as every switch on', async () => {
@@ -170,8 +175,6 @@ describe('savePushPreference', () => {
     ['pokesAndKisses', 'pokes_and_kisses'],
     ['partnerRequests', 'partner_requests'],
     ['dateReminders', 'date_reminders'],
-    ['dailyQuestion', 'daily_question'],
-    ['dailyPartnerPicked', 'daily_partner_picked'],
     ['dailyNudge', 'daily_nudge'],
     ['dailyReminder', 'daily_reminder'],
     ['dailyBothAnswered', 'daily_both_answered'],
@@ -184,6 +187,19 @@ describe('savePushPreference', () => {
 
     expect(calls[0].table).toBe('push_preferences');
     expect(argsOf('upsert')).toEqual([[{ user_id: 'USER-A', [column]: false }, { onConflict: 'user_id' }]]);
+  });
+
+  it.each(COLUMNS)('%s names neither removed column in its request, read-back select included', async (key) => {
+    results.push({ data: ROW, error: null });
+
+    await pushPreferencesService.savePushPreference('USER-A', key, true);
+
+    const [[body]] = argsOf('upsert') as [[Record<string, unknown>]];
+    expect(Object.keys(body)).not.toContain('daily_question');
+    expect(Object.keys(body)).not.toContain('daily_partner_picked');
+    const [[columns]] = argsOf('select') as [[string]];
+    expect(columns).not.toMatch(/daily_question\b/);
+    expect(columns).not.toContain('daily_partner_picked');
   });
 
   it('returns the stored row, mapped', async () => {

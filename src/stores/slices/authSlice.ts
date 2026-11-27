@@ -262,6 +262,7 @@ export function signedOutState() {
     // The server answers shown so far; the next account counts from none.
     dailyDayAnswers: 0,
     dailyDayAnsweredId: null,
+    dailyQueuedPickSent: null,
     // The couple's streak the outgoing account was shown, and its read state.
     coupleStreak: null,
     coupleStreakLoading: false,

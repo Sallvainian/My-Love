@@ -1,23 +1,25 @@
 /**
  * E2E: the waiting screen's Nudge button nudges the partner (epic
- * daily-pushes-and-nudge, story 8.8; R2, architecture AD-13, AD-16, AD-17).
+ * daily-pushes-and-nudge, story 8.8, and epic-simpler-daily-pushes-and-nudge, story 11.1;
+ * R1, architecture AD-13, AD-16, AD-17).
  *
- * Two pages on this worker's own pooled pair. The partner opens /daily first
- * (the read writes the partner's zone, so their date is the worker's), then the
- * worker opens it and picks: the waiting card shows an enabled Nudge button.
+ * Two pages on this worker's own pooled pair. The partner opens /daily first (the
+ * read writes the partner's zone, so their date is the worker's), then the worker
+ * opens it and picks: the sheet that follows is closed with "Not now" (which ends
+ * only the prompt's chance), and the waiting card shows an enabled Nudge button.
  *
  *   - Offline, a tap makes no `send_daily_nudge` request, shows the offline
  *     sentence, and no `daily_nudges` row exists.
- *   - Online, a tap makes exactly one request that answers 200, leaves one row
- *     for the pair's day, and disables the button, also after a reload.
+ *   - Online, a tap makes exactly one request that answers 200, leaves one row for
+ *     the pair's day from the button, and shows the button as sent (greyed), also
+ *     after a reload, where the server's own answer says so.
  *
- * The slot is read from the row, never guessed from the host clock: the server
- * chose it on the worker's own stored zone. A run that would cross 20:00 or local
+ * Whether the server held the nudge (the partner's clock before 08:00) is read
+ * from the row, never guessed from the host clock. A run that would cross local
  * midnight between the nudge and the reload waits past the turn first
  * (`waitClearOfDailyTurns`, which extends the timeout by the wait; DW-535).
  * Nothing here links, unlinks or resets an account; the pair's days (and their
- * nudges) are cleared before the test and
- * again at teardown.
+ * nudges) are cleared before the test and again at teardown.
  */
 import { getStorageStatePath } from '@seontechnologies/playwright-utils/auth-session';
 import { interceptNetworkCall as observeOn } from '@seontechnologies/playwright-utils/intercept-network-call';
@@ -51,7 +53,7 @@ const OFFLINE_SENTENCE = 'You are offline. Your nudge needs a connection to send
 test.describe('Daily question: nudge the partner', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('[P0] a nudge is sent once online, refused offline, and stays spent after a reload', async ({
+  test('[P0] the button\'s nudge is sent once online, refused offline, and stays shown as sent after a reload, though the prompt was closed with Not now', async ({
     page,
     browser,
     baseURL,
@@ -73,7 +75,7 @@ test.describe('Daily question: nudge the partner', () => {
     const nudgeRows = async (dayId: string) => {
       const { data, error } = await supabaseAdmin
         .from('daily_nudges')
-        .select('id, slot, from_user, to_user')
+        .select('id, source, held, from_user, to_user')
         .eq('day_id', dayId);
       expect(error, 'the pair day\'s nudges').toBeNull();
       return data ?? [];
@@ -112,8 +114,8 @@ test.describe('Daily question: nudge the partner', () => {
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
 
     // The first picker is asked something right after the pick: the day's writer
-    // to write tomorrow's question, anyone else whether to nudge. Either sheet
-    // covers the card until it is closed.
+    // to write tomorrow's question, then everyone whether to nudge. The sheets
+    // cover the card until they are closed; Not now ends only the prompt's chance.
     await closeAfterPickSheet(page, (await readPairDayWriter(supabaseAdmin, pair)) === pair.userId);
     await expect(page.getByTestId('daily-nudge')).toBeEnabled();
 
@@ -124,12 +126,13 @@ test.describe('Daily question: nudge the partner', () => {
     expect(sends.started(), 'no send_daily_nudge request was made offline').toBe(0);
     expect(await nudgeRows(dayId), 'no nudge row exists').toEqual([]);
 
-    await log.step('Online, one tap sends one request: 200, one row, a disabled button');
+    await log.step('Online, one tap sends one request: 200, one row from the button, the button shown as sent');
     await goOffline(page, false);
     const nudgeSend = interceptNetworkCall({ method: 'POST', url: DAILY_NUDGE_SEND });
     await page.getByTestId('daily-nudge').click();
     expect((await nudgeSend).status).toBe(200);
     await expect(page.getByTestId('daily-nudge')).toBeDisabled();
+    await expect(page.getByTestId('daily-nudge')).toHaveAttribute('data-sent', 'true');
     await expect(page.getByTestId('daily-nudge-error')).toHaveCount(0);
     expect(sends.started(), 'exactly one send_daily_nudge request').toBe(1);
     const rows = await nudgeRows(dayId);
@@ -137,10 +140,11 @@ test.describe('Daily question: nudge the partner', () => {
     expect(rows[0]).toMatchObject({
       from_user: pair.userId,
       to_user: pair.partnerId,
-      slot: expect.stringMatching(/^(after_pick|evening)$/),
+      source: 'button',
+      held: expect.any(Boolean),
     });
 
-    await log.step('After a reload the button is still disabled');
+    await log.step('After a reload the button still shows as sent');
     // The reconnect above re-reads the day (the `online` refresh and the channel's
     // re-join), and one of those reads can start after this point, only for the
     // reload to cut it off: observe the reloaded page's own read.
@@ -151,10 +155,13 @@ test.describe('Daily question: nudge the partner', () => {
     // The server's own answer says spent, not only the saved copy.
     expect(rereadAnswer.responseJson).toMatchObject({
       status: 'ok',
-      snapshot: { nudge: { slot: rows[0].slot, spent: true } },
+      snapshot: { nudges: { prompt_sent: false, button_sent: true } },
     });
+    expect(rereadAnswer.responseJson).not.toHaveProperty('snapshot.nudge');
     await expect(page.getByTestId('daily-waiting')).toBeVisible();
     await expect(page.getByTestId('daily-nudge')).toBeDisabled();
+    await expect(page.getByTestId('daily-nudge')).toHaveAttribute('data-sent', 'true');
+    await expect(page.getByTestId('daily-nudge-sheet')).toHaveCount(0);
     expect(await nudgeRows(dayId), 'the reload sent no second nudge').toHaveLength(1);
   });
 });

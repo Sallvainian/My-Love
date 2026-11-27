@@ -59,6 +59,7 @@ import {
 import { sendEphemeralBroadcast } from './ephemeralBroadcast';
 import { isOnline, isPostgrestError, logSupabaseError } from './errorHandlers';
 import { getPartnerId, supabase } from './supabaseClient';
+import type { NudgeSource } from '../services/dailyNudges';
 import { DAILY_NUDGE_EVENT, DAILY_PICK_EVENT } from './validation/broadcastSchemas';
 import {
   type DailyChoice,
@@ -82,14 +83,19 @@ const STREAK_CONTEXT = 'DailyQuestionApi.fetchCoupleStreak';
 const HISTORY_CONTEXT = 'DailyQuestionApi.fetchDailyHistory';
 const NUDGE_CONTEXT = 'DailyQuestionApi.sendDailyNudge';
 
-/** Shown when a nudge is refused by the server or fails for any reason but being offline. */
+/** Shown when a nudge is refused by the server, or a re-read shows it was not recorded. */
 export const NUDGE_FAILED_MESSAGE = 'Your nudge could not be sent.';
+
+/** Shown when a nudge's answer was lost and the re-read of the day failed too (DW-539). */
+export const NUDGE_UNCHECKED_MESSAGE = "We couldn't check if your nudge went through. Try again?";
 
 /**
  * SQLSTATEs `send_daily_nudge` raises for a nudge it refuses for good: `DQ007`
- * (before the viewer's own pick), `DQ008` (the partner has picked), `DQ009` (not
- * the partner's current date), `DQ010` (already sent for the slot) and `P0002`
- * (day not found).
+ * (before the viewer's own pick), `DQ008` (the partner has picked), `DQ009` (the
+ * day has ended on the partner's clock), `DQ010` (already sent from that
+ * source), `P0002` (day not found, or a link that does not go both ways) and
+ * `22023` (unknown source). `DQ010` is told apart by `isNudgeAlreadySent`: it
+ * means the nudge is on record, not that it failed.
  */
 const NUDGE_REFUSAL_CODES: ReadonlySet<string> = new Set([
   'DQ007',
@@ -97,7 +103,11 @@ const NUDGE_REFUSAL_CODES: ReadonlySet<string> = new Set([
   'DQ009',
   'DQ010',
   'P0002',
+  '22023',
 ]);
+
+/** SQLSTATE `send_daily_nudge` raises when the viewer's nudge from that source is already on record. */
+const NUDGE_ALREADY_SENT = 'DQ010';
 
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
 const PICK_DATE_MISMATCH = 'DQ001';
@@ -277,15 +287,44 @@ export async function announceDailyNudge(dayId: string): Promise<void> {
 }
 
 /**
- * Send the caller's nudge for `dayId` (their partner has not picked). Returns
- * the day's snapshot. Throws on any failure; a refusal the server raises for
- * good is `AccountDataError('refused', NUDGE_FAILED_MESSAGE)`.
+ * Whether `error` is `sendDailyNudge`'s refusal of a nudge that is already on
+ * record from that source (`DQ010`): the send ended as a sent nudge, not a
+ * failure (a retry after a lost answer, or a stale screen on another device).
  */
-export async function sendDailyNudge(dayId: string): Promise<DailyDaySnapshot> {
+export function isNudgeAlreadySent(error: unknown): boolean {
+  return (
+    error instanceof AccountDataError &&
+    error.code === 'refused' &&
+    isPostgrestError(error.cause) &&
+    error.cause.code === NUDGE_ALREADY_SENT
+  );
+}
+
+/**
+ * Whether the answer to a nudge request is unknown: the request timed out or
+ * failed on the network, or the server's answer could not be parsed. The
+ * server may have recorded the nudge, so nothing says it failed (DW-539).
+ */
+export function isNudgeOutcomeUnknown(error: unknown): boolean {
+  return (
+    error instanceof AccountDataError &&
+    (error.code === 'transport' || error.code === 'invalid-response')
+  );
+}
+
+/**
+ * Send the caller's nudge for `dayId` from `source`, the prompt after their
+ * answer or the waiting card's button (their partner has not picked). Returns
+ * the day's snapshot. Throws on any failure; a refusal the server raises for
+ * good is `AccountDataError('refused', NUDGE_FAILED_MESSAGE)` (`DQ010` among
+ * them: see `isNudgeAlreadySent`), and a lost answer is `transport` or
+ * `invalid-response` (`isNudgeOutcomeUnknown`).
+ */
+export async function sendDailyNudge(dayId: string, source: NudgeSource): Promise<DailyDaySnapshot> {
   refuseOffline('Your nudge', 'send');
   try {
     const { data, error } = await supabase
-      .rpc('send_daily_nudge', { day_id: dayId })
+      .rpc('send_daily_nudge', { day_id: dayId, source })
       .abortSignal(requestTimeout());
     if (error) throw error;
     const parsed = DailyDaySnapshotSchema.safeParse(data);

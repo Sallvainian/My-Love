@@ -38,12 +38,15 @@ import { AccountDataError } from '../../services/accountDataError';
 import {
   DAY_CHANGED_MESSAGE,
   NUDGE_FAILED_MESSAGE,
+  NUDGE_UNCHECKED_MESSAGE,
   announceDailyNudge,
   announceDailyPick,
   fetchCoupleStreak,
   fetchDailyDay,
   fetchDailyDayById,
   fetchDailyHistory,
+  isNudgeAlreadySent,
+  isNudgeOutcomeUnknown,
   isPickRefusal,
   pickZone,
   sendDailyNudge,
@@ -187,6 +190,23 @@ describe('fetchCoupleStreak', () => {
         streak: {
           ...coupleStreak(),
           week: coupleStreak().week.map((d) => ({ ...d, day: '2030-13-45' })),
+        },
+      },
+    ],
+    [
+      'a calendar week of six days',
+      {
+        status: 'ok',
+        streak: { ...coupleStreak(), calendar_week: coupleStreak().calendar_week?.slice(1) },
+      },
+    ],
+    [
+      'a calendar week state that is unknown',
+      {
+        status: 'ok',
+        streak: {
+          ...coupleStreak(),
+          calendar_week: coupleStreak().calendar_week?.map((d) => ({ ...d, state: 'x' })),
         },
       },
     ],
@@ -398,22 +418,28 @@ describe('sendDailyNudge', () => {
     data: null,
     error: { message: 'server words', code, details: '', hint: '' },
   });
-  const spent = () =>
-    dailySnapshot({ state: 'me', nudge: { slot: 'after_pick', spent: true } });
+  const sentFromPrompt = () =>
+    dailySnapshot({
+      state: 'me',
+      nudges: { prompt_sent: true, button_sent: false, closes_at: '2026-11-06T10:00:00+00:00' },
+    });
 
-  it('calls send_daily_nudge with the day and returns the snapshot', async () => {
-    rpc.mockResolvedValue({ data: spent(), error: null });
+  it.each(['prompt', 'button'] as const)(
+    'calls send_daily_nudge with the day and the %s source and returns the snapshot',
+    async (source) => {
+      rpc.mockResolvedValue({ data: sentFromPrompt(), error: null });
 
-    await expect(sendDailyNudge(DAY_ID)).resolves.toEqual(spent());
+      await expect(sendDailyNudge(DAY_ID, source)).resolves.toEqual(sentFromPrompt());
 
-    expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith('send_daily_nudge', { day_id: DAY_ID });
-  });
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc).toHaveBeenCalledWith('send_daily_nudge', { day_id: DAY_ID, source });
+    }
+  );
 
   it('bounds the request with a timeout signal', async () => {
-    rpc.mockResolvedValue({ data: spent(), error: null });
+    rpc.mockResolvedValue({ data: sentFromPrompt(), error: null });
 
-    await sendDailyNudge(DAY_ID);
+    await sendDailyNudge(DAY_ID, 'prompt');
 
     expect(abortSignal).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
@@ -421,57 +447,152 @@ describe('sendDailyNudge', () => {
   it('refuses offline before any request, with the nudge sentence', async () => {
     setOnline(false);
 
-    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({
+    await expect(sendDailyNudge(DAY_ID, 'button')).rejects.toMatchObject({
       code: 'offline',
       message: 'You are offline. Your nudge needs a connection to send.',
     });
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it.each(['DQ007', 'DQ008', 'DQ009', 'DQ010', 'P0002'])(
+  it.each(['DQ007', 'DQ008', 'DQ009', 'DQ010', 'P0002', '22023'])(
     'maps the refusal %s to a refused error with the fixed sentence and the cause kept',
     async (code) => {
       rpc.mockResolvedValue(failure(code));
 
-      const caught = (await sendDailyNudge(DAY_ID).catch((error: unknown) => error)) as AccountDataError;
+      const caught = (await sendDailyNudge(DAY_ID, 'prompt').catch(
+        (error: unknown) => error
+      )) as AccountDataError;
 
       expect(caught).toBeInstanceOf(AccountDataError);
       expect(caught).toMatchObject({ code: 'refused', message: NUDGE_FAILED_MESSAGE });
       expect(caught.cause).toMatchObject({ code });
+      expect(isNudgeOutcomeUnknown(caught)).toBe(false);
     }
   );
 
-  it('says the sentence the card shows', () => {
-    expect(NUDGE_FAILED_MESSAGE).toBe('Your nudge could not be sent.');
+  it('tells "already sent" (DQ010) from every other refusal', async () => {
+    rpc.mockResolvedValue(failure('DQ010'));
+    const sent = await sendDailyNudge(DAY_ID, 'button').catch((error: unknown) => error);
+    expect(isNudgeAlreadySent(sent)).toBe(true);
+
+    for (const code of ['DQ007', 'DQ008', 'DQ009', 'P0002', '22023']) {
+      rpc.mockResolvedValue(failure(code));
+      const refused = await sendDailyNudge(DAY_ID, 'button').catch((error: unknown) => error);
+      expect(isNudgeAlreadySent(refused)).toBe(false);
+    }
+    expect(isNudgeAlreadySent(new Error('DQ010'))).toBe(false);
+    expect(isNudgeAlreadySent(new AccountDataError('transport', 'x'))).toBe(false);
   });
 
-  it('leaves any other server error a transport error', async () => {
+  it('says the two sentences the controls show', () => {
+    expect(NUDGE_FAILED_MESSAGE).toBe('Your nudge could not be sent.');
+    expect(NUDGE_UNCHECKED_MESSAGE).toBe("We couldn't check if your nudge went through. Try again?");
+  });
+
+  it('leaves any other server error a transport error, an unknown outcome', async () => {
     rpc.mockResolvedValue(failure('XX000'));
 
-    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'transport' });
+    const caught = await sendDailyNudge(DAY_ID, 'prompt').catch((error: unknown) => error);
+
+    expect(caught).toMatchObject({ code: 'transport' });
+    expect(isNudgeOutcomeUnknown(caught)).toBe(true);
   });
 
-  it('leaves a network failure a transport error', async () => {
+  it('leaves a network failure a transport error, an unknown outcome', async () => {
     rpc.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'transport' });
+    const caught = await sendDailyNudge(DAY_ID, 'button').catch((error: unknown) => error);
+
+    expect(caught).toMatchObject({ code: 'transport' });
+    expect(isNudgeOutcomeUnknown(caught)).toBe(true);
   });
 
-  it('throws an invalid-response error on an answer that is not a snapshot', async () => {
+  it('leaves a timeout a transport error, an unknown outcome', async () => {
+    rpc.mockRejectedValue(new DOMException('The operation timed out.', 'TimeoutError'));
+
+    const caught = await sendDailyNudge(DAY_ID, 'prompt').catch((error: unknown) => error);
+
+    expect(caught).toMatchObject({ code: 'transport' });
+    expect(isNudgeOutcomeUnknown(caught)).toBe(true);
+  });
+
+  it('throws an invalid-response error, an unknown outcome, on an answer that is not a snapshot', async () => {
     rpc.mockResolvedValue({ data: { nope: true }, error: null });
 
-    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'invalid-response' });
+    const caught = await sendDailyNudge(DAY_ID, 'prompt').catch((error: unknown) => error);
+
+    expect(caught).toMatchObject({ code: 'invalid-response' });
+    expect(isNudgeOutcomeUnknown(caught)).toBe(true);
   });
 
-  it('parses a snapshot with and without nudge', async () => {
+  it('is not unknown offline, nor for something that is not an account error', async () => {
+    setOnline(false);
+    const offline = await sendDailyNudge(DAY_ID, 'prompt').catch((error: unknown) => error);
+    expect(isNudgeOutcomeUnknown(offline)).toBe(false);
+    expect(isNudgeOutcomeUnknown(new Error('x'))).toBe(false);
+  });
+
+  it('parses a snapshot with nudges, with the legacy nudge, and with neither', async () => {
     rpc.mockResolvedValue({ data: dailySnapshot(), error: null });
-    await expect(sendDailyNudge(DAY_ID)).resolves.not.toHaveProperty('nudge');
+    const bare = await sendDailyNudge(DAY_ID, 'prompt');
+    expect(bare).not.toHaveProperty('nudge');
+    expect(bare).not.toHaveProperty('nudges');
 
-    rpc.mockResolvedValue({ data: { ...dailySnapshot(), nudge: { slot: null, spent: false } }, error: null });
-    await expect(sendDailyNudge(DAY_ID)).resolves.toMatchObject({ nudge: { slot: null, spent: false } });
+    rpc.mockResolvedValue({ data: sentFromPrompt(), error: null });
+    await expect(sendDailyNudge(DAY_ID, 'prompt')).resolves.toMatchObject({
+      nudges: { prompt_sent: true, button_sent: false, closes_at: '2026-11-06T10:00:00+00:00' },
+    });
 
-    rpc.mockResolvedValue({ data: { ...dailySnapshot(), nudge: { slot: 'noon', spent: false } }, error: null });
-    await expect(sendDailyNudge(DAY_ID)).rejects.toMatchObject({ code: 'invalid-response' });
+    rpc.mockResolvedValue({
+      data: { ...dailySnapshot(), nudge: { slot: null, spent: false } },
+      error: null,
+    });
+    await expect(sendDailyNudge(DAY_ID, 'prompt')).resolves.toMatchObject({
+      nudge: { slot: null, spent: false },
+    });
+  });
+
+  it('refuses a nudges object that is malformed, or a legacy slot that is unknown', async () => {
+    rpc.mockResolvedValue({
+      data: { ...dailySnapshot(), nudges: { prompt_sent: true, button_sent: false } },
+      error: null,
+    });
+    await expect(sendDailyNudge(DAY_ID, 'prompt')).rejects.toMatchObject({ code: 'invalid-response' });
+
+    rpc.mockResolvedValue({
+      data: {
+        ...dailySnapshot(),
+        nudges: { prompt_sent: true, button_sent: false, closes_at: 'tomorrow' },
+      },
+      error: null,
+    });
+    await expect(sendDailyNudge(DAY_ID, 'prompt')).rejects.toMatchObject({ code: 'invalid-response' });
+
+    rpc.mockResolvedValue({
+      data: { ...dailySnapshot(), nudge: { slot: 'noon', spent: false } },
+      error: null,
+    });
+    await expect(sendDailyNudge(DAY_ID, 'prompt')).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('reads the closing instant as the server writes it: a UTC offset, null while none applies', async () => {
+    rpc.mockResolvedValue({
+      data: {
+        ...dailySnapshot(),
+        nudges: { prompt_sent: false, button_sent: false, closes_at: '2030-09-11T10:00:00+00:00' },
+      },
+      error: null,
+    });
+    await expect(sendDailyNudge(DAY_ID, 'button')).resolves.toMatchObject({
+      nudges: { closes_at: '2030-09-11T10:00:00+00:00' },
+    });
+    rpc.mockResolvedValue({
+      data: { ...dailySnapshot(), nudges: { prompt_sent: false, button_sent: false, closes_at: null } },
+      error: null,
+    });
+    await expect(sendDailyNudge(DAY_ID, 'button')).resolves.toMatchObject({
+      nudges: { closes_at: null },
+    });
   });
 });
 

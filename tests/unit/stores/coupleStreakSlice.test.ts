@@ -446,8 +446,10 @@ describe('the daily-streak local copy', () => {
     expect(await savedCopy()).toEqual({ ...coupleStreak({ held: 3 }), partner_id: 'PARTNER-OLD' });
   });
 
-  it('replaces an older saved streak with the new ok answer', async () => {
-    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 2 }));
+  it('replaces an older saved streak, one saved before the calendar week included, with the new ok answer', async () => {
+    const before = coupleStreak({ held: 2 });
+    delete before.calendar_week;
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, before);
     fetchCoupleStreak.mockResolvedValue(okStreak({ held: 3 }));
 
     await state().loadCoupleStreak();
@@ -493,19 +495,22 @@ describe('the daily-streak local copy', () => {
   });
 
   it('offline with a saved streak: shows it and sets the error, unlogged', async () => {
-    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, coupleStreak({ held: 6 }));
+    const saved = coupleStreak({ held: 6 });
+    delete saved.calendar_week;
+    await writeLocalCopy(A, DAILY_STREAK_COPY_KIND, saved);
     fetchCoupleStreak.mockRejectedValue(
       new AccountDataError('offline', 'You are offline. The streak needs a connection to load.')
     );
 
     await state().loadCoupleStreak();
 
-    expect(state().coupleStreak).toEqual(okStreak({ held: 6 }));
+    expect(state().coupleStreak).toEqual({ status: 'ok', streak: saved });
+    expect(state().coupleStreak).not.toHaveProperty('streak.calendar_week');
     expect(state().coupleStreakError).toBe(
       'You are offline. The streak needs a connection to load.'
     );
     expect(console.error).not.toHaveBeenCalled();
-    expect(await savedCopy()).toEqual(coupleStreak({ held: 6 }));
+    expect(await savedCopy()).toEqual(saved);
   });
 
   it('offline with nothing saved: nothing is shown and the error says the streak needs a connection', async () => {

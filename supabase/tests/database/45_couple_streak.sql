@@ -27,7 +27,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(49);
+select plan(59);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -65,7 +65,7 @@ begin
   update public.users set partner_id = v_x where id = v_y;
 end; $$;
 
-select pg_temp.mk_pair(l) from unnest(array['seq', 'apart', 'late', 'cold', 'big', 'relink', 'empty']) as l;
+select pg_temp.mk_pair(l) from unnest(array['seq', 'apart', 'late', 'cold', 'big', 'relink', 'empty', 'ahead']) as l;
 
 create temporary table t_outsider as select tests.create_test_user('streak-outsider@example.com') as o_id;
 grant select on t_outsider to authenticated, anon, service_role;
@@ -112,6 +112,18 @@ $$;
 create or replace function pg_temp.week(j jsonb)
 returns text language sql immutable as $$
   select string_agg(e ->> 'state', ',' order by ord) from jsonb_array_elements(j -> 'week') with ordinality as t(e, ord)
+$$;
+
+-- calendar_week states, Sunday first, comma-joined
+create or replace function pg_temp.cal(j jsonb)
+returns text language sql immutable as $$
+  select string_agg(e ->> 'state', ',' order by ord) from jsonb_array_elements(j -> 'calendar_week') with ordinality as t(e, ord)
+$$;
+
+-- first day/last day of calendar_week
+create or replace function pg_temp.calspan(j jsonb)
+returns text language sql immutable as $$
+  select (j #>> '{calendar_week,0,day}') || '/' || (j #>> '{calendar_week,6,day}')
 $$;
 
 -- ============================================
@@ -205,8 +217,8 @@ select is(
 );
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(pg_temp.streak('seq', 'a', timestamptz '2030-07-05 12:00:00+00')) k),
-  array['done', 'held', 'milestones', 'missed', 'run', 'same', 'today_state', 'week'],
-  'STREAK-014: the streak carries exactly held, run, today_state, milestones, same, done, missed and week'
+  array['calendar_week', 'done', 'held', 'milestones', 'missed', 'run', 'same', 'today_state', 'week'],
+  'STREAK-014: the streak carries exactly held, run, today_state, milestones, same, done, missed, week and calendar_week'
 );
 select is(
   (select count(*)::int
@@ -224,6 +236,33 @@ select is(
   pg_temp.line(pg_temp.streak('seq', 'a', timestamptz '2030-07-03 00:30:00+00')),
   '2/2/0/grey/1',
   'STREAK-017: at 07-03 00:30Z the open day breaks nothing: run 2, missed 0, grey'
+);
+
+-- calendar_week (story 11.3): 2030-07-05 is a Friday, 06-30 the Sunday before it.
+select is(
+  pg_temp.cal(pg_temp.streak('seq', 'a', timestamptz '2030-07-05 12:00:00+00')),
+  'open,done,done,missed,missed,open,upcoming',
+  'STREAK-050: on a Friday the calendar week is Sunday 06-30 to Saturday 07-06: the date before the first day is open, today is open and the Saturday is upcoming'
+);
+select is(
+  pg_temp.calspan(pg_temp.streak('seq', 'a', timestamptz '2030-07-05 12:00:00+00')),
+  '2030-06-30/2030-07-06',
+  'STREAK-051: and it runs from the Sunday to the Saturday holding the viewer''s date'
+);
+select is(
+  (select count(*)::int
+   from jsonb_array_elements(pg_temp.streak('seq', 'a', timestamptz '2030-07-05 12:00:00+00') -> 'calendar_week') c
+   join jsonb_array_elements(pg_temp.streak('seq', 'a', timestamptz '2030-07-05 12:00:00+00') -> 'week') w on w ->> 'day' = c ->> 'day'
+   where w ->> 'state' <> c ->> 'state'),
+  0,
+  'STREAK-052: every date both fields hold has the same state in each'
+);
+select is(
+  (select count(*)::int
+   from jsonb_array_elements(pg_temp.streak('seq', 'a', timestamptz '2030-07-05 12:00:00+00') -> 'calendar_week') e
+   where (select array_agg(k order by k) from jsonb_object_keys(e) k) = array['day', 'state']),
+  7,
+  'STREAK-053: the calendar week is seven {day, state} objects'
 );
 
 -- Blue until both pick: A picks on 07-05, then B.
@@ -269,6 +308,12 @@ select is(
   '3/1/0/grey/2',
   'STREAK-023: a missed date followed by a closed done date is no longer blue'
 );
+select is(
+  pg_temp.cal(pg_temp.streak('seq', 'a', timestamptz '2030-07-06 12:00:00+00'))
+    || '/' || pg_temp.calspan(pg_temp.streak('seq', 'a', timestamptz '2030-07-06 12:00:00+00')),
+  'open,done,done,missed,missed,done,open/2030-06-30/2030-07-06',
+  'STREAK-054: on the Saturday today is the last slot and no date is upcoming'
+);
 
 -- ============================================
 -- A pair with no days
@@ -284,8 +329,14 @@ select is(
   'STREAK-025: and a week of open dates'
 );
 select is(
+  pg_temp.calspan(pg_temp.streak('empty', 'a', timestamptz '2030-07-05 12:00:00+00'))
+    || '/' || pg_temp.cal(pg_temp.streak('empty', 'a', timestamptz '2030-07-05 12:00:00+00')),
+  '2030-06-30/2030-07-06/open,open,open,open,open,open,upcoming',
+  'STREAK-057: a pair with no day has a calendar week open to the viewer''s date, then upcoming'
+);
+select is(
   (select array_agg(k order by k) from jsonb_object_keys(pg_temp.streak('empty', 'a', timestamptz '2030-07-05 12:00:00+00')) k),
-  array['done', 'held', 'milestones', 'missed', 'run', 'same', 'today_state', 'week'],
+  array['calendar_week', 'done', 'held', 'milestones', 'missed', 'run', 'same', 'today_state', 'week'],
   'STREAK-044: the no-day answer carries exactly the same keys'
 );
 select is(
@@ -337,6 +388,40 @@ select is(
   pg_temp.streak('apart', 'b', timestamptz '2030-08-11 06:00:00+00') #>> '{week,6,day}',
   '2030-08-11',
   'STREAK-029: and B''s week ends on B''s own date, 08-11'
+);
+select is(
+  pg_temp.calspan(pg_temp.streak('apart', 'a', timestamptz '2030-08-11 06:00:00+00'))
+    || '/' || pg_temp.cal(pg_temp.streak('apart', 'a', timestamptz '2030-08-11 06:00:00+00')),
+  '2030-08-04/2030-08-10/open,open,open,open,open,open,missed',
+  'STREAK-055: at 2030-08-11 06:00Z it is Saturday 08-10 in A''s Los Angeles: A''s calendar week is 08-04 to 08-10, today last, no upcoming'
+);
+select is(
+  pg_temp.calspan(pg_temp.streak('apart', 'b', timestamptz '2030-08-11 06:00:00+00'))
+    || '/' || pg_temp.cal(pg_temp.streak('apart', 'b', timestamptz '2030-08-11 06:00:00+00')),
+  '2030-08-11/2030-08-17/open,upcoming,upcoming,upcoming,upcoming,upcoming,upcoming',
+  'STREAK-056: at the same instant it is Sunday 08-11 in B''s Chicago: B''s week is 08-11 to 08-17, today first and six upcoming'
+);
+
+-- ============================================
+-- Partner ahead: A in Chicago, B in New York. At 2030-08-21 04:30Z it is still
+-- Tuesday 08-20 for A and already Wednesday 08-21 for B, and both have picked 08-21.
+-- ============================================
+select public.record_user_time_zone(
+  pg_temp.pa('ahead'), 'America/Chicago', -300,
+  timestamptz '2030-08-20 12:00:00+00', timestamptz '2030-08-20 12:00:00+00');
+select public.record_user_time_zone(
+  pg_temp.pb('ahead'), 'America/New_York', -240,
+  timestamptz '2030-08-20 12:00:00+00', timestamptz '2030-08-20 12:00:00+00');
+select pg_temp.put('ahead', 'a', date '2030-08-20', 'this', 'America/Chicago');
+select pg_temp.put('ahead', 'b', date '2030-08-20', 'this', 'America/New_York');
+select pg_temp.put('ahead', 'a', date '2030-08-21', 'this', 'America/Chicago');
+select pg_temp.put('ahead', 'b', date '2030-08-21', 'this', 'America/New_York');
+
+select is(
+  pg_temp.calspan(pg_temp.streak('ahead', 'a', timestamptz '2030-08-21 04:30:00+00'))
+    || '/' || pg_temp.cal(pg_temp.streak('ahead', 'a', timestamptz '2030-08-21 04:30:00+00')),
+  '2030-08-18/2030-08-24/open,open,done,upcoming,upcoming,upcoming,upcoming',
+  'STREAK-058: the viewer''s date is Tuesday 08-20; Wednesday 08-21, done on both picks and already today for the partner, is upcoming'
 );
 
 -- ============================================
@@ -462,6 +547,16 @@ select is(
   pg_temp.week(current_setting('tests.relinked')::jsonb -> 'streak'),
   'open,done,done,missed,missed,missed,open',
   'STREAK-040: and the week shows the gap'
+);
+select ok(
+  (select extract(dow from (c -> 'calendar_week' -> 0 ->> 'day')::date) = 0
+      and jsonb_array_length(c -> 'calendar_week') = 7
+      and (c #>> '{week,6,day}')::date between (c #>> '{calendar_week,0,day}')::date and (c #>> '{calendar_week,6,day}')::date
+      and not exists (
+        select 1 from jsonb_array_elements(c -> 'calendar_week') e
+        where ((e ->> 'day')::date > (c #>> '{week,6,day}')::date) <> (e ->> 'state' = 'upcoming'))
+   from (select current_setting('tests.relinked')::jsonb -> 'streak' as c) x),
+  'STREAK-059: get_couple_streak carries calendar_week: seven days from a Sunday holding the viewer''s date, upcoming exactly after it'
 );
 
 -- ============================================

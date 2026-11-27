@@ -1,13 +1,16 @@
 -- ============================================
--- pgTAP: a pick pushes the partner, and both answered (20261126010000)
+-- pgTAP: a second pick pushes the first picker, a first pick pushes nobody
+-- (20261126010000; the partner-picked trigger dropped by 20261127010000)
 --
 -- Story 8.6 of epic-daily-pushes-and-nudge (architecture-daily-question: AD-10;
--- requirements R1, R4). Pinned here:
---   * daily_picks carries exactly the two notify_push triggers, AFTER INSERT FOR
---     EACH ROW, enabled, each with its WHEN and its kind.
---   * a first pick queues one {kind: daily_partner_picked, id} call and a second
---     pick one {kind: daily_both_answered, id} call, each body holding exactly the
---     keys kind and id (no choice), to the sender URL with the shared secret.
+-- requirements R1, R4), narrowed by story 11.2 of epic-simpler-daily-pushes-and-nudge.
+-- Pinned here:
+--   * daily_picks carries exactly one notify_push trigger, the both-answered one,
+--     AFTER INSERT FOR EACH ROW, enabled, with its WHEN and its kind; the
+--     partner-picked trigger is gone.
+--   * a first pick queues no call and a second pick one {kind:
+--     daily_both_answered, id} call, each body holding exactly the keys kind and
+--     id (no choice), to the sender URL with the shared secret.
 --   * a repeat record_daily_pick for a stored pick inserts nothing and queues
 --     nothing more.
 --   * with no push_sender_settings row a pick lands and nothing is queued.
@@ -20,7 +23,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(14);
+select plan(15);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -71,13 +74,12 @@ select is(
   (select string_agg(t.tgname || ' ' || p.proname || ' ' || t.tgenabled::text || ' ' || t.tgtype::text, ', ' order by t.tgname)
      from pg_trigger t join pg_proc p on p.oid = t.tgfoid
     where t.tgrelid = 'public.daily_picks'::regclass and not t.tgisinternal),
-  'daily_picks_push_both_answered_after_insert notify_push O 5, daily_picks_push_partner_picked_after_insert notify_push O 5',
-  'DAILY-PICK-001: daily_picks carries exactly the two notify_push triggers, AFTER INSERT FOR EACH ROW, enabled'
+  'daily_picks_push_both_answered_after_insert notify_push O 5',
+  'DAILY-PICK-001: daily_picks carries exactly the both-answered notify_push trigger, AFTER INSERT FOR EACH ROW, enabled'
 );
 select ok(
-  (select pg_get_triggerdef(t.oid) ~ 'WHEN \(\(NOT new\.is_second\)\) EXECUTE FUNCTION notify_push\(''daily_partner_picked''\)'
-     from pg_trigger t where t.tgname = 'daily_picks_push_partner_picked_after_insert'),
-  'DAILY-PICK-002: the daily_partner_picked trigger fires only for a first pick'
+  not exists (select 1 from pg_trigger t where t.tgname = 'daily_picks_push_partner_picked_after_insert'),
+  'DAILY-PICK-002: the daily_partner_picked trigger is gone, so a first pick posts nothing'
 );
 select ok(
   (select pg_get_triggerdef(t.oid) ~ 'WHEN \(new\.is_second\) EXECUTE FUNCTION notify_push\(''daily_both_answered''\)'
@@ -89,11 +91,11 @@ select ok(
 -- A first pick, a second pick and a retry
 -- ============================================
 select pg_temp.pick('a');
-select is(pg_temp.queued('a'), 'daily_partner_picked', 'DAILY-PICK-004: a first pick queued one daily_partner_picked call');
+select is(pg_temp.queued('a'), '', 'DAILY-PICK-004: a first pick queued no call');
 
 select pg_temp.pick('b');
 select is(pg_temp.queued('b'), 'daily_both_answered', 'DAILY-PICK-005: a second pick queued one daily_both_answered call');
-select is(pg_temp.queued('a'), 'daily_partner_picked', 'DAILY-PICK-006: and the first pick queued nothing more');
+select is(pg_temp.queued('a'), '', 'DAILY-PICK-006: and the first pick still has no call');
 
 select is(
   (select string_agg(distinct (select string_agg(k, ',' order by k) from jsonb_object_keys(convert_from(q.body, 'UTF8')::jsonb) k), ';')
@@ -157,17 +159,29 @@ select is(
 );
 
 -- ============================================
--- Comments name the new triggers
+-- Comments name the one remaining trigger and no removed kind
 -- ============================================
 select ok(
-  obj_description('public.daily_picks'::regclass, 'pg_class') like '%daily_partner_picked%'
-    and obj_description('public.daily_picks'::regclass, 'pg_class') like '%daily_both_answered%',
-  'DAILY-PICK-013: the daily_picks comment names both kinds'
+  obj_description('public.daily_picks'::regclass, 'pg_class') like '%daily_both_answered%'
+    and obj_description('public.daily_picks'::regclass, 'pg_class') not like '%daily_partner_picked%',
+  'DAILY-PICK-013: the daily_picks comment names daily_both_answered and not daily_partner_picked'
 );
 select ok(
   obj_description('public.notify_push()'::regprocedure, 'pg_proc') like '%daily_picks%'
     and obj_description('public.push_sender_settings'::regclass, 'pg_class') like '%daily_picks%',
   'DAILY-PICK-014: the notify_push and push_sender_settings comments name daily_picks'
+);
+select is(
+  (select count(*)::int from (
+     select obj_description('public.push_requests'::regclass, 'pg_class') as c
+     union all select col_description('public.push_requests'::regclass, a.attnum)
+       from pg_attribute a
+      where a.attrelid = 'public.push_requests'::regclass and a.attname in ('daily_pick_id', 'daily_reminder_id')
+     union all select obj_description('public.notify_push()'::regprocedure, 'pg_proc')
+     union all select obj_description('public.daily_picks'::regclass, 'pg_class')
+   ) x where x.c ~ '(daily_partner_picked|daily_question($|[^_a-z])|evening_partner|morning)'),
+  0,
+  'DAILY-PICK-015: the push_requests, notify_push and daily_picks comments name no removed kind'
 );
 
 select * from finish();

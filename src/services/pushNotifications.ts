@@ -162,7 +162,9 @@ const VIEW_FOR_KIND: Readonly<Record<string, ViewType>> = {
   // An added event or anniversary opens Home, which re-reads both.
   event: 'home',
   anniversary: 'home',
-  // The five Daily pushes open Daily (story 8.4).
+  // The three Daily pushes open Daily (story 8.4). `daily_question` and `daily_partner_picked`
+  // are no longer sent (story 11.2) but stay: a push of either delivered before the deploy and
+  // tapped after still opens Daily.
   daily_question: 'daily',
   daily_partner_picked: 'daily',
   daily_nudge: 'daily',

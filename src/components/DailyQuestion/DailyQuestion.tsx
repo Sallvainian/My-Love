@@ -58,24 +58,33 @@
  * there. A milestone that showed never shows again.
  * Once only the own pick is in (`me`), the card below the day card is the board's
  * dashed waiting card (`WaitingCard`, test id `daily-waiting`, "Waiting on
- * {partner}") with a Nudge button (AD-17). The button follows the snapshot's
- * `nudge`: disabled when it is missing, has no `slot`, is `spent`, or a send is in
- * flight; offline it stays enabled and a tap shows the offline sentence with no
- * request. A refusal or a failed request shows `NUDGE_FAILED_MESSAGE` and the
- * slice re-reads the day. `useDailyDayRereads` re-reads the day at 20:00 (the
- * evening slot) and when the page comes back to the front.
+ * {partner}") with a Nudge button (AD-17). The button is the second of the two
+ * places a nudge is sent from, each once per question: it follows
+ * `nudgeState(snapshot)` (`services/dailyNudges.ts`), enabled while its own
+ * nudge is unsent and the question still takes nudges (`closesAt` set and not
+ * passed), greyed once it is sent (grey always means sent) and hidden when it
+ * was never sent and cannot be: after `closesAt`, or on a day saved by the
+ * build before this one, which has no closing instant, until the server answers
+ * for it. `useNudgeClosed` flips it at `closesAt` with no re-read. Both controls
+ * send through `useNudgeSend`: a refusal or a re-read that found no nudge shows
+ * `NUDGE_FAILED_MESSAGE`, a lost answer whose re-read failed too shows
+ * `NUDGE_UNCHECKED_MESSAGE`, an "already sent" refusal ends as a sent nudge, and
+ * offline a tap shows the offline sentence with no request. `useDailyDayRereads`
+ * re-reads the day when the page comes back to the front.
  *
- * The nudge offer (R2): right after the first picker's Send my pick answers, when
- * the day on screen is that day in state `me` with a `nudge` that has a slot and
- * is not spent, `NudgeSheet` ("Do you want to nudge your partner?") opens once.
- * It is raised only by that in-view send (a queued pick leaves the state `none`
- * or `partner`, a queue drain raises nothing) and is state of this mount, so a
- * reload, a remount or an account switch offers nothing. It waits behind the
- * +1/milestone overlays and this mount's first read, and never shows alongside
- * the write sheet or after it has shown in this mount (the writer meets one
- * sheet). Nudge sends through `sendDailyNudge` and closes it; Not now, the scrim
- * and Escape close it with nothing sent. The partner's `daily_pick` for that day,
- * or any re-read that leaves the state `me`, ends it.
+ * The nudge prompt (R1): once an answer is confirmed, `NudgeSheet` ("Do you want
+ * to nudge your partner?") opens once, when the day on screen is that day in
+ * state `me`, the snapshot's `closesAt` is set and not passed, and the prompt's
+ * own nudge is unsent. A confirmation is the in-view Send my pick answering, or a
+ * queued pick confirmed while this view is mounted (`dailyQueuedPickSent`
+ * changing; the value found at mount is ignored, so an answer sent while Daily
+ * was closed is never offered later). The offer is state of this mount, so a
+ * reload, a remount or an account switch offers nothing, and Not now, the scrim
+ * and Escape end it for the question while the waiting card's button stays. It
+ * waits behind the +1/milestone overlays, this mount's first read and the write
+ * sheet, however the write sheet closes (a send, "No thanks", the scrim or
+ * Escape), and is dropped when the partner answers (their `daily_pick`, or any
+ * re-read that leaves the state `me`) and at `closesAt`.
  * The write sheet opens only once the server has answered for the shown day in
  * this mount: any answer the store shows after the mount counts (`dailyDayAnswers`
  * has grown since it), whether a read, a re-read, the pick's own confirmation or
@@ -102,16 +111,17 @@ import {
 import { useDailyDayRereads } from '../../hooks/useDailyDayRereads';
 import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError } from '../../services/accountDataError';
+import { nudgeState } from '../../services/dailyNudges';
 import { parseEventDate } from '../../services/eventsService';
 import type { QueuedDailyPick } from '../../stores/slices/dailyDaySlice';
 import { useAppStore } from '../../stores/useAppStore';
 import { formatDateISO } from '../../utils/dateUtils';
 import { CARD, FAILURE_BOX, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../shared/kitClasses';
-import { StreakWeek } from '../shared/StreakWeek';
+import { StreakRow } from '../shared/StreakWeek';
 import { Milestone } from './Milestone';
 import { NudgeSheet } from './NudgeSheet';
-import { nudgeFailureMessage } from './nudgeFailureMessage';
 import { StreakUp } from './StreakUp';
+import { useNudgeClosed, useNudgeSend } from './useNudgeSend';
 import { WriteQuestionSheet } from './WriteQuestionSheet';
 
 const OPTION =
@@ -239,9 +249,11 @@ function PickCard({
 
 /**
  * The waiting card (the board's `Waiting.dc.html`): the viewer's pick is in and
- * the partner's is not. Its Nudge button sends one nudge for the slot the
- * snapshot names; the failure box shows the offline sentence or
- * `NUDGE_FAILED_MESSAGE`, and clears on the next tap.
+ * the partner's is not. Its Nudge button sends the button's one nudge about this
+ * question through `useNudgeSend`; the failure box shows the offline sentence or
+ * the send's failure line, and clears on the next tap. The button is greyed once
+ * its nudge is sent, and hidden (with its failure box) while it is unsent and
+ * the question takes no nudge: after `closesAt`, or with no `closesAt` at all.
  */
 function WaitingCard({
   snapshot,
@@ -251,24 +263,11 @@ function WaitingCard({
   /** The partner's name, or "your partner" (for the middle of a sentence). */
   partnerNameInline: string;
 }) {
-  const sendDailyNudge = useAppStore((state) => state.sendDailyNudge);
-  const [sending, setSending] = useState(false);
-  const [nudgeError, setNudgeError] = useState<string | null>(null);
-
-  const nudge = snapshot.nudge;
-  const canNudge = nudge !== undefined && nudge.slot !== null && !nudge.spent && !sending;
-
-  const nudgePartner = useCallback(async () => {
-    setNudgeError(null);
-    setSending(true);
-    try {
-      await sendDailyNudge();
-    } catch (caught) {
-      setNudgeError(nudgeFailureMessage(caught));
-    } finally {
-      setSending(false);
-    }
-  }, [sendDailyNudge]);
+  const { send, busy, error: nudgeError } = useNudgeSend('button');
+  const { buttonSent, closesAt } = nudgeState(snapshot);
+  const closed = useNudgeClosed(closesAt);
+  const offerable = closesAt !== null && !closed;
+  const showButton = buttonSent || offerable;
 
   return (
     <div
@@ -282,17 +281,20 @@ function WaitingCard({
       <p className="text-[13px] leading-[1.4] text-muted">
         They can&apos;t see your pick until they make theirs.
       </p>
-      <button
-        type="button"
-        className="inline-flex h-11 items-center gap-2 rounded-full bg-ptint px-[18px] text-sm font-semibold text-partner transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-partner disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={!canNudge}
-        onClick={() => void nudgePartner()}
-        data-testid="daily-nudge"
-      >
-        <Bell className="h-4 w-4" aria-hidden="true" />
-        Nudge {partnerNameInline}
-      </button>
-      {nudgeError && (
+      {showButton && (
+        <button
+          type="button"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-ptint px-[18px] text-sm font-semibold text-partner transition-opacity hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-partner disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={buttonSent || busy}
+          data-sent={buttonSent ? 'true' : undefined}
+          onClick={() => void send()}
+          data-testid="daily-nudge"
+        >
+          <Bell className="h-4 w-4" aria-hidden="true" />
+          Nudge {partnerNameInline}
+        </button>
+      )}
+      {showButton && nudgeError && (
         <div className={`${FAILURE_BOX} self-stretch`} role="alert" data-testid="daily-nudge-error">
           {nudgeError}
         </div>
@@ -587,45 +589,63 @@ export function DailyQuestion() {
     answeredDayId === writeSnapshot.day_id &&
     !celebrationShown;
 
-  // The nudge offer (R2), raised only by the in-view Send my pick and kept with
-  // the session it was raised in, so an account change hides it. It is state of
-  // this mount: a reload or a remount offers nothing. Whether it shows is
-  // decided below from the shown day, never from the offer alone.
+  // The nudge prompt (R1), raised only by a confirmed answer while this view is
+  // mounted: the in-view Send my pick, or a queued pick confirmed meanwhile. It
+  // is kept with the session it was raised in, so an account change hides it,
+  // and it is state of this mount: a reload or a remount offers nothing, so
+  // "Not now" needs no stored flag. Whether it shows is decided below from the
+  // shown day, never from the offer alone.
   const [nudgeOffer, setNudgeOffer] = useState<{ session: string; dayId: string } | null>(null);
-  // The session in which the write sheet has shown in this mount: the offer
-  // never shows alongside it or after it.
-  const [writeShownIn, setWriteShownIn] = useState<string | null>(null);
-  const markWriteShown = useCallback(() => setWriteShownIn(sessionKey), [sessionKey]);
   const closeNudgeOffer = useCallback(() => setNudgeOffer(null), []);
-  // A pick the server answered: offer the nudge when the day on screen is that
-  // day with only the own pick in and an open slot. A queued pick leaves the
-  // state `none` or `partner`, so it raises nothing.
-  const offerNudge = useCallback(
-    (dayId: string, shown: DailyDayAnswer) => {
-      if (shown.status !== 'ok') return;
+  // An answer the server confirmed: offer the prompt when the day on screen is
+  // that day with only the own pick in. Whether the question still takes
+  // nudges is checked where the sheet shows, at the closing instant itself.
+  const raiseNudgeOffer = useCallback(
+    (dayId: string, shown: DailyDayAnswer | null): boolean => {
+      if (shown?.status !== 'ok') return false;
       const snap = shown.snapshot;
-      if (snap.day_id !== dayId || snap.state !== 'me' || !snap.my_choice) return;
-      if (!snap.nudge || snap.nudge.slot === null || snap.nudge.spent) return;
+      if (snap.day_id !== dayId || snap.state !== 'me' || !snap.my_choice) return false;
       setNudgeOffer({ session: sessionKey, dayId });
+      return true;
     },
     [sessionKey]
   );
+  const offerNudge = useCallback(
+    (dayId: string, shown: DailyDayAnswer) => {
+      raiseNudgeOffer(dayId, shown);
+    },
+    [raiseNudgeOffer]
+  );
+  // A queued pick confirmed while this view is mounted offers the prompt too. A
+  // value the store already held at mount is not one (an answer sent while Daily
+  // was closed is not offered later). Adjusted while rendering, like the
+  // answers baseline above.
+  const queuedPickSent = useAppStore((state) => state.dailyQueuedPickSent);
+  const [handledQueuedSend, setHandledQueuedSend] = useState(queuedPickSent);
+  if (queuedPickSent !== handledQueuedSend) {
+    setHandledQueuedSend(queuedPickSent);
+    if (queuedPickSent !== null) raiseNudgeOffer(queuedPickSent.dayId, dailyDay);
+  }
   // The partner's pick on that day ends the offer for good.
   const dropNudgeOffer = useCallback(
     (dayId: string) => setNudgeOffer((current) => (current?.dayId === dayId ? null : current)),
     []
   );
   const nudgeSnapshot = dailyDay?.status === 'ok' ? dailyDay.snapshot : null;
+  const promptNudge = nudgeState(nudgeSnapshot);
+  const promptClosed = useNudgeClosed(promptNudge.closesAt);
   const showNudgeSheet =
     nudgeOffer !== null &&
     nudgeOffer.session === sessionKey &&
     nudgeSnapshot !== null &&
     nudgeSnapshot.day_id === nudgeOffer.dayId &&
     nudgeSnapshot.state === 'me' &&
+    promptNudge.closesAt !== null &&
+    !promptClosed &&
+    !promptNudge.promptSent &&
     readFor === sessionKey &&
     !celebrationShown &&
-    !showWriteSheet &&
-    writeShownIn !== sessionKey;
+    !showWriteSheet;
 
   // Re-read on each mount, and for a new session while the view stays open (an
   // account switch clears `dailyDay` through signedOutState). The sheet waits
@@ -707,7 +727,7 @@ export function DailyQuestion() {
 
   // The partner's pick shows without a reload (AD-11).
   useDailyPickListener(dropNudgeOffer);
-  // The evening slot and a return to the front re-read the day.
+  // A return to the front re-reads the day.
   useDailyDayRereads();
 
   return (
@@ -735,7 +755,7 @@ export function DailyQuestion() {
 
             {streak && (
               <div className={`${CARD} p-4`}>
-                <StreakWeek week={streak.week} testIdPrefix="daily-streak" labelClass="text-muted" />
+                <StreakRow streak={streak} testIdPrefix="daily-streak" labelClass="text-muted" />
               </div>
             )}
 
@@ -838,20 +858,11 @@ export function DailyQuestion() {
           targetDay={writeSnapshot.write.target_day}
           partnerName={partnerName}
           onClose={closeWriteSheet}
-          onShown={markWriteShown}
         />
       )}
 
       {showNudgeSheet && (
-        <NudgeSheet
-          key={nudgeSnapshot.day_id}
-          canNudge={
-            nudgeSnapshot.nudge !== undefined &&
-            nudgeSnapshot.nudge.slot !== null &&
-            !nudgeSnapshot.nudge.spent
-          }
-          onClose={closeNudgeOffer}
-        />
+        <NudgeSheet key={nudgeSnapshot.day_id} onClose={closeNudgeOffer} />
       )}
     </div>
   );

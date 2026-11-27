@@ -19,7 +19,7 @@
  * `me`/`partner` < `both`) does not replace it, so a slow read cannot undo a
  * reveal. Every async action captures `{ userId, authSessionVersion }` before
  * its first await and writes nothing after it if either changed.
- * `signedOutState()` clears all seven fields.
+ * `signedOutState()` clears all eight fields.
  *
  * Overlapping `loadDailyDay` calls collapse: one read runs per signed-in
  * identity, and a call that arrives meanwhile asks for one more read after it
@@ -81,15 +81,24 @@
  * counts: a first link and a reload of the same partner clear nothing, and an
  * identity change (`userId`/`authSessionVersion`) forgets the last id.
  *
- * A nudge (AD-13, AD-16, AD-17): `sendDailyNudge` sends it for the shown day and
- * merges the returned snapshot (whose `nudge.spent` is then true) like
- * `submitWrittenQuestion`, then announces it on the partner's channel
- * (`announceDailyNudge`, fire-and-forget, a failure only logged). A refusal or
- * any failed request throws, announces nothing and starts `refreshDailyDay` for
- * that day, so the button follows the server; offline throws with no request
- * and no re-read. `nudge.spent` never moves back to false within one
- * `nudge.slot` (`keepNudgeSpent`, in `mergeAnswer` and the copy), so a read
- * that started before the send cannot enable the button again.
+ * A nudge (AD-13, AD-16, AD-17): `sendDailyNudge(source)` sends the prompt's or
+ * the button's nudge for the shown day and merges the returned snapshot (whose
+ * `nudges` then has that source sent) like `submitWrittenQuestion`, then
+ * announces it on the partner's channel (`announceDailyNudge`, fire-and-forget,
+ * a failure only logged) and answers `'sent'`. Offline throws with no request and
+ * no re-read. A source's nudge never moves back to unsent (`keepNudgesSent`, in
+ * `mergeAnswer` and the copy), so a read that started before the send cannot
+ * enable its control again. "Unknown is not failed" (DW-539): an `already sent`
+ * refusal (`DQ010`) marks that source sent on the shown day in memory, waits for
+ * a re-read of the day and answers `'sent'`; any other refusal starts a re-read
+ * (not awaited) and answers `'failed'`; a lost answer (timeout, network, an
+ * unparsable answer) waits for a re-read of that day and answers `'sent'` when it
+ * has the source sent, `'failed'` when it has not, and `'unchecked'` when the
+ * re-read failed too. `dailyQueuedPickSent` names the day of a queued pick the
+ * drain has just had confirmed, whether or not that day is on screen; Daily,
+ * mounted at that moment, checks the day against the one it shows and, when it
+ * is that day with only the own pick in, offers the prompt; a value already there
+ * when Daily mounts is not one.
  *
  * The couple's streak and past questions live in the streak and history
  * slices; `submitDailyPick` and the queue drain re-read the streak
@@ -102,12 +111,12 @@ import { AccountDataError } from '../../services/accountDataError';
 import {
   DAILY_DAYS_COPY_KIND,
   dailyStateRank,
-  keepNudgeSpent,
   keepWriteDone,
   mergeDailyDay,
   readSavedDailyDay,
 } from '../../services/dailyDaysCopy';
 import type { StoredQueuedPick } from '../../services/dbSchema';
+import { isNudgeSent, keepNudgesSent, type NudgeSource, nudgeState, withNudgeSent } from '../../services/dailyNudges';
 import { addDeclinedWriteDay, readDeclinedWriteDays } from '../../services/dailyWriteDeclined';
 import { registerLocalCopy } from '../../services/localCopy';
 import {
@@ -129,6 +138,8 @@ import {
   announceDailyPick,
   fetchDailyDay,
   fetchDailyDayById,
+  isNudgeAlreadySent,
+  isNudgeOutcomeUnknown,
   isPickRefusal,
   pickZone,
   sendDailyNudge as sendDailyNudgeRequest,
@@ -172,6 +183,14 @@ export interface DailyDaySlice {
    * day's. Never persisted.
    */
   dailyDayAnsweredId: string | null;
+  /**
+   * The day of the last queued pick the drain had confirmed (on screen or not), with a
+   * counter that makes each one a new value (`null` before any, and after
+   * sign-out). Daily offers the nudge prompt when this changes while it is
+   * mounted and the day is the one on screen, and ignores the value it finds at mount (an answer sent while Daily
+   * was closed is not offered later). Never persisted.
+   */
+  dailyQueuedPickSent: { dayId: string; seq: number } | null;
 
   /**
    * Read today's day from the server. Never throws; a failure keeps what is
@@ -214,13 +233,15 @@ export interface DailyDaySlice {
    */
   submitWrittenQuestion: (thisText: string, thatText: string) => Promise<void>;
   /**
-   * Nudge the partner about the shown day and store the answer, then announce
-   * it. Throws a plain `Error` when signed out or with no day shown, and
-   * otherwise the request's own error (`AccountDataError`): a refusal or a
-   * failed request also starts a re-read of the day (not when offline, which
-   * sends nothing).
+   * Nudge the partner about the shown day from `source` and store the answer,
+   * then announce it. Answers `'sent'` (the nudge is on record, whether the
+   * request said so, refused it as already sent, or a re-read after a lost
+   * answer found it), `'failed'` (refused, or a re-read found none) or
+   * `'unchecked'` (the answer was lost and the re-read failed too). Throws a
+   * plain `Error` when signed out or with no day shown, and `AccountDataError`
+   * (`offline`) when it sent nothing for want of a connection.
    */
-  sendDailyNudge: () => Promise<void>;
+  sendDailyNudge: (source: NudgeSource) => Promise<NudgeSendOutcome>;
   /**
    * Record that the account declined to write for `dayId` on this device.
    * Never throws: a write failure is logged, and `dailyWriteDeclined` is left
@@ -228,6 +249,9 @@ export interface DailyDaySlice {
    */
   declineWrittenQuestion: (dayId: string) => Promise<void>;
 }
+
+/** How a nudge send ended: see `DailyDaySlice.sendDailyNudge`. */
+export type NudgeSendOutcome = 'sent' | 'failed' | 'unchecked';
 
 /**
  * What one drain pass ended on (see `drainOnce`). `other-tab` means another
@@ -245,8 +269,8 @@ const PICK_RETRY_MAX_DELAY_MS = 60_000;
 
 /**
  * The answer to keep: `next`, unless it is the same day at an earlier state than
- * `stored`. For the same day `write.done` never goes back to false, nor
- * `nudge.spent` within the same `nudge.slot`.
+ * `stored`. For the same day `write.done` never goes back to false, nor a
+ * source's nudge sent back to unsent.
  */
 function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): DailyDayAnswer {
   if (
@@ -258,7 +282,7 @@ function mergeAnswer(stored: DailyDayAnswer | null, next: DailyDayAnswer): Daily
     const [kept, other] = keepStored
       ? [stored.snapshot, next.snapshot]
       : [next.snapshot, stored.snapshot];
-    return { status: 'ok', snapshot: keepNudgeSpent(keepWriteDone(kept, other), other) };
+    return { status: 'ok', snapshot: keepNudgesSent(keepWriteDone(kept, other), other) };
   }
   return next;
 }
@@ -334,6 +358,9 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       }));
     }
   };
+
+  // Counts the queued picks the drain has had confirmed (`dailyQueuedPickSent`).
+  let queuedPickSeq = 0;
 
   // The last non-null partner id seen in this identity, and the identity it was
   // seen in (`userId:authSessionVersion`).
@@ -489,6 +516,9 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
           if (!isCurrent()) return 'stale';
           if (!isSamePair()) continue;
           showIfOnScreen(snapshot, merged);
+          // Tell an open Daily that an answer it did not send itself was confirmed.
+          queuedPickSeq += 1;
+          set({ dailyQueuedPickSent: { dayId: snapshot.day_id, seq: queuedPickSeq } });
         }
         return 'done';
       });
@@ -599,6 +629,42 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     }
   };
 
+  /**
+   * Re-read one day by id and merge the answer into the saved days; it is shown
+   * only when it is the day on screen, or today's with nothing on screen. Never
+   * throws. Answers the merged snapshot, or `null` when the read failed or the
+   * session or pair changed meanwhile (a failure is logged and changes nothing).
+   */
+  const readDayById = async (dayId: string): Promise<DailyDaySnapshot | null> => {
+    const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
+    if (!requestedBy) return null;
+    const epoch = pairEpoch;
+    const isCurrent = () =>
+      get().userId === requestedBy &&
+      get().authSessionVersion === requestedInSession &&
+      pairEpoch === epoch;
+
+    try {
+      const snapshot = await fetchDailyDayById(dayId);
+      if (!isCurrent()) return null;
+      const partner = await mergePartnerId(get, requestedBy);
+      if (!isCurrent()) return null;
+      const merged = await mergeDailyDay(
+        requestedBy,
+        { status: 'ok', snapshot },
+        partner,
+        isCurrent
+      );
+      if (!isCurrent()) return null;
+      showIfOnScreen(snapshot, merged);
+      return merged.status === 'ok' ? merged.snapshot : snapshot;
+    } catch (error) {
+      if (!isCurrent()) return null;
+      console.error('[DailyQuestion] Failed to re-read a day:', error);
+      return null;
+    }
+  };
+
   // The tab's day reads, one in flight plus one trailing pass per identity and
   // pair (`userId:authSessionVersion:pairEpoch`): see `trailingRead.ts`. A call
   // in another identity or pair starts its own read, and the old read, now
@@ -616,35 +682,12 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
     dailyWriteDeclined: [],
     dailyDayAnswers: 0,
     dailyDayAnsweredId: null,
+    dailyQueuedPickSent: null,
 
     loadDailyDay: () => dayReads.call(),
 
     refreshDailyDay: async (dayId) => {
-      const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
-      if (!requestedBy) return;
-      const epoch = pairEpoch;
-      const isCurrent = () =>
-        get().userId === requestedBy &&
-        get().authSessionVersion === requestedInSession &&
-        pairEpoch === epoch;
-
-      try {
-        const snapshot = await fetchDailyDayById(dayId);
-        if (!isCurrent()) return;
-        const partner = await mergePartnerId(get, requestedBy);
-        if (!isCurrent()) return;
-        const merged = await mergeDailyDay(
-          requestedBy,
-          { status: 'ok', snapshot },
-          partner,
-          isCurrent
-        );
-        if (!isCurrent()) return;
-        showIfOnScreen(snapshot, merged);
-      } catch (error) {
-        if (!isCurrent()) return;
-        console.error('[DailyQuestion] Failed to re-read a day:', error);
-      }
+      await readDayById(dayId);
     },
 
     submitDailyPick: async (choice) => {
@@ -794,7 +837,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       });
     },
 
-    sendDailyNudge: async () => {
+    sendDailyNudge: async (source) => {
       const { userId: requestedBy, authSessionVersion: requestedInSession } = get();
       if (!requestedBy) throw new Error('You must be signed in to send a nudge');
       const epoch = pairEpoch;
@@ -809,24 +852,46 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
 
       let snapshot: DailyDaySnapshot;
       try {
-        snapshot = await sendDailyNudgeRequest(dayId);
+        snapshot = await sendDailyNudgeRequest(dayId, source);
       } catch (error) {
-        // Offline sent nothing, so there is nothing to re-read; any other
-        // failure may mean the day moved on (the partner picked): look.
-        const offline = error instanceof AccountDataError && error.code === 'offline';
-        if (!offline && isCurrent()) void get().refreshDailyDay(dayId);
-        throw error;
+        // Offline sent nothing: the caller shows the offline sentence, with no re-read.
+        if (error instanceof AccountDataError && error.code === 'offline') throw error;
+        if (isNudgeAlreadySent(error)) {
+          // An earlier nudge from this source reached the server: this one ends as sent.
+          if (isCurrent()) {
+            set((state) => {
+              const current = state.dailyDay;
+              if (current?.status !== 'ok' || current.snapshot.day_id !== dayId) return {};
+              return {
+                dailyDay: { status: 'ok', snapshot: withNudgeSent(current.snapshot, source) },
+              };
+            });
+          }
+          await readDayById(dayId);
+          return 'sent';
+        }
+        if (!isNudgeOutcomeUnknown(error)) {
+          // A refusal: the day may have moved on (the partner picked), so look.
+          console.error('[DailyQuestion] The nudge was refused:', error);
+          if (isCurrent()) void readDayById(dayId);
+          return 'failed';
+        }
+        // The answer was lost: the server may have recorded it. Unknown is not failed.
+        console.error('[DailyQuestion] The nudge answer was lost; checking the day:', error);
+        const reread = await readDayById(dayId);
+        if (reread === null) return 'unchecked';
+        return isNudgeSent(nudgeState(reread), source) ? 'sent' : 'failed';
       }
-      if (!isCurrent()) return;
+      if (!isCurrent()) return 'sent';
       const partner = await mergePartnerId(get, requestedBy);
-      if (!isCurrent()) return;
+      if (!isCurrent()) return 'sent';
       const merged = await mergeDailyDay(
         requestedBy,
         { status: 'ok', snapshot },
         partner,
         isCurrent
       );
-      if (!isCurrent()) return;
+      if (!isCurrent()) return 'sent';
       // Only when that day is still the one on screen: a re-read may have moved on.
       showIfOnScreen(snapshot, merged);
       // Tell the partner's open Daily, without waiting for it: the nudge is
@@ -834,6 +899,7 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       void announceDailyNudge(snapshot.day_id).catch((error: unknown) => {
         console.error('[DailyQuestion] Could not announce the nudge:', error);
       });
+      return 'sent';
     },
 
     declineWrittenQuestion: async (dayId) => {
