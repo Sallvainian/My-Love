@@ -13,7 +13,7 @@ inputs:
     # the image 2.117.0 pulls (public.ecr.aws/supabase/realtime:v2.124.4).
     # Keep this at or above the CLI the suite is developed against; a CI pin
     # behind it silently tests a different Realtime than the app ships for.
-    default: '2.122.0'
+    default: '3.4.0'
   needs-mail:
     description: >-
       Start the Mailpit catcher for jobs whose specs read a real auth email.
@@ -44,9 +44,8 @@ runs:
     # takes the cold path once (it can only read caches from its own ref or
     # main), so a cold download on a fresh branch is normal, not a broken cache.
     # deploy.yml's migrate job and supabase-migrations.yml still use setup-cli,
-    # pinned to this same version. package.json's supabase:up and supabase:down
-    # run whatever `supabase` is on PATH (Homebrew), so bump all three pins
-    # after `brew upgrade supabase`.
+    # pinned to this same version. Locally the CLI comes from mise (.mise.toml,
+    # locked in mise.lock), so bump all three pins together with .mise.toml's.
     - name: Cache Supabase CLI
       id: cli-cache
       uses: actions/cache@v6

@@ -8,7 +8,7 @@ echo ""
 
 # Show tables with details
 echo "📋 Tables in public schema:"
-supabase db remote query --linked \
+supabase db query --remote --read-only \
     "SELECT
         tablename,
         pg_size_pretty(pg_total_relation_size('public.'||tablename)) AS size
@@ -18,7 +18,7 @@ supabase db remote query --linked \
 
 echo ""
 echo "📊 Row counts per table:"
-supabase db remote query --linked \
+supabase db query --remote --read-only \
     "SELECT
         'users' AS table_name, COUNT(*) AS row_count FROM users
     UNION ALL SELECT 'moods', COUNT(*) FROM moods
@@ -28,7 +28,7 @@ supabase db remote query --linked \
 
 echo ""
 echo "🔐 RLS Policies:"
-supabase db remote query --linked \
+supabase db query --remote --read-only \
     "SELECT tablename, policyname, cmd
     FROM pg_policies
     WHERE schemaname = 'public'
@@ -36,7 +36,7 @@ supabase db remote query --linked \
 
 echo ""
 echo "📐 Table columns:"
-supabase db remote query --linked \
+supabase db query --remote --read-only \
     "SELECT
         table_name,
         column_name,
