@@ -249,18 +249,20 @@ Deno.test('a partner pick names the picker and has no choice, with Your partner 
   assertEquals(buildDailyPartnerPickedPayload('  ').aps.alert.title, 'Your partner made their pick');
 });
 
-Deno.test('a nudge quotes the held streak, drops it at 0, and plays the default sound', () => {
-  assertEquals(buildDailyNudgePayload('Casey', 12), {
+Deno.test('a nudge says the sender answered and wants to know the answer, names no streak, and plays the default sound', () => {
+  assertEquals(buildDailyNudgePayload('Casey'), {
     aps: {
-      alert: { title: 'Casey nudged you', body: 'Your 12-day streak needs your pick today.' },
+      alert: {
+        title: 'Casey nudged you',
+        body: 'Casey answered the daily question and wants to know your answer!',
+      },
       'thread-id': PARTNER_ACTIVITY_THREAD_ID,
       sound: 'default',
     },
   });
-  assertEquals(buildDailyNudgePayload('Casey', 1).aps.alert.body, 'Your 1-day streak needs your pick today.');
-  assertEquals(buildDailyNudgePayload(null, 0).aps.alert, {
+  assertEquals(buildDailyNudgePayload(null).aps.alert, {
     title: 'Your partner nudged you',
-    body: 'Your streak needs your pick today.',
+    body: 'Your partner answered the daily question and wants to know your answer!',
   });
 });
 
@@ -325,7 +327,7 @@ Deno.test('only the nudge and both 8 PM reminders carry a sound; the badge and k
     assertFalse('kind' in payload);
   }
   for (const payload of [
-    buildDailyNudgePayload('Casey', 2),
+    buildDailyNudgePayload('Casey'),
     buildDailyReminderPayload('evening_self', 'Tea or Coffee?'),
     buildDailyReminderPayload('evening_partner', 'Casey'),
   ]) {

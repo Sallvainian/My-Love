@@ -126,7 +126,7 @@ const db: PushDb = {
   async getDailyNudge(nudgeId) {
     const { data, error } = await admin
       .from('daily_nudges')
-      .select('id, from_user, to_user, day_id')
+      .select('id, from_user, to_user, day_id, held, released_at')
       .eq('id', nudgeId)
       .maybeSingle();
     if (error) throw new Error(error.message);

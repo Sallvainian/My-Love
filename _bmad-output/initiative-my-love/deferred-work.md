@@ -4484,3 +4484,42 @@ location: src/services/dailyCelebrated.ts:115-118 (`claimCelebration` seeds with
 severity: low
 reason: With nothing saved for the account and partner, the first claim stores the streak's total and plays nothing (the first-read rule), so when both partners pick before this device's first claim answers, that day's +1 is never shown. On main the window is the mount's own reads (about 250 ms); the single-flight change widened it until c2b90f5d settled each caller after its own pass. main never failed in 38 CI runs; a test could wait for `data-streak-claimed="0"` before the partner picks, but on its own that would hide a regression rather than fix the race.
 status: open
+
+### DW-555: `waitClearOfDailyTurns` still waits out 20:00, a turn that went with the nudge slots, and does not wait out 08:00, the turn a held nudge now has.
+origin: build of story 11.1 (two nudges per question, held until the partner's 8 AM), 2026-11-27
+location: tests/support/helpers/events.ts:221-285 (`msUntilClearOfDailyTurns`, hours `[0, 20]`; the six Daily specs that call `waitClearOfDailyTurns`); tests/unit/helpers/events.test.ts
+severity: low
+reason: The 20:00 turn existed because the nudge slot changed there (DW-534); story 11.1 removed the slots and the 20:00:05 re-read, so a run that starts near 20:00 now sleeps for nothing. A nudge the real clock sends is held before 08:00 on the partner's clock, which no spec waits out, so `push-daily-nudge.spec.ts` reads the row's `held` and asserts the branch the host clock is in instead of choosing one. Dropping 20:00 changes `events.test.ts`'s expectations and every spec's wait, so it is a change of its own.
+status: open
+
+### DW-556: A device clock behind the server's keeps the nudge controls enabled after the server's closing instant, so each tap gets DQ009 and "Your nudge could not be sent." until the device clock catches up.
+origin: spec-deferred 1d83c4e1a88d
+location: src/stores/slices/dailyDaySlice.ts (sendDailyNudge refusal path); src/components/DailyQuestion/useNudgeSend.ts (useNudgeClosed)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: daily_day_snapshot does not null closes_at after the instant (DAILY-NUDGE-053) and useNudgeClosed compares closes_at with the device clock, so after a DQ009 refusal the re-read leaves the control offerable while Date.now() < closes_at. Real, low: needs clock skew at the end of the partner's day; a fix (closing the source on DQ009, or the server sending its own now) adds a branch the plan does not settle (review 2026-11-27: blind-hunter).
+status: open
+
+### DW-557: A definite PostgREST error on a nudge send (an expired-token 401, a PGRST code) is treated as a lost answer, so a failed re-read shows "couldn't check" instead of "could not be sent".
+origin: spec-deferred 95aaaf1f39a2
+location: src/api/dailyQuestionApi.ts (isNudgeOutcomeUnknown, sendDailyNudge catch)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: isNudgeOutcomeUnknown counts every 'transport' AccountDataError as unknown, and toAccountDataError maps non-refusal PostgREST errors to 'transport'. Only the failure wording differs, and Nudge is re-enabled either way. Real, low, rare; the fix adds a classification branch (review 2026-11-27: edge-case-hunter).
+status: open
+
+### DW-558: A DQ010 "already sent" ending whose re-read fails marks the source sent only in memory, so an offline reload from the saved copy offers that control again until the next tap.
+origin: spec-deferred 453b05826acf
+location: src/stores/slices/dailyDaySlice.ts (sendDailyNudge, DQ010 branch)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: sendDailyNudge applies withNudgeSent to the shown day only; the daily-days copy is written only from a successful server answer (AGENTS.md), and the refusal carries no snapshot. The next tap online is refused DQ010 again and ends as sent. Real, low: needs DQ010, a failed re-read and an offline reload (review 2026-11-27: edge-case-hunter).
+status: open
+
+### DW-559: The nudge prompt unmounts at the closing instant even while its send or the re-read after a lost answer is in progress, cutting short criterion 16's disabled-until-re-read.
+origin: spec-deferred 8aaa08e2e72d
+location: src/components/DailyQuestion/DailyQuestion.tsx (showNudgeSheet)
+source_spec: `tickets/epic-simpler-daily-pushes-and-nudge/tickets/story-two-nudges-per-question-held-until-the-partner-s-8-am-plan.md`
+severity: low
+reason: showNudgeSheet requires !promptClosed, so the sheet goes at closes_at whatever useNudgeSend's busy state; the outcome of a send in flight at that instant is then never shown on the prompt. Real, low: needs a send in flight at the end of the partner's day; keeping the sheet while busy means lifting the busy state into DailyQuestion (review 2026-11-27: intent-alignment).
+status: open

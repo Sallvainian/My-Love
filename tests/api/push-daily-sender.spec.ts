@@ -10,8 +10,9 @@
  * trigger exists too (story 8.7), so each nudge row inserted here posts `daily_nudge`
  * itself: the case waits for the records, and a nudge to a recipient who switched the
  * kind off still answers `zeros` to a hand post and lists no device. The rows are
- * inserted with the service role, which bypasses `send_daily_nudge`'s rules; the
- * client RPC is `push-daily-nudge.spec.ts`.
+ * inserted with the service role, which bypasses `send_daily_nudge`'s rules (a row that
+ * is not `held` posts on insert; a held one, and its release, are `push-daily-nudge-held.spec.ts`);
+ * the client RPC is `push-daily-nudge.spec.ts`.
  *
  * Asserted: the title, body, sound, badge, `partner-activity` thread and `kind`
  * recorded in `push_requests` (CI cannot reach APNs, so the sender records the
@@ -109,13 +110,13 @@ test.describe('Daily push sender', () => {
       expect(error, kind).toBeNull();
       return data!.id;
     }
-    async function addNudge(from: Party, to: Party, slot: 'after_pick' | 'evening') {
+    async function addNudge(from: Party, to: Party, source: 'prompt' | 'button') {
       const { data, error } = await supabaseAdmin
         .from('daily_nudges')
-        .insert({ from_user: from.userId, to_user: to.userId, day_id: dayId, sender_local_date: today, slot })
+        .insert({ from_user: from.userId, to_user: to.userId, day_id: dayId, source })
         .select('id')
         .single();
-      expect(error, slot).toBeNull();
+      expect(error, source).toBeNull();
       return data!.id;
     }
 
@@ -155,13 +156,18 @@ test.describe('Daily push sender', () => {
     expect(await requestsFor(supabaseAdmin, evening, 'daily_reminder_id')).toEqual(eveningRows);
 
     // ---- a nudge from Alice to Bob: Bob's devices only, the default sound ----
-    const nudge = await addNudge(alice, bob, 'after_pick');
+    const nudge = await addNudge(alice, bob, 'prompt');
     // The insert's trigger posts it; the sender records both of Bob's devices.
     const nudgeRows = await awaitRequests(supabaseAdmin, nudge, 'daily_nudge_id', 2);
     expect(nudgeRows.map((r) => r.token).sort()).toEqual([bobPhone, bobTablet].sort());
     for (const row of nudgeRows) {
       expect(row.payload).toEqual(
-        dailyPayload('daily_nudge', `${alice.name} nudged you`, 'Your 3-day streak needs your pick today.', 'default')
+        dailyPayload(
+          'daily_nudge',
+          `${alice.name} nudged you`,
+          `${alice.name} answered the daily question and wants to know your answer!`,
+          'default'
+        )
       );
     }
 
@@ -174,7 +180,7 @@ test.describe('Daily push sender', () => {
     expect(switchOff.error).toBeNull();
 
     // A new nudge to Bob records none and lists no device.
-    const blocked = await addNudge(alice, bob, 'evening');
+    const blocked = await addNudge(alice, bob, 'button');
     expect(await postKindToSender(supabaseAdmin, 'daily_nudge', blocked)).toEqual(zeros);
     expect(await requestsFor(supabaseAdmin, blocked, 'daily_nudge_id')).toEqual([]);
 
@@ -187,11 +193,16 @@ test.describe('Daily push sender', () => {
     }
 
     // ... and so does the nudge he sends to Alice, whose own switch is on.
-    const back = await addNudge(bob, alice, 'after_pick');
+    const back = await addNudge(bob, alice, 'prompt');
     const backRows = await awaitRequests(supabaseAdmin, back, 'daily_nudge_id', 1);
     expect(backRows.map((r) => r.token)).toEqual([aliceDevice]);
     expect(backRows[0].payload).toEqual(
-      dailyPayload('daily_nudge', `${bob.name} nudged you`, 'Your 3-day streak needs your pick today.', 'default')
+      dailyPayload(
+        'daily_nudge',
+        `${bob.name} nudged you`,
+        `${bob.name} answered the daily question and wants to know your answer!`,
+        'default'
+      )
     );
     expect(await postKindToSender(supabaseAdmin, 'daily_nudge', back)).toEqual({ ...zeros, skipped: 1 });
   });

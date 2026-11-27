@@ -67,8 +67,10 @@
  * sender's clock as `at`; there is no zone arithmetic here. A
  * `daily_partner_picked` whose day is not that date is dropped (200, every
  * count 0, nothing claimed); a `daily_both_answered` for such a day still
- * sends, with "That day counts." in place of "See {Picker}'s pick.". The
- * nudge, the morning push and `daily_both_answered` read the streak from
+ * sends, with "That day counts." in place of "See {Picker}'s pick.". A nudge
+ * names no streak: its body is the same for every nudge, and a held one whose
+ * `released_at` is still null is dropped the same way (the release posts it
+ * again). The morning push and `daily_both_answered` read the streak from
  * `couple_streak` (`held` or `run`) as the recipient sees it. The sender never
  * selects a pick's `choice`, and no payload carries one. These reads happen
  * before the switch check, and a failed one answers 500 and claims nothing.
@@ -275,6 +277,9 @@ export interface DailyNudgeRow {
   from_user: string;
   to_user: string;
   day_id: string;
+  /** True for a nudge sent before 08:00 on the recipient's clock; it pushes only once `released_at` is set. */
+  held: boolean;
+  released_at: string | null;
 }
 
 export interface DailyReminderRow {
@@ -457,15 +462,16 @@ async function resolveSource(db: PushDb, kind: PushKind, id: string, atIso: stri
     case 'daily_nudge': {
       const nudge = await db.getDailyNudge(id);
       if (!nudge) return null;
-      const day = await db.getCoupleDay(nudge.day_id);
-      if (!day) return null;
-      const { held } = await db.getCoupleStreak(day.user_a, day.user_b, nudge.to_user, atIso);
+      // A nudge held until the partner's 8 AM posts nothing yet: its insert trigger skips it and
+      // `release_held_daily_nudges` posts it again with `released_at` set. A held row that arrives
+      // unreleased is no push, claiming nothing, so the release's post still sends.
+      const unreleased = nudge.held && nudge.released_at === null;
       return {
         kind,
         id,
         senderId: nudge.from_user,
         recipientId: nudge.to_user,
-        buildPayload: (name) => buildDailyNudgePayload(name, held),
+        buildPayload: unreleased ? null : (name) => buildDailyNudgePayload(name),
       };
     }
     case 'daily_question':

@@ -25,6 +25,13 @@
  */
 import type { TypedSupabaseClient } from '../support/factories';
 import { orderedPair, readPairQuestionsByDay } from '../support/factories/daily-question';
+import {
+  KATHMANDU_OFFSET_MINUTES,
+  KATHMANDU_ZONE,
+  kathmanduInstant,
+  kathmanduYesterday,
+  otherAccountsDueAt,
+} from '../support/helpers/daily-clock';
 import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
@@ -36,37 +43,10 @@ import {
 } from '../support/helpers/push-requests';
 import { test, expect } from '../support/merged-fixtures';
 
-const ZONE = 'Asia/Kathmandu';
-const OFFSET_MINUTES = 345;
-
-/** Kathmandu's yesterday as `YYYY-MM-DD`. */
-function kathmanduYesterday(): string {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(new Date());
-  const date = new Date(`${today}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - 1);
-  return date.toISOString().slice(0, 10);
-}
-
-/** The instant at which Kathmandu's wall clock reads `time` on `day`. */
-const kathmanduInstant = (day: string, time: string) => new Date(`${day}T${time}:00+05:45`).toISOString();
+const ZONE = KATHMANDU_ZONE;
+const OFFSET_MINUTES = KATHMANDU_OFFSET_MINUTES;
 
 test.describe('Daily reminders on each person\'s clock', () => {
-  /** Accounts other than these two that are due (linked both ways, a device, a zone, clock in a window) at the instant. */
-  async function otherAccountsDueAt(instant: string, own: string[]) {
-    const ids = own.map((id) => `'${id}'`).join(', ');
-    const result = await runPsql(
-      `select count(*) from public.users u
-         join public.users p on p.id = u.partner_id and p.partner_id = u.id
-         join public.user_time_zones z on z.user_id = u.id
-        cross join lateral (select ((timestamptz '${instant}') at time zone z.effective_zone)::time as local_time) t
-        where exists (select 1 from public.push_devices d where d.user_id = u.id)
-          and u.id not in (${ids})
-          and ((t.local_time >= '08:00' and t.local_time < '08:30') or (t.local_time >= '20:00' and t.local_time < '20:30'));\n`
-    );
-    expect(result.code, result.stderr).toBe(0);
-    return Number(result.stdout.trim());
-  }
-
   async function reminderId(supabaseAdmin: TypedSupabaseClient, userId: string, slot: 'morning' | 'evening', day: string) {
     const { data, error } = await supabaseAdmin
       .from('daily_reminders')

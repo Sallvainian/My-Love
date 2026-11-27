@@ -33,8 +33,37 @@ export function waitingSnapshot(
   return dailySnapshot({ state: 'me', my_choice: myChoice, my_picked_at: pickedAt });
 }
 
-/** The viewer picked and the partner has not, with the viewer's `nudge` as given. */
-export function nudgeSnapshot(
+/**
+ * A closing instant well after the fixture's day (2026-11-05) in any zone: the
+ * question still takes nudges unless a test moves its clock past it.
+ */
+export const NUDGE_CLOSES_AT = '2026-11-07T00:00:00+00:00';
+
+/**
+ * The viewer picked and the partner has not, with the day's `nudges` as given:
+ * which sources are sent (neither by default) and the closing instant
+ * (`NUDGE_CLOSES_AT` by default; `null` gives none).
+ */
+export function nudgesSnapshot(
+  nudges: { prompt?: boolean; button?: boolean; closesAt?: string | null } = {},
+  overrides: Partial<DailyDaySnapshot> = {}
+): DailyDaySnapshot {
+  return {
+    ...waitingSnapshot('this'),
+    nudges: {
+      prompt_sent: nudges.prompt ?? false,
+      button_sent: nudges.button ?? false,
+      closes_at: nudges.closesAt === undefined ? NUDGE_CLOSES_AT : nudges.closesAt,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * The viewer picked and the partner has not, as the build before story 11.1
+ * saved it: its `nudge { slot, spent }` and no `nudges`.
+ */
+export function legacyNudgeSnapshot(
   slot: 'after_pick' | 'evening' | null,
   spent: boolean,
   overrides: Partial<DailyDaySnapshot> = {}

@@ -90,6 +90,8 @@ const dailyNudge: DailyNudgeRow = {
   from_user: 'sender',
   to_user: 'recipient',
   day_id: COUPLE_DAY_ID,
+  held: false,
+  released_at: null,
 };
 /** For `recipient`, whose partner is `sender` (these rows are used with `partnerId: 'sender'`). */
 const morningReminder: DailyReminderRow = {
@@ -1458,25 +1460,31 @@ Deno.test('a late both answered still sends, with That day counts. in place of t
   }
 });
 
-Deno.test('a nudge goes to_user, titled with from_user, quotes the held streak and plays the default sound', async () => {
+Deno.test('a nudge goes to_user, titled with from_user, says the sender answered, reads no streak and plays the default sound', async () => {
   const listed: string[] = [];
   const streakLookups: [string, string, string, string][] = [];
+  const dayLookups: string[] = [];
   const { status, answer, claimed } = await postDaily(NUDGE_POST, {
     dailyNudge,
     streak: { held: 12, run: 3 },
     listed,
     streakLookups,
+    dayLookups,
   });
   assertEquals(status, 200);
   assertEquals(answer, { ...ZEROS, recorded: 1 });
   assertEquals(listed, ['recipient']);
-  assertEquals(streakLookups, [['recipient', 'sender', 'recipient', AT_ISO]]);
+  assertEquals(streakLookups, []);
+  assertEquals(dayLookups, []);
   assertEquals(claimed[0].kind, 'daily_nudge');
   assertEquals(claimed[0].source_id, DAILY_NUDGE_ID);
   assertEquals(claimed[0].payload, {
     kind: 'daily_nudge',
     aps: {
-      alert: { title: 'Casey nudged you', body: 'Your 12-day streak needs your pick today.' },
+      alert: {
+        title: 'Casey nudged you',
+        body: 'Casey answered the daily question and wants to know your answer!',
+      },
       'thread-id': 'partner-activity',
       sound: 'default',
       badge: 0,
@@ -1484,10 +1492,46 @@ Deno.test('a nudge goes to_user, titled with from_user, quotes the held streak a
   });
 });
 
-Deno.test('a nudge with a held streak of 0 drops the number', async () => {
+Deno.test('a nudge with a streak of 0 says the same', async () => {
   const { claimed } = await postDaily(NUDGE_POST, { dailyNudge, streak: { held: 0, run: 0 } });
-  assertEquals(claimed[0].payload.aps.alert.body, 'Your streak needs your pick today.');
+  assertEquals(
+    claimed[0].payload.aps.alert.body,
+    'Casey answered the daily question and wants to know your answer!'
+  );
   assertEquals(claimed[0].payload.aps.sound, 'default');
+});
+
+Deno.test('a held nudge not yet released answers zeros, claims nothing and lists no device', async () => {
+  const claimed: PushRequestRow[] = [];
+  const listed: string[] = [];
+  const { status, answer } = await postDaily(NUDGE_POST, {
+    dailyNudge: { ...dailyNudge, held: true, released_at: null },
+    claimed,
+    listed,
+  });
+  assertEquals(status, 200);
+  assertEquals(answer, ZEROS);
+  assertEquals(claimed, []);
+  assertEquals(listed, []);
+});
+
+Deno.test('a held nudge once released sends the nudge, and the unreleased post claimed nothing so it still sends', async () => {
+  const claimed: PushRequestRow[] = [];
+  const held = { ...dailyNudge, held: true, released_at: null };
+  await postDaily(NUDGE_POST, { dailyNudge: held, claimed });
+  assertEquals(claimed, []);
+  const { answer } = await postDaily(NUDGE_POST, {
+    dailyNudge: { ...held, released_at: '2030-09-10T18:00:00+00:00' },
+    claimed,
+  });
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
+  assertEquals(claimed.length, 1);
+  assertEquals(claimed[0].payload.aps.alert.title, 'Casey nudged you');
+});
+
+Deno.test('a nudge that was never held sends with released_at null', async () => {
+  const { answer } = await postDaily(NUDGE_POST, { dailyNudge: { ...dailyNudge, held: false, released_at: null } });
+  assertEquals(answer, { ...ZEROS, recorded: 1 });
 });
 
 Deno.test('the morning push quotes the question and counts the day after the held streak, with no sound', async () => {
@@ -1650,11 +1694,11 @@ Deno.test('a daily post whose row is gone is a 404', async () => {
   }
 });
 
+// A nudge reads no day: its row is deleted with the couple day (ON DELETE CASCADE), and its body names no streak.
 Deno.test('a daily row whose day is gone is a 404', async () => {
   const cases: [Record<string, string>, Parameters<typeof fakeDb>[0]][] = [
     [PICK_POST, { dailyPick: firstPick }],
     [BOTH_POST, { dailyPick: secondPick }],
-    [NUDGE_POST, { dailyNudge }],
     [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }],
     [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }],
   ];
@@ -1671,8 +1715,6 @@ Deno.test('a failed read of the day, the date or the streak answers 500 and clai
     [PICK_POST, { dailyPick: firstPick }, 'getUserLocalDate'],
     [BOTH_POST, { dailyPick: secondPick }, 'getUserLocalDate'],
     [BOTH_POST, { dailyPick: secondPick }, 'getCoupleStreak'],
-    [NUDGE_POST, { dailyNudge }, 'getCoupleDay'],
-    [NUDGE_POST, { dailyNudge }, 'getCoupleStreak'],
     [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, 'getCoupleDay'],
     [MORNING_POST, { dailyReminder: morningReminder, partnerId: 'sender' }, 'getCoupleStreak'],
     [EVENING_POST, { dailyReminder: eveningSelf, partnerId: 'sender' }, 'getCoupleDay'],

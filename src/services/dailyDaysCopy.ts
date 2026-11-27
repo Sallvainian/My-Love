@@ -16,9 +16,10 @@
  * whatever its tag). `readSavedDailyDay` also gives an untagged entry, so the day saved
  * before the tag still shows offline. Callers never see `partner_id`. A failed server read never
  * reaches this module; an `unlinked` answer is saved as `{}` because the server
- * said there is no day. `nudge.spent` is kept the same way within one
- * `nudge.slot` (`keepNudgeSpent`; a different slot is taken as the new answer
- * has it). Sign-out removes the kind with the account's other copies
+ * said there is no day. Each source's nudge sent is kept the same way
+ * (`keepNudgesSent`, `services/dailyNudges.ts`): a day saved by the build before
+ * the per-question nudges (`nudge { slot, spent }`) is read by slot there.
+ * Sign-out removes the kind with the account's other copies
  * (`deleteAccountCopies`).
  *
  * @module services/dailyDaysCopy
@@ -30,6 +31,7 @@ import {
   DailyDaySnapshotSchema,
 } from '../api/validation/dailyQuestionSchemas';
 import { type PartnerTag, resolvePartnerTag } from './dailyPartnerTag';
+import { keepNudgesSent } from './dailyNudges';
 import { readLocalCopy, readLocalCopyStatus, writeLocalCopy } from './localCopy';
 import { DAILY_DAYS_LOCK, withWaitingLock } from './syncLock';
 
@@ -64,23 +66,6 @@ export function keepWriteDone(
 ): DailyDaySnapshot {
   if (!other?.write.done || entry.write.done) return entry;
   return { ...entry, write: { ...entry.write, done: true } };
-}
-
-/**
- * `entry`, with `nudge.spent` true when `other` (the same day) has it for the
- * same non-null slot: a nudge once sent stays sent within its slot, so a read
- * that started before the send cannot enable the button again. A different slot
- * is taken as `entry` has it (a new slot starts unspent).
- */
-export function keepNudgeSpent(
-  entry: DailyDaySnapshot,
-  other: DailyDaySnapshot | undefined
-): DailyDaySnapshot {
-  const slot = entry.nudge?.slot ?? null;
-  if (slot === null || entry.nudge?.spent || other?.nudge?.slot !== slot || !other.nudge.spent) {
-    return entry;
-  }
-  return { ...entry, nudge: { slot, spent: true } };
 }
 
 /**
@@ -167,7 +152,7 @@ export async function readSavedDailyHistory(
  * The one merge: `snapshots` (all from successful server answers) into the
  * saved entries, `partner` as their tag. Per snapshot the stored entry for
  * its `day_id` wins only when it ranks higher (never moving `write.done` back
- * to false, nor `nudge.spent` to false within the same slot), the tag is
+ * to false, nor a source's nudge sent back to unsent), the tag is
  * the new one (an `unknown` partner keeps the stored entry's tag, and a new
  * entry stays untagged), and every other entry for the same `day` under a
  * different `day_id` is dropped. Returns the entries now saved
@@ -185,7 +170,7 @@ function mergeSnapshots(
     const keepStored =
       stored !== undefined && dailyStateRank(stored.state) > dailyStateRank(snapshot.state);
     const [kept, other] = keepStored ? [stored, snapshot] : [snapshot, stored];
-    const entry = keepNudgeSpent(keepWriteDone(kept, other), other);
+    const entry = keepNudgesSent(keepWriteDone(kept, other), other);
     for (const [dayId, saved] of Object.entries(days)) {
       if (saved.snapshot.day === snapshot.day && dayId !== snapshot.day_id) delete days[dayId];
     }

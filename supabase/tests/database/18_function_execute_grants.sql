@@ -229,10 +229,11 @@ select ok(
   'FN-GRANT-023: get_daily_history is executable by authenticated'
 );
 
--- 20261126020000, same shape: the waiting screen's Nudge button calls it, so
--- without the grant every nudge answers 42501.
+-- 20261126020000, same shape: the prompt and the waiting screen's Nudge button
+-- call it, so without the grant every nudge answers 42501. 20261127000000
+-- replaced the one-argument function with (day_id, source default 'button').
 select ok(
-  has_function_privilege('authenticated', 'public.send_daily_nudge(uuid)', 'EXECUTE'),
+  has_function_privilege('authenticated', 'public.send_daily_nudge(uuid, text)', 'EXECUTE'),
   'FN-GRANT-024: send_daily_nudge is executable by authenticated'
 );
 

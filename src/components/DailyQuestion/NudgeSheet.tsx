@@ -1,16 +1,19 @@
 /**
- * "Do you want to nudge your partner?" — the bottom sheet offered once, right
- * after the first picker's Send my pick (R2).
+ * "Do you want to nudge your partner?" — the bottom sheet offered once after an
+ * answer (R1): right after Send my pick, after the write sheet that follows it,
+ * or when a pick saved offline is sent while Daily is open.
  *
- * `DailyQuestion` decides when it shows (see its header) and passes `canNudge`
- * from the shown snapshot's `nudge` (a slot, not spent). Nudge calls the
- * store's `sendDailyNudge` itself: a success calls `onClose` (the waiting
- * card's button then greys from `nudge.spent`); the offline sentence or
- * `NUDGE_FAILED_MESSAGE` shows in the failure box with the sheet kept open (the
- * slice re-reads the day after a refusal). "Not now", a tap on the scrim and
- * Escape only call `onClose`; nothing is sent. Both buttons are disabled while
- * a send is in flight, and the scrim and Escape do nothing then, so a failed
- * send's line is never closed away unseen.
+ * `DailyQuestion` decides when it shows and hides it at the question's closing
+ * instant (see its header). Nudge sends the prompt's nudge through
+ * `useNudgeSend` (the waiting card's button uses the same hook): a send that
+ * ends as a sent nudge calls `onClose`; a refusal, a re-read that found no
+ * nudge, or a lost answer whose re-read failed shows its line in the failure
+ * box with the sheet kept open and Nudge enabled, and the offline sentence
+ * shows the same way. "Not now", a tap on the scrim and Escape only call
+ * `onClose`; nothing is sent, and the waiting card's button still offers its
+ * own nudge. Both buttons are disabled while a send, and the re-read after a
+ * lost answer, is in progress, and the scrim and Escape do nothing then, so a
+ * failure line is never closed away unseen.
  *
  * It opens and closes at once, with no animation (the iOS back swipe pictures
  * whatever is still fading out, and Reduce Motion). The scrim and panel are the
@@ -21,9 +24,8 @@
  */
 
 import { Bell } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { useAppStore } from '../../stores/useAppStore';
 import {
   FAILURE_BOX,
   PRIMARY_BUTTON,
@@ -31,49 +33,33 @@ import {
   SHEET_PANEL,
   SHEET_SCRIM,
 } from '../shared/kitClasses';
-import { nudgeFailureMessage } from './nudgeFailureMessage';
+import { useNudgeSend } from './useNudgeSend';
 
 interface NudgeSheetProps {
-  /** The shown snapshot's nudge has a slot and is not spent. */
-  canNudge: boolean;
   /** Not now, scrim, Escape, and after a nudge was sent. */
   onClose: () => void;
 }
 
-export function NudgeSheet({ canNudge, onClose }: NudgeSheetProps) {
-  const sendDailyNudge = useAppStore((state) => state.sendDailyNudge);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function NudgeSheet({ onClose }: NudgeSheetProps) {
+  const { send, busy: sending, isBusy, error } = useNudgeSend('prompt');
 
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
   // The focus trap re-arms (and moves focus) on a new Escape handler, so it
-  // gets a stable one that calls the latest `onClose`. A ref, not `sending`,
-  // tells it a send is in flight, for the same reason.
+  // gets a stable one that calls the latest `onClose`. `isBusy` reads a ref, not
+  // `sending`, so a send that has begun blocks it before a render shows it.
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
-  const sendingRef = useRef(false);
   const close = useCallback(() => {
-    if (!sendingRef.current) onCloseRef.current();
-  }, []);
+    if (!isBusy()) onCloseRef.current();
+  }, [isBusy]);
   useFocusTrap(panelRef, true, { onEscape: close, initialFocusRef: panelRef });
 
   const nudge = async () => {
-    setError(null);
-    sendingRef.current = true;
-    setSending(true);
-    try {
-      await sendDailyNudge();
-      onCloseRef.current();
-    } catch (caught) {
-      setError(nudgeFailureMessage(caught));
-    } finally {
-      sendingRef.current = false;
-      setSending(false);
-    }
+    if (await send()) onCloseRef.current();
   };
 
   return (
@@ -109,7 +95,7 @@ export function NudgeSheet({ canNudge, onClose }: NudgeSheetProps) {
             <button
               type="button"
               className={PRIMARY_BUTTON}
-              disabled={sending || !canNudge}
+              disabled={sending}
               onClick={() => void nudge()}
               data-testid="daily-nudge-sheet-send"
             >

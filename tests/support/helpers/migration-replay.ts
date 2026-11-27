@@ -114,9 +114,13 @@ export async function assertLocalDatabaseReachable(): Promise<void> {
  * 25 of the migrations in this repo are written that way, so this is a trap
  * waiting for the next caller rather than a hypothetical. Failing here is the
  * point: a replay that cannot be rolled back should say so, not do it anyway.
+ * A plpgsql body (`$$ ... $$`) is skipped: its `end;` is the block's own.
  */
 function assertNoOwnTransactionControl(migration: string, sql: string): void {
-  const offenders = sql
+  // A dollar-quoted body (a function or a DO block) is not transaction control at this
+  // level: its `begin` ... `end;` is plpgsql's block, so blank it, keeping the line count.
+  const outside = sql.replace(/(\$[A-Za-z_]*\$)[\s\S]*?\1/g, (quoted) => quoted.replace(/[^\n]/g, ''));
+  const offenders = outside
     .split('\n')
     .map((line, index) => ({ line: line.trim().toLowerCase(), number: index + 1 }))
     // Statement-leading only: `commit;` inside a function body or a string

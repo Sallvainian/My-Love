@@ -239,13 +239,10 @@ export function buildDailyPartnerPickedPayload(pickerName: string | null): ApnsP
   return dailyPayload(`${partnerName(pickerName)} made their pick`, DAILY_PARTNER_PICKED_BODY, false);
 }
 
-/** `{From} nudged you`; `held` 0 drops the number. Plays the default sound. */
-export function buildDailyNudgePayload(fromName: string | null, held: number): ApnsPayload {
-  return dailyPayload(
-    `${partnerName(fromName)} nudged you`,
-    held > 0 ? `Your ${held}-day streak needs your pick today.` : 'Your streak needs your pick today.',
-    true
-  );
+/** `{From} nudged you` / `{From} answered the daily question and wants to know your answer!`. Plays the default sound. */
+export function buildDailyNudgePayload(fromName: string | null): ApnsPayload {
+  const from = partnerName(fromName);
+  return dailyPayload(`${from} nudged you`, `${from} answered the daily question and wants to know your answer!`, true);
 }
 
 /**

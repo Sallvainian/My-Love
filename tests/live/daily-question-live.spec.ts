@@ -2,19 +2,21 @@
  * Live check: Daily on the real site (epic daily-question, story 6.11; R1, R2),
  * the streak and Past questions on its Partner page (epic
  * streak-and-partner-page, story 7.11; R6, R7), and a nudge (epic
- * daily-pushes-and-nudge, story 8.11; R2).
+ * daily-pushes-and-nudge, story 8.11; R2, and epic-simpler-daily-pushes-and-nudge,
+ * story 11.1; R1).
  *
  * `deploy.yml` runs this after every deploy (`live-daily-check`) against the
  * deployed site and its hosted project, with `playwright.live.config.ts`. It
  * checks that the hidden-pick gate holds and the reveal works in production:
  * the two claude bot accounts open Daily in two browser pages and see one
- * question; bot A picks This and waits. A's pick raises one sheet: when A's own
- * day answer says A is the day's writer (`write.mine`), A answers the write
- * sheet "No thanks", so no question row is written, and meets no nudge sheet;
- * otherwise A answers the nudge sheet "Not now". A's waiting card then sends a
- * nudge (one `send_daily_nudge` answered 200), and after a reload A's day answer
- * has the nudge spent and the Nudge button is grey. The spec registers no push
- * device for either bot.
+ * question; bot A picks This and waits. When A's own day answer says A is the
+ * day's writer (`write.mine`), A first answers the write sheet "No thanks", so no
+ * question row is written. A then meets the nudge prompt and taps Nudge (one
+ * `send_daily_nudge` answered 200). After a reload A sees no prompt and an
+ * enabled Nudge button on the waiting card; A taps it (one more
+ * `send_daily_nudge`, answered 200), and after another reload A's day answer has
+ * the button's nudge sent and the button shows as sent, grey. The spec registers
+ * no push device for either bot.
  * Bot B's own RPC answers before B's pick
  * (`get_daily_day`, `get_daily_day_by_id`) carry no choice, mark or count; B's
  * page says A has picked and shows no reveal; B picks That; both pages, after a
@@ -335,9 +337,9 @@ test.describe('Live Daily check', () => {
 
       await ensureLinked(target, a, b);
 
-      // The bots' day and nudge slot turn at 00:00 and 20:00 UTC (both store
-      // UTC), so the guard reads the UTC clock whatever zone the host is on
-      // (DW-542); wait past one before the reset.
+      // The bots' day turns at 00:00 UTC (both store UTC, which is also where
+      // a nudge's closing instant falls), so the guard reads the UTC clock
+      // whatever zone the host is on (DW-542); wait past a turn before the reset.
       await waitClearOfDailyTurns(testInfo, 'UTC');
 
       for (const bot of [a, b]) {
@@ -381,37 +383,52 @@ test.describe('Live Daily check', () => {
       await expect(pageA.getByTestId('daily-waiting')).toBeVisible();
       await expect(pageA.getByTestId('daily-my-pick')).toHaveText(thisText);
 
-      // A's pick raises one sheet. As the day's writer A declines to write, so
-      // no question row is written, and is never also asked to nudge;
-      // otherwise A turns down the nudge offer.
+      // A's pick raises the nudge prompt. As the day's writer A first meets the
+      // write sheet and declines it, so no question row is written, and the
+      // prompt follows it.
       if (openedA.snapshot.write.mine) {
         await expect(pageA.getByTestId('daily-write-sheet')).toBeVisible();
+        await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
         await pageA.getByTestId('daily-write-decline').click();
         await expect(pageA.getByTestId('daily-write-sheet')).toHaveCount(0);
-        await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
-      } else {
-        await expect(pageA.getByTestId('daily-nudge-sheet')).toBeVisible();
-        await pageA.getByTestId('daily-nudge-sheet-dismiss').click();
-        await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
       }
+      const nudgeSheet = pageA.getByTestId('daily-nudge-sheet');
+      await expect(nudgeSheet).toBeVisible();
 
-      // A's waiting card nudges B once, on the project's send_daily_nudge, and
-      // its button greys. The button is also disabled while the send is in
-      // flight, so the grey is read after a reload, from the server's answer.
+      // A taps Nudge on the prompt: one send_daily_nudge on the project, answered 200.
+      const nudgeSends = trackReads(pageA, NUDGE_SEND_PATH, 'POST');
+      const promptNudged = observeRpc(pageA, DAILY_NUDGE_SEND);
+      await pageA.getByTestId('daily-nudge-sheet-send').click();
+      expect((await promptNudged).status).toBe(200);
+      await expect(nudgeSheet).toHaveCount(0);
+      expect(nudgeSends.started()).toBe(1);
+
+      // After a reload A sees no prompt and an enabled Nudge button on the waiting card.
+      const afterPrompt = (await openDaily(pageA, () => pageA.reload())) as {
+        snapshot: { nudges?: { prompt_sent: boolean; button_sent: boolean } };
+      };
+      expect(afterPrompt.snapshot.nudges).toMatchObject({ prompt_sent: true, button_sent: false });
+      await expect(pageA.getByTestId('daily-waiting')).toBeVisible();
+      await expect(nudgeSheet).toHaveCount(0);
       const nudgeButton = pageA.getByTestId('daily-nudge');
       await expect(nudgeButton).toBeEnabled();
-      const nudgeSends = trackReads(pageA, NUDGE_SEND_PATH, 'POST');
-      const nudged = observeRpc(pageA, DAILY_NUDGE_SEND);
+
+      // A taps it: one more request, answered 200, and after another reload the
+      // button shows as sent. The button is also disabled while the send is in
+      // flight, so "sent" is read from the server's answer after the reload.
+      const buttonNudged = observeRpc(pageA, DAILY_NUDGE_SEND);
       await nudgeButton.click();
-      expect((await nudged).status).toBe(200);
+      expect((await buttonNudged).status).toBe(200);
+      expect(nudgeSends.started()).toBe(2);
       const afterNudge = (await openDaily(pageA, () => pageA.reload())) as {
-        snapshot: { nudge?: { spent: boolean } };
+        snapshot: { nudges?: { prompt_sent: boolean; button_sent: boolean } };
       };
-      expect(afterNudge.snapshot.nudge?.spent).toBe(true);
+      expect(afterNudge.snapshot.nudges).toMatchObject({ prompt_sent: true, button_sent: true });
       await expect(nudgeButton).toBeDisabled();
+      await expect(nudgeButton).toHaveAttribute('data-sent', 'true');
       await expect(pageA.getByTestId('daily-nudge-error')).toHaveCount(0);
-      await expect(pageA.getByTestId('daily-nudge-sheet')).toHaveCount(0);
-      expect(nudgeSends.started()).toBe(1);
+      await expect(nudgeSheet).toHaveCount(0);
+      expect(nudgeSends.started()).toBe(2);
 
       // B has not picked: B's own answers say a pick was made and nothing of it.
       const { data: answer, error: dayError } = await b.client.rpc('get_daily_day', {

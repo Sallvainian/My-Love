@@ -11,6 +11,7 @@ import {
   dailySnapshot,
   DAY_ID,
   waitingSnapshot,
+  nudgesSnapshot,
   writerSnapshot,
 } from '../../../../tests/unit/stores/dailyQuestionFixture';
 import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
@@ -59,7 +60,6 @@ import {
 import { enqueuePick } from '../../../services/pickQueue';
 import { useAppStore } from '../../../stores/useAppStore';
 import { DailyQuestion } from '../DailyQuestion';
-import { WriteQuestionSheet } from '../WriteQuestionSheet';
 
 /** A local-time instant on the fixture's day (2026-11-05), whatever the machine's zone. */
 const SAME_DAY = new Date(2026, 10, 5, 12);
@@ -331,14 +331,14 @@ describe("the write tomorrow's question sheet", () => {
     expect(sheet()).toBeNull();
   });
 
-  it('a saved day with the turn open and a failed read: the pick the server confirms opens the sheet, and the nudge offer waits', async () => {
+  it('a saved day with the turn open and a failed read: the pick the server confirms opens the sheet, and the nudge prompt waits behind it', async () => {
     const user = userEvent.setup();
     await writeLocalCopy('USER-A-ID', DAILY_DAYS_COPY_KIND, {
       [DAY_ID]: dailySnapshot({ write: { mine: true, done: false } }),
     });
     fetchDailyDay.mockRejectedValueOnce(new AccountDataError('transport', 'The server is down'));
     submitDailyPickRequest.mockResolvedValue(
-      writerSnapshot('this', { nudge: { slot: 'after_pick', spent: false } })
+      nudgesSnapshot({}, { write: { mine: true, done: false } })
     );
 
     render(<DailyQuestion />);
@@ -695,27 +695,5 @@ describe("the write tomorrow's question sheet", () => {
       render(<DailyQuestion />);
       expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
     });
-  });
-});
-
-describe('WriteQuestionSheet onShown', () => {
-  const props = { dayId: DAY_ID, day: '2026-11-05', partnerName: 'Jessie', onClose: () => {} };
-
-  it('is called once on mount, and not again by a re-render with a new callback', async () => {
-    const first = vi.fn();
-    const second = vi.fn();
-    const view = render(<WriteQuestionSheet {...props} onShown={first} />);
-    await screen.findByTestId('daily-write-sheet');
-    expect(first).toHaveBeenCalledTimes(1);
-
-    view.rerender(<WriteQuestionSheet {...props} onShown={second} />);
-    expect(first).toHaveBeenCalledTimes(1);
-    expect(second).not.toHaveBeenCalled();
-  });
-
-  it('is optional', async () => {
-    render(<WriteQuestionSheet {...props} />);
-
-    expect(await screen.findByTestId('daily-write-sheet')).toBeInTheDocument();
   });
 });

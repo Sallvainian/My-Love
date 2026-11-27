@@ -5,8 +5,9 @@
 -- AD-8, AD-9, AD-10; requirements R3, R5). Pinned here:
 --   * enqueue_daily_reminders(at): two clocks, the window edges (07:59:59,
 --     08:00:00, 08:29:59, 08:30:00 and the same at 20:xx), a recipient who has
---     picked, one or both picked at 8 PM, a spent evening nudge (and an
---     after_pick nudge that is not), the accounts that are not eligible (no
+--     picked, one or both picked at 8 PM, a nudge the recipient sent about the
+--     day (from either source; a nudge about another day, or the partner's, does
+--     not skip it: story 11.1, 20261127000000), the accounts that are not eligible (no
 --     device, no zone, unlinked, linked one way), a repeat at the same instant,
 --     and one person's failure leaving the other's row.
 --   * the two AFTER INSERT triggers on daily_reminders and the call each queues.
@@ -24,7 +25,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(52);
+select plan(53);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -300,28 +301,38 @@ select pg_temp.pick('ra', 'rb', date '2030-08-07', 'rb');
 select public.enqueue_daily_reminders(timestamptz '2030-08-07 20:10:00+00');
 select is(pg_temp.got('ra') || '|' || pg_temp.got('rb'), '|', 'DAILY-REM-031: when both have picked, 8 PM queues nothing');
 
--- Evening nudge spent
+-- A nudge about the day (from either source) skips evening_partner
 select pg_temp.mk('sa', 'UTC');
 select pg_temp.mk('sb', 'UTC');
 select pg_temp.link('sa', 'sb');
 select pg_temp.pick('sa', 'sb', date '2030-08-08', 'sa');
-insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-values (pg_temp.u('sa'), pg_temp.u('sb'), pg_temp.day('sa', 'sb', date '2030-08-08'), date '2030-08-08', 'evening');
+insert into public.daily_nudges (from_user, to_user, day_id, source)
+values (pg_temp.u('sa'), pg_temp.u('sb'), pg_temp.day('sa', 'sb', date '2030-08-08'), 'button');
 select public.enqueue_daily_reminders(timestamptz '2030-08-08 20:10:00+00');
-select is(pg_temp.got('sa'), '', 'DAILY-REM-032: a picker whose evening nudge is spent gets no evening_partner row');
+select is(pg_temp.got('sa'), '', 'DAILY-REM-032: a picker who nudged about the day (the button) gets no evening_partner row');
 select is(pg_temp.got('sb'), 'evening_self 2030-08-08', 'DAILY-REM-033: the partner still gets evening_self');
 
--- An after_pick nudge, or the partner's evening nudge, does not spend it.
+-- A nudge about another day, or the partner's nudge about this one, does not skip it.
 select pg_temp.mk('ta', 'UTC');
 select pg_temp.mk('tb', 'UTC');
 select pg_temp.link('ta', 'tb');
 select pg_temp.pick('ta', 'tb', date '2030-08-09', 'ta');
-insert into public.daily_nudges (from_user, to_user, day_id, sender_local_date, slot)
-values (pg_temp.u('ta'), pg_temp.u('tb'), pg_temp.day('ta', 'tb', date '2030-08-09'), date '2030-08-09', 'after_pick'),
-       (pg_temp.u('tb'), pg_temp.u('ta'), pg_temp.day('ta', 'tb', date '2030-08-09'), date '2030-08-09', 'evening');
+insert into public.daily_nudges (from_user, to_user, day_id, source)
+values (pg_temp.u('ta'), pg_temp.u('tb'), pg_temp.day('ta', 'tb', date '2030-08-08'), 'prompt'),
+       (pg_temp.u('tb'), pg_temp.u('ta'), pg_temp.day('ta', 'tb', date '2030-08-09'), 'button');
 select public.enqueue_daily_reminders(timestamptz '2030-08-09 20:10:00+00');
 select is(pg_temp.got('ta'), 'evening_partner 2030-08-09',
-  'DAILY-REM-034: an after_pick nudge, or the partner''s evening nudge, leaves the evening_partner row');
+  'DAILY-REM-034: a nudge about another day, or the partner''s nudge about this one, leaves the evening_partner row');
+
+-- The prompt's nudge skips it as the button's does.
+select pg_temp.mk('ua', 'UTC');
+select pg_temp.mk('ub', 'UTC');
+select pg_temp.link('ua', 'ub');
+select pg_temp.pick('ua', 'ub', date '2030-08-12', 'ua');
+insert into public.daily_nudges (from_user, to_user, day_id, source)
+values (pg_temp.u('ua'), pg_temp.u('ub'), pg_temp.day('ua', 'ub', date '2030-08-12'), 'prompt');
+select public.enqueue_daily_reminders(timestamptz '2030-08-12 20:10:00+00');
+select is(pg_temp.got('ua'), '', 'DAILY-REM-047: the prompt''s nudge about the day skips evening_partner too');
 
 -- ============================================
 -- Not eligible
