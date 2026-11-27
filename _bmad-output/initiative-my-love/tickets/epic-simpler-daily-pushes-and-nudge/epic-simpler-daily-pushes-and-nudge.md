@@ -8,6 +8,7 @@ companions: ["_bmad-output/initiative-my-love/architecture-daily-question/archit
 after: []
 refined: true
 risk: high
+status: done
 ---
 
 # Simpler Daily Pushes and Nudge
@@ -87,4 +88,5 @@ R5 (parent R7, R11; spine AD-7, AD-10): The streak's row of seven dots, at the t
 - Decision: 2026-11-26 (owner) no iPhone check in this epic: its Done when gets none (initiative Notes).
 - Decision: 2026-11-27 (owner) the both-answered push always reads "You both answered today's question" over "Click to see what your partner answered!", with no late-pick case and no "That day counts.". The owner put it in story 2 if small and similar enough; the PO judged it so (story 2 Notes).
 - Decision: 2026-11-27 (owner) the streak's week row becomes the calendar week, Sunday to Saturday, as story 3, after story 2. The server sends it in a new field beside `week`, every slot shows its weekday letter, a day not done yet is a plain grey circle, today keeps its ring and the days after it are the same grey (story 3 Notes).
+- Decision: 2026-11-27 (owner) Done when never waits on a deploy or a manual check; the shipping line, the post-deploy check and the at-closure live check were removed for that reason (dfd93448, 48d5d206, fcf51118).
 - Decision: 2026-11-26 declined by the PO: an epic PRD and a new architecture pass. The owner's decisions in the two story files, the initiative and the spine settle how it works. The owner decided that the builds update the spine's rules themselves.
