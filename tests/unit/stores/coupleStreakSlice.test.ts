@@ -92,9 +92,6 @@ const withPartner = (id: string) =>
     partnerKnown: true,
   });
 
-// Long enough for a read to get through its saved-copy reads (fake-indexeddb) to its fetch.
-const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
-
 const savedCopy = (userId: string = A) => readLocalCopy<unknown>(userId, DAILY_STREAK_COPY_KIND);
 
 beforeEach(async () => {
@@ -227,9 +224,8 @@ describe('loadCoupleStreak', () => {
     const first = state().loadCoupleStreak();
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
     const second = state().loadCoupleStreak();
-    // The second call sends nothing while the first read runs, though a read of its own
-    // would be at its fetch by now.
-    await pause();
+    // The second call asks for its trailing pass as it is made and sends nothing while the
+    // first read runs; the exact count after both promises settle shows no read of its own.
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
     older.settle(okStreak({ held: 7 }));
     // The trailing read starts after the first one ends, and both promises wait for it.
@@ -240,6 +236,7 @@ describe('loadCoupleStreak', () => {
     unsubscribe();
 
     // The running read's answer was shown, then the trailing read's replaced it.
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
     expect(shown).toEqual([7, 8]);
     expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
     expect(state().coupleStreakLoading).toBe(false);
@@ -286,11 +283,9 @@ describe('loadCoupleStreak', () => {
 
     const calls = [state().loadCoupleStreak()];
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
-    // Each call comes after the one before could have reached its fetch.
+    // A call asks for its trailing pass as it is made, so no wait is needed between the calls.
     calls.push(state().loadCoupleStreak());
-    await pause();
     calls.push(state().loadCoupleStreak());
-    await pause();
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
     running.settle(okStreak({ held: 8 }));
     await Promise.all(calls);
@@ -926,7 +921,6 @@ describe('the partner changes in the session', () => {
     await first;
     // The call that asked for the dropped pass settles; it is not left hanging.
     await expect(dropped).resolves.toBeUndefined();
-    await pause();
 
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
     expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
@@ -951,7 +945,6 @@ describe('the partner changes in the session', () => {
 
     // The new pair's read is still open, so this call asks for a pass after it.
     const joined = state().loadCoupleStreak();
-    await pause();
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
     newer.settle(okStreak({ held: 4 }));
     await joined;
