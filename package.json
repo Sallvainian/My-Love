@@ -6,9 +6,8 @@
   "scripts": {
     "dev": "./scripts/dev-with-cleanup.sh",
     "dev:raw": "vite",
-    "dev:local": "./scripts/dev-local.sh",
-    "supabase:up": "node scripts/supabase-prune.mjs --quiet && supabase start",
-    "supabase:prune": "node scripts/supabase-prune.mjs",
+    "dev:local": "vite --mode test",
+    "supabase:up": "supabase start",
     "supabase:down": "supabase stop",
     "db:types": "node scripts/gen-db-types.mjs",
     "build": "tsc -p tsconfig.app.json && vite build",

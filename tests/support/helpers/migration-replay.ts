@@ -11,11 +11,10 @@
  * the live table is untouched and no other worker or pgTAP run can observe the
  * seeded rows.
  *
- * Mechanism: `docker exec -i <database container> psql` with the script on
- * stdin. On the classic backend (CI) the container is supabase_db_My-Love, from
- * `project_id = "My-Love"` in supabase/config.toml; on the stack backend each
- * worktree and branch has its own, which playwright.config.ts looks up and
- * passes in SUPABASE_DB_CONTAINER. Inside the container
+ * Mechanism: `docker exec -i supabase_db_My-Love psql` with the script on
+ * stdin. The container name follows playwright.config.ts:55, which already
+ * shells to `docker inspect supabase_auth_My-Love`; both derive from
+ * `project_id = "My-Love"` in supabase/config.toml:5. Inside the container
  * `psql -U postgres` authenticates over the local socket, which is how the
  * Supabase CLI's own `db` commands reach it. Measured 2026-09-12: the script
  * `BEGIN; INSERT; SELECT count; <migration>; SELECT count; ROLLBACK;` printed
@@ -32,7 +31,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export const SUPABASE_DB_CONTAINER = process.env.SUPABASE_DB_CONTAINER || 'supabase_db_My-Love';
+export const SUPABASE_DB_CONTAINER = 'supabase_db_My-Love';
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), 'supabase', 'migrations');
 

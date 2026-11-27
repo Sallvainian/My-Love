@@ -370,7 +370,7 @@ test.describe('Love note image upload limits', () => {
 
     // Any document on the dev server's origin will do — what is being measured
     // is the browser's own framing of a Blob body, not the page.
-    await page.goto(process.env.BASE_URL ?? 'http://localhost:5173/');
+    await page.goto('http://localhost:5173/');
 
     const result = await page.evaluate(
       async ({ url, token, magic }) => {
