@@ -10,11 +10,6 @@ on:
 permissions:
   contents: read
 
-# The classic local stack, as in .github/actions/setup-supabase: config.toml's
-# [experimental] stack is for local checkouts running in parallel.
-env:
-  SUPABASE_EXPERIMENTAL_STACK: '0'
-
 jobs:
   validate-migrations:
     name: Validate Migrations

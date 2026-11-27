@@ -30,14 +30,6 @@ runs:
     # cache. This replaced a hand-rolled download that existed because
     # supabase/setup-cli's npm postinstall had no retry (ECONNRESET on PRs #252
     # and #254, a 15-minute hang on #262); mise retries downloads (http_retries).
-    # CI runs the classic local stack: one job never runs two, and the steps
-    # below rely on its fixed container names and `status --output json`.
-    # supabase/config.toml turns the stack backend on for local checkouts;
-    # writing this to GITHUB_ENV turns it off for every later step of the job.
-    - name: Use the classic local stack
-      shell: bash
-      run: echo "SUPABASE_EXPERIMENTAL_STACK=0" >> "$GITHUB_ENV"
-
     - name: Install Supabase CLI (mise)
       uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
       with:

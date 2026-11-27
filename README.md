@@ -37,7 +37,7 @@ A Progressive Web App for couples to exchange daily love messages, track moods, 
 git clone https://github.com/Sallvainian/My-Love.git
 cd My-Love
 npm install
-npm run supabase:up     # Start this checkout's local Supabase (one per worktree and branch)
+supabase start          # Start local Supabase (Postgres, Auth, Realtime, etc.)
 fnox exec -- npm run dev  # Start dev server with decrypted secrets
 ```
 
@@ -48,8 +48,7 @@ Open http://localhost:5173 in your browser.
 ```bash
 fnox exec -- npm run dev      # Start dev server (cleanup wrapper)
 fnox exec -- npm run dev:raw  # Vite dev server directly
-npm run dev:local             # Vite against this checkout's local Supabase (no secrets needed)
-npm run supabase:prune        # Stop/destroy local Supabases of switched-away branches and removed worktrees
+npm run dev:local             # Vite against local Supabase (.env.test, no secrets needed)
 fnox exec -- npm run build    # Production build (tsc + vite)
 npm run typecheck             # tsc -b --force (all three tsconfig projects)
 npm run lint                  # ESLint

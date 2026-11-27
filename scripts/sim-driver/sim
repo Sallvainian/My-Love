@@ -192,8 +192,7 @@ Notifications (the shell, or with --host the runner's host app, "Runner"):
                          Launches the host, so it comes to the front.
 
 The device is --device, else $SIM_DEVICE, else the only booted simulator.
-SIM_SUPABASE_URL overrides the local stack's URL (default: supabase status's
-API_URL, read in the repo).
+SIM_SUPABASE_URL overrides the local stack's URL (default: .env.test's).
 SIM_IDLE_NAMES="Class,method,method" replaces the private XCUITest names the
 center patches to skip idle waits (to check the warning).
 Work dir: $SIM_DRIVER_WORK, default ~/Library/Caches/my-love-sim-driver/
@@ -321,22 +320,9 @@ OSA
 
 # ---- local stack -------------------------------------------------------------
 
-# One value from the repo's local Supabase. The stack backend ([experimental]
-# stack: one local Supabase per worktree and branch, each on its own ports)
-# answers `status --env`; the classic backend (SUPABASE_EXPERIMENTAL_STACK=0)
-# answers `status -o env`. Runs in the repo whatever directory sim was called
-# from, because status reads the project, and with the stack backend the
-# branch, from the current directory.
-stack_env() {
-  local out
-  out=$(cd $REPO && supabase status --env --output-format text 2>/dev/null)
-  [[ $out == *API_URL=* ]] || out=$(cd $REPO && supabase status -o env 2>/dev/null)
-  print -r -- $out | sed -n "s/^$1=[\"']\(.*\)[\"']\$/\1/p"
-}
-
 supabase_url() {
   if [[ -n ${SIM_SUPABASE_URL:-} ]]; then print -- $SIM_SUPABASE_URL; return; fi
-  stack_env API_URL
+  sed -n 's/^VITE_SUPABASE_URL=//p' $REPO/.env.test
 }
 
 # The supabase CLI the repo resolves must be .mise.toml's pin: another one
@@ -501,15 +487,12 @@ sync_stage() {
   fi
 }
 
-# Builds the web code in a stage against the repo's local Supabase. Inherited
-# VITE_* values are dropped first: Vite gives process.env priority over
-# .env.test, and fnox's would point the bundle at production. The URL is read
-# in the repo before the build, since the stage is another directory and so,
-# with the stack backend, another stack identity.
+# Builds the web code in a stage against .env.test. Inherited VITE_* values
+# are dropped first: Vite gives process.env priority over .env.test, and
+# fnox's would point the bundle at production.
 build_web() {
   local dir=$1 id=$2 update_url=$3 readout=$4
-  local url=$(supabase_url)
-  SIM_SUPABASE_URL=$url stage vite zsh -c '
+  stage vite zsh -c '
     for v in ${(k)parameters[(I)VITE_*]}; do unset $v; done
     [[ -n ${SIM_SUPABASE_URL:-} ]] && export VITE_SUPABASE_URL=$SIM_SUPABASE_URL
     cd $1 && GITHUB_SHA=$2 VITE_LIVE_UPDATE_URL=$3 npx vite build --mode test' \
@@ -652,8 +635,10 @@ cmd_serve_update() {
 
 # ---- accounts ----------------------------------------------------------------
 
+# supabase status reads the project from the current directory, so it runs in
+# the repo whatever directory sim was called from.
 stack_secret() {
-  stack_env SECRET_KEY
+  (cd $REPO && supabase status -o env 2>/dev/null) | sed -n 's/^SECRET_KEY="\(.*\)"$/\1/p'
 }
 
 cmd_provision() {
