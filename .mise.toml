@@ -1,8 +1,8 @@
 [tools]
-# Track the latest 24.x rather than an exact patch. mise.lock pins the exact
+# Track the latest 26.x (Node 26 LTS) rather than an exact patch. mise.lock pins the exact
 # resolved version so every machine and CI still install the same build;
-# run `mise upgrade node` to move the lock to a newer 24.x.
-node = "24"
+# run `mise upgrade node` to move the lock to a newer 26.x.
+node = "26"
 # The one Supabase CLI pin: CI installs it through jdx/mise-action (the
 # setup-supabase action, deploy.yml, supabase-migrations.yml) and Renovate
 # bumps it (renovate.json). Keep it at 2.117.0 or later: older releases bundle a

@@ -10,7 +10,8 @@
   "enabledManagers": [
     "npm",
     "github-actions",
-    "mise"
+    "mise",
+    "nodenv"
   ],
   "timezone": "America/New_York",
   "semanticCommits": "enabled",
@@ -134,12 +135,13 @@
       "enabled": false
     },
     {
-      "description": "mise: only the Supabase CLI; node stays on its 24.x range in .mise.toml.",
+      "description": "mise: only the Supabase CLI and Node (the rule below groups Node).",
       "matchManagers": [
         "mise"
       ],
       "matchDepNames": [
-        "!supabase"
+        "!supabase",
+        "!node"
       ],
       "enabled": false
     },
@@ -165,6 +167,35 @@
       ],
       "matchDepNames": [
         "supabase"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Node's version lives in .mise.toml (and mise.lock), .node-version and every workflow's node-version input. One PR moves them together; the major-only ranges ('26') are kept, and a new major waits for a person.",
+      "matchManagers": [
+        "mise",
+        "nodenv",
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "node"
+      ],
+      "groupName": "node",
+      "rangeStrategy": "replace",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "node"
+    },
+    {
+      "matchManagers": [
+        "mise",
+        "nodenv",
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "node"
       ],
       "matchUpdateTypes": [
         "major"
