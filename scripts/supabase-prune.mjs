@@ -13,8 +13,8 @@
  *   - otherwise it is the stack a checkout is using -> leave it alone.
  * Stacks started with --stack <name> are never touched.
  *
- * Runs from `npm run supabase:up` and from Claude Code's SessionEnd hook
- * (.claude/settings.json). --quiet prints only what it changed. It never fails
+ * Runs from `npm run supabase:up`, and on the owner's machine also from a
+ * Claude Code SessionEnd hook in the gitignored .claude/settings.json. --quiet prints only what it changed. It never fails
  * the caller: with the stack backend off or the CLI missing it does nothing.
  */
 import { execFileSync } from 'node:child_process';

@@ -132,7 +132,7 @@ try {
   try {
     // Wake Auth first: on the stack backend its container exists only while it
     // is awake. Any answer wakes it.
-    if (id) execSync(`curl -s -o /dev/null "${vars.API_URL}/auth/v1/health"`, execOpts);
+    if (id) execSync(`curl -s "${vars.API_URL}/auth/v1/health"`, execOpts);
     // Double quotes, not single: cmd.exe does not treat ' as a quote character,
     // so a single-quoted --format string arrives as separate argv entries there.
     const jwtKeysRaw = execSync(

@@ -43,6 +43,13 @@ concurrency:
   group: 'deploy'
   cancel-in-progress: false
 
+# The classic CLI backend, as in .github/actions/setup-supabase and
+# supabase-migrations.yml: config.toml's [experimental] stack is for local
+# checkouts running in parallel, and link, db push and functions deploy were
+# only ever exercised here on the classic backend.
+env:
+  SUPABASE_EXPERIMENTAL_STACK: '0'
+
 jobs:
   # Schema before frontend. The build below ships code that assumes the current
   # schema, so a frontend that deploys ahead of its migration runs against a
