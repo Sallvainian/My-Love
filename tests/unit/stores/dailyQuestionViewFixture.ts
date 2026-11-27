@@ -1,0 +1,63 @@
+/**
+ * Setup the DailyQuestion view's test files share. Each file keeps its own
+ * `vi.mock` calls and `vi.fn()` mocks (Vitest hoists those per file); this holds
+ * the instants, the partner, and the store, queue and clock reset around them.
+ */
+import 'fake-indexeddb/auto';
+import { vi } from 'vitest';
+import { openMyLoveDB } from '../../../src/services/dbSchema';
+import { deleteAccountCopies } from '../../../src/services/localCopy';
+import { useAppStore } from '../../../src/stores/useAppStore';
+import { dailySnapshot } from './dailyQuestionFixture';
+import { setOnline } from './navigatorFixtures';
+
+/** A local-time instant on the fixture's day (2026-11-05), whatever the machine's zone. */
+export const SAME_DAY = new Date(2026, 10, 5, 12);
+/** One minute past local midnight: the device's date is no longer the fixture's day. */
+export const NEXT_DAY = new Date(2026, 10, 6, 0, 1);
+/** The sentence a `DQ002` refusal is stored with (`submitDailyPick`). */
+export const CLOCK_REFUSAL =
+  "Your phone's clock looks wrong, so this pick couldn't be sent. Check Settings → General → Date & Time, then pick again.";
+
+export const ok = (snapshot: ReturnType<typeof dailySnapshot>) => ({
+  status: 'ok' as const,
+  snapshot,
+});
+
+export function setPartner(displayName: string | null) {
+  useAppStore.setState({
+    partner: displayName === null ? null : { id: 'USER-B-ID', displayName, email: 'b@example.com' },
+    // `loadPartner` sets `partnerKnown` with a set partner: that state without it is never reached.
+    // A null partner is not confirmed unlinked here, so `partnerKnown` stays false (not yet loaded).
+    partnerKnown: displayName !== null,
+  } as unknown as Parameters<typeof useAppStore.setState>[0]);
+}
+
+export const realNavigatePartner = useAppStore.getState().navigatePartner;
+
+/** The part of a file's `beforeEach` that follows its own mock resets. */
+export async function resetDailyQuestionView() {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  setOnline(true);
+  // Only Date: Testing Library recognises Jest fake timers alone (AGENTS user-event note).
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(SAME_DAY);
+  useAppStore.getState().clearAuth();
+  useAppStore.getState().setAuthUser('USER-A-ID');
+  setPartner('Jessie');
+  // A day saved by an earlier test must not be shown first in this one, nor a
+  // pick it left in the queue.
+  const queueDb = await openMyLoveDB();
+  await queueDb.clear('pick-queue');
+  queueDb.close();
+  await deleteAccountCopies('USER-A-ID');
+  await deleteAccountCopies('USER-C-ID');
+  useAppStore.setState({ coupleStreak: null, coupleStreakError: null });
+}
+
+/** A file's `afterEach`. */
+export function restoreDailyQuestionView() {
+  vi.useRealTimers();
+  setOnline(true);
+  useAppStore.setState({ navigatePartner: realNavigatePartner });
+}
