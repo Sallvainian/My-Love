@@ -198,7 +198,12 @@ export default defineConfig({
   // Supabase stack plus a Vite server, so 2 workers means ~2 Chromium
   // contexts sharing 4 cores. Higher risks starving the realtime tests into
   // timeout-driven flakes, which would cost far more than the minutes saved.
-  workers: process.env.CI ? 2 : undefined,
+  //
+  // Locally also 2, not Playwright's default of half the CPU cores: each worker
+  // drives its own Chromium, every worktree runs its own local Supabase, and on
+  // a 16 GB Mac two uncapped runs at once plus their stacks ran it out of memory
+  // (2026-11-27). PLAYWRIGHT_WORKERS raises it for a run that has the Mac to itself.
+  workers: process.env.CI ? 2 : Number(process.env.PLAYWRIGHT_WORKERS) || 2,
 
   // Timeouts
   timeout: 60 * 1000, // Test timeout: 60s
