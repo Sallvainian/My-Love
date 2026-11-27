@@ -55,7 +55,7 @@ import { moodService } from '../../../src/services/moodService';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import { accountDeletesSettled, setOnline } from './accountDataFixtures';
 import { coupleStreak } from './dailyQuestionFixture';
-import { deferred } from './loaderIdentityGuardsFixture';
+import { deferred, storeWritesDuring } from './loaderIdentityGuardsFixture';
 
 const A = 'USER-A-ID';
 const B = 'USER-B-ID';
@@ -91,9 +91,6 @@ const withPartner = (id: string) =>
     },
     partnerKnown: true,
   });
-
-// Long enough for a read to get through its saved-copy reads (fake-indexeddb) to its fetch.
-const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
 
 const savedCopy = (userId: string = A) => readLocalCopy<unknown>(userId, DAILY_STREAK_COPY_KIND);
 
@@ -226,10 +223,14 @@ describe('loadCoupleStreak', () => {
 
     const first = state().loadCoupleStreak();
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
-    const second = state().loadCoupleStreak();
-    // The second call sends nothing while the first read runs, though a read of its own
-    // would be at its fetch by now.
-    await pause();
+    // The second call asks for its trailing pass as it is made and sends nothing while the
+    // first read runs. A read that started at once would set the loading flag in this same
+    // turn; a read of its own would also show a third answer, which `shown` below rules out.
+    let second!: Promise<void>;
+    const writes = storeWritesDuring(() => {
+      second = state().loadCoupleStreak();
+    });
+    expect(writes).toBe(0);
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
     older.settle(okStreak({ held: 7 }));
     // The trailing read starts after the first one ends, and both promises wait for it.
@@ -240,6 +241,7 @@ describe('loadCoupleStreak', () => {
     unsubscribe();
 
     // The running read's answer was shown, then the trailing read's replaced it.
+    expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
     expect(shown).toEqual([7, 8]);
     expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
     expect(state().coupleStreakLoading).toBe(false);
@@ -286,11 +288,13 @@ describe('loadCoupleStreak', () => {
 
     const calls = [state().loadCoupleStreak()];
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
-    // Each call comes after the one before could have reached its fetch.
-    calls.push(state().loadCoupleStreak());
-    await pause();
-    calls.push(state().loadCoupleStreak());
-    await pause();
+    // A call asks for its trailing pass as it is made, so no wait is needed between the calls.
+    // A read that started at once would set the loading flag in this same turn.
+    const writes = storeWritesDuring(() => {
+      calls.push(state().loadCoupleStreak());
+      calls.push(state().loadCoupleStreak());
+    });
+    expect(writes).toBe(0);
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(1);
     running.settle(okStreak({ held: 8 }));
     await Promise.all(calls);
@@ -926,7 +930,6 @@ describe('the partner changes in the session', () => {
     await first;
     // The call that asked for the dropped pass settles; it is not left hanging.
     await expect(dropped).resolves.toBeUndefined();
-    await pause();
 
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
     expect(state().coupleStreak).toEqual(okStreak({ held: 8 }));
@@ -942,6 +945,14 @@ describe('the partner changes in the session', () => {
       .mockReturnValueOnce(newer.promise)
       .mockResolvedValueOnce(okStreak({ held: 5 }));
 
+    // The loading flag each time an ok answer is shown: a pass already asked for keeps it true.
+    const loadingWhenShown: Array<[number, boolean]> = [];
+    const unsubscribe = useAppStore.subscribe((next, previous) => {
+      if (next.coupleStreak !== previous.coupleStreak && next.coupleStreak?.status === 'ok') {
+        loadingWhenShown.push([next.coupleStreak.streak.held, next.coupleStreakLoading]);
+      }
+    });
+
     const first = state().loadCoupleStreak();
     await vi.waitFor(() => expect(fetchCoupleStreak).toHaveBeenCalledTimes(1));
     withPartner(PARTNER_C);
@@ -949,13 +960,24 @@ describe('the partner changes in the session', () => {
     older.settle(okStreak({ held: 1 }));
     await first;
 
-    // The new pair's read is still open, so this call asks for a pass after it.
-    const joined = state().loadCoupleStreak();
-    await pause();
+    // The new pair's read is still open, so this call asks for a pass after it. A read of
+    // its own would set the loading flag in this same turn, which is the old read leaving the
+    // slot empty for the call to take.
+    let joined!: Promise<void>;
+    const writes = storeWritesDuring(() => {
+      joined = state().loadCoupleStreak();
+    });
+    expect(writes).toBe(0);
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(2);
     newer.settle(okStreak({ held: 4 }));
     await joined;
+    unsubscribe();
 
+    // The new pair's 4 is shown while the pass asked for behind it is still to come.
+    expect(loadingWhenShown).toEqual([
+      [4, true],
+      [5, false],
+    ]);
     expect(fetchCoupleStreak).toHaveBeenCalledTimes(3);
     expect(state().coupleStreak).toEqual(okStreak({ held: 5 }));
   });
