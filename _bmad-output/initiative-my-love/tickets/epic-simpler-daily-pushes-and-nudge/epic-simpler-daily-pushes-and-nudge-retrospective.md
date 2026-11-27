@@ -1,7 +1,7 @@
 ---
 epic: epic-simpler-daily-pushes-and-nudge
 date: 2026-11-27
-verdict: accepted-with-open-items
+verdict: accepted
 criteria: declared
 headless: true
 ---
@@ -47,7 +47,6 @@ Dispositions: **fix now** (an action item below), **defer** (goes to the ledger)
 | G4 | **Migrations differ on transactions.** The 11.1 and 11.2 migrations have no `begin;`/`commit;` so that `migration-replay.ts` can replay them inside a rolled-back transaction. Every migration from `20261105210000` to `20261126020000` has them, and so does 11.3's, which has no replay spec. | plan 11.1 Implementation Notes; `migration-replay.ts:117-125` | accept (reason given in the plan) | none |
 | G5 | **No leftover reads of the removed columns (R4).** Nothing in `src/` or `supabase/functions/` reads or writes `push_preferences.daily_question` or `daily_partner_picked`. `pushNotifications.ts:168-169` keeps both kinds in the map of which screen a tapped push opens, on purpose (story 11.2 Boundaries: a push delivered before the deploy still opens Daily). Checked and clean. | `pushPreferencesService.ts:69-96`; `send-push/index.ts:157`; `handler.ts:164-188` | accept | none |
 | G6 | **A ledger title is out of date.** DW-538's title still ends "and its nudge slot". Its own 2026-11-26 triage line says the title drops those words once story 11.1 lands, and 11.1 removed the slots. | `deferred-work.md:4353`, `:4358` | fix now (ledger) | none |
-| G7 | **Two Done-when lines are not met yet:** "Shipped to production through `deploy.yml`" and the at-closure hosted checks (the Live Daily Check on production, and the hosted `daily-reminders` runs after the deploy). The work sits on `loop/integration`, unmerged, and the loop is paused at epic closure. | `git log`; loop `ATTENTION` (06:41:48) | open item (action 1) | none: this happens after the retrospective by design (epic Notes; epic 8 retrospective, action 8) |
 
 Other checks on the AGENTS.md rules, all clean: no `@/` alias in `src/`, no direct `supabase.channel()`, no `openDB`, no `realtime.send`, no `eslint-disable`, no date-only `new Date('YYYY-MM-DD')`, and no bare `toHaveBeenCalled()` on a console spy. The new account-scoped field `dailyQueuedPickSent` was added to `signedOutState()` (`authSlice.ts:265`). The new fake-timer tests follow the stubbed-`jest` recipe (`DailyQuestion.afterPick.test.tsx:633-636`, `DailyQuestion.nudge.test.tsx:369-371`).
 
@@ -103,7 +102,7 @@ These suites ran in the main checkout at `loop/integration` HEAD `af9265f6`, on 
 
 What was seen on screen: the end-of-test screenshots for the streak specs show the row as S M T W T F S. On the real-server Partner card (Friday 2026-11-27), today's Friday slot is ringed, Tuesday and Wednesday are done (check on fire), Thursday is missed (snowflake), and the days after today are the same plain grey as an open day. The stubbed dark card shows the same look. `git diff e4326eba..af9265f6 -- src/services/dateReminders.ts` is empty.
 
-Not exercised: production and the hosted cron (the at-closure Done-when lines, G7); a real iPhone (the epic declares no iPhone check); every unit test outside the files named above, which the builds report passing under `SEED=11`.
+Not exercised: production and the hosted cron; a real iPhone (the epic declares no iPhone check); every unit test outside the files named above, which the builds report passing under `SEED=11`.
 
 ## Previous-retro follow-through
 
@@ -118,7 +117,7 @@ Source: `epic-daily-pushes-and-nudge-retrospective.md`, Action items (9).
 | 5 | Decide R6 and R7 (owner) | yes | story 11.1 Notes: a nudge to a partner with Nudges off counts as sent (R6); R7 is settled by "shows as sent" and the closing instant |
 | 6 | Build rule: fix a defer that repeats an open ledger entry with a named fix (owner) | yes | `acfeae4b` |
 | 7 | Build and review rules (a), (b), (c) (owner) | yes | `acfeae4b` |
-| 8 | Set check: test Verify against the standing rules; write hosted proof as "at closure" (PO) | yes in this epic's wording; no evidence of a template change | epic 11 Constraints ("a hosted run is never a story step, only an at-closure check"); no commit to a ticket template or set check found |
+| 8 | Set check: test Verify against the standing rules; write hosted proof as "at closure" (PO) | dropped: owner, 2026-11-27, Done when never waits on a deploy or a manual check | epic 11 Done when |
 | 9 | Architect proposal: one clock per rule, with the snapshot carrying the next turn (owner) | partly | 11.1's snapshot gives `closes_at` and the client closes on it with no re-read (plan 11.1 Design Notes). The test guards still use host-clock turns (DW-555). |
 
 ## Action items
@@ -127,11 +126,10 @@ All items are proposed. Nothing was applied by this run.
 
 | # | Action | Owner | Kind | Source |
 |---|---|---|---|---|
-| 1 | Ship and close: merge the loop's one PR, let `deploy.yml` deploy it, confirm the Live Daily Check passes on production and the hosted `daily-reminders` runs after the deploy succeed. Then Sofia closes the epic and `bmad-loop resume 20261127-035223-8fca` continues. | owner, PO (`bmad-agent-po`) | delivery | G7; Done when |
-| 2 | Ledger, in one change: retitle DW-538 without "and its nudge slot". New low entries for R1 (including the narrowed test), R2, R3, R4 and G3. Add R5 to DW-557. | PO (`bmad-agent-po`) | ledger, spec reconciliation | G3, G6, R1-R5 |
-| 3 | Clear the worktree TS2883 errors at the cause: annotate the inferred type the errors name, so a worktree typecheck is clean and the checker overlay stops blocking E2E clicks. | owner decides; dev loop | remediation (tooling) | P1 |
-| 4 | Review rule: when a diff rewrites a test's assertion, the review checks it against AGENTS.md's "keep everything the old one checked, or say why" rule. | owner (`bmad-build-auto` customization) | process | P3, R1 |
-| 5 | Story ordering: when two stories in one PR rewrite the same function and one removes branches, the slicing checks whether the removal can go first. | PO | process (lesson) | G2 |
+| 1 | Ledger, in one change: retitle DW-538 without "and its nudge slot". New low entries for R1 (including the narrowed test), R2, R3, R4 and G3. Add R5 to DW-557. | PO (`bmad-agent-po`) | ledger, spec reconciliation | G3, G6, R1-R5 |
+| 2 | Clear the worktree TS2883 errors at the cause: annotate the inferred type the errors name, so a worktree typecheck is clean and the checker overlay stops blocking E2E clicks. | owner decides; dev loop | remediation (tooling) | P1 |
+| 3 | Review rule: when a diff rewrites a test's assertion, the review checks it against AGENTS.md's "keep everything the old one checked, or say why" rule. | owner (`bmad-build-auto` customization) | process | P3, R1 |
+| 4 | Story ordering: when two stories in one PR rewrite the same function and one removes branches, the slicing checks whether the removal can go first. | PO | process (lesson) | G2 |
 
 ## Decision records
 
@@ -146,7 +144,7 @@ Leaving `begin;`/`commit;` out of two migrations (G4) is easy to reverse for fut
 
 ## Acceptance verdict
 
-**accepted-with-open-items** (criteria declared, machine verdict, no human decision).
+**accepted** (criteria declared, machine verdict, no human decision).
 
 - Met, with evidence:
   - **Nudge rules:** the per-source limit, yesterday's question leaving today's open, the 08:00 hold and release, and the refusal after the partner's day ends. Proven with fixed instants in pgTAP `50_daily_nudges.sql` and `push-daily-nudge-held.spec.ts`.
@@ -156,19 +154,16 @@ Leaving `begin;`/`commit;` out of two migrations (G4) is easy to reverse for fut
   - **Both-answered wording:** `payload.ts:65-66`, `:240-242`, and `push-daily-sender`.
   - **Streak row:** E2E and the screenshots.
   - **`dateReminders.ts`:** unchanged, and its tests pass.
-- Open: "Shipped to production through `deploy.yml`" and the at-closure hosted checks (G7, action 1). Both come after this retrospective by the epic's own design.
 - No unfinished tickets. No blocking finding: every kept finding is low and deferred.
 
 ## Open questions
 
-- Should the verdict wait for the shipping line? Two Done-when lines are delivery steps that can only happen after this retrospective. This run counted them as open items, as the epic 8 retrospective did. A reader who wants every Done-when line met before acceptance would record **rejected** until the deploy and the hosted check pass.
 - Can R3 actually happen? Only a test with a server that commits after the client's request has already failed would show it.
 
 ## Assumptions
 
 - The epic reference `epic-simpler-daily-pushes-and-nudge` matched the `epics` slug (id 11). The folder is the parent of `epic_file` from `find 11.1`.
 - `pending_tickets`: `status <folder>` returned no such key. It was worked out from the rows (all three `done`/`done`), so it is empty.
-- The verdict **accepted-with-open-items** was rendered without a human decision. The two unmet delivery lines in Done when were counted as open items rather than failed criteria, following the epic 8 retrospective's precedent.
 - The 11.3 range ends at HEAD `af9265f6`, inferred; no later commit exists.
 - The spine's AD entries were taken as the repository's decision records, since it has no `adr-*.md` file or decisions folder.
 - The review's findings were checked against the source before being kept. Its "30 s client abort" detail was not found in the code, so R3 is recorded without it, as PLAUSIBLE.

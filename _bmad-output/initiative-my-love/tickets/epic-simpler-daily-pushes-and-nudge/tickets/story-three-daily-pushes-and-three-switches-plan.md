@@ -208,4 +208,3 @@ Status: built
 **Residual risks:**
 - The deferred migration-versus-cron race above (low).
 - Deploy order: between the migration and the function deploy, the old `send-push` still words the 8 PM reminder and both-answered the old way for a few minutes. Nothing wrong is sent, and nothing posts a removed kind (Design Notes).
-- Hosted checks are the epic's at-closure steps and were not run: the Live Daily Check and the hosted `daily-reminders` runs after the deploy.

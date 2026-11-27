@@ -191,7 +191,7 @@ Tests and helpers to reuse:
   - `low` `patch` useNudgeClosed stale nowMs for an already-past closesAt on a mounted hook (same root as the stale-nowMs row) — fixed by the same rewrite (verification-gap).
   - `low` `defer` the prompt unmounts at closesAt mid-send, cutting criterion 16's disabled-until-re-read — real, rare; filed in `deferred` (intent-alignment).
   - `low` `patch` long-timer early close (same root as the MAX_TIMER row) — fixed by the same rewrite (intent-alignment).
-  - `false` `reject` criteria tested at pgTAP/api/unit surfaces rather than real devices, hosted cron and APNs — the story's verify line names exactly these surfaces, and the hosted Live Daily Check and cron runs are the epic's at-closure Done when, not a story step (intent-alignment).
+  - `false` `reject` criteria tested at pgTAP/api/unit surfaces rather than real devices, hosted cron and APNs — the story's verify line names exactly these surfaces (intent-alignment).
   - `low` `reject` write sheet closing by a send or a scrim tap is covered by unit tests only — the unit tests render the real DailyQuestion and WriteQuestionSheet, which the verify line allows; E2E covers No thanks and Escape (intent-alignment).
   - `low` `reject` the switch-off case is tested only for an immediate nudge, not a released held one — a released row takes send-push's same generic switch and device path, and handler tests cover a released held row (intent-alignment).
   - `low` `defer` E2E nudge paths depend on the host clock's 08:00 hold branch — already in the ledger as DW-555, not filed again (intent-alignment).
@@ -270,5 +270,4 @@ Status: built
 **Residual risks:**
 - The four `deferred` items above (all low).
 - DW-555: E2E nudge paths depend on the host clock's 08:00 hold branch.
-- Hosted checks are the epic's at-closure steps and were not run: the Live Daily Check on production, and the hosted `daily-reminders` runs after the deploy.
 - A queued drain that confirms the shown day first and an earlier day after it would not offer the prompt. This is unreachable as far as checked, because picks drain oldest first and a pick can only be for the day then shown.
