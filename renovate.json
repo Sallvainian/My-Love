@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate watches only the Supabase CLI pin in .mise.toml (and refreshes mise.lock). Dependabot keeps npm (.github/dependabot.yml).",
+  "enabledManagers": [
+    "mise"
+  ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "deps",
+  "semanticCommitScope": "supabase",
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Only the Supabase CLI; node stays on its 24.x range in .mise.toml.",
+      "matchManagers": [
+        "mise"
+      ],
+      "matchDepNames": [
+        "!supabase"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Minor and patch releases merge once the PR's required checks pass.",
+      "matchDepNames": [
+        "supabase"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "A major release (like 2.x to 3.x) can change deploy.yml's commands, which no PR check runs, so it waits for a person.",
+      "matchDepNames": [
+        "supabase"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    }
+  ]
+}
