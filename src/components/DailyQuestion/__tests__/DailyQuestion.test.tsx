@@ -15,31 +15,24 @@ import {
   waitingSnapshot,
 } from '../../../../tests/unit/stores/dailyQuestionFixture';
 import { setOnline } from '../../../../tests/unit/stores/navigatorFixtures';
+import {
+  fetchDailyDay,
+  resetDailyQuestionMocks,
+  submitDailyPickRequest,
+  useDailyPickListener,
+} from '../../../../tests/unit/stores/dailyQuestionViewMocks';
 
-const fetchDailyDay = vi.fn();
-const submitDailyPickRequest = vi.fn();
-const fetchCoupleStreak = vi.fn();
-
-vi.mock('../../../api/supabaseClient', () => ({
-  supabase: { from: vi.fn(), auth: {}, channel: vi.fn(), removeChannel: vi.fn() },
-  getPartnerId: vi.fn(),
-  lookupPartnerId: vi.fn(),
-  isSeedFallbackName: () => false,
-}));
-
-// The partner-event subscription has its own test; here it is only mounted.
-const useDailyPickListener = vi.fn();
-vi.mock('../../../hooks/useDailyPickListener', () => ({
-  useDailyPickListener: () => useDailyPickListener(),
-}));
-
-vi.mock('../../../api/dailyQuestionApi', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../api/dailyQuestionApi')>()),
-  fetchDailyDay: (...args: unknown[]) => fetchDailyDay(...args),
-  fetchCoupleStreak: (...args: unknown[]) => fetchCoupleStreak(...args),
-  announceDailyPick: vi.fn(async () => {}),
-  submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
-}));
+vi.mock('../../../api/supabaseClient', async () =>
+  (await import('../../../../tests/unit/stores/dailyQuestionViewMocks')).supabaseClientMock(),
+);
+vi.mock('../../../hooks/useDailyPickListener', async () =>
+  (await import('../../../../tests/unit/stores/dailyQuestionViewMocks')).dailyPickListenerMock(),
+);
+vi.mock('../../../api/dailyQuestionApi', async (importOriginal) =>
+  (await import('../../../../tests/unit/stores/dailyQuestionViewMocks')).dailyQuestionApiMock(
+    await importOriginal<typeof import('../../../api/dailyQuestionApi')>(),
+  ),
+);
 
 import { AccountDataError } from '../../../services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../services/dailyDaysCopy';
@@ -57,11 +50,7 @@ import {
 } from '../../../../tests/unit/stores/dailyQuestionViewFixture';
 
 beforeEach(async () => {
-  vi.clearAllMocks();
-  fetchDailyDay.mockReset();
-  submitDailyPickRequest.mockReset();
-  fetchCoupleStreak.mockReset();
-  fetchCoupleStreak.mockResolvedValue({ status: 'unlinked' });
+  resetDailyQuestionMocks();
   await resetDailyQuestionView();
 });
 

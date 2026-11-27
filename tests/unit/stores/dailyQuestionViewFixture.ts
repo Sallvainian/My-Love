@@ -1,7 +1,8 @@
 /**
  * Setup the DailyQuestion view's test files share. Each file keeps its own
- * `vi.mock` calls and `vi.fn()` mocks (Vitest hoists those per file); this holds
- * the instants, the partner, and the store, queue and clock reset around them.
+ * `vi.mock` calls (Vitest hoists those per file) and loads the mocks from
+ * `dailyQuestionViewMocks.ts`; this holds the instants, the partner, and the
+ * store, queue and clock reset around them.
  */
 import 'fake-indexeddb/auto';
 import { vi } from 'vitest';
