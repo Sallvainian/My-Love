@@ -137,7 +137,7 @@ import {
 } from '../../api/dailyQuestionApi';
 import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
 import type { AppStateCreator } from '../types';
-import { createTrailingRead } from './trailingRead';
+import { createTrailingRead } from '../trailingRead';
 
 /** One of the account's queued picks, as the view needs it. */
 export type QueuedDailyPick = Pick<

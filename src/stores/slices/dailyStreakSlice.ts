@@ -67,7 +67,7 @@ import {
 import { registerLocalCopy } from '../../services/localCopy';
 import { mergePartnerId, NO_PARTNER_TAG, shownPartnerId } from '../dailyPartnerIds';
 import type { AppState, AppStateCreator } from '../types';
-import { createTrailingRead } from './trailingRead';
+import { createTrailingRead } from '../trailingRead';
 
 /**
  * The partner a celebration claim is made for: the id the saved days would be
