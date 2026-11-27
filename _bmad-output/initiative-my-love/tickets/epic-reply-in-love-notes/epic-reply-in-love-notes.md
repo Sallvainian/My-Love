@@ -14,7 +14,7 @@ risk: medium
 
 ## Description
 
-The reveal's one action is Reply in Love Notes, spanning its card's full width. It opens Love Notes with the reply attached to that day's question, as replying to a message in iPhone Messages, and both partners see the sent note with the question attached; tapping the attachment opens that day's reveal. It adds the button to the reveal card epic 6 builds, after epic 7 adds its +1 animation there and after epic 8's migrations; epic 10 follows its migrations in turn.
+The reveal's one action is Reply in Love Notes, spanning its card's full width. It opens Love Notes with the reply attached to that day's question, as replying to a message in iPhone Messages, and both partners see the sent note with the question attached; tapping the attachment opens that day's reveal. It adds the button to the reveal card epic 6 builds, after epic 7 adds its +1 animation there and after epic 8's and epic 11's migrations; epic 10 follows its migrations in turn.
 
 ## Outcome
 
@@ -40,5 +40,6 @@ Partners talk about the day's answers where they already talk. Signal: a reply o
 - Waits on epic 6 because: the reply points at its stored question and sits on its reveal card.
 - Waits on epic 7 because: both change the reveal card.
 - Waits on epic 8 because: both add migrations, regenerate the database types and change epic 6's screens.
-- Decision: 2026-11-26 (owner) backlog story 6 ("A daily question has one nudge, one 8 PM reminder and the both-answered push") is built before this epic starts: it changes epic 8's migrations, the database types and Daily's screens.
+- Waits on epic 11 because: both add migrations, regenerate the database types and change Daily's screens.
+- Decision: 2026-11-26 (owner) backlog story 6 ("A daily question has one nudge, one 8 PM reminder and the both-answered push") is built before this epic starts: it changes epic 8's migrations, the database types and Daily's screens. On 2026-11-26 it became epic 11 (`epic-simpler-daily-pushes-and-nudge`), in this epic's `after`.
 - The architecture spine (companion) settles how a reply points at its day's question; refine against it.

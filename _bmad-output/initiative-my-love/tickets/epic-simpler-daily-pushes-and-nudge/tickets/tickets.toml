@@ -1,0 +1,28 @@
+# Epic 11, Simpler Daily Pushes and Nudge: every planned story in build order.
+# Both stories change enqueue_daily_reminders and send-push, one lane: story 2
+# waits on story 1 (owner, 2026-11-26). Story 1 goes first: it carries the
+# hosted risk (the nudge limit, the hold and the live check).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Two nudges per question, held until the partner's 8 AM"
+description = "A person who answers first can nudge their partner about that question once from the prompt right after their answer and once from the waiting card's Nudge button, and every nudge sent before 08:00 on the partner's clock is held until then. The prompt and the button close by themselves when the question stops taking nudges, and installed builds get no nudge until they take the live update."
+verify = "pgTAP with fixed instants proves the per-source, per-question limit, one source never spending the other, yesterday's nudge leaving today's open, the hold (day not started, and 00:00-08:00) and its 08:00-08:30 send, two held nudges about one question queuing one push, one held nudge with the other sent at 08:02 queuing nothing at the 08:05 tick, hosted-shaped `after_pick` and `evening` rows mapping to the prompt and the button, the closing instant and the refusal after it; Playwright and unit tests (faked time for the closing instant, when an unsent control is hidden and a sent button stays grey) prove the prompt, the waiting card's button, Not now leaving the button, the lost-answer and already-sent cases for both sends, the partner's Daily keeping its day on a held nudge's signal, an old build's schema reading the new snapshot, its one-argument nudge counting as the button's, and the new build reading days the old one saved, read by slot, with an unsent button hidden until the server answers; `deno test --no-lock supabase/functions/send-push/` proves the nudge's new body and the held push's send, and an `api` project spec sends a held nudge through `send-push`; the live check in local mode nudges from the prompt and then from the button. Every check runs on the shared local stack with fixed instants or faked time, never a moved clock."
+covers = ["R1", "R4"]
+after = ["8.11"]
+hitl = false
+risk = "high"
+refine = true
+
+[[entry]]
+id = 2
+type = "story"
+title = "Three daily pushes and three switches"
+description = "The daily pushes come down to the nudge, one 8 PM reminder to whoever has not answered, and both answered, and Settings shows their three switches. The app and send-push stop reading and writing the two removed switches' columns, which stay in the database for epic 10 to drop."
+verify = "pgTAP with fixed instants proves no 8 AM question push, an 08:00 tick that assigns no partner's day, no stored `morning` or `evening_partner` reminder left after the migration and a new one refused, no partner-picked push and the 8 PM reminder only to whoever has not answered; Playwright shows three daily switches on Settings > Notifications and no request naming either removed column; an `api` project spec on the shared local stack runs the old build's select of all twelve columns and a one-column upsert of each removed column and both still succeed; `deno test --no-lock supabase/functions/send-push/` proves the 8 PM reminder's new copy and that each switch stops only its own kind; push-copy.md and the spine name none of the removed pushes. Every check runs with fixed instants or faked time, never a moved clock."
+covers = ["R2", "R3", "R4"]
+after = [1]
+hitl = false
+risk = "medium"
+refine = true
