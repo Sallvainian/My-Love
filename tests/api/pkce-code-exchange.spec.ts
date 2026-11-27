@@ -123,7 +123,7 @@ test.describe('PKCE code exchange', () => {
     // GITHUB_ENV values while this one would skip — retiring the only evidence
     // for the acceptance half of CAP-13 behind a green check.
     //
-    // What the variable actually reports is `[inbucket] enabled` in
+    // What the variable actually reports is `[local_smtp] enabled` in
     // supabase/config.toml, not a running container: a catcher that is enabled
     // but down leaves it set, and this spec then fails loudly on the 15 s poll
     // below, which is the intended outcome.
