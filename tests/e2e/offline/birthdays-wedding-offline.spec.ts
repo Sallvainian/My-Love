@@ -16,6 +16,7 @@ import { test, expect } from '../../support/merged-fixtures';
 import { savedLocalCopy } from '../../support/helpers/local-copy';
 import { goOffline } from '../../support/helpers/offline';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { orderedPair } from '../../support/factories/daily-question';
 import {
   clockAnchorAvoidingLeapDay,
   isoBirthdayDaysFromNow,
@@ -34,10 +35,6 @@ import { recurseUntil } from '../../support/helpers/recurse';
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
 
-function orderedPair(a: string, b: string) {
-  return a < b ? { user_a: a, user_b: b } : { user_a: b, user_b: a };
-}
-
 async function setValues(
   supabaseAdmin: TypedSupabaseClient,
   ids: { userId: string; partnerId: string },
@@ -50,10 +47,11 @@ async function setValues(
     .update({ birthday: values.partner })
     .eq('id', ids.partnerId);
   expect(partner.error).toBeNull();
+  const [user_a, user_b] = orderedPair(ids);
   const couple = await supabaseAdmin
     .from('couple_settings')
     .upsert(
-      { ...orderedPair(ids.userId, ids.partnerId), wedding_date: values.wedding },
+      { user_a, user_b, wedding_date: values.wedding },
       { onConflict: 'user_a,user_b' }
     );
   expect(couple.error).toBeNull();
@@ -68,12 +66,12 @@ async function resetValues(
     .from('users')
     .update({ birthday: null })
     .in('id', [ids.userId, ids.partnerId]);
-  const pair = orderedPair(ids.userId, ids.partnerId);
+  const [userA, userB] = orderedPair(ids);
   const couple = await supabaseAdmin
     .from('couple_settings')
     .update({ wedding_date: null })
-    .eq('user_a', pair.user_a)
-    .eq('user_b', pair.user_b);
+    .eq('user_a', userA)
+    .eq('user_b', userB);
   expect([users.error, couple.error], 'resetting the birthdays and wedding date').toEqual([
     null,
     null,
