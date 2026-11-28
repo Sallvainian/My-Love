@@ -31,6 +31,8 @@ vi.mock('../../../hooks/usePartnerStreakListener', () => ({
   usePartnerStreakListener: vi.fn(),
 }));
 
+import { readLocalCopy } from '../../../services/localCopy';
+import { PARTNER_COPY_KIND } from '../../../stores/slices/partnerSlice';
 import { useAppStore } from '../../../stores/useAppStore';
 import { deferred } from '../../../../tests/unit/stores/accountDataFixtures';
 import { clearCopies } from '../../../../tests/unit/stores/dateRemindersAtLaunchFixture';
@@ -109,10 +111,16 @@ describe('PartnerView: a reload over a confirmed unlinked answer', () => {
 
     await screen.findByTestId('partner-search-card');
     await user.type(screen.getByLabelText("Your partner's email"), EMAIL);
+    // The mount load shows its answer before it saves the copy: wait for the
+    // save, so the delete below cannot run before it and leave a copy behind.
+    await vi.waitFor(async () => {
+      expect(await readLocalCopy(USER, PARTNER_COPY_KIND)).toEqual({ status: 'unlinked' });
+    });
 
     // No readable saved copy (a failed IndexedDB read answers null) and a
     // failed server read, over the confirmed unlinked answer already shown.
     await clearCopies();
+    expect(await readLocalCopy(USER, PARTNER_COPY_KIND)).toBeNull();
     getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
     await act(async () => {
       await store().loadPartner();
