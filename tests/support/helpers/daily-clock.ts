@@ -16,6 +16,7 @@
  * Import by this deep path: `tests/support/helpers` has no barrel.
  */
 import type { TypedSupabaseClient } from '../factories';
+import { pairDaySql, storeZoneSql } from '../factories/daily-question';
 import { expect } from '../merged-fixtures';
 import { runPsql } from './migration-replay';
 
@@ -39,10 +40,7 @@ export const kathmanduInstant = (day: string, time: string) =>
 
 /** Stores a user's zone as `get_daily_day` would (`user_time_zones`), through psql. */
 export async function storeZone(userId: string, zone: string, offsetMinutes: number): Promise<void> {
-  const stored = await runPsql(
-    'insert into public.user_time_zones (user_id, time_zone, utc_offset_minutes, effective_zone, reported_at) ' +
-      `values ('${userId}', '${zone}', ${offsetMinutes}, public.effective_zone('${zone}', ${offsetMinutes}), now());\n`
-  );
+  const stored = await runPsql(`${storeZoneSql(userId, zone, offsetMinutes)}\n`);
   expect(stored.code, stored.stderr).toBe(0);
 }
 
@@ -106,25 +104,30 @@ export async function deleteStaleKathmanduPairs(supabaseAdmin: TypedSupabaseClie
 }
 
 /**
- * The pair's `couple_days` id for `day` (creating it through `assign_couple_day`) and, when
- * `pickers` names users, each one's pick of `this` made at `pickedAt`. A pick cannot be
- * written through the API (`daily_picks` grants no write), so this runs as `postgres`.
+ * The pair's `couple_days` id for `day` (creating it through `assign_couple_day`, or keeping
+ * the one it holds) and, when `pickers` names users, each one's pick (`this` unless
+ * `choice` says) made at `pickedAt` in Kathmandu. A pick cannot be written through the
+ * API (`daily_picks` grants no write), so this runs as `postgres`, through the same
+ * statements as `seedPairDays` (`pairDaySql`).
  */
 export async function seedPairDay(
   pair: { userId: string; partnerId: string },
   day: string,
-  pickers: { userId: string; pickedAt: string; isSecond?: boolean }[]
+  pickers: { userId: string; pickedAt: string; isSecond?: boolean; choice?: 'this' | 'that' }[]
 ): Promise<string> {
   const [userA, userB] = [pair.userId, pair.partnerId].sort();
-  const statements = [`select public.assign_couple_day('${userA}', '${userB}', date '${day}');`];
-  for (const { userId, pickedAt, isSecond = false } of pickers) {
-    statements.push(
-      'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
-        `select cd.id, '${userId}', 'this', timestamptz '${pickedAt}', '${KATHMANDU_ZONE}', ${KATHMANDU_OFFSET_MINUTES}, ` +
-        `public.effective_zone('${KATHMANDU_ZONE}', ${KATHMANDU_OFFSET_MINUTES}), ${isSecond} ` +
-        `from public.couple_days cd where cd.user_a = '${userA}' and cd.user_b = '${userB}' and cd.day = date '${day}';`
-    );
-  }
+  const statements = pairDaySql(
+    pair,
+    day,
+    pickers.map(({ userId, pickedAt, isSecond = false, choice }) => ({
+      userId,
+      at: `timestamptz '${pickedAt}'`,
+      zone: KATHMANDU_ZONE,
+      offsetMinutes: KATHMANDU_OFFSET_MINUTES,
+      isSecond,
+      choice,
+    }))
+  );
   statements.push(
     `select cd.id from public.couple_days cd where cd.user_a = '${userA}' and cd.user_b = '${userB}' and cd.day = date '${day}';`
   );

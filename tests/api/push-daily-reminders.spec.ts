@@ -28,7 +28,7 @@
  * (`needs-edge-functions` in CI); the `api` project runs one worker.
  */
 import type { TypedSupabaseClient } from '../support/factories';
-import { orderedPair, readPairQuestionsByDay } from '../support/factories/daily-question';
+import { readPairQuestionsByDay } from '../support/factories/daily-question';
 import {
   KATHMANDU_OFFSET_MINUTES,
   KATHMANDU_ZONE,
@@ -37,8 +37,8 @@ import {
   kathmanduYesterday,
   otherAccountsDueAt,
   seedPairDay,
+  storeZone,
 } from '../support/helpers/daily-clock';
-import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
   createParty as createThrowawayParty,
@@ -87,13 +87,7 @@ test.describe('Daily reminders on each person\'s clock', () => {
     const aliceDevice = await registerDevice(alice, 'sandbox');
     const [bobPhone, bobTablet] = [await registerDevice(bob, 'sandbox'), await registerDevice(bob, 'production')];
 
-    for (const userId of [alice.userId, bob.userId]) {
-      const stored = await runPsql(
-        'insert into public.user_time_zones (user_id, time_zone, utc_offset_minutes, effective_zone, reported_at) ' +
-          `values ('${userId}', '${ZONE}', ${OFFSET_MINUTES}, public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), now());\n`
-      );
-      expect(stored.code, stored.stderr).toBe(0);
-    }
+    for (const userId of [alice.userId, bob.userId]) await storeZone(userId, ZONE, OFFSET_MINUTES);
 
     const day = kathmanduYesterday();
     const morningAt = kathmanduInstant(day, '08:25');
@@ -151,14 +145,9 @@ test.describe('Daily reminders on each person\'s clock', () => {
     expect(await requestsFor(supabaseAdmin, bobEvening, 'daily_reminder_id')).toEqual(bobEveningRows);
 
     // ---- Bob answers late in the evening: Alice hears both answered, and that is the day's last push ----
-    const [userA, userB] = orderedPair(pair);
-    const second = await runPsql(
-      'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
-        `select cd.id, '${bob.userId}', 'that', timestamptz '${eveningAt}' + interval '1 minute', '${ZONE}', ${OFFSET_MINUTES}, ` +
-        `public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), true ` +
-        `from public.couple_days cd where cd.user_a = '${userA}' and cd.user_b = '${userB}' and cd.day = date '${day}';\n`
-    );
-    expect(second.code, second.stderr).toBe(0);
+    await seedPairDay(pair, day, [
+      { userId: bob.userId, pickedAt: new Date(Date.parse(eveningAt) + 60_000).toISOString(), isSecond: true, choice: 'that' },
+    ]);
     const { data: picks, error: picksError } = await supabaseAdmin
       .from('daily_picks')
       .select('id, user_id')

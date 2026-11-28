@@ -21,6 +21,7 @@ import { interceptNetworkCall as fulfillOn } from '@seontechnologies/playwright-
 import { log } from '@seontechnologies/playwright-utils';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../support/merged-fixtures';
+import { calendarWeekFrom, sevenDatesEnding } from '../../support/factories/calendar-week';
 import { clearPairDays, readPairDayWriter } from '../../support/factories/daily-question';
 import { resolveWorkerPairIds } from '../../support/factories/events';
 import { closeContext } from '../../support/fixtures/cleanup';
@@ -131,14 +132,8 @@ async function openStubbedPartner(
     '2030-03-05': todayState === 'blue' ? 'missed' : 'open',
     '2030-03-06': todayState === 'orange' ? 'done' : 'open',
   };
-  const week = ['02-28', '03-01', '03-02', '03-03', '03-04', '03-05', '03-06'].map((md) => {
-    const day = `2030-${md}`;
-    return { day, state: states[day] ?? 'open' };
-  });
-  const calendarWeek = ['03', '04', '05', '06', '07', '08', '09'].map((dd) => {
-    const day = `2030-03-${dd}`;
-    return { day, state: day > '2030-03-06' ? 'upcoming' : (states[day] ?? 'open') };
-  });
+  const week = sevenDatesEnding('2030-03-06').map((day) => ({ day, state: states[day] ?? 'open' }));
+  const calendarWeek = calendarWeekFrom('2030-03-03', '2030-03-06', (day) => states[day]);
   const streak = fulfillOn({
     page,
     method: 'POST',

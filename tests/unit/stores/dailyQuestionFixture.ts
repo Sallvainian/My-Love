@@ -4,6 +4,7 @@
  */
 import type { CoupleStreak, DailyDaySnapshot } from '../../../src/api/validation/dailyQuestionSchemas';
 import type { PartnerTag } from '../../../src/services/dailyPartnerTag';
+import { calendarWeekFrom, sevenDatesFrom } from '../../support/factories/calendar-week';
 
 export const DAY_ID = '00000000-0000-4000-8000-0000000000d1';
 
@@ -103,7 +104,8 @@ export function streakWeek(states: CoupleStreak['week'][number]['state'][] = [])
   return padded.map((state, index) => ({ day: `2030-03-0${index + 1}`, state }));
 }
 
-type CalendarDay = NonNullable<CoupleStreak['calendar_week']>[number];
+/** The Sunday the fixtures' calendar week starts on. */
+const FIXTURE_SUNDAY = '2030-03-03';
 
 /**
  * The calendar week 2030-03-03 (Sunday) to 2030-03-09 (Saturday) as the server
@@ -115,10 +117,8 @@ export function calendarWeek(
   todayIndex = 4,
   states: Partial<Record<number, 'done' | 'missed' | 'open'>> = {}
 ): NonNullable<CoupleStreak['calendar_week']> {
-  return Array.from({ length: 7 }, (_, index): CalendarDay => ({
-    day: `2030-03-0${index + 3}`,
-    state: index > todayIndex ? 'upcoming' : (states[index] ?? 'open'),
-  }));
+  const today = sevenDatesFrom(FIXTURE_SUNDAY)[todayIndex];
+  return calendarWeekFrom(FIXTURE_SUNDAY, today, (_day, index) => states[index]);
 }
 
 /** The streak `get_couple_streak` answers; override any field. Defaults to one done day, orange. */
@@ -128,13 +128,11 @@ export function coupleStreak(overrides: Partial<CoupleStreak> = {}): CoupleStrea
   // date is the viewer's date, later dates are `upcoming`, an earlier date takes its state in
   // `week` and a date `week` does not hold is `open`.
   const today = week[week.length - 1].day;
-  const calendar_week = Array.from({ length: 7 }, (_, index): CalendarDay => {
-    const day = `2030-03-0${index + 3}`;
-    return {
-      day,
-      state: day > today ? 'upcoming' : (week.find((entry) => entry.day === day)?.state ?? 'open'),
-    };
-  });
+  const calendar_week = calendarWeekFrom(
+    FIXTURE_SUNDAY,
+    today,
+    (day) => week.find((entry) => entry.day === day)?.state
+  );
   return {
     held: 1,
     run: 1,
