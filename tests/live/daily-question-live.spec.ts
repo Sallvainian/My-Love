@@ -15,12 +15,19 @@
  * `send_daily_nudge` answered 200). After a reload A sees no prompt and an
  * enabled Nudge button on the waiting card; A taps it (one more
  * `send_daily_nudge`, answered 200), and after another reload A's day answer has
- * the button's nudge sent and the button shows as sent, grey. The spec registers
- * no push device for either bot.
+ * the button's nudge sent and the button shows as sent, grey. That reload is the
+ * last on A's page before B picks: the server's `ok` to the page's join of its
+ * partner channel (`mood-updates:<A's id>`, read off the Realtime socket) and
+ * the `get_daily_day` read the join starts must both land first. The spec
+ * registers no push device for either bot.
  * Bot B's own RPC answers before B's pick
  * (`get_daily_day`, `get_daily_day_by_id`) carry no choice, mark or count; B's
- * page says A has picked and shows no reveal; B picks That; both pages, after a
- * reload, show the reveal with "Different picks". Then each bot loads its
+ * page says A has picked and shows no reveal; B picks That. A's open page then
+ * shows the reveal with no reload (R2): one `get_daily_day_by_id` answered 200,
+ * the re-read B's `daily_pick` broadcast asks for, and no `get_daily_day` read
+ * started after B's send, so the update came by the hosted Realtime and its
+ * broadcast authorization, not a read. Then both pages, after a reload, show the
+ * reveal with "Different picks". Then each bot loads its
  * Partner page (story 7.11): the streak card is orange with 1 day answered
  * together and 1 in a row, and Past questions holds today's question alone,
  * that bot's pick first, marked Different. One day is all there is, because the
@@ -43,11 +50,12 @@
  * four agree on one date.
  */
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type WebSocket } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../src/types/database.types';
 import {
   COUPLE_STREAK_READ,
+  DAILY_DAY_BY_ID_READ,
   DAILY_DAY_READ,
   DAILY_HISTORY_READ,
   DAILY_NUDGE_SEND,
@@ -56,7 +64,8 @@ import {
 } from '../support/helpers/reads';
 import { waitClearOfDailyTurns } from '../support/helpers/events';
 import { observeReadAfterNavigation } from '../support/helpers/read-after-navigation';
-import { trackReads } from '../support/helpers/request-tracker';
+import { recurseUntil } from '../support/helpers/recurse';
+import { type ReadTracker, trackReads } from '../support/helpers/request-tracker';
 import { dismissWelcomeSplash } from '../support/helpers/welcome-splash';
 
 type BotClient = SupabaseClient<Database>;
@@ -70,6 +79,7 @@ const BOT_B_NAME = 'Claude Partner';
 
 const UTC_ZONE = { time_zone: 'UTC', utc_offset_minutes: 0 } as const;
 const NUDGE_SEND_PATH = '/rest/v1/rpc/send_daily_nudge';
+const GET_DAILY_DAY_PATH = '/rest/v1/rpc/get_daily_day';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 
 interface Target {
@@ -249,6 +259,81 @@ function observeRpcAfterNavigation(page: Page, url: string) {
   return observeReadAfterNavigation(page, { method: 'POST', url });
 }
 
+/** One text frame of the Realtime socket, or null for a binary frame or anything unparsable. */
+interface RealtimeFrame {
+  ref: string | null;
+  topic: string;
+  event: string;
+  status: unknown;
+}
+
+/**
+ * realtime-js writes a frame as `[join_ref, ref, topic, event, payload]`
+ * (protocol 2.0.0, its default) or as an object of the same fields (1.0.0).
+ * A broadcast may come as a binary frame, which no join reply is.
+ */
+function parseRealtimeFrame(data: string | Buffer): RealtimeFrame | null {
+  if (typeof data !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  let fields: { ref: unknown; topic: unknown; event: unknown; payload: unknown };
+  if (Array.isArray(parsed)) {
+    const [, ref, topic, event, payload] = parsed as unknown[];
+    fields = { ref, topic, event, payload };
+  } else if (parsed !== null && typeof parsed === 'object') {
+    const { ref, topic, event, payload } = parsed as Record<string, unknown>;
+    fields = { ref, topic, event, payload };
+  } else {
+    return null;
+  }
+  if (typeof fields.topic !== 'string' || typeof fields.event !== 'string') return null;
+  const status =
+    fields.payload !== null && typeof fields.payload === 'object'
+      ? (fields.payload as { status?: unknown }).status
+      : undefined;
+  return {
+    ref: typeof fields.ref === 'string' ? fields.ref : null,
+    topic: fields.topic,
+    event: fields.event,
+    status,
+  };
+}
+
+/**
+ * Watch the page's Realtime sockets for the server's `ok` to a join of the
+ * account's own partner channel (`mood-updates:<userId>`, where the partner's
+ * `daily_pick` lands) and keep the number of `get_daily_day` reads the page
+ * had started then. That reply is when the SDK reports `SUBSCRIBED`; the
+ * `[MoodSyncService]` log the local spec waits on is `logger.debug`, which a
+ * production build never prints. The join's `SUBSCRIBED` starts one more
+ * `get_daily_day` read, after that count. Attach it before the navigation
+ * that joins: a reply sent before it is never seen.
+ */
+function watchPartnerChannelJoin(page: Page, userId: string, reads: ReadTracker) {
+  const topic = `realtime:mood-updates:${userId}`;
+  let startedAtJoin: number | null = null;
+  // playwright-utils deviation: reads the Realtime socket's frames, which interceptNetworkCall (HTTP only) cannot see.
+  page.on('websocket', (socket: WebSocket) => {
+    const joinRefs = new Set<string>();
+    socket.on('framesent', ({ payload }) => {
+      const frame = parseRealtimeFrame(payload);
+      if (frame?.event === 'phx_join' && frame.topic === topic && frame.ref) joinRefs.add(frame.ref);
+    });
+    socket.on('framereceived', ({ payload }) => {
+      if (startedAtJoin !== null) return;
+      const frame = parseRealtimeFrame(payload);
+      if (frame?.event !== 'phx_reply' || frame.topic !== topic) return;
+      if (frame.ref === null || !joinRefs.has(frame.ref) || frame.status !== 'ok') return;
+      startedAtJoin = reads.started();
+    });
+  });
+  return { startedAtJoin: () => startedAtJoin };
+}
+
 async function signInThroughUi(page: Page, bot: Bot): Promise<void> {
   await dismissWelcomeSplash(page);
   await page.goto('/');
@@ -416,10 +501,14 @@ test.describe('Live Daily check', () => {
       // A taps it: one more request, answered 200, and after another reload the
       // button shows as sent. The button is also disabled while the send is in
       // flight, so "sent" is read from the server's answer after the reload.
+      // That reload is A's last before B picks, so the day-read tracker and the
+      // partner channel's join watch go on first.
       const buttonNudged = observeRpc(pageA, DAILY_NUDGE_SEND);
       await nudgeButton.click();
       expect((await buttonNudged).status).toBe(200);
       expect(nudgeSends.started()).toBe(2);
+      const dayReadsA = trackReads(pageA, GET_DAILY_DAY_PATH, 'POST');
+      const joinA = watchPartnerChannelJoin(pageA, a.id, dayReadsA);
       const afterNudge = (await openDaily(pageA, () => pageA.reload())) as {
         snapshot: { nudges?: { prompt_sent: boolean; button_sent: boolean } };
       };
@@ -429,6 +518,26 @@ test.describe('Live Daily check', () => {
       await expect(pageA.getByTestId('daily-nudge-error')).toHaveCount(0);
       await expect(nudgeSheet).toHaveCount(0);
       expect(nudgeSends.started()).toBe(2);
+
+      // A's page has joined its partner channel on the live project, and every
+      // get_daily_day read has settled: the join's own read starts after the
+      // count taken at the join, so it must be passed, with none in flight. A
+      // read left in flight could carry B's pick and stand in for the broadcast.
+      const dayReadsAtJoinA = await recurseUntil(
+        async () => joinA.startedAtJoin(),
+        (startedAtJoin) => {
+          expect(startedAtJoin, "the server's ok to A's join of its partner channel").not.toBeNull();
+        },
+        { timeout: 30_000 }
+      );
+      await recurseUntil(
+        async () => ({ started: dayReadsA.started(), inFlight: dayReadsA.inFlight() }),
+        ({ started, inFlight }) => {
+          expect(started, "the join's own read started").toBeGreaterThan(dayReadsAtJoinA ?? 0);
+          expect(inFlight, 'no get_daily_day read is in flight').toBe(0);
+        },
+        { timeout: 15_000 }
+      );
 
       // B has not picked: B's own answers say a pick was made and nothing of it.
       const { data: answer, error: dayError } = await b.client.rpc('get_daily_day', {
@@ -458,11 +567,22 @@ test.describe('Live Daily check', () => {
       await expect(pageB.getByTestId('daily-reveal-partner')).toHaveCount(0);
 
       // B picks That and sees the reveal.
+      const dayReadsBeforeSendA = dayReadsA.started();
+      const reReadA = observeRpc(pageA, DAILY_DAY_BY_ID_READ);
       await pageB.getByTestId('daily-option-that').click();
       const sentB = observeRpc(pageB, DAILY_PICK_SEND);
       await pageB.getByTestId('daily-send-pick').click();
       expect((await sentB).status).toBe(200);
       await expect(pageB.getByTestId('daily-reveal')).toBeVisible();
+
+      // A's open page shows the reveal with no reload: B's daily_pick broadcast
+      // asked for the one re-read, and no day read stood in for it.
+      expect((await reReadA).status).toBe(200);
+      await expect(pageA.getByTestId('daily-reveal')).toBeVisible();
+      await expect(pageA.getByTestId('daily-reveal-mine')).toHaveText(thisText);
+      await expect(pageA.getByTestId('daily-reveal-partner')).toHaveText(thatText);
+      await expect(pageA.getByTestId('daily-reveal-mark')).toHaveText('Different picks');
+      expect(dayReadsA.started(), "A's page read no day but the named one").toBe(dayReadsBeforeSendA);
 
       // After a reload each page shows the same reveal from its own side.
       await openDaily(pageB, () => pageB.reload());
