@@ -187,11 +187,11 @@ test.describe('Account data follows the account, not the browser', () => {
 
     const fresh = await signInFresh(second, email);
 
-    const customRead = observeOn({
-      page: fresh,
+    // The sign-in started Home's message-data refresher, whose custom_messages
+    // read the navigation can cut off; only the admin page's read counts.
+    const customRead = observeReadAfterNavigation(fresh, {
       method: 'GET',
       url: CUSTOM_MESSAGES_READ,
-      timeout: SECOND_CONTEXT_READ_TIMEOUT,
     });
     await fresh.goto('/admin');
     const customRows = await customRead;

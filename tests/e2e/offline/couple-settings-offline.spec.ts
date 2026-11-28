@@ -20,15 +20,12 @@ import { navigateTo } from '../../support/helpers/navigation';
 import { COUPLE_SETTINGS_READ } from '../../support/helpers/reads';
 import { recurseUntil } from '../../support/helpers/recurse';
 import type { TypedSupabaseClient } from '../../support/factories';
+import { orderedPair } from '../../support/factories/daily-question';
 
 // Tracing corrupts when the context goes offline (see network-status.spec.ts).
 test.use({ trace: 'off', video: 'off' });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function orderedPair(a: string, b: string) {
-  return a < b ? { user_a: a, user_b: b } : { user_a: b, user_b: a };
-}
 
 async function setPairStart(
   supabaseAdmin: TypedSupabaseClient,
@@ -88,7 +85,8 @@ test.describe('Couple start date from the local copy', () => {
     cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const pair = orderedPair(userId, partnerId);
+    const [user_a, user_b] = orderedPair({ userId, partnerId });
+    const pair = { user_a, user_b };
     // Ten days and an hour before the page's pinned clock, so Home reads
     // "10 days" whenever the run happens. The clock survives the reload below.
     const anchor = clockAnchor();
@@ -152,7 +150,8 @@ test.describe('Couple start date from the local copy', () => {
     cleanup,
   }) => {
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
-    const pair = orderedPair(userId, partnerId);
+    const [user_a, user_b] = orderedPair({ userId, partnerId });
+    const pair = { user_a, user_b };
     const start = new Date(Date.now() - 40 * DAY_MS);
     start.setSeconds(0, 0);
     const startIso = start.toISOString();
