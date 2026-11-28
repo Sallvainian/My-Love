@@ -44,6 +44,7 @@
  * file and the other push specs never run at once.
  */
 import type { TypedSupabaseClient } from '../support/factories';
+import { pairDaySql } from '../support/factories/daily-question';
 import type { Cleanup } from '../support/fixtures/cleanup';
 import { isoDateDaysFromNow, waitClearOfDailyTurns, waitClearOfReminderTicks } from '../support/helpers/events';
 import { runPsql } from '../support/helpers/migration-replay';
@@ -72,6 +73,7 @@ test.describe('Daily push sender', () => {
       second: bob,
       firstDevice: aliceDevice,
       secondDevices: [bobPhone, bobTablet],
+      pair,
       dayIds,
     } = await setUpPair(
       supabaseAdmin,
@@ -85,7 +87,7 @@ test.describe('Daily push sender', () => {
       ]
     );
     const today = isoDateDaysFromNow(0, new Date());
-    return { alice, bob, aliceDevice, bobPhone, bobTablet, today, dayId: dayIds[today], dayIds };
+    return { alice, bob, aliceDevice, bobPhone, bobTablet, pair, today, dayId: dayIds[today], dayIds };
   }
 
   test('[P0] the 8 PM reminder and a nudge record their copy for the recipient\'s devices only; an off switch records nothing for that kind and person', async ({
@@ -234,7 +236,7 @@ test.describe('Daily push sender', () => {
     cleanup,
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
-    const { alice, bob, aliceDevice, today, dayIds } = await setUpDailyPair(supabaseAdmin, cleanup);
+    const { alice, bob, aliceDevice, pair, today, dayIds } = await setUpDailyPair(supabaseAdmin, cleanup);
     const twoDaysAgo = isoDateDaysFromNow(-2, new Date());
 
     async function pickOf(day: string, party: Party) {
@@ -270,11 +272,19 @@ test.describe('Daily push sender', () => {
     expect(await postKindToSender(supabaseAdmin, 'daily_both_answered', lateSecond)).toEqual({ ...zeros, skipped: 1 });
 
     // ---- today's second pick (Bob): held is 4 and run 1, and the wording is the same ----
-    const inserted = await runPsql(
-      'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
-        `select '${dayIds[today]}', '${bob.userId}', 'that', now(), z.time_zone, z.utc_offset_minutes, z.effective_zone, true ` +
-        `from public.user_time_zones z where z.user_id = '${bob.userId}';\n`
-    );
+    // In the host zone the seed dated the days and stored for Bob, through the seed's own SQL.
+    const hostZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const secondPick = pairDaySql(pair, today, [
+      {
+        userId: bob.userId,
+        at: 'now()',
+        zone: hostZone,
+        offsetMinutes: -new Date().getTimezoneOffset(),
+        isSecond: true,
+        choice: 'that',
+      },
+    ]);
+    const inserted = await runPsql(`${secondPick.join('\n')}\n`);
     expect(inserted.code, inserted.stderr).toBe(0);
     const bobPick = await pickOf(today, bob);
     const bothRows = await awaitRequests(supabaseAdmin, bobPick, 'daily_pick_id', 1);
