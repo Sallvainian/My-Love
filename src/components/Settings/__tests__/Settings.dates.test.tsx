@@ -451,7 +451,7 @@ describe('Settings > Dates', () => {
       setDates({
         coupleSettings: { status: 'unlinked' },
         partner: null,
-        partnerKnown: true,
+        partnerKnown: false,
         partnerLoadError: true,
         events: [makeEvent('theirs', { userId: 'partner-1' })],
         anniversaries: [{ id: 1, date: '2021-01-02', label: 'Theirs', serverId: 'a-theirs', userId: 'partner-1' }],

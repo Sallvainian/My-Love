@@ -4,17 +4,19 @@
  *
  * `DailyQuestion` mounts this. While the account is signed in:
  *
- *   - every `visibilitychange` to `visible` calls `loadDailyDay`, because a
- *     page hidden past midnight, or while a partner answered, has missed any
- *     broadcast.
+ *   - every `visibilitychange` to `visible` calls `loadDailyDay` and
+ *     `loadCoupleStreak`, because a page hidden past midnight, or while a
+ *     partner answered, has missed any broadcast, and the streak's chip, week
+ *     and cold banner move with the day (DW-566).
  *   - a timer fires at the next local 00:00:05, calls `loadDailyDay` and
  *     `loadCoupleStreak`, and arms the next night's, so a page left on screen
  *     across midnight moves to the new day (header, question, chip, week, and a
  *     write sheet left open, which closes as its day is no longer the device's
  *     date). When the day then shown is still not the device's date (a server
  *     clock a little behind the device's, or a failed read), it reads both once
- *     more 5 s after the midnight read answered, and no more that night. The timers are cleared on unmount
- *     and on a session change, and a read that answers after that arms nothing.
+ *     more 5 s after the midnight read answered, and no more that night. The
+ *     timers are cleared on unmount and on a session change, and a read that
+ *     answers after that arms nothing.
  *
  * The evening re-read at 20:00:05 that followed the sender's nudge slot went
  * with the slots (story 11.1), and the nudge controls close themselves at the
@@ -86,7 +88,7 @@ export function useDailyDayRereads(): void {
     arm();
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') void loadDailyDay();
+      if (document.visibilityState === 'visible') void readDayAndStreak();
     };
     document.addEventListener('visibilitychange', onVisibility);
 

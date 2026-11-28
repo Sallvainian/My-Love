@@ -15,10 +15,10 @@
  * known; an unset couple date reads `Not set` and its target is the date's
  * one-field page (`…/date`), while a value not known yet is left empty, never
  * `Loading...`. Events and anniversaries are narrowed to the account's own
- * only on a confirmed unlinked answer (`partnerKnown`, no partner, no
- * `partnerLoadError`), since a saved copy could still hold a former partner's
- * rows (an anniversary saved before they were shared carries no owner and is
- * the account's own).
+ * only on a confirmed unlinked answer (`partnerKnown` with no partner; a failed
+ * read with nothing saved leaves `partnerKnown` false), since a saved copy
+ * could still hold a former partner's rows (an anniversary saved before they
+ * were shared carries no owner and is the account's own).
  *
  * Settings does not refresh events (the `events` refresher skips this view), so
  * the page loads them on mount and on each connectivity change, as Home does;
@@ -99,7 +99,6 @@ export function DatesPage() {
   const ownProfile = useAppStore((s) => s.ownProfile);
   const partner = useAppStore((s) => s.partner);
   const partnerKnown = useAppStore((s) => s.partnerKnown);
-  const partnerLoadError = useAppStore((s) => s.partnerLoadError);
 
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
@@ -199,7 +198,7 @@ export function DatesPage() {
   const now = new Date();
   const linked =
     coupleSettings?.status === 'linked' || (coupleSettings === null && partner !== null);
-  const confirmedUnlinked = partnerKnown && partner === null && !partnerLoadError;
+  const confirmedUnlinked = partnerKnown && partner === null;
   const visibleEvents = confirmedUnlinked ? events.filter((event) => event.userId === userId) : events;
   const visibleAnniversaries = confirmedUnlinked
     ? anniversaries?.filter((anniversary) => !anniversary.userId || anniversary.userId === userId)

@@ -28,18 +28,12 @@ const NOT_LINKED = 'Not linked';
 export function PartnerRow() {
   const partner = useAppStore((s) => s.partner);
   const partnerKnown = useAppStore((s) => s.partnerKnown);
-  const partnerLoadError = useAppStore((s) => s.partnerLoadError);
 
-  // The page's precedence: a failed read with nothing saved shows no value,
-  // even over an earlier loaded answer, so the row never says `Not linked`
-  // above a page that says the partner could not be loaded.
-  const value = partnerLoadError
-    ? undefined
-    : partner
-      ? partner.displayName
-      : partnerKnown
-        ? NOT_LINKED
-        : undefined;
+  // A failed read with nothing saved shows no value: the store raises the load
+  // error only while nothing is known (`partnerKnown` false, no partner), so the
+  // row never says `Not linked` above a page that says the partner could not
+  // be loaded.
+  const value = partner ? partner.displayName : partnerKnown ? NOT_LINKED : undefined;
 
   return (
     <SettingsRow

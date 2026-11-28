@@ -61,8 +61,7 @@ function useCoupleAbsent(): boolean {
   const coupleSettings = useAppStore((s) => s.coupleSettings);
   const partner = useAppStore((s) => s.partner);
   const partnerKnown = useAppStore((s) => s.partnerKnown);
-  const partnerLoadError = useAppStore((s) => s.partnerLoadError);
-  const confirmedUnlinked = partnerKnown && partner === null && !partnerLoadError;
+  const confirmedUnlinked = partnerKnown && partner === null;
   return coupleSettings?.status === 'unlinked' || (coupleSettings === null && confirmedUnlinked);
 }
 
@@ -278,9 +277,8 @@ export function YourBirthdayPage() {
 export function PartnerBirthdayPage() {
   const partner = useAppStore((s) => s.partner);
   const partnerKnown = useAppStore((s) => s.partnerKnown);
-  const partnerLoadError = useAppStore((s) => s.partnerLoadError);
   const [error, setError] = useState<string | null>(null);
-  useFallBackToDates(partnerKnown && partner === null && !partnerLoadError);
+  useFallBackToDates(partnerKnown && partner === null);
 
   return (
     <DatePage testId="settings-partner-birthday-page" error={error}>
