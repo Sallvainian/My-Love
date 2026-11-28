@@ -160,13 +160,14 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
         get().userId === userId && get().authSessionVersion === authSessionVersion;
       const seq = ++partnerLoadSeq;
 
-      // Spinner only while nothing has answered, or while the load error is what
-      // is shown (a retry then hides the error card until an answer lands): a
-      // refresh over a shown partner must not swap the view for a loading state,
-      // and neither must one over a confirmed "unlinked" answer, which would
-      // unmount the Connect UI and lose what is typed, searched or reported
-      // there. The Connect UI is not mounted while the load error is up.
-      if (get().partner === null && (!get().partnerKnown || get().partnerLoadError)) {
+      // Spinner only while nothing has answered, which covers a shown load error:
+      // the error is raised only while nothing is known (`nothingKnown` below),
+      // so a retry hides the error card until an answer lands. A refresh over a
+      // shown partner must not swap the view for a loading state, and neither
+      // must one over a confirmed "unlinked" answer, which would unmount the
+      // Connect UI and lose what is typed, searched or reported there. The
+      // Connect UI is not mounted while the load error is up.
+      if (get().partner === null && !get().partnerKnown) {
         set({ isLoadingPartner: true });
       }
 

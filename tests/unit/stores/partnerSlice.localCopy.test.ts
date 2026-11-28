@@ -533,4 +533,35 @@ describe('partner profile on the local copy', () => {
       expect(state().isLoadingPartner).toBe(false);
     });
   });
+
+  // DW-567: the spinner's condition and the component tests rely on this pair
+  // never being held, so the load error alone never needs its own clause.
+  it('never holds a load error over a known answer, on any load path', async () => {
+    const both: string[] = [];
+    const stop = useAppStore.subscribe((next) => {
+      if (next.partnerKnown && next.partnerLoadError) both.push(JSON.stringify(next.partner));
+    });
+
+    getPartner.mockResolvedValue(READ_FAILED);
+    await state().loadPartner();
+    expect(state().partnerLoadError).toBe(true);
+    getPartner.mockResolvedValue({ status: 'unlinked' });
+    await state().loadPartner();
+    getPartner.mockResolvedValue(READ_FAILED);
+    await state().loadPartner();
+    await clearCopies();
+    await state().loadPartner();
+    setOnline(false);
+    await state().loadPartner();
+    setOnline(true);
+    getPartner.mockResolvedValue(linked(FRESH));
+    await state().loadPartner();
+    await clearCopies();
+    getPartner.mockResolvedValue(READ_FAILED);
+    await state().loadPartner();
+    stop();
+
+    expect(state().partnerKnown).toBe(true);
+    expect(both).toEqual([]);
+  });
 });

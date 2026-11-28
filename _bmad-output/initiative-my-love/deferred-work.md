@@ -4566,7 +4566,9 @@ origin: dw-resolve 2026-11-28, raised while fixing DW-538
 location: src/hooks/useDailyDayRereads.ts:89 (the visibilitychange handler calls only loadDailyDay)
 severity: low
 reason: A page hidden past midnight comes back on the new day with the header streak chip, week strip and cold banner still from the old date until a remount; nothing else re-reads the streak on visibilitychange (grep finds only this hook in src/ outside services). The midnight timer added for DW-538 re-reads both; the visibility handler does not. UNVERIFIED in a browser.
-status: open
+status: done 2026-11-28
+resolution: the visibilitychange handler in useDailyDayRereads.ts re-reads the streak with the day, as the midnight timer does; proved by useDailyDayRereads.test.ts 'a page shown again after midnight re-reads the streak for the new day (DW-566)' (red on main).
+decision: 2026-11-28 fix-now — owner approved fixing the entries filed during the fix run in the follow-up PR
 
 ### DW-567: partnerSlice's spinner keeps a partnerLoadError clause the store can no longer reach
 
@@ -4574,7 +4576,9 @@ origin: dw-resolve 2026-11-28, raised while fixing DW-552
 location: src/stores/slices/partnerSlice.ts:169; src/components/Settings/__tests__/Settings.partner.test.tsx:166, Settings.dates.test.tsx:454-455, Settings.datePages.test.tsx:315, :827
 severity: low
 reason: After DW-552 the store never holds partnerKnown true with partnerLoadError true, so the spinner condition's `|| get().partnerLoadError` clause is dead and the component tests that mock that pair model a state the store cannot reach. Harmless as it stands.
-status: open
+status: done 2026-11-28
+resolution: the unreachable `|| get().partnerLoadError` spinner clause is removed, and with it the same dead checks in Settings PartnerPage.tsx, DatePages.tsx and DatesPage.tsx; the component tests now mock the reachable pair with their assertions kept; partnerSlice.localCopy.test.ts 'never holds a load error over a known answer, on any load path' guards the rule (fails when nothingKnown drops !partnerKnown).
+decision: 2026-11-28 fix-now — owner approved fixing the entries filed during the fix run in the follow-up PR
 
 ### DW-568: push-daily-sender.spec.ts still writes a pick with its own inline SQL
 
@@ -4582,7 +4586,9 @@ origin: dw-resolve 2026-11-28, raised while fixing DW-565
 location: tests/api/push-daily-sender.spec.ts:274
 severity: low
 reason: The second test writes Bob's second pick as an inline daily_picks insert (zone read from user_time_zones), a fifth copy of the pick SQL that pairDaySql (tests/support/factories/daily-question.ts) now builds. It was outside DW-565's listed sites.
-status: open
+status: done 2026-11-28
+resolution: push-daily-sender.spec.ts writes Bob's second pick through pairDaySql in the stored host zone instead of an inline daily_picks insert; both tests in the spec pass.
+decision: 2026-11-28 fix-now — owner approved fixing the entries filed during the fix run in the follow-up PR
 
 ### DW-569: dailyQuestionFixture's streakWeek still builds its seven dates by hand
 
@@ -4590,7 +4596,9 @@ origin: dw-resolve 2026-11-28, raised while fixing DW-565
 location: tests/unit/stores/dailyQuestionFixture.ts:102
 severity: low
 reason: streakWeek builds `2030-03-0${index + 1}` by hand instead of sevenDatesFrom('2030-03-01') from tests/support/factories/calendar-week.ts. It was outside DW-565's four listed builders.
-status: open
+status: done 2026-11-28
+resolution: dailyQuestionFixture.ts streakWeek takes its dates from sevenDatesFrom('2030-03-01'); the 30 unit files that import the fixture stay green.
+decision: 2026-11-28 fix-now — owner approved fixing the entries filed during the fix run in the follow-up PR
 
 ### DW-570: The live Daily check cannot tell a real announce failure from its own reload noise
 
@@ -4598,4 +4606,6 @@ origin: dw-resolve 2026-11-28, raised while fixing DW-488
 location: tests/live/daily-question-live.spec.ts:423-427, :454, :468-474
 severity: low
 reason: Each reload in the live check aborts requests still in flight, so the dev server logs "[DailyQuestion] Could not announce the nudge/pick: TypeError: Failed to fetch" and "Failed to load today's question" on every run, on main too; the spec does not watch the console, so a real announce failure on the live site would look the same in its log.
-status: open
+status: done 2026-11-28
+resolution: daily-question-live.spec.ts watches both pages for the announce and load-failure lines and fails on any not logged during its own navigation, and waits for each nudge's announce before the reload that follows it; proved in local mode by probes that made the nudge announce (prompt and button) throw: each run failed at the new check, and the normal run passes.
+decision: 2026-11-28 fix-now — owner approved fixing the entries filed during the fix run in the follow-up PR

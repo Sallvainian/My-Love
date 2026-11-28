@@ -115,6 +115,7 @@ import {
   type DailyDayAnswer,
   type DailyDaySnapshot,
 } from '../../api/dailyQuestionApi';
+import { isOnline } from '../../api/errorHandlers';
 import { useDailyDayRereads } from '../../hooks/useDailyDayRereads';
 import { useDailyPickListener } from '../../hooks/useDailyPickListener';
 import { AccountDataError } from '../../services/accountDataError';
@@ -342,6 +343,8 @@ function DayCard({
   onPickSent: (dayId: string, stored: DailyDayAnswer) => void;
 }) {
   const submitDailyPick = useAppStore((state) => state.submitDailyPick);
+  // Read so a connection change re-renders the queued line below.
+  const connected = useAppStore((state) => state.syncStatus.isOnline);
   const [selected, setSelected] = useState<DailyChoice | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -396,7 +399,11 @@ function DayCard({
             {pickedTime(waitingToSend.picked_at)}
           </p>
           <p className="text-[15px] font-semibold text-ink" data-testid="daily-pick-queued">
-            Waiting for a connection to send your pick.
+            {/* Online, the pick was queued after a failed send and the drain
+                is already retrying it; only offline is it waiting. */}
+            {connected && isOnline()
+              ? 'Sending your pick…'
+              : 'Waiting for a connection to send your pick.'}
           </p>
           {partnerStatus}
         </div>
