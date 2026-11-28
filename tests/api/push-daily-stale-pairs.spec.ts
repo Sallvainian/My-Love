@@ -12,6 +12,11 @@
  *
  * Throwaway accounts only. The leftover's `created_at` is moved back through psql, as no
  * API sets it. Requires `supabase start`; the `api` project runs one worker.
+ *
+ * Never run it beside `push-daily-reminders.spec.ts` or `push-daily-nudge-held.spec.ts` on
+ * another lane against the same stack: their guard counts this spec's aged pair, or their
+ * `deleteStaleKathmanduPairs` deletes it first and this spec fails at `deleted` (those two
+ * already must not run beside each other).
  */
 import type { TypedSupabaseClient } from '../support/factories';
 import {
