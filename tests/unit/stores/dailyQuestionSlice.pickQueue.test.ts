@@ -244,9 +244,10 @@ describe('submitDailyPick online', () => {
   it('keeps a failed row when the new send fails', async () => {
     await enqueuePick(queued({ failed: true, failure: 'REFUSED' }));
     useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
-    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    // Not a transport failure: that one queues the pick again (DW-484).
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('invalid-response', 'boom'));
 
-    await expect(state().submitDailyPick('that')).rejects.toMatchObject({ code: 'transport' });
+    await expect(state().submitDailyPick('that')).rejects.toMatchObject({ code: 'invalid-response' });
 
     expect(await listQueuedPicks(A)).toEqual([queued({ failed: true, failure: 'REFUSED' })]);
   });

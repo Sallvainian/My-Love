@@ -489,10 +489,30 @@ describe('sendDailyNudge', () => {
     expect(NUDGE_UNCHECKED_MESSAGE).toBe("We couldn't check if your nudge went through. Try again?");
   });
 
-  it('leaves any other server error a transport error, an unknown outcome', async () => {
-    rpc.mockResolvedValue(failure('XX000'));
+  // DW-557: any code is the server's own answer (the call rolled back), so the nudge is known unsent.
+  it.each(['PGRST301', 'PGRST202', 'XX000', '57014'])(
+    'maps any other error the server answered with a code (%s) to a refusal, a known outcome',
+    async (code) => {
+      rpc.mockResolvedValue(failure(code));
 
-    const caught = await sendDailyNudge(DAY_ID, 'prompt').catch((error: unknown) => error);
+      const caught = (await sendDailyNudge(DAY_ID, 'prompt').catch(
+        (error: unknown) => error
+      )) as AccountDataError;
+
+      expect(caught).toMatchObject({ code: 'refused', message: NUDGE_FAILED_MESSAGE });
+      expect(caught.cause).toMatchObject({ code });
+      expect(isNudgeOutcomeUnknown(caught)).toBe(false);
+      expect(isNudgeAlreadySent(caught)).toBe(false);
+    }
+  );
+
+  it('leaves a network failure as the client reports it (the empty code) a transport error, an unknown outcome', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' },
+    });
+
+    const caught = await sendDailyNudge(DAY_ID, 'button').catch((error: unknown) => error);
 
     expect(caught).toMatchObject({ code: 'transport' });
     expect(isNudgeOutcomeUnknown(caught)).toBe(true);
@@ -516,13 +536,54 @@ describe('sendDailyNudge', () => {
     expect(isNudgeOutcomeUnknown(caught)).toBe(true);
   });
 
-  it('throws an invalid-response error, an unknown outcome, on an answer that is not a snapshot', async () => {
+  // DW-557: a successful answer that did not parse means the call committed: a sent nudge.
+  it('throws an invalid-response error, a sent nudge, on an answer that is not a snapshot', async () => {
     rpc.mockResolvedValue({ data: { nope: true }, error: null });
 
     const caught = await sendDailyNudge(DAY_ID, 'prompt').catch((error: unknown) => error);
 
     expect(caught).toMatchObject({ code: 'invalid-response' });
-    expect(isNudgeOutcomeUnknown(caught)).toBe(true);
+    expect(isNudgeOutcomeUnknown(caught)).toBe(false);
+    expect(isNudgeAlreadySent(caught)).toBe(true);
+  });
+
+  // DW-547: each failed nudge is logged once, here, where its error is mapped.
+  const lostInTransit = {
+    message: 'AbortError: signal timed out',
+    details: '',
+    hint: 'Request was aborted (timeout or manual cancellation)',
+    code: '',
+  };
+  it.each([
+    [
+      'a refusal',
+      () => rpc.mockResolvedValue(failure('DQ009')),
+      { code: 'DQ009', message: 'server words', details: '', hint: '' },
+    ],
+    [
+      'an error with another code',
+      () => rpc.mockResolvedValue(failure('PGRST301')),
+      { code: 'PGRST301', message: 'server words', details: '', hint: '' },
+    ],
+    ['a network failure', () => rpc.mockRejectedValue(new TypeError('Failed to fetch')), 'Failed to fetch'],
+    // The form supabase-js resolves for a network failure or a timeout: the empty code.
+    [
+      'a network failure as the client reports it',
+      () => rpc.mockResolvedValue({ data: null, error: lostInTransit }),
+      lostInTransit,
+    ],
+    [
+      'an answer that is not a snapshot',
+      () => rpc.mockResolvedValue({ data: { nope: true }, error: null }),
+      'The daily question answer was not understood.',
+    ],
+  ])('logs %s once', async (_name, arrange, logged) => {
+    arrange();
+
+    await sendDailyNudge(DAY_ID, 'prompt').catch(() => undefined);
+
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith('[Supabase] DailyQuestionApi.sendDailyNudge:', logged);
   });
 
   it('is not unknown offline, nor for something that is not an account error', async () => {

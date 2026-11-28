@@ -36,10 +36,12 @@
  *
  * `sendDailyNudge` sends the caller's nudge for a day (`send_daily_nudge`, AD-17)
  * and answers the day's snapshot, whose `nudge.spent` is then true. Online-only
- * and throwing, as above. A refusal the server raises for good (`DQ007` to
- * `DQ010`, `P0002`) is `AccountDataError('refused', NUDGE_FAILED_MESSAGE)`, the
- * server error kept as `cause`; any other failure is a transport error from
- * `toAccountDataError`, and the view shows `NUDGE_FAILED_MESSAGE` for both.
+ * and throwing, as above. Any error the server answered with a code (a refusal
+ * such as `DQ007` to `DQ010` or `P0002`, an expired token, a `PGRST` error) is
+ * `AccountDataError('refused', NUDGE_FAILED_MESSAGE)`, the server error kept as
+ * `cause`; a network failure or a timeout is a transport error from
+ * `toAccountDataError`, whose outcome is unknown. Each failure is logged once,
+ * here.
  *
  * `announceDailyPick` tells the partner's open Daily that a day changed: a
  * `daily_pick { day_id }` broadcast on their `mood-updates:<uid>` topic, never
@@ -90,23 +92,13 @@ export const NUDGE_FAILED_MESSAGE = 'Your nudge could not be sent.';
 export const NUDGE_UNCHECKED_MESSAGE = "We couldn't check if your nudge went through. Try again?";
 
 /**
- * SQLSTATEs `send_daily_nudge` raises for a nudge it refuses for good: `DQ007`
- * (before the viewer's own pick), `DQ008` (the partner has picked), `DQ009` (the
- * day has ended on the partner's clock), `DQ010` (already sent from that
- * source), `P0002` (day not found, or a link that does not go both ways) and
- * `22023` (unknown source). `DQ010` is told apart by `isNudgeAlreadySent`: it
- * means the nudge is on record, not that it failed.
+ * SQLSTATE `send_daily_nudge` raises when the viewer's nudge from that source is
+ * already on record. Its other refusals are `DQ007` (before the viewer's own
+ * pick), `DQ008` (the partner has picked), `DQ009` (the day has ended on the
+ * partner's clock), `P0002` (day not found, or a link that does not go both
+ * ways) and `22023` (unknown source); `DQ010` is told apart by
+ * `isNudgeAlreadySent`: it means the nudge is on record, not that it failed.
  */
-const NUDGE_REFUSAL_CODES: ReadonlySet<string> = new Set([
-  'DQ007',
-  'DQ008',
-  'DQ009',
-  'DQ010',
-  'P0002',
-  '22023',
-]);
-
-/** SQLSTATE `send_daily_nudge` raises when the viewer's nudge from that source is already on record. */
 const NUDGE_ALREADY_SENT = 'DQ010';
 
 /** SQLSTATE `submit_daily_pick` raises when the pick's date is not the shown day's date. */
@@ -287,13 +279,16 @@ export async function announceDailyNudge(dayId: string): Promise<void> {
 }
 
 /**
- * Whether `error` is `sendDailyNudge`'s refusal of a nudge that is already on
- * record from that source (`DQ010`): the send ended as a sent nudge, not a
- * failure (a retry after a lost answer, or a stale screen on another device).
+ * Whether `error` from `sendDailyNudge` means the nudge is on record from that
+ * source, so the send ended as a sent nudge, not a failure: the server's
+ * refusal of a nudge already sent (`DQ010`: a retry after a lost answer, or a
+ * stale screen on another device), or a successful answer that could not be
+ * parsed (`invalid-response`: the call committed) (DW-557).
  */
 export function isNudgeAlreadySent(error: unknown): boolean {
+  if (!(error instanceof AccountDataError)) return false;
+  if (error.code === 'invalid-response') return true;
   return (
-    error instanceof AccountDataError &&
     error.code === 'refused' &&
     isPostgrestError(error.cause) &&
     error.cause.code === NUDGE_ALREADY_SENT
@@ -302,23 +297,22 @@ export function isNudgeAlreadySent(error: unknown): boolean {
 
 /**
  * Whether the answer to a nudge request is unknown: the request timed out or
- * failed on the network, or the server's answer could not be parsed. The
- * server may have recorded the nudge, so nothing says it failed (DW-539).
+ * failed on the network. The server may have recorded the nudge, so nothing
+ * says it failed (DW-539). An error the server answered with a code is a
+ * refusal, and an unreadable successful answer is a sent nudge (DW-557).
  */
 export function isNudgeOutcomeUnknown(error: unknown): boolean {
-  return (
-    error instanceof AccountDataError &&
-    (error.code === 'transport' || error.code === 'invalid-response')
-  );
+  return error instanceof AccountDataError && error.code === 'transport';
 }
 
 /**
  * Send the caller's nudge for `dayId` from `source`, the prompt after their
  * answer or the waiting card's button (their partner has not picked). Returns
- * the day's snapshot. Throws on any failure; a refusal the server raises for
- * good is `AccountDataError('refused', NUDGE_FAILED_MESSAGE)` (`DQ010` among
- * them: see `isNudgeAlreadySent`), and a lost answer is `transport` or
- * `invalid-response` (`isNudgeOutcomeUnknown`).
+ * the day's snapshot. Throws on any failure, logged once here: an error the
+ * server answered with a code is `AccountDataError('refused',
+ * NUDGE_FAILED_MESSAGE)` (`DQ010` among them: see `isNudgeAlreadySent`), an
+ * answer that does not parse is `invalid-response` (a sent nudge, too), and a
+ * lost answer is `transport` (`isNudgeOutcomeUnknown`).
  */
 export async function sendDailyNudge(dayId: string, source: NudgeSource): Promise<DailyDaySnapshot> {
   refuseOffline('Your nudge', 'send');
@@ -329,13 +323,19 @@ export async function sendDailyNudge(dayId: string, source: NudgeSource): Promis
     if (error) throw error;
     const parsed = DailyDaySnapshotSchema.safeParse(data);
     if (!parsed.success) {
-      throw new AccountDataError('invalid-response', 'The daily question answer was not understood.', {
-        cause: parsed.error,
-      });
+      const invalid = new AccountDataError(
+        'invalid-response',
+        'The daily question answer was not understood.',
+        { cause: parsed.error }
+      );
+      logSupabaseError(NUDGE_CONTEXT, invalid);
+      throw invalid;
     }
     return parsed.data;
   } catch (error) {
-    if (isPostgrestError(error) && NUDGE_REFUSAL_CODES.has(error.code)) {
+    // A code is the server's own answer: the call rolled back, so nothing was
+    // recorded. A network failure or a timeout carries the empty code (DW-557).
+    if (isPostgrestError(error) && error.code) {
       logSupabaseError(NUDGE_CONTEXT, error);
       throw new AccountDataError('refused', NUDGE_FAILED_MESSAGE, { cause: error });
     }
