@@ -548,6 +548,12 @@ describe('sendDailyNudge', () => {
   });
 
   // DW-547: each failed nudge is logged once, here, where its error is mapped.
+  const lostInTransit = {
+    message: 'AbortError: signal timed out',
+    details: '',
+    hint: 'Request was aborted (timeout or manual cancellation)',
+    code: '',
+  };
   it.each([
     [
       'a refusal',
@@ -560,6 +566,12 @@ describe('sendDailyNudge', () => {
       { code: 'PGRST301', message: 'server words', details: '', hint: '' },
     ],
     ['a network failure', () => rpc.mockRejectedValue(new TypeError('Failed to fetch')), 'Failed to fetch'],
+    // The form supabase-js resolves for a network failure or a timeout: the empty code.
+    [
+      'a network failure as the client reports it',
+      () => rpc.mockResolvedValue({ data: null, error: lostInTransit }),
+      lostInTransit,
+    ],
     [
       'an answer that is not a snapshot',
       () => rpc.mockResolvedValue({ data: { nope: true }, error: null }),
