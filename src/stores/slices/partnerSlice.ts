@@ -204,9 +204,17 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
         });
       }
 
+      // The load error is for "nothing has answered" only. A partner on screen
+      // or a confirmed answer in memory (`partnerKnown`) stays the answer when
+      // no saved copy could be read (a failed read, or an earlier copy write
+      // that failed): raising it over a confirmed "unlinked" would unmount the
+      // Connect UI and lose what is typed there (DW-552).
+      const nothingKnown = (): boolean =>
+        !copy && get().partner === null && !get().partnerKnown;
+
       // 2. Nothing known and no way to ask: say so rather than claim "unlinked".
       if (!isOnline()) {
-        set({ isLoadingPartner: false, partnerLoadError: !copy && get().partner === null });
+        set({ isLoadingPartner: false, partnerLoadError: nothingKnown() });
         return;
       }
 
@@ -222,7 +230,7 @@ export const createPartnerSlice: AppStateCreator<PartnerSlice> = (set, get, _api
       if (result.status === 'error') {
         // A failed read keeps what is shown and leaves the copy untouched.
         console.error('[PartnerSlice] Error loading partner:', result.reason);
-        set({ isLoadingPartner: false, partnerLoadError: !copy && get().partner === null });
+        set({ isLoadingPartner: false, partnerLoadError: nothingKnown() });
         return;
       }
 

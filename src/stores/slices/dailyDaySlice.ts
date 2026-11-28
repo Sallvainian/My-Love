@@ -215,8 +215,9 @@ export interface DailyDaySlice {
    * - `AccountDataError('day-changed')`, after starting a re-read of the day,
    *   when the device date is not the shown day or the server answers `DQ001`;
    * - the request's own error otherwise.
-   * Without a connection it queues the pick (no request) and resolves; a queue
-   * write failure throws.
+   * Without a connection it queues the pick (no request) and resolves, and so it
+   * does when the request fails in transit (`transport`: a network failure or a
+   * timeout), starting the drain; a queue write failure throws.
    * Resolves with the answer it stored, or `undefined` when it queued the pick
    * or the session changed before the answer was stored.
    */
@@ -235,9 +236,10 @@ export interface DailyDaySlice {
   /**
    * Nudge the partner about the shown day from `source` and store the answer,
    * then announce it. Answers `'sent'` (the nudge is on record, whether the
-   * request said so, refused it as already sent, or a re-read after a lost
-   * answer found it), `'failed'` (refused, or a re-read found none) or
-   * `'unchecked'` (the answer was lost and the re-read failed too). Throws a
+   * request said so, refused it as already sent, answered in a form that did not
+   * parse, or a re-read after a lost answer found it), `'failed'` (refused, or a
+   * re-read found none) or `'unchecked'` (the answer was lost and the re-read
+   * failed too, or the session changed before it could start). Throws a
    * plain `Error` when signed out or with no day shown, and `AccountDataError`
    * (`offline`) when it sent nothing for want of a connection.
    */
@@ -707,8 +709,8 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         throw new AccountDataError('day-changed', DAY_CHANGED_MESSAGE);
       }
 
-      if (!isOnline()) {
-        // The pick waits in the queue with the instant and zone it was made in.
+      // The pick waits in the queue with the instant and zone it was made in.
+      const queuePick = async () => {
         await enqueuePick({
           user_id: requestedBy,
           day_id: shown.snapshot.day_id,
@@ -722,6 +724,10 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         // The connection may have returned while the row was being written: an
         // `online` drain that read the queue before it would have missed it.
         if (isOnline() && isCurrent()) void get().drainQueuedPicks();
+      };
+
+      if (!isOnline()) {
+        await queuePick();
         return;
       }
 
@@ -731,6 +737,13 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
       } catch (error) {
         if (error instanceof AccountDataError && error.code === 'day-changed' && isCurrent()) {
           void get().loadDailyDay();
+        }
+        // Lost in transit, or answered after the timeout: the server may have the
+        // pick or not. It waits in the queue as an offline pick does, and the
+        // drain sends it again; the server keeps a pick already stored (DW-484).
+        if (error instanceof AccountDataError && error.code === 'transport') {
+          await queuePick();
+          return;
         }
         throw error;
       }
@@ -857,27 +870,27 @@ export const createDailyDaySlice: AppStateCreator<DailyDaySlice> = (set, get, ap
         // Offline sent nothing: the caller shows the offline sentence, with no re-read.
         if (error instanceof AccountDataError && error.code === 'offline') throw error;
         if (isNudgeAlreadySent(error)) {
-          // An earlier nudge from this source reached the server: this one ends as sent.
-          if (isCurrent()) {
-            set((state) => {
-              const current = state.dailyDay;
-              if (current?.status !== 'ok' || current.snapshot.day_id !== dayId) return {};
-              return {
-                dailyDay: { status: 'ok', snapshot: withNudgeSent(current.snapshot, source) },
-              };
-            });
-          }
+          // The nudge from this source is on record: this send ends as sent.
+          // After a session change the day is another account's: no re-read (DW-561).
+          if (!isCurrent()) return 'sent';
+          set((state) => {
+            const current = state.dailyDay;
+            if (current?.status !== 'ok' || current.snapshot.day_id !== dayId) return {};
+            return {
+              dailyDay: { status: 'ok', snapshot: withNudgeSent(current.snapshot, source) },
+            };
+          });
           await readDayById(dayId);
           return 'sent';
         }
+        // The API logged the failure: it is not logged again here (DW-547).
         if (!isNudgeOutcomeUnknown(error)) {
           // A refusal: the day may have moved on (the partner picked), so look.
-          console.error('[DailyQuestion] The nudge was refused:', error);
           if (isCurrent()) void readDayById(dayId);
           return 'failed';
         }
         // The answer was lost: the server may have recorded it. Unknown is not failed.
-        console.error('[DailyQuestion] The nudge answer was lost; checking the day:', error);
+        if (!isCurrent()) return 'unchecked';
         const reread = await readDayById(dayId);
         if (reread === null) return 'unchecked';
         return isNudgeSent(nudgeState(reread), source) ? 'sent' : 'failed';

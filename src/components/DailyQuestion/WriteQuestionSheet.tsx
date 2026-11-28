@@ -14,7 +14,9 @@
  * the options (R4), Send is disabled only while a send is in flight, and a
  * refusal's reason (or the offline sentence) shows in the failure box with the
  * sheet kept open. A successful send ends the prompt through the snapshot's
- * `write.done`; "No thanks, pick one for us" saves the day on this device. A tap
+ * `write.done`, and tells `onSent` the date the sheet named as Send was tapped,
+ * so `DailyQuestion` can say so when the answer's date differs (DW-498); "No
+ * thanks, pick one for us" saves the day on this device. A tap
  * on the scrim or Escape only calls `onClose`, which hides it for this mount.
  * However it closes (a send, "No thanks", the scrim or Escape), the nudge prompt
  * that waited behind it shows next, as `DailyQuestion` decides.
@@ -30,7 +32,6 @@
 import { Shuffle } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
-import { parseEventDate } from '../../services/eventsService';
 import { useAppStore } from '../../stores/useAppStore';
 import {
   FAILURE_BOX,
@@ -42,20 +43,7 @@ import {
   SHEET_SCRIM,
   fieldClass,
 } from '../shared/kitClasses';
-
-/**
- * The weekday name (`Thursday`) of `targetDay` when it is not the day after
- * `day`; null for tomorrow, a missing target or a date that does not parse.
- */
-function laterWeekday(day: string, targetDay: string | undefined): string | null {
-  if (!targetDay) return null;
-  const from = parseEventDate(day);
-  const target = parseEventDate(targetDay);
-  if (!from || !target) return null;
-  const tomorrow = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1);
-  if (target.getTime() === tomorrow.getTime()) return null;
-  return target.toLocaleDateString('en-US', { weekday: 'long' });
-}
+import { laterWeekday, namedWriteDay } from './writeDay';
 
 interface WriteQuestionSheetProps {
   /** The day the sheet writes from (the shown day). */
@@ -67,6 +55,12 @@ interface WriteQuestionSheetProps {
   partnerName: string;
   /** Scrim or Escape: hide the sheet until the next mount of Daily. */
   onClose: () => void;
+  /**
+   * A send the server accepted, with the `YYYY-MM-DD` date the sheet named when
+   * Send was tapped. It is called after the sheet has gone, as `write.done`
+   * hides it.
+   */
+  onSent?: (namedDay: string) => void;
 }
 
 export function WriteQuestionSheet({
@@ -75,6 +69,7 @@ export function WriteQuestionSheet({
   targetDay,
   partnerName,
   onClose,
+  onSent,
 }: WriteQuestionSheetProps) {
   const weekday = laterWeekday(day, targetDay);
   const submitWrittenQuestion = useAppStore((state) => state.submitWrittenQuestion);
@@ -102,8 +97,10 @@ export function WriteQuestionSheet({
   const send = async () => {
     setError(null);
     setSending(true);
+    const named = namedWriteDay(day, targetDay);
     try {
       await submitWrittenQuestion(thisText, thatText);
+      if (named !== null) onSent?.(named);
     } catch (caught) {
       console.error("[DailyQuestion] Could not send tomorrow's question:", caught);
       setError(caught instanceof Error ? caught.message : "Could not send tomorrow's question.");

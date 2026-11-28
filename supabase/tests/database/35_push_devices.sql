@@ -17,14 +17,34 @@
 --
 -- net.http_post only queues the call in net.http_request_queue inside the
 -- caller's transaction, so the queue rows are read back here. Nothing is sent.
+--
+-- The queue is read unscoped, so a call another session commits meanwhile would
+-- count too. The live daily-reminders job (every 5 minutes on real time) is one:
+-- its tick inserts daily_reminders rows and releases held daily_nudges, each of
+-- which queues a call. This file therefore locks both tables first, so a tick that
+-- lands mid-file waits on the lock until the rollback and queues nothing here
+-- (DW-528). share row exclusive lets reads through and blocks every other
+-- session's insert, update and delete on them.
 -- ============================================
 
 begin;
 
+lock table public.daily_nudges, public.daily_reminders in share row exclusive mode;
+
 create schema if not exists tests;
 grant usage on schema tests to authenticated, anon;
 
-select plan(95);
+select plan(96);
+
+select is(
+  (select array_agg(c.relname::text order by c.relname)
+     from pg_locks l
+     join pg_class c on c.oid = l.relation
+    where l.pid = pg_backend_pid() and l.mode = 'ShareRowExclusiveLock' and l.granted
+      and c.relnamespace = 'public'::regnamespace),
+  array['daily_nudges', 'daily_reminders'],
+  'PUSH-DB-122: the file holds daily_nudges and daily_reminders against the daily-reminders job'
+);
 
 create or replace function tests.create_test_user(test_email text)
 returns uuid language plpgsql security definer set search_path = '' as $$

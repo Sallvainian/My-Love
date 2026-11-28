@@ -3,7 +3,7 @@
  * the streak re-read, the session check after the await and the device-date guard,
  * with only the Supabase client and the API module mocked.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 const fetchDailyDay = vi.fn();
@@ -26,10 +26,11 @@ vi.mock('../../../src/api/dailyQuestionApi', async (importOriginal) => ({
   submitDailyPick: (...args: unknown[]) => submitDailyPickRequest(...args),
 }));
 
-import { DAY_CHANGED_MESSAGE } from '../../../src/api/dailyQuestionApi';
+import { DAY_CHANGED_MESSAGE, pickZone } from '../../../src/api/dailyQuestionApi';
 import { AccountDataError } from '../../../src/services/accountDataError';
 import { DAILY_DAYS_COPY_KIND } from '../../../src/services/dailyDaysCopy';
 import { deleteAccountCopies, readLocalCopy } from '../../../src/services/localCopy';
+import { listQueuedPicks, removeQueuedPick } from '../../../src/services/pickQueue';
 import { useAppStore } from '../../../src/stores/useAppStore';
 import {
   dailySnapshot,
@@ -129,9 +130,9 @@ describe('submitDailyPick', () => {
   });
 
   it('does not re-read the streak when the pick fails', async () => {
-    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('invalid-response', 'boom'));
 
-    await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'transport' });
+    await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'invalid-response' });
 
     expect(loadCoupleStreak).not.toHaveBeenCalled();
   });
@@ -149,9 +150,9 @@ describe('submitDailyPick', () => {
   });
 
   it('announces nothing when the pick is refused', async () => {
-    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('refused', 'boom'));
 
-    await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'transport' });
+    await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'refused' });
 
     expect(announceDailyPick).not.toHaveBeenCalled();
   });
@@ -205,7 +206,7 @@ describe('submitDailyPick', () => {
   });
 
   it('throws the request error and leaves the shown day as it was', async () => {
-    const failure = new AccountDataError('transport', 'boom');
+    const failure = new AccountDataError('invalid-response', 'boom');
     submitDailyPickRequest.mockRejectedValue(failure);
 
     await expect(state().submitDailyPick('this')).rejects.toBe(failure);
@@ -346,11 +347,76 @@ describe('submitDailyPick', () => {
     });
 
     it('leaves every other failure on the old path: no re-read', async () => {
-      submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+      submitDailyPickRequest.mockRejectedValue(new AccountDataError('invalid-response', 'boom'));
 
-      await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'transport' });
+      await expect(state().submitDailyPick('this')).rejects.toMatchObject({ code: 'invalid-response' });
 
       expect(fetchDailyDay).not.toHaveBeenCalled();
+    });
+  });
+
+  // DW-484: a pick whose request fails in transit waits in the queue, as an offline pick does.
+  describe('a request that fails in transit', () => {
+    const lost = () => new AccountDataError('transport', '[DailyQuestionApi.submitDailyPick] Network error: Failed to fetch.');
+
+    afterEach(async () => {
+      await removeQueuedPick(A, DAY_ID);
+    });
+
+    it('queues the pick with the instant and zone it was made in, shows it waiting and sends it from the queue', async () => {
+      const resend = deferred<ReturnType<typeof waitingSnapshot>>();
+      submitDailyPickRequest.mockRejectedValueOnce(lost()).mockReturnValueOnce(resend.promise);
+
+      await expect(state().submitDailyPick('this')).resolves.toBeUndefined();
+
+      const row = {
+        user_id: A,
+        day_id: DAY_ID,
+        choice: 'this',
+        picked_at: SAME_DAY.toISOString(),
+        ...pickZone(SAME_DAY),
+        failed: false,
+        failure: null,
+      };
+      expect(await listQueuedPicks(A)).toEqual([row]);
+      expect(state().dailyQueuedPicks).toEqual([
+        { day_id: DAY_ID, choice: 'this', picked_at: row.picked_at, failed: false, failure: null },
+      ]);
+      expect(state().dailyDay).toEqual(ok(dailySnapshot()));
+      await vi.waitFor(() => expect(submitDailyPickRequest).toHaveBeenCalledTimes(2));
+      expect(submitDailyPickRequest).toHaveBeenLastCalledWith(DAY_ID, 'this', SAME_DAY, pickZone(SAME_DAY));
+
+      resend.settle(waitingSnapshot('this'));
+      await vi.waitFor(() => expect(state().dailyQueuedPickSent).toMatchObject({ dayId: DAY_ID }));
+      expect(state().dailyDay).toEqual(ok(waitingSnapshot('this')));
+      expect(state().dailyQueuedPicks).toEqual([]);
+      expect(await listQueuedPicks(A)).toEqual([]);
+    });
+
+    it('still throws an answer that did not parse, and queues nothing', async () => {
+      const failure = new AccountDataError('invalid-response', 'The daily question answer was not understood.');
+      submitDailyPickRequest.mockRejectedValue(failure);
+
+      await expect(state().submitDailyPick('this')).rejects.toBe(failure);
+
+      expect(await listQueuedPicks(A)).toEqual([]);
+      expect(state().dailyQueuedPicks).toEqual([]);
+      expect(submitDailyPickRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the pick for its account but starts no drain when another account signed in meanwhile', async () => {
+      const request = deferred<ReturnType<typeof waitingSnapshot>>();
+      submitDailyPickRequest.mockReturnValue(request.promise);
+
+      const submit = state().submitDailyPick('this');
+      state().clearAuth();
+      state().setAuthUser(C);
+      request.fail(lost());
+      await submit;
+
+      expect(await listQueuedPicks(A)).toMatchObject([{ user_id: A, day_id: DAY_ID, choice: 'this' }]);
+      expect(state().dailyQueuedPicks).toEqual([]);
+      expect(submitDailyPickRequest).toHaveBeenCalledTimes(1);
     });
   });
 });

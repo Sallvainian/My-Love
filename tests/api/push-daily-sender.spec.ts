@@ -32,9 +32,12 @@
  * lands today, held is 4 and run 1, so the both-answered wording is checked across two
  * different streaks.
  *
- * A host-local midnight or 20:00 inside a test's timeout would turn the Daily day or
- * the nudge slot between the seed and the last assertion, so each test first calls
- * `waitClearOfDailyTurns`, which waits past the turn (DW-527).
+ * A host-local midnight inside a test's timeout would turn the Daily day between the seed
+ * and the last assertion, so each test first calls `waitClearOfDailyTurns`, which waits
+ * past the turn (DW-527). The first test also inserts Bob's `evening_self` for today, which
+ * the live `daily-reminders` job inserts itself on a tick at 20:00 to 20:25 on the host
+ * clock (the pair's stored zone), so it first calls `waitClearOfReminderTicks`, which
+ * waits past every such tick its timeout could reach (DW-528).
  *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI); the `api` project runs one worker, so this
@@ -42,7 +45,7 @@
  */
 import type { TypedSupabaseClient } from '../support/factories';
 import type { Cleanup } from '../support/fixtures/cleanup';
-import { isoDateDaysFromNow, waitClearOfDailyTurns } from '../support/helpers/events';
+import { isoDateDaysFromNow, waitClearOfDailyTurns, waitClearOfReminderTicks } from '../support/helpers/events';
 import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
@@ -90,6 +93,7 @@ test.describe('Daily push sender', () => {
     cleanup,
   }, testInfo) => {
     await waitClearOfDailyTurns(testInfo);
+    await waitClearOfReminderTicks(testInfo);
     const { alice, bob, aliceDevice, bobPhone, bobTablet, today, dayId, dayIds } = await setUpDailyPair(
       supabaseAdmin,
       cleanup

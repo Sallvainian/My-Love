@@ -11,7 +11,8 @@
  * box with the sheet kept open and Nudge enabled, and the offline sentence
  * shows the same way. "Not now", a tap on the scrim and Escape only call
  * `onClose`; nothing is sent, and the waiting card's button still offers its
- * own nudge. Both buttons are disabled while a send, and the re-read after a
+ * own nudge. `children` (Daily's line naming the day a written question moved
+ * to, DW-498) shows under the question. Both buttons are disabled while a send, and the re-read after a
  * lost answer, is in progress, and the scrim and Escape do nothing then, so a
  * failure line is never closed away unseen.
  *
@@ -24,7 +25,7 @@
  */
 
 import { Bell } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef } from 'react';
+import { type ReactNode, useCallback, useEffect, useId, useRef } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import {
   FAILURE_BOX,
@@ -38,9 +39,11 @@ import { useNudgeSend } from './useNudgeSend';
 interface NudgeSheetProps {
   /** Not now, scrim, Escape, and after a nudge was sent. */
   onClose: () => void;
+  /** Shown under the question: Daily's line naming a moved written question's day. */
+  children?: ReactNode;
 }
 
-export function NudgeSheet({ onClose }: NudgeSheetProps) {
+export function NudgeSheet({ onClose, children }: NudgeSheetProps) {
   const { send, busy: sending, isBusy, error } = useNudgeSend('prompt');
 
   const titleId = useId();
@@ -83,6 +86,8 @@ export function NudgeSheet({ onClose }: NudgeSheetProps) {
         <h2 id={titleId} className="font-serif text-[24px] leading-[1.15] font-semibold text-ink">
           Do you want to nudge your partner?
         </h2>
+
+        {children}
 
         {error && (
           <div className={FAILURE_BOX} role="alert" data-testid="daily-nudge-sheet-error">

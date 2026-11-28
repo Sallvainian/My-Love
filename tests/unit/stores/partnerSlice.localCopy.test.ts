@@ -453,15 +453,12 @@ describe('partner profile on the local copy', () => {
       expect(state().partnerLoadError).toBe(false);
     });
 
-    it('is raised by a retry over a confirmed unlinked answer that a failed read turned into a load error', async () => {
-      getPartner.mockResolvedValue({ status: 'unlinked' });
-      await state().loadPartner();
-      // The saved copy is gone (a failed IndexedDB read answers null) and the
-      // server read fails: the load error is what the screen shows now.
-      await clearCopies();
+    it('is raised by a retry over a load error', async () => {
+      // A failed read with nothing saved and nothing known: the load error is
+      // what the screen shows now.
       getPartner.mockResolvedValue(READ_FAILED);
       await state().loadPartner();
-      expect(state().partnerKnown).toBe(true);
+      expect(state().partnerKnown).toBe(false);
       expect(state().partnerLoadError).toBe(true);
 
       // Retry: the error card is hidden until an answer lands.
@@ -492,6 +489,47 @@ describe('partner profile on the local copy', () => {
 
       server.settle({ status: 'unlinked' });
       await inFlight;
+      expect(state().isLoadingPartner).toBe(false);
+    });
+  });
+
+  // DW-552: a confirmed "unlinked" answer in memory is still the answer when
+  // a later reload finds no saved copy (a failed IndexedDB read answers null,
+  // or the earlier copy write failed) and cannot ask the server either.
+  describe('a failed reload over a confirmed unlinked answer with no saved copy', () => {
+    beforeEach(async () => {
+      getPartner.mockResolvedValue({ status: 'unlinked' });
+      await state().loadPartner();
+      expect(state().partnerKnown).toBe(true);
+      await clearCopies();
+    });
+
+    it('a failed server read keeps the unlinked answer, with no load error', async () => {
+      getPartner.mockResolvedValue(READ_FAILED);
+      const seen: boolean[] = [];
+      const stop = useAppStore.subscribe((next) => seen.push(next.isLoadingPartner));
+
+      await state().loadPartner();
+      stop();
+
+      expect(getPartner).toHaveBeenCalledTimes(2);
+      expect(seen).not.toContain(true);
+      expect(state().partner).toBeNull();
+      expect(state().partnerKnown).toBe(true);
+      expect(state().partnerLoadError).toBe(false);
+      expect(state().isLoadingPartner).toBe(false);
+      expect(await readLocalCopy(A, PARTNER_COPY_KIND)).toBeNull();
+    });
+
+    it('offline keeps the unlinked answer, with no load error', async () => {
+      setOnline(false);
+
+      await state().loadPartner();
+
+      expect(getPartner).toHaveBeenCalledTimes(1);
+      expect(state().partner).toBeNull();
+      expect(state().partnerKnown).toBe(true);
+      expect(state().partnerLoadError).toBe(false);
       expect(state().isLoadingPartner).toBe(false);
     });
   });

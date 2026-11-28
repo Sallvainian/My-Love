@@ -5,7 +5,7 @@
  * Daily is open (story 11.1, criteria 1-3, 5, 13, 14); one test per row of the
  * story's matrix, bar the reload (a remount is the closest a unit test gets).
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -283,6 +283,100 @@ describe('the nudge prompt after an answer', () => {
 
       await waitFor(() => expect(screen.queryByTestId('daily-write-sheet')).toBeNull());
       expect(await screen.findByTestId('daily-nudge-sheet')).toBeInTheDocument();
+    });
+
+    describe('the date the question is asked moved while the sheet was open (DW-498)', () => {
+      /** The writer's day with the turn open and the sheet naming `targetDay` (none: tomorrow). */
+      const openTurn = (targetDay?: string) =>
+        nudgesSnapshot({}, { write: { mine: true, done: false, target_day: targetDay } });
+      /** The send's answer: the question written, asked on `targetDay`. */
+      const written = (targetDay: string, overrides: Partial<Snapshot> = {}) =>
+        nudgesSnapshot({}, { write: { mine: true, done: true, target_day: targetDay }, ...overrides });
+
+      async function writeAs(open: Snapshot, answer: Snapshot) {
+        const picked = await pickWith(open, dailySnapshot({ write: { mine: true, done: false } }));
+        await screen.findByTestId('daily-write-sheet');
+        submitWrittenQuestionRequest.mockResolvedValue(answer);
+        await picked.user.type(screen.getByTestId('daily-write-this'), 'Tea');
+        await picked.user.type(screen.getByTestId('daily-write-that'), 'Coffee');
+        await picked.user.click(screen.getByTestId('daily-write-send'));
+        await waitFor(() => expect(screen.queryByTestId('daily-write-sheet')).toBeNull());
+        return picked;
+      }
+
+      it.each([
+        ['tomorrow (Friday) moved to Saturday', undefined, '2026-11-07', 'Jessie gets it on Saturday.'],
+        ['Saturday moved to Sunday', '2026-11-07', '2026-11-08', 'Jessie gets it on Sunday.'],
+      ])('%s: one line names the real day, and the prompt still follows', async (_label, named, real, line) => {
+        await writeAs(openTurn(named), written(real));
+
+        expect(await screen.findByTestId('daily-write-day')).toHaveTextContent(line);
+        expect(screen.getByTestId('daily-write-day')).toBeVisible();
+        expect(screen.getAllByText(line)).toHaveLength(1);
+        expect(await screen.findByTestId('daily-nudge-sheet')).toBeInTheDocument();
+        // Beside the prompt: inside its panel while it is open, not under its scrim.
+        expect(within(screen.getByTestId('daily-nudge-panel')).getByTestId('daily-write-day')).toHaveTextContent(line);
+      });
+
+      it('after the prompt closes, the line stays at the top of the page', async () => {
+        const { user } = await writeAs(openTurn(), written('2026-11-07'));
+        await screen.findByTestId('daily-nudge-sheet');
+
+        await user.click(screen.getByTestId('daily-nudge-sheet-dismiss'));
+
+        await waitFor(() => expect(sheet()).toBeNull());
+        expect(screen.getByTestId('daily-write-day')).toHaveTextContent('Jessie gets it on Saturday.');
+        expect(screen.getByTestId('daily-write-day')).toBeVisible();
+        expect(screen.getAllByText('Jessie gets it on Saturday.')).toHaveLength(1);
+      });
+
+      it.each([
+        ['tomorrow', undefined, '2026-11-06'],
+        ['Saturday', '2026-11-07', '2026-11-07'],
+      ])('the answer keeps the day the sheet named (%s): no line', async (_label, named, real) => {
+        await writeAs(openTurn(named), written(real));
+
+        expect(await screen.findByTestId('daily-nudge-sheet')).toBeInTheDocument();
+        expect(screen.queryByTestId('daily-write-day')).toBeNull();
+      });
+
+      it('shows when the partner had answered too, with no prompt to sit beside', async () => {
+        await writeAs(openTurn(), {
+          ...revealSnapshot('this', 'that'),
+          write: { mine: true, done: true, target_day: '2026-11-07' },
+        });
+
+        expect(await screen.findByTestId('daily-write-day')).toHaveTextContent(
+          'Jessie gets it on Saturday.'
+        );
+        expect(sheet()).toBeNull();
+      });
+
+      it('goes with the day: the next day on screen shows no line', async () => {
+        await writeAs(openTurn(), written('2026-11-07'));
+        await screen.findByTestId('daily-write-day');
+
+        await act(async () => {
+          useAppStore.setState({
+            dailyDay: ok(dailySnapshot({ day_id: 'NEXT-DAY-ID', day: '2026-11-06' })),
+          });
+        });
+
+        expect(screen.queryByTestId('daily-write-day')).toBeNull();
+      });
+
+      it('a re-read that moves the date with no send of this mount shows no line', async () => {
+        await pickWith(openTurn(), dailySnapshot({ write: { mine: true, done: false } }));
+        await screen.findByTestId('daily-write-sheet');
+
+        // Written on another device: the turn is done and asked on Saturday.
+        await act(async () => {
+          useAppStore.setState({ dailyDay: ok(written('2026-11-07')) });
+        });
+
+        await waitFor(() => expect(screen.queryByTestId('daily-write-sheet')).toBeNull());
+        expect(screen.queryByTestId('daily-write-day')).toBeNull();
+      });
     });
 
     it('Nudge on the prompt after it sends the prompt\'s nudge', async () => {
