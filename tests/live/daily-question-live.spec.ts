@@ -445,6 +445,9 @@ test.describe('Live Daily check', () => {
       contexts.push(contextB);
       const pageA = await contextA.newPage();
       const pageB = await contextB.newPage();
+      // Before sign-in: a read the counter never saw start would look settled
+      // when it ends, so A's day reads are counted from the page's first load.
+      const dayReadsA = trackReads(pageA, GET_DAILY_DAY_PATH, 'POST');
 
       await signInThroughUi(pageA, a);
       await signInThroughUi(pageB, b);
@@ -501,13 +504,12 @@ test.describe('Live Daily check', () => {
       // A taps it: one more request, answered 200, and after another reload the
       // button shows as sent. The button is also disabled while the send is in
       // flight, so "sent" is read from the server's answer after the reload.
-      // That reload is A's last before B picks, so the day-read tracker and the
-      // partner channel's join watch go on first.
+      // That reload is A's last before B picks, so the partner channel's join
+      // watch goes on first: it must see only the reloaded page's join.
       const buttonNudged = observeRpc(pageA, DAILY_NUDGE_SEND);
       await nudgeButton.click();
       expect((await buttonNudged).status).toBe(200);
       expect(nudgeSends.started()).toBe(2);
-      const dayReadsA = trackReads(pageA, GET_DAILY_DAY_PATH, 'POST');
       const joinA = watchPartnerChannelJoin(pageA, a.id, dayReadsA);
       const afterNudge = (await openDaily(pageA, () => pageA.reload())) as {
         snapshot: { nudges?: { prompt_sent: boolean; button_sent: boolean } };
