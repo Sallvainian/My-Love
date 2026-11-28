@@ -197,6 +197,25 @@ describe('mergeDailyDay', () => {
     expect(await savedMap()).toEqual(keyed(written));
   });
 
+  it.each([
+    ['an equal state', () => writerSnapshot('this', { write: { mine: true, done: false, target_day: '2026-11-06' } })],
+    ['a higher state', () => ({
+      ...revealSnapshot('this', 'that'),
+      write: { mine: true, done: false, target_day: '2026-11-06' },
+    })],
+  ])('%s with write.done false keeps the written turn\'s target_day with its done (DW-498)', async (_label, late) => {
+    const written = writerSnapshot('this', {
+      write: { mine: true, done: true, target_day: '2026-11-07' },
+    });
+    await mergeDailyDay(A, ok(written), UNLINKED, current);
+
+    const result = await mergeDailyDay(A, ok(late()), UNLINKED, current);
+
+    const kept = { ...late(), write: { mine: true, done: true, target_day: '2026-11-07' } };
+    expect(result).toEqual(ok(kept));
+    expect(await savedMap()).toEqual(keyed(kept));
+  });
+
   it('a higher state with write.done false keeps write.done true', async () => {
     const written = writerSnapshot('this', { write: { mine: true, done: true } });
     await mergeDailyDay(A, ok(written), UNLINKED, current);

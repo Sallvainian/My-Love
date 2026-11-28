@@ -249,6 +249,24 @@ describe('a read that started before the Send', () => {
 
     expect(state().dailyDay).toEqual(ok(done()));
   });
+
+  it("does not put back the date from before the Send (DW-498)", async () => {
+    const before = writerSnapshot('this', { write: { mine: true, done: false, target_day: '2026-11-06' } });
+    const sent = writerSnapshot('this', { write: { mine: true, done: true, target_day: '2026-11-07' } });
+    useAppStore.setState({ dailyDay: ok(before) });
+    const read = deferred<ReturnType<typeof writerSnapshot>>();
+    fetchDailyDayById.mockReturnValue(read.promise);
+    const refresh = state().refreshDailyDay(DAY_ID);
+    submitWrittenQuestionRequest.mockResolvedValue(sent);
+    await state().submitWrittenQuestion('a', 'b');
+
+    read.settle(before);
+    await refresh;
+
+    expect(state().dailyDay).toEqual(ok(sent));
+    const saved = await readLocalCopy<Record<string, unknown>>(A, DAILY_DAYS_COPY_KIND);
+    expect(saved?.[DAY_ID]).toEqual({ ...sent, partner_id: null });
+  });
 });
 
 describe('declineWrittenQuestion', () => {
