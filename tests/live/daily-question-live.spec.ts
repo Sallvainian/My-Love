@@ -384,6 +384,44 @@ function watchDailyErrors(pages: Record<string, Page>) {
   return { kept: () => [...kept] };
 }
 
+/** The broadcast event a nudge is announced with (`DAILY_NUDGE_EVENT` in `broadcastSchemas.ts`). */
+const NUDGE_EVENT = 'daily_nudge';
+/** Where realtime-js's `httpSend` posts a broadcast: `<this>/<topic>/events/<event>`. */
+const BROADCAST_SEND_PATH = '/realtime/v1/api/broadcast/';
+
+/**
+ * Count the page's nudge announces that have ended (DW-570): a `daily_nudge`
+ * broadcast send answered 202, or a kept "Could not announce the nudge" line of
+ * that page. Wait for the count to pass its value from before a nudge, before a
+ * reload replaces the page: the announce starts after `send_daily_nudge` answers,
+ * and a page that reloads first never announces, so a failure there would pass.
+ */
+function watchNudgeAnnounces(page: Page, name: string, errors: { kept(): string[] }) {
+  let delivered = 0;
+  // playwright-utils deviation: counts every nudge broadcast the page sends; interceptNetworkCall's observe mode latches onto the first matching request only.
+  page.on('response', (response) => {
+    const request = response.request();
+    const { pathname } = new URL(request.url());
+    if (request.method() !== 'POST' || response.status() !== 202) return;
+    if (pathname.startsWith(BROADCAST_SEND_PATH) && pathname.endsWith(`/events/${NUDGE_EVENT}`)) delivered += 1;
+  });
+  const failed = () =>
+    errors.kept().filter((line) => line.startsWith(`${name}: [DailyQuestion] Could not announce the nudge:`))
+      .length;
+  return { ended: () => delivered + failed() };
+}
+
+/** Wait until one more of the page's nudge announces has ended than `before`. */
+async function waitForNudgeAnnounce(announces: { ended(): number }, before: number): Promise<void> {
+  await recurseUntil(
+    async () => announces.ended(),
+    (ended) => {
+      expect(ended, 'the nudge announce ended: delivered, or its failure logged').toBeGreaterThan(before);
+    },
+    { timeout: 30_000 }
+  );
+}
+
 async function signInThroughUi(page: Page, bot: Bot): Promise<void> {
   await dismissWelcomeSplash(page);
   await navigate(page, () => page.goto('/'));
@@ -499,6 +537,7 @@ test.describe('Live Daily check', () => {
       // when it ends, so A's day reads are counted from the page's first load.
       const dayReadsA = trackReads(pageA, GET_DAILY_DAY_PATH, 'POST');
       const dailyErrors = watchDailyErrors({ A: pageA, B: pageB });
+      const nudgeAnnouncesA = watchNudgeAnnounces(pageA, 'A', dailyErrors);
 
       await signInThroughUi(pageA, a);
       await signInThroughUi(pageB, b);
@@ -535,12 +574,15 @@ test.describe('Live Daily check', () => {
       await expect(nudgeSheet).toBeVisible();
 
       // A taps Nudge on the prompt: one send_daily_nudge on the project, answered 200.
+      // Its announce ends before the reload below, so a failed one is seen.
       const nudgeSends = trackReads(pageA, NUDGE_SEND_PATH, 'POST');
+      const announcedBeforePrompt = nudgeAnnouncesA.ended();
       const promptNudged = observeRpc(pageA, DAILY_NUDGE_SEND);
       await pageA.getByTestId('daily-nudge-sheet-send').click();
       expect((await promptNudged).status).toBe(200);
       await expect(nudgeSheet).toHaveCount(0);
       expect(nudgeSends.started()).toBe(1);
+      await waitForNudgeAnnounce(nudgeAnnouncesA, announcedBeforePrompt);
 
       // After a reload A sees no prompt and an enabled Nudge button on the waiting card.
       const afterPrompt = (await openDaily(pageA, () => pageA.reload())) as {
@@ -556,11 +598,14 @@ test.describe('Live Daily check', () => {
       // button shows as sent. The button is also disabled while the send is in
       // flight, so "sent" is read from the server's answer after the reload.
       // That reload is A's last before B picks, so the partner channel's join
-      // watch goes on first: it must see only the reloaded page's join.
+      // watch goes on first: it must see only the reloaded page's join. The
+      // nudge's announce ends before that reload, so a failed one is seen.
+      const announcedBeforeButton = nudgeAnnouncesA.ended();
       const buttonNudged = observeRpc(pageA, DAILY_NUDGE_SEND);
       await nudgeButton.click();
       expect((await buttonNudged).status).toBe(200);
       expect(nudgeSends.started()).toBe(2);
+      await waitForNudgeAnnounce(nudgeAnnouncesA, announcedBeforeButton);
       const joinA = watchPartnerChannelJoin(pageA, a.id, dayReadsA);
       const afterNudge = (await openDaily(pageA, () => pageA.reload())) as {
         snapshot: { nudges?: { prompt_sent: boolean; button_sent: boolean } };
