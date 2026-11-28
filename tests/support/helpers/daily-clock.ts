@@ -9,8 +9,13 @@
  * :30). Only an account in a half-hour zone could be due too, and `otherAccountsDueAt`
  * checks that none is before a spec relies on `enqueue_daily_reminders`' count.
  *
+ * Both specs' throwaway pairs live in Kathmandu, so a pair a killed run left behind is due
+ * at the instants of either spec. `deleteStaleKathmanduPairs` deletes such leftovers
+ * before a spec makes its own pair (DW-530).
+ *
  * Import by this deep path: `tests/support/helpers` has no barrel.
  */
+import type { TypedSupabaseClient } from '../factories';
 import { expect } from '../merged-fixtures';
 import { runPsql } from './migration-replay';
 
@@ -42,22 +47,62 @@ export async function storeZone(userId: string, zone: string, offsetMinutes: num
 }
 
 /**
- * Accounts other than `own` that are due (linked both ways, a device, a zone, clock in
- * a window) at the instant: `enqueue_daily_reminders` sees every account on the stack.
+ * The emails of the accounts other than `own` that are due (linked both ways, a device, a
+ * zone, clock in a window) at the instant, so a guard that finds any names them:
+ * `enqueue_daily_reminders` sees every account on the stack.
  */
-export async function otherAccountsDueAt(instant: string, own: string[]): Promise<number> {
+export async function otherAccountsDueAt(instant: string, own: string[]): Promise<string[]> {
   const ids = own.map((id) => `'${id}'`).join(', ');
   const result = await runPsql(
-    `select count(*) from public.users u
+    `select u.email from public.users u
        join public.users p on p.id = u.partner_id and p.partner_id = u.id
        join public.user_time_zones z on z.user_id = u.id
       cross join lateral (select ((timestamptz '${instant}') at time zone z.effective_zone)::time as local_time) t
       where exists (select 1 from public.push_devices d where d.user_id = u.id)
         and u.id not in (${ids})
-        and ((t.local_time >= '08:00' and t.local_time < '08:30') or (t.local_time >= '20:00' and t.local_time < '20:30'));\n`
+        and ((t.local_time >= '08:00' and t.local_time < '08:30') or (t.local_time >= '20:00' and t.local_time < '20:30'))
+      order by u.email;\n`
   );
   expect(result.code, result.stderr).toBe(0);
-  return Number(result.stdout.trim());
+  return result.stdout.split('\n').filter((line) => line !== '');
+}
+
+/**
+ * The `createParty` prefixes of the Kathmandu throwaway pairs: `push-daily-reminders.spec.ts`
+ * makes `dailyrem` and `push-daily-nudge-held.spec.ts` makes `dailyheld`.
+ */
+export const KATHMANDU_PAIR_PREFIXES = ['dailyrem', 'dailyheld'] as const;
+
+/**
+ * How old a Kathmandu throwaway account must be to count as left behind. A test makes its
+ * pair inside its own timeout (the api project's is 60 s, teardown included) and deletes it
+ * at teardown, so an older one belongs to no test still running, on any lane of the shared
+ * stack, while a fresh one may belong to another run's live test and is kept.
+ */
+export const STALE_PAIR_AGE_MINUTES = 10;
+
+/**
+ * Deletes every Kathmandu throwaway account (`KATHMANDU_PAIR_PREFIXES`, the
+ * `createOutsiderClient` email shape `<prefix>-<role>-<ms>@test.example.com`) created more
+ * than `STALE_PAIR_AGE_MINUTES` ago, and returns their ids. A killed run never reaches
+ * its teardown, so its linked pair keeps its devices and zone and is due at both specs'
+ * instants: `otherAccountsDueAt` would stop every later run, and
+ * `enqueue_daily_reminders` would insert the leftover's rows too. The delete cascades from
+ * `auth.users` to everything the account owns.
+ */
+export async function deleteStaleKathmanduPairs(supabaseAdmin: TypedSupabaseClient): Promise<string[]> {
+  const prefixes = KATHMANDU_PAIR_PREFIXES.join('|');
+  const result = await runPsql(
+    `select id from auth.users where email ~ '^(${prefixes})-[a-z]+-[0-9]+@test[.]example[.]com$' ` +
+      `and created_at < now() - interval '${STALE_PAIR_AGE_MINUTES} minutes' order by id;\n`
+  );
+  expect(result.code, result.stderr).toBe(0);
+  const ids = result.stdout.split('\n').filter((line) => line !== '');
+  for (const id of ids) {
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+    expect(error, `delete the left-behind account ${id}`).toBeNull();
+  }
+  return ids;
 }
 
 /**

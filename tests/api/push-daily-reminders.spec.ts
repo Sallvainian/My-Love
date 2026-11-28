@@ -13,7 +13,10 @@
  * so only an account in a half-hour zone could be due too. The function sees every
  * account, so a psql guard first requires that no account but this pair is due at
  * the evening instant: the rpc's return count is then the pair's own, and no other
- * account's rows are touched (the spec never reaches the pool pairs' rows).
+ * account's rows are touched (the spec never reaches the pool pairs' rows). A Kathmandu
+ * pair a killed run of this spec or `push-daily-nudge-held.spec.ts` left behind would be
+ * due, so the test first deletes those (`deleteStaleKathmanduPairs`, DW-530), and the
+ * guard names any account it still finds.
  *
  * Asserted: the rpc at D 08:25 inserts 0 rows, records no request and assigns the pair no
  * couple day for D; after Alice's pick for D, the rpc at D 20:25 inserts Bob's
@@ -29,6 +32,7 @@ import { orderedPair, readPairQuestionsByDay } from '../support/factories/daily-
 import {
   KATHMANDU_OFFSET_MINUTES,
   KATHMANDU_ZONE,
+  deleteStaleKathmanduPairs,
   kathmanduInstant,
   kathmanduYesterday,
   otherAccountsDueAt,
@@ -76,6 +80,7 @@ test.describe('Daily reminders on each person\'s clock', () => {
     supabaseAdmin,
     cleanup,
   }) => {
+    await deleteStaleKathmanduPairs(supabaseAdmin);
     const alice = await createThrowawayParty(supabaseAdmin, cleanup, 'dailyrem', 'Rem', 'a');
     const bob = await createThrowawayParty(supabaseAdmin, cleanup, 'dailyrem', 'Rem', 'b');
     await link(supabaseAdmin, alice, bob);
@@ -97,7 +102,7 @@ test.describe('Daily reminders on each person\'s clock', () => {
     const pair = { userId: alice.userId, partnerId: bob.userId };
 
     // No other account is due at the evening instant, so the rpc's count is this pair's own.
-    expect(await otherAccountsDueAt(eveningAt, own), 'accounts due at the evening instant').toBe(0);
+    expect(await otherAccountsDueAt(eveningAt, own), 'accounts due at the evening instant').toEqual([]);
 
     // ---- 8 AM on D in Kathmandu: no reminder, no request and no day assigned ----
     const morning = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: morningAt });
