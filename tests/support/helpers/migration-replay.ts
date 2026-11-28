@@ -100,6 +100,93 @@ export async function assertLocalDatabaseReachable(): Promise<void> {
   }
 }
 
+/** A character that continues an identifier, so a `$` after it is part of the name (`a$b`). */
+const IDENT_CONT = /[A-Za-z0-9_$\u0080-\uffff]/;
+/** A dollar-quote tag: `$`, an optional identifier with no `$` in it, `$` (Postgres, 4.1.2.4). */
+const DOLLAR_TAG = /^\$(?:[A-Za-z_\u0080-\uffff][A-Za-z0-9_\u0080-\uffff]*)?\$/;
+
+/**
+ * `sql` with every comment, string literal, quoted identifier and dollar-quoted
+ * body blanked to spaces, newlines kept, so a line number still names the line
+ * of the file. It reads the text the way Postgres's lexer does: `--` to the end
+ * of the line, `/* *\/` nested, `''` inside a string, a backslash escape inside
+ * an `E'...'` string, `""` inside a quoted identifier, and a dollar-quote tag
+ * that may hold digits after its first character (`$fn1$`). A `$` that ends an
+ * identifier (`a$b`) or starts a positional parameter (`$1`) opens nothing.
+ *
+ * Text that opens and never closes throws rather than blanking to the end of
+ * the file, where it would hide a real `commit;`.
+ */
+function blankQuotedAndComments(migration: string, sql: string): string {
+  const out: string[] = [];
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to; k++) out.push(sql[k] === '\n' ? '\n' : ' ');
+  };
+  const unclosed = (what: string, at: number): never => {
+    const line = sql.slice(0, at).split('\n').length;
+    throw new Error(`${migration}: the ${what} opened on line ${line} never closes, so its transaction control cannot be read`);
+  };
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    const previous = i > 0 ? sql[i - 1] : '';
+    if (ch === '-' && sql[i + 1] === '-') {
+      const newline = sql.indexOf('\n', i);
+      const end = newline === -1 ? sql.length : newline;
+      blank(i, end);
+      i = end;
+    } else if (ch === '/' && sql[i + 1] === '*') {
+      let depth = 1;
+      let j = i + 2;
+      while (depth > 0) {
+        if (j >= sql.length) unclosed('block comment', i);
+        if (sql[j] === '/' && sql[j + 1] === '*') {
+          depth++;
+          j += 2;
+        } else if (sql[j] === '*' && sql[j + 1] === '/') {
+          depth--;
+          j += 2;
+        } else {
+          j++;
+        }
+      }
+      blank(i, j);
+      i = j;
+    } else if (ch === "'" || ch === '"') {
+      // `E'...'` (a lone E, not the end of a longer name) takes backslash escapes.
+      const escapes =
+        ch === "'" && (previous === 'E' || previous === 'e') && !IDENT_CONT.test(i > 1 ? sql[i - 2] : '');
+      let j = i + 1;
+      for (;;) {
+        if (j >= sql.length) unclosed(ch === "'" ? 'string literal' : 'quoted identifier', i);
+        if (escapes && sql[j] === '\\') {
+          j += 2;
+        } else if (sql[j] === ch && sql[j + 1] === ch) {
+          j += 2;
+        } else if (sql[j] === ch) {
+          j++;
+          break;
+        } else {
+          j++;
+        }
+      }
+      blank(i, j);
+      i = j;
+    } else if (ch === '$' && !IDENT_CONT.test(previous) && DOLLAR_TAG.test(sql.slice(i, i + 64))) {
+      const tag = DOLLAR_TAG.exec(sql.slice(i, i + 64))![0];
+      const close = sql.indexOf(tag, i + tag.length);
+      if (close === -1) unclosed(`dollar-quoted body ${tag}`, i);
+      const end = close + tag.length;
+      blank(i, end);
+      i = end;
+    } else {
+      out.push(ch);
+      i++;
+    }
+  }
+  return out.join('');
+}
+
 /**
  * Refuse a migration that opens or closes its own transaction.
  *
@@ -111,15 +198,17 @@ export async function assertLocalDatabaseReachable(): Promise<void> {
  * from a clean replay, so the run reads as isolated while having written to a
  * database other test workers share.
  *
- * 25 of the migrations in this repo are written that way, so this is a trap
+ * Most of the migrations in this repo are written that way, so this is a trap
  * waiting for the next caller rather than a hypothetical. Failing here is the
  * point: a replay that cannot be rolled back should say so, not do it anyway.
- * A plpgsql body (`$$ ... $$`) is skipped: its `end;` is the block's own.
+ * A plpgsql body (`$$ ... $$`, `$fn1$ ... $fn1$`) is skipped: its `end;` is the block's own;
+ * so are comments and literals (see {@link blankQuotedAndComments}).
  */
-function assertNoOwnTransactionControl(migration: string, sql: string): void {
+export function assertNoOwnTransactionControl(migration: string, sql: string): void {
   // A dollar-quoted body (a function or a DO block) is not transaction control at this
-  // level: its `begin` ... `end;` is plpgsql's block, so blank it, keeping the line count.
-  const outside = sql.replace(/(\$[A-Za-z_]*\$)[\s\S]*?\1/g, (quoted) => quoted.replace(/[^\n]/g, ''));
+  // level: its `begin` ... `end;` is plpgsql's block. Comments and literals are not
+  // either, and a `$$` inside one opens nothing, so all of them are blanked.
+  const outside = blankQuotedAndComments(migration, sql);
   const offenders = outside
     .split('\n')
     .map((line, index) => ({ line: line.trim().toLowerCase(), number: index + 1 }))
