@@ -58,14 +58,24 @@ export function dailyStateRank(state: DailyDaySnapshot['state']): number {
 /**
  * `entry`, with `write.done` true when `other` (the same day) has it: a question
  * once written stays written, so a read that started before the Send cannot
- * reopen the prompt.
+ * reopen the prompt. `target_day` comes with `done` from the same copy (when it
+ * has one), so that read cannot put back the date from before the Send either
+ * (DW-498).
  */
 export function keepWriteDone(
   entry: DailyDaySnapshot,
   other: DailyDaySnapshot | undefined
 ): DailyDaySnapshot {
   if (!other?.write.done || entry.write.done) return entry;
-  return { ...entry, write: { ...entry.write, done: true } };
+  const targetDay = other.write.target_day ?? entry.write.target_day;
+  return {
+    ...entry,
+    write: {
+      ...entry.write,
+      done: true,
+      ...(targetDay !== undefined ? { target_day: targetDay } : {}),
+    },
+  };
 }
 
 /**

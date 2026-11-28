@@ -97,8 +97,9 @@
  * After a write sheet's send in this mount, when the shown day's
  * `write.target_day` is not the date the sheet named as Send was tapped (the
  * partner whose clock is ahead opened that date, or another written question
- * took it, while the sheet was open), one line at the top names the real day
- * ("{partner} gets it on Sunday."), whether or not the nudge prompt follows; it
+ * took it, while the sheet was open), one line names the real day ("{partner}
+ * gets it on Sunday."): inside the nudge prompt while it is open, and at the
+ * top of the page when no prompt follows or once it has closed; it
  * belongs to the session and the day it was written from (DW-498).
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
@@ -500,22 +501,28 @@ function movedWriteDayLine(
   return partnerGetsIt(partnerName, shown.day, target);
 }
 
-/** The line from `movedWriteDayLine`, or nothing. */
+/** The line from `movedWriteDayLine`, or nothing; `inSheet` for the nudge prompt's panel. */
 function WriteDayLine({
   sent,
   sessionKey,
   shown,
   partnerName,
+  inSheet = false,
 }: {
   sent: WriteSent | null;
   sessionKey: string;
   shown: DailyDaySnapshot | null;
   partnerName: string;
+  inSheet?: boolean;
 }) {
   const line = movedWriteDayLine(sent, sessionKey, shown, partnerName);
   if (line === null) return null;
   return (
-    <p className="px-1 text-[15px] leading-[1.4] text-ink" role="status" data-testid="daily-write-day">
+    <p
+      className={`${inSheet ? '' : 'px-1 '}text-[15px] leading-[1.4] text-ink`}
+      role="status"
+      data-testid="daily-write-day"
+    >
       {line}
     </p>
   );
@@ -805,12 +812,14 @@ export function DailyQuestion() {
           </p>
         )}
 
-        <WriteDayLine
-          sent={writeSent}
-          sessionKey={sessionKey}
-          shown={writeSnapshot}
-          partnerName={partnerName}
-        />
+        {!showNudgeSheet && (
+          <WriteDayLine
+            sent={writeSent}
+            sessionKey={sessionKey}
+            shown={writeSnapshot}
+            partnerName={partnerName}
+          />
+        )}
 
         {dailyDay?.status === 'ok' && (
           <>
@@ -930,7 +939,15 @@ export function DailyQuestion() {
       )}
 
       {showNudgeSheet && (
-        <NudgeSheet key={nudgeSnapshot.day_id} onClose={closeNudgeOffer} />
+        <NudgeSheet key={nudgeSnapshot.day_id} onClose={closeNudgeOffer}>
+          <WriteDayLine
+            sent={writeSent}
+            sessionKey={sessionKey}
+            shown={writeSnapshot}
+            partnerName={partnerName}
+            inSheet
+          />
+        </NudgeSheet>
       )}
     </div>
   );

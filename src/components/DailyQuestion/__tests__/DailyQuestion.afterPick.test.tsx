@@ -5,7 +5,7 @@
  * Daily is open (story 11.1, criteria 1-3, 5, 13, 14); one test per row of the
  * story's matrix, bar the reload (a remount is the closest a unit test gets).
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -314,6 +314,20 @@ describe('the nudge prompt after an answer', () => {
         expect(screen.getByTestId('daily-write-day')).toBeVisible();
         expect(screen.getAllByText(line)).toHaveLength(1);
         expect(await screen.findByTestId('daily-nudge-sheet')).toBeInTheDocument();
+        // Beside the prompt: inside its panel while it is open, not under its scrim.
+        expect(within(screen.getByTestId('daily-nudge-panel')).getByTestId('daily-write-day')).toHaveTextContent(line);
+      });
+
+      it('after the prompt closes, the line stays at the top of the page', async () => {
+        const { user } = await writeAs(openTurn(), written('2026-11-07'));
+        await screen.findByTestId('daily-nudge-sheet');
+
+        await user.click(screen.getByTestId('daily-nudge-sheet-dismiss'));
+
+        await waitFor(() => expect(sheet()).toBeNull());
+        expect(screen.getByTestId('daily-write-day')).toHaveTextContent('Jessie gets it on Saturday.');
+        expect(screen.getByTestId('daily-write-day')).toBeVisible();
+        expect(screen.getAllByText('Jessie gets it on Saturday.')).toHaveLength(1);
       });
 
       it.each([
