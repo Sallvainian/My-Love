@@ -24,7 +24,10 @@
 -- which queues a call. This file therefore locks both tables first, so a tick that
 -- lands mid-file waits on the lock until the rollback and queues nothing here
 -- (DW-528). share row exclusive lets reads through and blocks every other
--- session's insert, update and delete on them.
+-- session's insert, update and delete on them. That includes the app's and every
+-- spec's: a nudge sent, or a reminder written, on the shared stack while this file
+-- runs waits until the rollback, so a slow nudge during a database run is the lock,
+-- not an app bug.
 -- ============================================
 
 begin;

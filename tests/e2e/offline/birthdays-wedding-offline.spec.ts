@@ -66,12 +66,12 @@ async function resetValues(
     .from('users')
     .update({ birthday: null })
     .in('id', [ids.userId, ids.partnerId]);
-  const [userA, userB] = orderedPair(ids);
+  const [user_a, user_b] = orderedPair(ids);
   const couple = await supabaseAdmin
     .from('couple_settings')
     .update({ wedding_date: null })
-    .eq('user_a', userA)
-    .eq('user_b', userB);
+    .eq('user_a', user_a)
+    .eq('user_b', user_b);
   expect([users.error, couple.error], 'resetting the birthdays and wedding date').toEqual([
     null,
     null,
