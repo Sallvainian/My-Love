@@ -360,6 +360,34 @@ describe('DailyQuestion', () => {
     expect(screen.queryByTestId('daily-reveal')).toBeNull();
   });
 
+  it('a pick queued after a failed send while online says it is sending, and waiting once offline', async () => {
+    const user = userEvent.setup();
+    fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
+    // The server is down: the send and the drain's retry both fail in transit.
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'Network error'));
+
+    render(<DailyQuestion />);
+    await user.click(await screen.findByTestId('daily-option-this'));
+    await user.click(screen.getByTestId('daily-send-pick'));
+
+    expect(await screen.findByTestId('daily-pick-queued')).toHaveTextContent('Sending your pick…');
+    expect(screen.getByTestId('daily-my-pick')).toHaveTextContent('Beach day');
+    expect(screen.queryByTestId('daily-send-error')).toBeNull();
+    expect(screen.queryByTestId('daily-send-pick')).toBeNull();
+
+    // The connection drops (App sets `syncStatus.isOnline` from the same event).
+    setOnline(false);
+    act(() =>
+      useAppStore.setState((s) => ({ syncStatus: { ...s.syncStatus, isOnline: false } }))
+    );
+
+    expect(screen.getByTestId('daily-pick-queued')).toHaveTextContent(
+      'Waiting for a connection to send your pick.'
+    );
+    // The drain's backoff retry goes with the session.
+    act(() => useAppStore.getState().clearAuth());
+  });
+
   it('a queued pick with the partner already picked shows "has picked", never the reveal', async () => {
     const user = userEvent.setup();
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot({ state: 'partner' })));
