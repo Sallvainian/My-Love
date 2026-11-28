@@ -32,8 +32,9 @@
  * `push-daily-nudge-held.spec.ts`.
  *
  * A host-local midnight inside a test's timeout would turn the Daily day (and with it
- * the closing instant), so each test first calls `waitClearOfDailyTurns`, which waits
- * past the turn (DW-534).
+ * the closing instant), and a host-local 08:00 would release a nudge held before it, so
+ * each test first calls `waitClearOfDailyTurns`, which waits past the turn (DW-534,
+ * DW-555).
  *
  * Requires `supabase start` with the edge runtime serving `send-push`
  * (`needs-edge-functions` in CI); the `api` project runs one worker, so this file and

@@ -53,6 +53,65 @@ export interface SeededDay {
   picks: SeededPicks;
 }
 
+/**
+ * One pick a seed writes: who, when (a SQL `timestamptz` expression such as `now()`), in
+ * which zone and offset (east-positive, as the app sends it), whether it is the day's
+ * second, and its choice (`this` unless given).
+ */
+export interface SeedPick {
+  userId: string;
+  at: string;
+  zone: string;
+  offsetMinutes: number;
+  isSecond: boolean;
+  choice?: 'this' | 'that';
+}
+
+/**
+ * The statements that give the pair its `couple_days` row for `day` (`YYYY-MM-DD`)
+ * through `assign_couple_day`, move its `created_at` to `createdAt` (a SQL `timestamptz`
+ * expression) when given, and write each of `picks` on it. The one core of
+ * `seedPairDays` and `daily-clock.ts`'s `seedPairDay`, which run it as `postgres`:
+ * `daily_picks` grants no API role a write.
+ */
+export function pairDaySql(
+  pair: WorkerPairIds,
+  day: string,
+  picks: readonly SeedPick[],
+  createdAt?: string
+): string[] {
+  const [userA, userB] = orderedPair(pair);
+  const pairWhere = `user_a = '${userA}' and user_b = '${userB}'`;
+  const pairWhereCd = `cd.user_a = '${userA}' and cd.user_b = '${userB}'`;
+  const statements = [`select public.assign_couple_day('${userA}', '${userB}', date '${day}');`];
+  if (createdAt !== undefined) {
+    statements.push(`update public.couple_days set created_at = ${createdAt} where ${pairWhere} and day = date '${day}';`);
+  }
+  for (const { userId, at, zone, offsetMinutes, isSecond, choice = 'this' } of picks) {
+    statements.push(
+      'insert into public.daily_picks ' +
+        '(day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
+        `select cd.id, '${userId}', '${choice}', ${at}, '${zone}', ${offsetMinutes}, ` +
+        `public.effective_zone('${zone}', ${offsetMinutes}), ${isSecond} ` +
+        `from public.couple_days cd where ${pairWhereCd} ` +
+        `and cd.day = date '${day}';`
+    );
+  }
+  return statements;
+}
+
+/**
+ * The statement that stores a user's zone in `user_time_zones` as `get_daily_day` would,
+ * reported now; with `ifAbsent` a row already there is kept.
+ */
+export function storeZoneSql(userId: string, zone: string, offsetMinutes: number, ifAbsent = false): string {
+  return (
+    'insert into public.user_time_zones (user_id, time_zone, utc_offset_minutes, effective_zone, reported_at) ' +
+    `values ('${userId}', '${zone}', ${offsetMinutes}, public.effective_zone('${zone}', ${offsetMinutes}), now())` +
+    (ifAbsent ? ' on conflict (user_id) do nothing;' : ';')
+  );
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ZONE_NAME = /^[A-Za-z0-9_+\-/]+$/;
 
@@ -107,41 +166,25 @@ export async function seedPairDays(
     seen.add(daysAgo);
   }
 
-  const pairWhere = `user_a = '${userA}' and user_b = '${userB}'`;
-  const pairWhereCd = `cd.user_a = '${userA}' and cd.user_b = '${userB}'`;
   const statements: string[] = ['begin;'];
 
   for (const { daysAgo, picks } of days) {
     const { iso, offsetMinutes } = localDate(daysAgo);
     const instant =
       daysAgo === 0 ? 'now()' : `((date '${iso}' + time '12:00') at time zone '${zone}')`;
-    statements.push(
-      `select public.assign_couple_day('${userA}', '${userB}', date '${iso}');`,
-      `update public.couple_days set created_at = ${instant} where ${pairWhere} and day = date '${iso}';`
-    );
 
     const pickers: string[] = [];
     if (picks === 'both' || picks === 'user') pickers.push(pair.userId);
     if (picks === 'both' || picks === 'partner') pickers.push(pair.partnerId);
-    pickers.forEach((userId, index) => {
-      statements.push(
-        'insert into public.daily_picks ' +
-          '(day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
-          `select cd.id, '${userId}', 'this', ${instant}, '${zone}', ${offsetMinutes}, ` +
-          `public.effective_zone('${zone}', ${offsetMinutes}), ${index > 0} ` +
-          `from public.couple_days cd where ${pairWhereCd} ` +
-          `and cd.day = date '${iso}';`
-      );
-    });
+    const seeded = pickers.map(
+      (userId, index): SeedPick => ({ userId, at: instant, zone, offsetMinutes, isSecond: index > 0 })
+    );
+    statements.push(...pairDaySql(pair, iso, seeded, instant));
   }
 
   const { offsetMinutes: nowOffset } = localDate(0);
   for (const userId of [userA, userB]) {
-    statements.push(
-      'insert into public.user_time_zones (user_id, time_zone, utc_offset_minutes, effective_zone, reported_at) ' +
-        `values ('${userId}', '${zone}', ${nowOffset}, public.effective_zone('${zone}', ${nowOffset}), now()) ` +
-        'on conflict (user_id) do nothing;'
-    );
+    statements.push(storeZoneSql(userId, zone, nowOffset, true));
   }
   statements.push('commit;', '');
 

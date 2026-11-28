@@ -13,7 +13,10 @@
  * so only an account in a half-hour zone could be due too. The function sees every
  * account, so a psql guard first requires that no account but this pair is due at
  * the evening instant: the rpc's return count is then the pair's own, and no other
- * account's rows are touched (the spec never reaches the pool pairs' rows).
+ * account's rows are touched (the spec never reaches the pool pairs' rows). A Kathmandu
+ * pair a killed run of this spec or `push-daily-nudge-held.spec.ts` left behind would be
+ * due, so the test first deletes those (`deleteStaleKathmanduPairs`, DW-530), and the
+ * guard names any account it still finds.
  *
  * Asserted: the rpc at D 08:25 inserts 0 rows, records no request and assigns the pair no
  * couple day for D; after Alice's pick for D, the rpc at D 20:25 inserts Bob's
@@ -25,16 +28,17 @@
  * (`needs-edge-functions` in CI); the `api` project runs one worker.
  */
 import type { TypedSupabaseClient } from '../support/factories';
-import { orderedPair, readPairQuestionsByDay } from '../support/factories/daily-question';
+import { readPairQuestionsByDay } from '../support/factories/daily-question';
 import {
   KATHMANDU_OFFSET_MINUTES,
   KATHMANDU_ZONE,
+  deleteStaleKathmanduPairs,
   kathmanduInstant,
   kathmanduYesterday,
   otherAccountsDueAt,
   seedPairDay,
+  storeZone,
 } from '../support/helpers/daily-clock';
-import { runPsql } from '../support/helpers/migration-replay';
 import {
   awaitRequests,
   createParty as createThrowawayParty,
@@ -76,19 +80,14 @@ test.describe('Daily reminders on each person\'s clock', () => {
     supabaseAdmin,
     cleanup,
   }) => {
+    await deleteStaleKathmanduPairs(supabaseAdmin);
     const alice = await createThrowawayParty(supabaseAdmin, cleanup, 'dailyrem', 'Rem', 'a');
     const bob = await createThrowawayParty(supabaseAdmin, cleanup, 'dailyrem', 'Rem', 'b');
     await link(supabaseAdmin, alice, bob);
     const aliceDevice = await registerDevice(alice, 'sandbox');
     const [bobPhone, bobTablet] = [await registerDevice(bob, 'sandbox'), await registerDevice(bob, 'production')];
 
-    for (const userId of [alice.userId, bob.userId]) {
-      const stored = await runPsql(
-        'insert into public.user_time_zones (user_id, time_zone, utc_offset_minutes, effective_zone, reported_at) ' +
-          `values ('${userId}', '${ZONE}', ${OFFSET_MINUTES}, public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), now());\n`
-      );
-      expect(stored.code, stored.stderr).toBe(0);
-    }
+    for (const userId of [alice.userId, bob.userId]) await storeZone(userId, ZONE, OFFSET_MINUTES);
 
     const day = kathmanduYesterday();
     const morningAt = kathmanduInstant(day, '08:25');
@@ -97,7 +96,7 @@ test.describe('Daily reminders on each person\'s clock', () => {
     const pair = { userId: alice.userId, partnerId: bob.userId };
 
     // No other account is due at the evening instant, so the rpc's count is this pair's own.
-    expect(await otherAccountsDueAt(eveningAt, own), 'accounts due at the evening instant').toBe(0);
+    expect(await otherAccountsDueAt(eveningAt, own), 'accounts due at the evening instant').toEqual([]);
 
     // ---- 8 AM on D in Kathmandu: no reminder, no request and no day assigned ----
     const morning = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: morningAt });
@@ -146,14 +145,9 @@ test.describe('Daily reminders on each person\'s clock', () => {
     expect(await requestsFor(supabaseAdmin, bobEvening, 'daily_reminder_id')).toEqual(bobEveningRows);
 
     // ---- Bob answers late in the evening: Alice hears both answered, and that is the day's last push ----
-    const [userA, userB] = orderedPair(pair);
-    const second = await runPsql(
-      'insert into public.daily_picks (day_id, user_id, choice, picked_at, time_zone, utc_offset_minutes, effective_zone, is_second) ' +
-        `select cd.id, '${bob.userId}', 'that', timestamptz '${eveningAt}' + interval '1 minute', '${ZONE}', ${OFFSET_MINUTES}, ` +
-        `public.effective_zone('${ZONE}', ${OFFSET_MINUTES}), true ` +
-        `from public.couple_days cd where cd.user_a = '${userA}' and cd.user_b = '${userB}' and cd.day = date '${day}';\n`
-    );
-    expect(second.code, second.stderr).toBe(0);
+    await seedPairDay(pair, day, [
+      { userId: bob.userId, pickedAt: new Date(Date.parse(eveningAt) + 60_000).toISOString(), isSecond: true, choice: 'that' },
+    ]);
     const { data: picks, error: picksError } = await supabaseAdmin
       .from('daily_picks')
       .select('id, user_id')

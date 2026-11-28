@@ -14,8 +14,11 @@
  * 08:00 on a day D is 02:15 UTC. The days sit in the past (Kathmandu's yesterday and the
  * days before it), each with Alice's pick only unless the case says otherwise. The job
  * sees every account, so the one case that runs it first requires, with a psql guard, that
- * no account but this pair is due at the instant (`otherAccountsDueAt`); the others call
- * `release_held_daily_nudges(at)`, which touches only held nudges.
+ * no account but this pair is due at the instant (`otherAccountsDueAt`, which names any it
+ * finds); the others call `release_held_daily_nudges(at)`, which touches only held nudges.
+ * A Kathmandu pair a killed run of this spec or `push-daily-reminders.spec.ts` left behind
+ * would be due, so each pair is made after deleting those (`deleteStaleKathmanduPairs`,
+ * DW-530).
  *
  * Asserted: a prompt nudge before Bob's 08:00 and a button nudge at 05:00 are held, record
  * no request and answer a hand post with zeros; the job at 08:25 releases the earlier one
@@ -31,6 +34,7 @@
 import type { TypedSupabaseClient } from '../support/factories';
 import {
   KATHMANDU_ZONE,
+  deleteStaleKathmanduPairs,
   kathmanduDay,
   kathmanduInstant,
   otherAccountsDueAt,
@@ -57,6 +61,7 @@ test.describe.configure({ mode: 'serial' });
 test.describe('A held daily nudge', () => {
   /** Alice (one device) and Bob (two) linked, Alice on UTC+14 and Bob on Kathmandu. */
   async function setUpHeldPair(supabaseAdmin: TypedSupabaseClient, cleanup: Cleanup) {
+    await deleteStaleKathmanduPairs(supabaseAdmin);
     const alice = await createParty(supabaseAdmin, cleanup, 'dailyheld', 'Held', 'a');
     const bob = await createParty(supabaseAdmin, cleanup, 'dailyheld', 'Held', 'b');
     await link(supabaseAdmin, alice, bob);
@@ -128,7 +133,7 @@ test.describe('A held daily nudge', () => {
     expect((await record(supabaseAdmin, alice, dayId, 'prompt', buttonAt)).error?.code).toBe('DQ010');
 
     // 08:25 on Bob's clock: the job releases the earlier nudge and only it.
-    expect(await otherAccountsDueAt(releaseAt, [alice.userId, bob.userId]), 'accounts due at the release instant').toBe(0);
+    expect(await otherAccountsDueAt(releaseAt, [alice.userId, bob.userId]), 'accounts due at the release instant').toEqual([]);
     const tick = await supabaseAdmin.rpc('enqueue_daily_reminders', { at: releaseAt });
     expect(tick.error).toBeNull();
 

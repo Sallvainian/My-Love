@@ -40,7 +40,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { TypedSupabaseClient } from '../support/factories';
-import { resolveOwnPair } from '../support/helpers/events';
+import { resolveOwnPair, waitClearOfReminderTicks } from '../support/helpers/events';
 import {
   awaitRequests,
   clientFor,
@@ -255,7 +255,11 @@ test.describe('Added dates push, date changes do not', () => {
     supabaseAdmin,
     supabaseAsUser,
     cleanup,
-  }) => {
+  }, testInfo) => {
+    // The pool pair is linked and may hold a host-zone stored zone (any sign-in stores one),
+    // so with the partner's devices below a `daily-reminders` tick at 20:00 to 20:25 on the
+    // host clock would add a reminder's records to the by-token count of six (DW-528).
+    await waitClearOfReminderTicks(testInfo);
     const { userId, partnerId } = await resolveOwnPair(supabaseAdmin);
     const partner = await clientFor(supabaseAdmin, partnerId);
     const [phone, tablet] = [newToken(), newToken()];

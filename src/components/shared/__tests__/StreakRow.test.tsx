@@ -8,27 +8,16 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { CoupleStreak } from '../../../api/dailyQuestionApi';
+import { sevenDatesEnding, sevenDatesFrom } from '../../../../tests/support/factories/calendar-week';
 import { calendarWeek, coupleStreak } from '../../../../tests/unit/stores/dailyQuestionFixture';
 import { StreakRow, StreakWeek } from '../StreakWeek';
 
 /** The seven dates ending on `last` (a `YYYY-MM-DD`), oldest first, all open: what `week` holds. */
 function weekEnding(last: string): CoupleStreak['week'] {
-  const [year, month, day] = last.split('-').map(Number);
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(Date.UTC(year, month - 1, day - 6 + index));
-    return { day: date.toISOString().slice(0, 10), state: 'open' as const };
-  });
+  return sevenDatesEnding(last).map((day) => ({ day, state: 'open' as const }));
 }
 
-const DAYS = [
-  '2030-03-03',
-  '2030-03-04',
-  '2030-03-05',
-  '2030-03-06',
-  '2030-03-07',
-  '2030-03-08',
-  '2030-03-09',
-];
+const DAYS = sevenDatesFrom('2030-03-03');
 
 /** A streak whose viewer's date is weekday `todayIndex` (0 Sunday to 6 Saturday) of 03-03's week */
 function streakOn(todayIndex: number): CoupleStreak {
