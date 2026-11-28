@@ -1,6 +1,6 @@
 /**
- * useDailyDayRereads — while signed in, `loadDailyDay` runs on every return to
- * the front, and the day and the streak are re-read at each local 00:00:05, with
+ * useDailyDayRereads — while signed in, the day and the streak are re-read on
+ * every return to the front (DW-566) and at each local 00:00:05, with
  * one more read 5 s later when the day shown is still not the device's date
  * (DW-538). The 20:00:05 evening re-read went with the nudge slots (story 11.1).
  * The listener and the timers are removed on unmount and on a session change.
@@ -174,17 +174,35 @@ describe('useDailyDayRereads', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('re-reads on each visibilitychange to visible, and not to hidden', () => {
+  it('re-reads the day and the streak on each visibilitychange to visible, and not to hidden', () => {
     renderHook(() => useDailyDayRereads());
 
     setVisibility('hidden');
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
     expect(state.loadDailyDay).not.toHaveBeenCalled();
+    expect(state.loadCoupleStreak).not.toHaveBeenCalled();
 
     setVisibility('visible');
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
     expect(state.loadDailyDay).toHaveBeenCalledTimes(2);
+    expect(state.loadCoupleStreak).toHaveBeenCalledTimes(2);
+  });
+
+  it('a page shown again after midnight re-reads the streak for the new day (DW-566)', async () => {
+    vi.setSystemTime(at(23, 59));
+    renderHook(() => useDailyDayRereads());
+
+    setVisibility('hidden');
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    // Hidden across midnight: the clock moves on without the timer firing.
+    vi.setSystemTime(new Date(2026, 10, 6, 7, 30));
+    setVisibility('visible');
+    await act(async () => void document.dispatchEvent(new Event('visibilitychange')));
+
+    expect(state.loadDailyDay).toHaveBeenCalledTimes(1);
+    expect(state.loadCoupleStreak).toHaveBeenCalledTimes(1);
+    expect(state.dailyDay).toEqual(shows('2026-11-06'));
   });
 
   it('removes the listener and the timer on unmount', () => {
