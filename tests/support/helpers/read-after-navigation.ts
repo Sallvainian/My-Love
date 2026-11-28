@@ -46,15 +46,21 @@ export class ReadAfterNavigationTimeoutError extends Error {
 
 /**
  * The path a read glob from `reads.ts` names: `**` then a path, with an optional
- * trailing `*` for the query string. A glob that pins query parameters, or has a
- * wildcard anywhere else, is refused: this helper matches on the path alone.
+ * trailing `*` or `?*` for the query string (`?*` also requires one, as the glob
+ * does). A glob that pins query parameters, or has a wildcard anywhere else, is
+ * refused: this helper matches on the path alone.
  */
-function pathOfRead(glob: string): string {
-  const path = glob.replace(/^\*\*/, '').replace(/\*$/, '');
+function pathOfRead(glob: string): { path: string; needsQuery: boolean } {
+  const needsQuery = glob.endsWith('?*');
+  const path = glob.replace(/^\*\*/, '').replace(needsQuery ? /\?\*$/ : /\*$/, '');
   if (!path.startsWith('/') || /[*?]/.test(path)) {
     throw new Error(`${glob}: observeReadAfterNavigation matches a path glob like '**/rest/v1/table*'`);
   }
-  return path;
+  return { path, needsQuery };
+}
+
+function matchesRead(candidate: URL, path: string, needsQuery: boolean): boolean {
+  return candidate.pathname.endsWith(path) && (!needsQuery || candidate.search !== '');
 }
 
 /**
@@ -69,7 +75,7 @@ export async function observeReadAfterNavigation(
     timeout = SECOND_CONTEXT_READ_TIMEOUT,
   }: { method: 'GET' | 'POST'; url: string; timeout?: number }
 ): Promise<{ status: number; responseJson: unknown }> {
-  const path = pathOfRead(url);
+  const { path, needsQuery } = pathOfRead(url);
   let documentRequested = false;
   let navigated = false;
   const onRequest = (candidate: Request) => {
@@ -89,7 +95,7 @@ export async function observeReadAfterNavigation(
         (candidate) =>
           navigated &&
           candidate.method() === method &&
-          new URL(candidate.url()).pathname.endsWith(path),
+          matchesRead(new URL(candidate.url()), path, needsQuery),
         { timeout }
       )
       .catch((error: unknown) => {

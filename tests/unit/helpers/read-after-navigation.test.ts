@@ -5,7 +5,11 @@ import {
   observeReadAfterNavigation,
   ReadAfterNavigationTimeoutError,
 } from '../../support/helpers/read-after-navigation';
-import { ANNIVERSARIES_READ, DAILY_DAY_READ } from '../../support/helpers/reads';
+import {
+  ANNIVERSARIES_READ,
+  CUSTOM_MESSAGES_READ,
+  DAILY_DAY_READ,
+} from '../../support/helpers/reads';
 
 const ORIGIN = 'http://127.0.0.1:54321';
 
@@ -62,11 +66,12 @@ function documentRequest(frame: Frame): Request {
 function fakeRequest(
   method: string,
   path: string,
-  response: () => Promise<FakeResponse | null>
+  response: () => Promise<FakeResponse | null>,
+  query = '?select=*'
 ): Request {
   return {
     method: () => method,
-    url: () => `${ORIGIN}${path}?select=*`,
+    url: () => `${ORIGIN}${path}${query}`,
     isNavigationRequest: () => false,
     frame: () => ({}) as Frame,
     response,
@@ -220,6 +225,25 @@ describe('observeReadAfterNavigation', () => {
     );
 
     await expect(observed).resolves.toEqual({ status: 502, responseJson: null });
+  });
+
+  it('accepts a read glob ending in ?*, requiring a query string as the glob does', async () => {
+    const fake = fakePage();
+    const observed = observeReadAfterNavigation(fake.page, {
+      method: 'GET',
+      url: CUSTOM_MESSAGES_READ,
+    });
+    const leftPage = vi.fn(async () => null);
+    const noQuery = vi.fn(async () => null);
+    fake.send(fakeRequest('GET', '/rest/v1/custom_messages', leftPage));
+    fake.navigate();
+    fake.send(fakeRequest('GET', '/rest/v1/custom_messages', noQuery, ''));
+    fake.send(fakeRequest('GET', '/rest/v1/custom_messages', answer(200, [{ text: 'x' }])));
+
+    await expect(observed).resolves.toEqual({ status: 200, responseJson: [{ text: 'x' }] });
+    expect(leftPage).not.toHaveBeenCalled();
+    expect(noQuery).not.toHaveBeenCalled();
+    expect(fake.listeners()).toBe(0);
   });
 
   it('refuses a glob that pins query parameters, which it would not match on', async () => {
