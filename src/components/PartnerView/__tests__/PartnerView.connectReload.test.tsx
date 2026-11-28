@@ -31,6 +31,8 @@ vi.mock('../../../hooks/usePartnerStreakListener', () => ({
   usePartnerStreakListener: vi.fn(),
 }));
 
+import { readLocalCopy } from '../../../services/localCopy';
+import { PARTNER_COPY_KIND } from '../../../stores/slices/partnerSlice';
 import { useAppStore } from '../../../stores/useAppStore';
 import { deferred } from '../../../../tests/unit/stores/accountDataFixtures';
 import { clearCopies } from '../../../../tests/unit/stores/dateRemindersAtLaunchFixture';
@@ -101,6 +103,33 @@ describe('PartnerView: a reload over a confirmed unlinked answer', () => {
     expect(screen.getByLabelText("Your partner's email")).toHaveValue(EMAIL);
     expect(screen.getByTestId('partner-search-results')).toHaveTextContent('Jessie');
     expect(screen.getByTestId('partner-connection-error')).toHaveTextContent('Request refused');
+  });
+
+  it('keeps the typed email when the reload fails and the saved copy is gone (DW-552)', async () => {
+    const user = userEvent.setup();
+    render(<PartnerView />);
+
+    await screen.findByTestId('partner-search-card');
+    await user.type(screen.getByLabelText("Your partner's email"), EMAIL);
+    // The mount load shows its answer before it saves the copy: wait for the
+    // save, so the delete below cannot run before it and leave a copy behind.
+    await vi.waitFor(async () => {
+      expect(await readLocalCopy(USER, PARTNER_COPY_KIND)).toEqual({ status: 'unlinked' });
+    });
+
+    // No readable saved copy (a failed IndexedDB read answers null) and a
+    // failed server read, over the confirmed unlinked answer already shown.
+    await clearCopies();
+    expect(await readLocalCopy(USER, PARTNER_COPY_KIND)).toBeNull();
+    getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
+    await act(async () => {
+      await store().loadPartner();
+    });
+
+    expect(getPartner).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(LOADING)).not.toBeInTheDocument();
+    expect(screen.getByTestId('partner-search-card')).toBeInTheDocument();
+    expect(screen.getByLabelText("Your partner's email")).toHaveValue(EMAIL);
   });
 
   it('still shows the loading block on the first load, while nothing has answered', async () => {
