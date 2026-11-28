@@ -9,7 +9,9 @@ import {
   isoBirthdayDaysFromNow,
   isoDateDaysFromNow,
   msUntilClearOfDailyTurns,
+  msUntilClearOfReminderTicks,
   waitClearOfDailyTurns,
+  waitClearOfReminderTicks,
 } from '../../support/helpers/events';
 
 describe('isoDateDaysFromNow', () => {
@@ -246,38 +248,52 @@ describe('msUntilClearOfDailyTurns', () => {
     );
   });
 
-  it('waits until 10 s past 20:00 when the test could cross it', () => {
-    const now = new Date(2026, 10, 26, 19, 58, 30);
+  // DW-555: a nudge sent before 08:00 on the partner's clock is held and released from 08:00.
+  it('waits until 10 s past 08:00 when the test could cross it', () => {
+    const now = new Date(2026, 10, 26, 7, 58, 30);
     const ms = msUntilClearOfDailyTurns(now, 120_000);
     expect(ms).toBe(100_000);
-    expect(new Date(now.getTime() + ms)).toEqual(new Date(2026, 10, 26, 20, 0, 10));
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(2026, 10, 26, 8, 0, 10));
+  });
+
+  // DW-555: 20:00 went with the nudge slots (story 11.1), so it is no turn any more.
+  it('does not wait at 20:00', () => {
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 19, 58, 30), 120_000)).toBe(0);
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 20, 0, 4), 60_000)).toBe(0);
   });
 
   it('still waits just after a turn, until the 10 s mark', () => {
-    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 20, 0, 4), 60_000)).toBe(6_000);
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 8, 0, 4), 60_000)).toBe(6_000);
     expect(msUntilClearOfDailyTurns(new Date(2026, 10, 27, 0, 0, 4), 60_000)).toBe(6_000);
   });
 
   it('does not wait once 10 s past a turn', () => {
-    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 20, 0, 10), 60_000)).toBe(0);
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 8, 0, 10), 60_000)).toBe(0);
   });
 
   it('does not wait for a turn beyond the window', () => {
-    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 19, 57), 60_000)).toBe(0);
+    expect(msUntilClearOfDailyTurns(new Date(2026, 10, 26, 7, 57), 60_000)).toBe(0);
+  });
+
+  it('waits out a second turn that the window reaches once moved past the first', () => {
+    // Past midnight to 00:00:10, the window then ends at 08:01:10 and holds 08:00 too.
+    const now = new Date(2026, 10, 26, 23, 59, 30);
+    const ms = msUntilClearOfDailyTurns(now, 8 * 3_600_000 + 60_000);
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(2026, 10, 27, 8, 0, 10));
   });
 
   it('finds the wall-clock midnight on the spring-forward day', () => {
-    // 8 March 2026: 02:00 is skipped in New York, midnight and 20:00 still exist.
+    // 8 March 2026: 02:00 is skipped in New York, midnight and 08:00 still exist.
     const now = new Date(2026, 2, 7, 23, 59, 30);
     expect(msUntilClearOfDailyTurns(now, 60_000)).toBe(40_000);
-    const evening = new Date(2026, 2, 8, 19, 59, 30);
-    expect(msUntilClearOfDailyTurns(evening, 60_000)).toBe(40_000);
+    const morning = new Date(2026, 2, 8, 7, 59, 30);
+    expect(msUntilClearOfDailyTurns(morning, 60_000)).toBe(40_000);
   });
 
   it('finds the wall-clock turns on the fall-back day', () => {
-    // 1 November 2026 has 25 hours; the turns are still the wall-clock 20:00 and 00:00.
-    const evening = new Date(2026, 10, 1, 19, 59, 30);
-    expect(msUntilClearOfDailyTurns(evening, 60_000)).toBe(40_000);
+    // 1 November 2026 has 25 hours; the turns are still the wall-clock 08:00 and 00:00.
+    const morning = new Date(2026, 10, 1, 7, 59, 30);
+    expect(msUntilClearOfDailyTurns(morning, 60_000)).toBe(40_000);
     const night = new Date(2026, 10, 1, 23, 59, 30);
     expect(msUntilClearOfDailyTurns(night, 60_000)).toBe(40_000);
   });
@@ -296,12 +312,12 @@ describe('msUntilClearOfDailyTurns on the UTC clock', () => {
     expect(new Date(now.getTime() + ms)).toEqual(new Date(Date.UTC(2026, 10, 27, 0, 0, 10)));
   });
 
-  it('waits until 10 s past 20:00 UTC', () => {
-    const now = new Date(Date.UTC(2026, 10, 26, 19, 58, 30));
+  it('waits until 10 s past 08:00 UTC', () => {
+    const now = new Date(Date.UTC(2026, 10, 26, 7, 58, 30));
     expect(msUntilClearOfDailyTurns(now, 60_000)).toBe(0);
     const ms = msUntilClearOfDailyTurns(now, 120_000, 'UTC');
     expect(ms).toBe(100_000);
-    expect(new Date(now.getTime() + ms)).toEqual(new Date(Date.UTC(2026, 10, 26, 20, 0, 10)));
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(Date.UTC(2026, 10, 26, 8, 0, 10)));
   });
 
   it('still waits just after a UTC turn, until the 10 s mark, and not once past it', () => {
@@ -322,11 +338,11 @@ describe('msUntilClearOfDailyTurns on the UTC clock', () => {
 
   it('measures a window that spans the host fall-back in real elapsed time', () => {
     // 05:30 UTC on 1 November 2026 is 01:30 EDT, half an hour before New York falls
-    // back (06:00 UTC); the next UTC turn, 20:00, is 14.5 hours of real time away.
+    // back (06:00 UTC); the next UTC turn, 08:00, is 2.5 hours of real time away.
     const now = new Date(Date.UTC(2026, 10, 1, 5, 30));
     const ms = msUntilClearOfDailyTurns(now, 15 * 3_600_000, 'UTC');
-    expect(ms).toBe(Date.UTC(2026, 10, 1, 20, 0, 10) - now.getTime());
-    expect(ms).toBe(14.5 * 3_600_000 + 10_000);
+    expect(ms).toBe(Date.UTC(2026, 10, 1, 8, 0, 10) - now.getTime());
+    expect(ms).toBe(2.5 * 3_600_000 + 10_000);
   });
 });
 
@@ -361,5 +377,66 @@ describe('waitClearOfDailyTurns', () => {
     const testInfo = { timeout: 60_000, setTimeout: vi.fn() };
     await waitClearOfDailyTurns(testInfo as unknown as TestInfo);
     expect(testInfo.setTimeout).not.toHaveBeenCalled();
+  });
+});
+
+// DW-528: the live `daily-reminders` job ticks every five minutes, and only its host-clock
+// ticks at 20:00 to 20:25 insert a reminder (a person's clock must read 20:00 to 20:30).
+describe('msUntilClearOfReminderTicks', () => {
+  it('does not wait outside the evening window', () => {
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 14), 60_000)).toBe(0);
+    // 08:00 releases held nudges and inserts no reminder.
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 7, 59, 30), 60_000)).toBe(0);
+  });
+
+  it('waits until 10 s past the 20:00 tick when the test could cross it', () => {
+    const now = new Date(2026, 10, 26, 19, 59, 30);
+    const ms = msUntilClearOfReminderTicks(now, 60_000);
+    expect(ms).toBe(40_000);
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(2026, 10, 26, 20, 0, 10));
+  });
+
+  it('waits for each tick in the window, 20:25 included, and not for 20:30', () => {
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 20, 12, 30), 60_000)).toBe(0);
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 20, 14, 30), 60_000)).toBe(40_000);
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 20, 25, 4), 60_000)).toBe(6_000);
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 20, 25, 10), 60_000)).toBe(0);
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 26, 20, 29, 30), 60_000)).toBe(0);
+  });
+
+  it('walks on through the later ticks a long window reaches once moved', () => {
+    const now = new Date(2026, 10, 26, 20, 4, 55);
+    const ms = msUntilClearOfReminderTicks(now, 6 * 60_000);
+    expect(new Date(now.getTime() + ms)).toEqual(new Date(2026, 10, 26, 20, 25, 10));
+  });
+
+  it('reads the wall clock on the fall-back day', () => {
+    // 1 November 2026 has 25 hours; the evening ticks are still the wall-clock ones.
+    expect(msUntilClearOfReminderTicks(new Date(2026, 10, 1, 19, 59, 30), 60_000)).toBe(40_000);
+  });
+});
+
+describe('waitClearOfReminderTicks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] });
+    vi.setSystemTime(new Date(2026, 10, 26, 19, 59, 30));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sleeps past the tick and extends the timeout by the wait', async () => {
+    const testInfo = { timeout: 60_000, setTimeout: vi.fn() };
+    let done = false;
+    const waited = waitClearOfReminderTicks(testInfo as unknown as TestInfo).then(() => {
+      done = true;
+    });
+    expect(testInfo.setTimeout).toHaveBeenCalledWith(100_000);
+    await vi.advanceTimersByTimeAsync(39_999);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await waited;
+    expect(done).toBe(true);
   });
 });

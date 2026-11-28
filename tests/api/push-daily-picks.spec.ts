@@ -30,7 +30,7 @@
  * touched. A host-local midnight inside the test's timeout would turn the Daily day
  * between the seed and the last assertion, so the test first calls
  * `waitClearOfDailyTurns`, which waits past the turn (DW-531); the shared guard also
- * waits past 20:00, which this spec, sending no nudge, does not need. Requires `supabase
+ * waits past 08:00, which this spec, sending no nudge, does not need. Requires `supabase
  * start` with the edge runtime serving `send-push` (`needs-edge-functions` in CI);
  * the `api` project runs one worker, so this file and
  * the other push specs never run at once.

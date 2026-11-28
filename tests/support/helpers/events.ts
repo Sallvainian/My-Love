@@ -211,7 +211,10 @@ export function clockAnchor(now: Date = new Date()): Date {
   return anchor;
 }
 
-/** How far past a turn the guard sleeps: `useDailyDayRereads` re-reads at 20:00:05. */
+/**
+ * How far past a turn the guard sleeps: long enough for the work a turn starts (a
+ * `daily-reminders` tick's run, the release of a held nudge) to have landed.
+ */
 const PAST_TURN_MS = 10_000;
 
 /**
@@ -220,16 +223,41 @@ const PAST_TURN_MS = 10_000;
  */
 export type DailyTurnZone = 'UTC';
 
+/** Wall-clock `hour:minute` on the day `dayOffset` days from `now`'s, on the host clock or UTC. */
+function wallClock(now: Date, dayOffset: number, hour: number, minute: number, timeZone?: DailyTurnZone): Date {
+  return timeZone === 'UTC'
+    ? new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + dayOffset, hour, minute)
+      )
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour, minute);
+}
+
+/**
+ * The milliseconds from `now` until a test that may run for `windowMs` has none of
+ * `turns` inside [start - 10 s, start + `windowMs`], or 0 when it has none now. A turn
+ * inside the window moves the start to 10 s past it, and the turns are walked in order,
+ * so a later turn that the moved window then reaches is waited out too.
+ */
+function msUntilClearOf(now: Date, windowMs: number, turns: Date[]): number {
+  let start = now.getTime();
+  for (const turn of [...turns].sort((a, b) => a.getTime() - b.getTime())) {
+    const until = turn.getTime() - start;
+    if (until > -PAST_TURN_MS && until <= windowMs) start = turn.getTime() + PAST_TURN_MS;
+  }
+  return start - now.getTime();
+}
+
 /**
  * The milliseconds to wait before a test that starts at `now` and may run for
  * `windowMs` can no longer have a Daily turn inside it, or 0 when none can.
  *
- * The turns are wall-clock 00:00 (the Daily day changes) and 20:00 (the nudge
- * slot changes), on the host clock by default or, with `timeZone` 'UTC', on the
+ * The turns are wall-clock 00:00 (the Daily day changes) and 08:00 (a nudge sent
+ * before it on the partner's clock is held, and the `daily-reminders` job releases it
+ * from 08:00; DW-555), on the host clock by default or, with `timeZone` 'UTC', on the
  * UTC clock the live check's bots run on (DW-542). A turn inside
  * [now - 10 s, now + `windowMs`] makes the answer "sleep until 10 s past that
  * turn": the lower bound is the same 10 s, so a start just after a turn waits
- * out the 20:00:05 re-read as well. Built from calendar components
+ * out the work that turn starts as well. Built from calendar components
  * (`new Date(y, m, d, h)`, or `Date.UTC` for UTC), never parsed from a string,
  * so a DST day's turn is the wall-clock one; the day before and after are tried
  * so a window that straddles midnight finds it.
@@ -244,26 +272,17 @@ export function msUntilClearOfDailyTurns(
   windowMs: number,
   timeZone?: DailyTurnZone
 ): number {
-  for (const hour of [0, 20]) {
-    for (const dayOffset of [-1, 0, 1]) {
-      const turn =
-        timeZone === 'UTC'
-          ? new Date(
-              Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + dayOffset, hour)
-            )
-          : new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour);
-      const until = turn.getTime() - now.getTime();
-      if (until > -PAST_TURN_MS && until <= windowMs) return until + PAST_TURN_MS;
-    }
-  }
-  return 0;
+  const turns = [0, 8].flatMap((hour) =>
+    [-1, 0, 1].map((dayOffset) => wallClock(now, dayOffset, hour, 0, timeZone))
+  );
+  return msUntilClearOf(now, windowMs, turns);
 }
 
 /**
- * Sleep past a Daily turn (00:00 or 20:00, on the host clock or on UTC when
+ * Sleep past a Daily turn (00:00 or 08:00, on the host clock or on UTC when
  * `timeZone` is 'UTC') that falls inside this test's own timeout window (or just
  * behind it), and extend the timeout by the wait. Call it before the first seed,
- * clear or read that depends on the date or the nudge slot.
+ * clear or read that depends on the date or on whether a nudge is held.
  *
  * The window is `testInfo.timeout` because a test that ends in time cannot cross
  * a turn it started clear of, whatever it does inside. The timeout is extended
@@ -274,7 +293,42 @@ export async function waitClearOfDailyTurns(
   testInfo: TestInfo,
   timeZone?: DailyTurnZone
 ): Promise<void> {
-  const waitMs = msUntilClearOfDailyTurns(new Date(), testInfo.timeout, timeZone);
+  await sleepExtending(testInfo, msUntilClearOfDailyTurns(new Date(), testInfo.timeout, timeZone));
+}
+
+/**
+ * The milliseconds to wait before a test that starts at `now` and may run for
+ * `windowMs` has no tick of the live `daily-reminders` job inside it that can insert a
+ * reminder on the host clock, or 0 when none can (DW-528).
+ *
+ * The job runs every five minutes on real time
+ * (`supabase/migrations/20261126000000_daily_reminders_schedule.sql`), and
+ * `enqueue_daily_reminders` inserts an `evening_self` row for every eligible person
+ * whose clock reads 20:00 to 20:30 and who has not picked
+ * (`20261127010000_three_daily_pushes.sql`), so the ticks that can are the host's 20:00,
+ * 20:05, ... 20:25. A tick inside [now - 10 s, now + `windowMs`] moves the start to 10 s
+ * past it, and the next tick is then tried against the moved window. Wall-clock ticks,
+ * built from calendar components, the day before and after included.
+ */
+export function msUntilClearOfReminderTicks(now: Date, windowMs: number): number {
+  const ticks = [-1, 0, 1].flatMap((dayOffset) =>
+    [0, 5, 10, 15, 20, 25].map((minute) => wallClock(now, dayOffset, 20, minute))
+  );
+  return msUntilClearOf(now, windowMs, ticks);
+}
+
+/**
+ * Sleep past every tick of the `daily-reminders` job that could insert a reminder for a
+ * host-zone account inside this test's timeout window (`msUntilClearOfReminderTicks`),
+ * and extend the timeout by the wait. Call it first in a test whose linked pair holds a
+ * device and a host-zone stored zone and has not picked today, where a reminder the job
+ * inserts would collide with the test's own row or add to a count of push requests.
+ */
+export async function waitClearOfReminderTicks(testInfo: TestInfo): Promise<void> {
+  await sleepExtending(testInfo, msUntilClearOfReminderTicks(new Date(), testInfo.timeout));
+}
+
+async function sleepExtending(testInfo: TestInfo, waitMs: number): Promise<void> {
   if (waitMs <= 0) return;
   if (testInfo.timeout > 0) testInfo.setTimeout(testInfo.timeout + waitMs);
   await new Promise<void>((done) => setTimeout(done, waitMs));
