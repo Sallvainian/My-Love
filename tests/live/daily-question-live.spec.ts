@@ -27,7 +27,9 @@
  * the re-read B's `daily_pick` broadcast asks for, and no `get_daily_day` read
  * started after B's send, so the update came by the hosted Realtime and its
  * broadcast authorization, not a read. Then both pages, after a reload, show the
- * reveal with "Different picks". Then each bot loads its
+ * reveal with "Different picks". Neither page logs a failed announce or day
+ * read along the way, except the dropped requests of the spec's own
+ * navigations (DW-570). Then each bot loads its
  * Partner page (story 7.11): the streak card is orange with 1 day answered
  * together and 1 in a row, and Past questions holds today's question alone,
  * that bot's pick first, marked Different. One day is all there is, because the
@@ -334,9 +336,57 @@ function watchPartnerChannelJoin(page: Page, userId: string, reads: ReadTracker)
   return { startedAtJoin: () => startedAtJoin };
 }
 
+/**
+ * The lines `dailyDaySlice.ts` logs when announcing a pick or a nudge, or reading
+ * today's question, fails.
+ */
+const DAILY_ERROR_LINE =
+  /^\[DailyQuestion\] (Could not announce the (pick|nudge)|Failed to load today's question):/;
+/** How such a line reads when the browser dropped the request. */
+const FETCH_FAILED = 'Failed to fetch';
+
+/** The pages with a navigation of the spec's own under way, and how many. */
+const navigations = new WeakMap<Page, number>();
+
+/** Run one of the spec's navigations (`goto`, `reload`) of `page`, marked as under way. */
+async function navigate<T>(page: Page, go: () => Promise<T>): Promise<T> {
+  navigations.set(page, (navigations.get(page) ?? 0) + 1);
+  try {
+    return await go();
+  } finally {
+    navigations.set(page, (navigations.get(page) ?? 1) - 1);
+  }
+}
+
+/**
+ * Collect the Daily error lines the pages log (DW-570). A navigation of the spec's
+ * own aborts the requests the page it leaves still has in flight, and that page logs
+ * each as "TypeError: Failed to fetch", on every run; such a line, logged while that
+ * page's navigation is under way, is the reload's own and is not kept. Every other
+ * Daily error line is kept: a failed announce on the live site, whatever it reads,
+ * and a dropped request outside a navigation, such as a blocked broadcast send.
+ * In local runs (2026-11-28) the reloads' lines reached only the dev server's log,
+ * never this listener, because the page logging them was already being replaced;
+ * the filter keeps a run green where one does arrive. Attach it before the pages'
+ * first navigation.
+ */
+function watchDailyErrors(pages: Record<string, Page>) {
+  const kept: string[] = [];
+  for (const [name, page] of Object.entries(pages)) {
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      const text = message.text();
+      if (!DAILY_ERROR_LINE.test(text)) return;
+      if ((navigations.get(page) ?? 0) > 0 && text.includes(FETCH_FAILED)) return;
+      kept.push(`${name}: ${text}`);
+    });
+  }
+  return { kept: () => [...kept] };
+}
+
 async function signInThroughUi(page: Page, bot: Bot): Promise<void> {
   await dismissWelcomeSplash(page);
-  await page.goto('/');
+  await navigate(page, () => page.goto('/'));
   await expect(page.getByTestId('login-screen')).toBeVisible();
   await page.getByLabel('Email', { exact: true }).fill(bot.email);
   await page.getByTestId('password-input').fill(bot.password);
@@ -348,7 +398,7 @@ async function signInThroughUi(page: Page, bot: Bot): Promise<void> {
 /** Navigate, and answer the page's own `get_daily_day` response once it is 200. */
 async function openDaily(page: Page, goto: () => Promise<unknown>): Promise<unknown> {
   const read = observeRpcAfterNavigation(page, DAILY_DAY_READ);
-  await goto();
+  await navigate(page, goto);
   const result = await read;
   expect(result.status).toBe(200);
   return result.responseJson;
@@ -362,7 +412,7 @@ async function openDaily(page: Page, goto: () => Promise<unknown>): Promise<unkn
 async function openPartner(page: Page): Promise<void> {
   const streak = observeRpcAfterNavigation(page, COUPLE_STREAK_READ);
   const history = observeRpcAfterNavigation(page, DAILY_HISTORY_READ);
-  await page.goto('/partner');
+  await navigate(page, () => page.goto('/partner'));
   const [streakResult, historyResult] = await Promise.all([streak, history]);
   expect(streakResult.status).toBe(200);
   expect(historyResult.status).toBe(200);
@@ -448,6 +498,7 @@ test.describe('Live Daily check', () => {
       // Before sign-in: a read the counter never saw start would look settled
       // when it ends, so A's day reads are counted from the page's first load.
       const dayReadsA = trackReads(pageA, GET_DAILY_DAY_PATH, 'POST');
+      const dailyErrors = watchDailyErrors({ A: pageA, B: pageB });
 
       await signInThroughUi(pageA, a);
       await signInThroughUi(pageB, b);
@@ -604,6 +655,9 @@ test.describe('Live Daily check', () => {
       await expectOneDayTogether(pageA, questionA, thisText, thatText);
       await openPartner(pageB);
       await expectOneDayTogether(pageB, questionA, thatText, thisText);
+
+      // No announce or day read failed outside a reload's own dropped requests.
+      expect(dailyErrors.kept(), 'Daily error lines outside a navigation').toEqual([]);
     } finally {
       for (const context of contexts) await context.close().catch(() => undefined);
       // Local scope: only the sessions these two API clients opened end.
