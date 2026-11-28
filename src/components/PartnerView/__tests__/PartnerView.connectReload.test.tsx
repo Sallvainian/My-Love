@@ -103,6 +103,27 @@ describe('PartnerView: a reload over a confirmed unlinked answer', () => {
     expect(screen.getByTestId('partner-connection-error')).toHaveTextContent('Request refused');
   });
 
+  it('keeps the typed email when the reload fails and the saved copy is gone (DW-552)', async () => {
+    const user = userEvent.setup();
+    render(<PartnerView />);
+
+    await screen.findByTestId('partner-search-card');
+    await user.type(screen.getByLabelText("Your partner's email"), EMAIL);
+
+    // No readable saved copy (a failed IndexedDB read answers null) and a
+    // failed server read, over the confirmed unlinked answer already shown.
+    await clearCopies();
+    getPartner.mockResolvedValue({ status: 'error', reason: 'network' });
+    await act(async () => {
+      await store().loadPartner();
+    });
+
+    expect(getPartner).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(LOADING)).not.toBeInTheDocument();
+    expect(screen.getByTestId('partner-search-card')).toBeInTheDocument();
+    expect(screen.getByLabelText("Your partner's email")).toHaveValue(EMAIL);
+  });
+
   it('still shows the loading block on the first load, while nothing has answered', async () => {
     const server = deferred<unknown>();
     getPartner.mockReturnValue(server.promise);
