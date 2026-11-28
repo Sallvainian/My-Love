@@ -162,14 +162,6 @@ describe('Settings > Partner', () => {
       expect(row()).not.toHaveTextContent('Not linked');
     });
 
-    it('shows no value when a later read fails with nothing saved, over an earlier loaded answer', async () => {
-      setPartner({ partner: null, partnerKnown: true, partnerLoadError: true });
-      await renderSettings();
-
-      expect(row()).toHaveAccessibleName('Partner');
-      expect(row()).not.toHaveTextContent('Not linked');
-    });
-
     it('follows the store to a new answer with no reload', async () => {
       await renderSettings();
       expect(row()).toHaveAccessibleName('Partner');

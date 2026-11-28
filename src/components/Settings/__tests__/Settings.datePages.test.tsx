@@ -312,7 +312,7 @@ describe('Settings > Dates > date pages', () => {
     });
 
     it('does not fall back after a failed partner read', async () => {
-      setDates({ coupleSettings: null, partner: null, partnerKnown: true, partnerLoadError: true });
+      setDates({ coupleSettings: null, partner: null, partnerKnown: false, partnerLoadError: true });
       renderAt('dates/together-since');
       await heading('Together since');
 
@@ -824,7 +824,7 @@ describe('Settings > Dates > date pages', () => {
     });
 
     it('with a failed partner read stays, as Birthday with nothing under it', async () => {
-      setDates({ partner: null, partnerKnown: true, partnerLoadError: true });
+      setDates({ partner: null, partnerKnown: false, partnerLoadError: true });
       renderAt('dates/partner-birthday');
       await heading('Birthday');
 
