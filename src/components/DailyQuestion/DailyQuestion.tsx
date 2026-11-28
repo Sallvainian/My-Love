@@ -94,6 +94,12 @@
  * The day-changed notice is dropped for good once the shown day offers no Send
  * or the pair is unlinked (DW-496), and the cold banner names a missed date
  * that is not yesterday by its weekday (DW-515).
+ * After a write sheet's send in this mount, when the shown day's
+ * `write.target_day` is not the date the sheet named as Send was tapped (the
+ * partner whose clock is ahead opened that date, or another written question
+ * took it, while the sheet was open), one line at the top names the real day
+ * ("{partner} gets it on Sunday."), whether or not the nudge prompt follows; it
+ * belongs to the session and the day it was written from (DW-498).
  * The root carries `data-streak-claimed` (the held total of the last claim this
  * mount has had answered, whether or not it played), so a test can wait for the
  * answer before asserting that no overlay came.
@@ -122,6 +128,7 @@ import { Milestone } from './Milestone';
 import { NudgeSheet } from './NudgeSheet';
 import { StreakUp } from './StreakUp';
 import { useNudgeClosed, useNudgeSend } from './useNudgeSend';
+import { partnerGetsIt } from './writeDay';
 import { WriteQuestionSheet } from './WriteQuestionSheet';
 
 const OPTION =
@@ -468,6 +475,52 @@ function DayCard({
   );
 }
 
+/** A write sheet's send in this mount: its session, source day and the date it named. */
+interface WriteSent {
+  session: string;
+  dayId: string;
+  named: string;
+}
+
+/**
+ * The line naming the real day of a question this mount wrote (DW-498): only
+ * for the same session and source day, once the turn is done, when the date it
+ * is asked is not the one the sheet named; null otherwise.
+ */
+function movedWriteDayLine(
+  sent: WriteSent | null,
+  sessionKey: string,
+  shown: DailyDaySnapshot | null,
+  partnerName: string
+): string | null {
+  if (sent === null || sent.session !== sessionKey || shown === null) return null;
+  if (shown.day_id !== sent.dayId || !shown.write.done) return null;
+  const target = shown.write.target_day;
+  if (target === undefined || target === sent.named) return null;
+  return partnerGetsIt(partnerName, shown.day, target);
+}
+
+/** The line from `movedWriteDayLine`, or nothing. */
+function WriteDayLine({
+  sent,
+  sessionKey,
+  shown,
+  partnerName,
+}: {
+  sent: WriteSent | null;
+  sessionKey: string;
+  shown: DailyDaySnapshot | null;
+  partnerName: string;
+}) {
+  const line = movedWriteDayLine(sent, sessionKey, shown, partnerName);
+  if (line === null) return null;
+  return (
+    <p className="px-1 text-[15px] leading-[1.4] text-ink" role="status" data-testid="daily-write-day">
+      {line}
+    </p>
+  );
+}
+
 export function DailyQuestion() {
   const dailyDay = useAppStore((state) => state.dailyDay);
   const loading = useAppStore((state) => state.dailyDayLoading);
@@ -588,6 +641,11 @@ export function DailyQuestion() {
     answeredHere &&
     answeredDayId === writeSnapshot.day_id &&
     !celebrationShown;
+
+  // A send the write sheet made in this mount: the session, the day it was
+  // written from and the date the sheet named. When the answer (or a later read
+  // of that day) asks the question on another date, one line names it (DW-498).
+  const [writeSent, setWriteSent] = useState<WriteSent | null>(null);
 
   // The nudge prompt (R1), raised only by a confirmed answer while this view is
   // mounted: the in-view Send my pick, or a queued pick confirmed meanwhile. It
@@ -747,6 +805,13 @@ export function DailyQuestion() {
           </p>
         )}
 
+        <WriteDayLine
+          sent={writeSent}
+          sessionKey={sessionKey}
+          shown={writeSnapshot}
+          partnerName={partnerName}
+        />
+
         {dailyDay?.status === 'ok' && (
           <>
             <StreakHeader day={dailyDay.snapshot.day} streak={streak} />
@@ -858,6 +923,9 @@ export function DailyQuestion() {
           targetDay={writeSnapshot.write.target_day}
           partnerName={partnerName}
           onClose={closeWriteSheet}
+          onSent={(named) =>
+            setWriteSent({ session: sessionKey, dayId: writeSnapshot.day_id, named })
+          }
         />
       )}
 
