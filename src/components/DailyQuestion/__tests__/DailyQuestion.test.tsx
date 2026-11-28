@@ -196,7 +196,7 @@ describe('DailyQuestion', () => {
   it('a new day_id resets the chosen option and the send error', async () => {
     const user = userEvent.setup();
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
-    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'nope'));
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('refused', 'nope'));
 
     render(<DailyQuestion />);
     await user.click(await screen.findByTestId('daily-option-this'));
@@ -534,14 +534,15 @@ describe('DailyQuestion', () => {
   it('a failed send shows the error and keeps the options', async () => {
     const user = userEvent.setup();
     fetchDailyDay.mockResolvedValue(ok(dailySnapshot()));
-    const failure = new AccountDataError('transport', 'Could not reach the server');
+    // A transport failure queues the pick instead (DW-484); a refusal shows its line.
+    const failure = new AccountDataError('refused', "This pick couldn't be sent.");
     submitDailyPickRequest.mockRejectedValue(failure);
 
     render(<DailyQuestion />);
     await user.click(await screen.findByTestId('daily-option-this'));
     await user.click(screen.getByTestId('daily-send-pick'));
 
-    expect(await screen.findByTestId('daily-send-error')).toHaveTextContent('Could not reach the server');
+    expect(await screen.findByTestId('daily-send-error')).toHaveTextContent("This pick couldn't be sent.");
     expect(console.error).toHaveBeenCalledWith('[DailyQuestion] Could not send the pick:', failure);
     expect(screen.getByTestId('daily-send-pick')).toBeEnabled();
   });

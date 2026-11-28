@@ -168,7 +168,8 @@ describe('sendDailyNudge', () => {
         expect(announceDailyNudge).not.toHaveBeenCalled();
         expect(fetchDailyDayById).toHaveBeenCalledTimes(1);
         expect(fetchDailyDayById).toHaveBeenCalledWith(DAY_ID);
-        expect(console.error).toHaveBeenCalledWith('[DailyQuestion] The nudge was refused:', error);
+        // The API logged the refusal; the store does not log it again (DW-547).
+        expect(console.error).not.toHaveBeenCalled();
         read.settle(nudgesSnapshot());
         await vi.waitFor(() => expect(state().dailyDay).toEqual(ok(nudgesSnapshot())));
       }
@@ -184,9 +185,15 @@ describe('sendDailyNudge', () => {
     });
   });
 
-  describe.each(SOURCES)('an "already sent" refusal (DQ010) of the %s', (source) => {
-    it('ends as sent: the source is marked sent at once, the re-read is waited for and no failure shows', async () => {
-      sendDailyNudgeRequest.mockRejectedValue(refusal('DQ010'));
+  /** What says the nudge is on record: an "already sent" refusal, or a successful answer that did not parse (DW-557). */
+  const recorded: [string, () => AccountDataError][] = [
+    ['an "already sent" refusal (DQ010)', () => refusal('DQ010')],
+    ['an answer that is not a snapshot', () => new AccountDataError('invalid-response', 'not understood')],
+  ];
+
+  describe.each(SOURCES)('a nudge on record from the %s', (source) => {
+    it.each(recorded)('%s ends as sent: the source is marked sent at once, the re-read is waited for and no failure shows', async (_name, make) => {
+      sendDailyNudgeRequest.mockRejectedValue(make());
       const read = deferred<ReturnType<typeof nudgesSnapshot>>();
       fetchDailyDayById.mockReturnValue(read.promise);
 
@@ -213,8 +220,8 @@ describe('sendDailyNudge', () => {
       );
     });
 
-    it('still ends as sent when the re-read fails, and writes no saved day', async () => {
-      sendDailyNudgeRequest.mockRejectedValue(refusal('DQ010'));
+    it.each(recorded)('%s still ends as sent when the re-read fails, and writes no saved day', async (_name, make) => {
+      sendDailyNudgeRequest.mockRejectedValue(make());
       fetchDailyDayById.mockRejectedValue(new AccountDataError('transport', 'Failed to fetch'));
 
       await expect(state().sendDailyNudge(source)).resolves.toBe('sent');
@@ -227,7 +234,6 @@ describe('sendDailyNudge', () => {
   describe.each(SOURCES)('a lost answer of the %s', (source) => {
     const lost: [string, () => AccountDataError][] = [
       ['a timeout or network failure', () => new AccountDataError('transport', 'Failed to fetch')],
-      ['an answer that is not a snapshot', () => new AccountDataError('invalid-response', 'not understood')],
     ];
 
     it.each(lost)('%s waits for the re-read and ends as sent when it has the nudge', async (_name, make) => {
@@ -250,6 +256,8 @@ describe('sendDailyNudge', () => {
       expect(outcome).toBe('sent');
       expect(state().dailyDay).toEqual(ok(sentFrom(source)));
       expect(announceDailyNudge).not.toHaveBeenCalled();
+      // The API logged the lost answer; the store does not log it again (DW-547).
+      expect(console.error).not.toHaveBeenCalled();
     });
 
     it.each(lost)('%s ends as failed when the re-read has no nudge from that source', async (_name, make) => {
@@ -360,6 +368,27 @@ describe('sendDailyNudge', () => {
     await send;
 
     expect(fetchDailyDayById).not.toHaveBeenCalled();
+  });
+
+  // DW-561: the lost-answer and on-record branches check the session before their re-read too.
+  it.each([
+    ['a lost answer', () => new AccountDataError('transport', 'Failed to fetch'), 'unchecked'],
+    ['an "already sent" refusal (DQ010)', () => refusal('DQ010'), 'sent'],
+    ['an answer that is not a snapshot', () => new AccountDataError('invalid-response', 'not understood'), 'sent'],
+  ])('starts no re-read after %s when the session changed meanwhile', async (_name, make, outcome) => {
+    const request = deferred<ReturnType<typeof nudgesSnapshot>>();
+    sendDailyNudgeRequest.mockReturnValue(request.promise);
+    const other = ok(dailySnapshot({ day_id: 'c-day' }));
+
+    const send = state().sendDailyNudge('prompt');
+    state().clearAuth();
+    state().setAuthUser(C);
+    useAppStore.setState({ dailyDay: other });
+    request.fail(make());
+
+    await expect(send).resolves.toBe(outcome);
+    expect(fetchDailyDayById).not.toHaveBeenCalled();
+    expect(state().dailyDay).toEqual(other);
   });
 
   it('answers unchecked, with no write, when the session changed during the re-read of a lost answer', async () => {

@@ -534,7 +534,7 @@ describe('the server answers the store shows (dailyDayAnswers, DW-491)', () => {
 
   it('a refused pick leaves it as it was', async () => {
     useAppStore.setState({ dailyDay: ok(dailySnapshot()) });
-    submitDailyPickRequest.mockRejectedValue(new AccountDataError('transport', 'boom'));
+    submitDailyPickRequest.mockRejectedValue(new AccountDataError('refused', 'boom'));
 
     await expect(state().submitDailyPick('this')).rejects.toThrow('boom');
 
